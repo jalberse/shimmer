@@ -12,3 +12,4 @@ default = []
 use_f64 = []
 
 [dependencies]
+rand = "0.8.5"
