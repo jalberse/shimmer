@@ -1,9 +1,7 @@
-use crate::float::{next_float_down, Float};
-
-struct discrete_sample_data {
-    // The index
-    offset: Option<usize>,
-}
+use crate::{
+    float::{next_float_down, Float},
+    math::lerp,
+};
 
 // See PBRT v4 2.14
 #[inline]
@@ -68,6 +66,31 @@ pub fn sample_discrete(
     }
 
     Some(offset)
+}
+
+#[inline]
+pub fn linear_pdf(x: Float, a: Float, b: Float) -> Float {
+    debug_assert!(a >= 0.0 && b >= 0.0);
+    if x < 0.0 || x > 1.0 {
+        0.0
+    } else {
+        2.0 * lerp(x, a, b) / (a + b)
+    }
+}
+
+#[inline]
+pub fn sample_linear(u: Float, a: Float, b: Float) -> Float {
+    debug_assert!(a >= 0.0 && b >= 0.0);
+    if u == 0.0 && a == 0.0 {
+        return 0.0;
+    }
+    let x = u * (a + b) / (a + Float::sqrt(lerp(u, a * a, b * b)));
+    Float::min(x, 1.0 - Float::EPSILON)
+}
+
+#[inline]
+pub fn invert_linear_sample(x: Float, a: Float, b: Float) -> Float {
+    x * (a * (2.0 - x) + b * x) / (a + b)
 }
 
 #[cfg(test)]
