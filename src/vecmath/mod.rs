@@ -37,6 +37,10 @@ pub use normal::{Normal3f, Normal3i};
 pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
+// TODO consider moving away from glam. If nothing else, I don't love not being able to access fields directly
+//   as required by the newtype pattern. We could implement optimizations ourselves, and long-term that's likely
+//   something we want to do as we e.g. use SIMD to process ray clusters. We likely want more control.
+
 // We use glam as it is a optimized vector math library which includes SIMD optimization.
 // We wrap the glam vector classes using the newtype pattern. This accomplishes two things:
 //  1. Points, Vectors, and Normals can be defined as distinct types,

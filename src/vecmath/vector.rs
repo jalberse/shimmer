@@ -49,6 +49,16 @@ impl Vector2i {
     pub const fn splat(v: i32) -> Self {
         Self(IVec2::splat(v))
     }
+
+    /// Compute the dot product.
+    pub fn dot(self, v: Self) -> i32 {
+        self.0.dot(v.0)
+    }
+
+    /// Compute the dot product and take the absolute value.
+    pub fn abs_dot(self, v: Self) -> i32 {
+        i32::abs(self.dot(v))
+    }
 }
 
 impl Default for Vector2i {
@@ -147,6 +157,26 @@ impl Vector3i {
     #[inline]
     pub const fn splat(v: i32) -> Self {
         Self(IVec3::splat(v))
+    }
+
+    /// Compute the dot product
+    pub fn dot(self, v: Self) -> i32 {
+        self.0.dot(v.0)
+    }
+
+    /// Dot this vector with a normal.
+    pub fn dot_normal(self, n: Normal3i) -> i32 {
+        self.0.dot(n.0)
+    }
+
+    /// Compute the dot product and take the absolute value.
+    pub fn abs_dot(self, v: Self) -> i32 {
+        i32::abs(self.dot(v))
+    }
+
+    /// Dot this vector with a normal and take the absolute value.
+    pub fn abs_dot_normal(self, n: Normal3i) -> i32 {
+        i32::abs(self.dot_normal(n))
     }
 }
 
@@ -267,6 +297,18 @@ impl Vector2f {
         debug_assert!(!self.has_nan());
         Self(self.0.normalize())
     }
+
+    /// Compute the dot product.
+    pub fn dot(self, v: Self) -> Float {
+        debug_assert!(!self.has_nan());
+        debug_assert!(!v.has_nan());
+        self.0.dot(v.0)
+    }
+
+    /// Compute the dot product and take the absolute value.
+    pub fn abs_dot(self, v: Self) -> Float {
+        Float::abs(self.dot(v))
+    }
 }
 
 impl Default for Vector2f {
@@ -385,6 +427,30 @@ impl Vector3f {
         debug_assert!(!self.has_nan());
         Self(self.0.normalize())
     }
+
+    /// Compute the dot product.
+    pub fn dot(self, v: Self) -> Float {
+        debug_assert!(!self.has_nan());
+        debug_assert!(!v.has_nan());
+        self.0.dot(v.0)
+    }
+
+    /// Dot this vector with a normal.
+    pub fn dot_normal(self, n: Normal3f) -> Float {
+        debug_assert!(!self.has_nan());
+        debug_assert!(!n.has_nan());
+        self.0.dot(n.0)
+    }
+
+    /// Compute the dot product and take the absolute value.
+    pub fn abs_dot(self, v: Self) -> Float {
+        Float::abs(self.dot(v))
+    }
+
+    /// Dot this vector with a normal and take its absolute value.
+    pub fn abs_dot_normal(self, n: Normal3f) -> Float {
+        Float::abs(self.dot_normal(n))
+    }
 }
 
 impl Default for Vector3f {
@@ -501,22 +567,62 @@ mod tests {
 
     #[test]
     fn vector_vector_dot() {
-        // TODO test vector.dot(vector)
+        let v1 = Vector3f::new(0.0, 1.0, 2.0);
+        let v2 = Vector3f::new(3.0, 4.0, 5.0);
+        assert_eq!(14.0, v1.dot(v2));
+
+        let v1 = Vector3i::new(0, 1, 2);
+        let v2 = Vector3i::new(3, 4, 5);
+        assert_eq!(14, v1.dot(v2));
+
+        let v1 = Vector2f::new(0.0, 1.0);
+        let v2 = Vector2f::new(2.0, 3.0);
+        assert_eq!(3.0, v1.dot(v2));
+
+        let v1 = Vector2i::new(0, 1);
+        let v2 = Vector2i::new(2, 3);
+        assert_eq!(3, v1.dot(v2));
     }
 
     #[test]
     fn vector_normal_dot() {
-        // TODO
+        let v1 = Vector3f::new(0.0, 1.0, 2.0);
+        let n = Normal3f::new(3.0, 4.0, 5.0);
+        assert_eq!(14.0, v1.dot_normal(n));
+
+        let v1 = Vector3i::new(0, 1, 2);
+        let n = Normal3i::new(3, 4, 5);
+        assert_eq!(14, v1.dot_normal(n));
     }
 
     #[test]
-    fn vector_vector_dot_abs() {
-        // TODO test
+    fn vector_vector_abs_dot() {
+        let v1 = Vector3f::new(0.0, 1.0, 2.0);
+        let v2 = -Vector3f::new(3.0, 4.0, 5.0);
+        assert_eq!(14.0, v1.abs_dot(v2));
+
+        let v1 = Vector3i::new(0, 1, 2);
+        let v2 = -Vector3i::new(3, 4, 5);
+        assert_eq!(14, v1.abs_dot(v2));
+
+        let v1 = Vector2f::new(0.0, 1.0);
+        let v2 = -Vector2f::new(2.0, 3.0);
+        assert_eq!(3.0, v1.abs_dot(v2));
+
+        let v1 = Vector2i::new(0, 1);
+        let v2 = -Vector2i::new(2, 3);
+        assert_eq!(3, v1.abs_dot(v2));
     }
 
     #[test]
-    fn vector_normal_dot_abs() {
-        // TODO
+    fn vector_normal_abs_dot() {
+        let v1 = Vector3f::new(0.0, 1.0, 2.0);
+        let n = -Normal3f::new(3.0, 4.0, 5.0);
+        assert_eq!(14.0, v1.abs_dot_normal(n));
+
+        let v1 = Vector3i::new(0, 1, 2);
+        let n = -Normal3i::new(3, 4, 5);
+        assert_eq!(14, v1.abs_dot_normal(n));
     }
 
     #[test]
