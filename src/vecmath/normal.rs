@@ -2,6 +2,7 @@ use super::vec_types::Vec3f;
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
 use crate::impl_unary_op_for_nt;
+use crate::math::difference_of_products;
 use crate::newtype_macros::{
     impl_binary_op_assign_for_nt_with_other, impl_binary_op_assign_trait_for_nt,
     impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
@@ -77,6 +78,13 @@ impl Normal3i {
     /// Compute the dot product with a vector and take the absolute value.
     pub fn abs_dot_vector(self, v: Vector3i) -> i32 {
         i32::abs(self.dot_vector(v))
+    }
+
+    /// Cross this normal with a vector.
+    /// Note that you cannot take the cross product of two normals.
+    pub fn cross(self, v: Vector3i) -> Vector3i {
+        // Note that integer based vectors don't need EFT methods.
+        Vector3i(self.0.cross(v.0))
     }
 }
 
@@ -224,6 +232,15 @@ impl Normal3f {
     pub fn abs_dot_vector(self, v: Vector3f) -> Float {
         Float::abs(self.dot_vector(v))
     }
+
+    pub fn cross(self, v: Vector3f) -> Vector3f {
+        // TODO share this
+        Vector3f::new(
+            difference_of_products(self.0.y, v.0.z, self.0.z, v.0.y),
+            difference_of_products(self.0.z, v.0.x, self.0.x, v.0.z),
+            difference_of_products(self.0.x, v.0.y, self.0.y, v.0.x),
+        )
+    }
 }
 
 impl Default for Normal3f {
@@ -363,10 +380,16 @@ mod tests {
 
     #[test]
     fn normal_cross_vector() {
-        // TODO
-
         // Note that normals can be crossed with vectors,
         // but you can't cross two normals.
+
+        let n = Normal3i::new(3, -3, 1);
+        let v = Vector3i::new(4, 9, 2);
+        assert_eq!(Vector3i::new(-15, -2, 39), n.cross(v));
+
+        let n = Normal3f::new(3.0, -3.0, 1.0);
+        let v = Vector3f::new(4.0, 9.0, 2.0);
+        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), n.cross(v));
     }
 
     #[test]

@@ -2,6 +2,7 @@ use super::vec_types::{Vec2f, Vec3f};
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
 use crate::impl_unary_op_for_nt;
+use crate::math::difference_of_products;
 use crate::newtype_macros::{
     impl_binary_op_assign_for_nt_with_other, impl_binary_op_assign_trait_for_nt,
     impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
@@ -177,6 +178,17 @@ impl Vector3i {
     /// Dot this vector with a normal and take the absolute value.
     pub fn abs_dot_normal(self, n: Normal3i) -> i32 {
         i32::abs(self.dot_normal(n))
+    }
+
+    /// Take the cross product of this and a vector v
+    pub fn cross(self, v: Self) -> Self {
+        // Integer vectors do not need to use EFT methods for accuracy.
+        Self(self.0.cross(v.0))
+    }
+
+    /// Take the cross product of this and a normal n
+    pub fn cross_normal(self, n: Normal3i) -> Self {
+        Self(self.0.cross(n.0))
     }
 }
 
@@ -451,6 +463,34 @@ impl Vector3f {
     pub fn abs_dot_normal(self, n: Normal3f) -> Float {
         Float::abs(self.dot_normal(n))
     }
+
+    /// Take the cross product of this and a vector v.
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64.
+    pub fn cross(self, v: Self) -> Self {
+        // TODO We'd like to share this implementation across Vector and Normal (and various combos)
+        // We could do that by having a cross() that takes tuples or 6 scalars, but even the latter of
+        // those would require an into() copy on the return type.
+        // Instead, we can create some trait that both Vector3f and Normal3f satisfy that you can access
+        // the x, y, z and get a Float, and implement our cross() with that generic type.
+        // This lets us share the code without any copies.
+        // Such a trait would also let us define e.g. a dot() helper if we move away from glam.
+        Self::new(
+            difference_of_products(self.0.y, v.0.z, self.0.z, v.0.y),
+            difference_of_products(self.0.z, v.0.x, self.0.x, v.0.z),
+            difference_of_products(self.0.x, v.0.y, self.0.y, v.0.x),
+        )
+    }
+
+    /// Take the cross product of this and a normal n.
+    pub fn cross_normal(self, n: Normal3f) -> Self {
+        // TODO share this
+        Self::new(
+            difference_of_products(self.0.y, n.0.z, self.0.z, n.0.y),
+            difference_of_products(self.0.z, n.0.x, self.0.x, n.0.z),
+            difference_of_products(self.0.x, n.0.y, self.0.y, n.0.x),
+        )
+    }
 }
 
 impl Default for Vector3f {
@@ -627,12 +667,24 @@ mod tests {
 
     #[test]
     fn vector_vector_cross() {
-        // TODO test vector.cross(vector)
+        let v1 = Vector3i::new(3, -3, 1);
+        let v2 = Vector3i::new(4, 9, 2);
+        assert_eq!(Vector3i::new(-15, -2, 39), v1.cross(v2));
+
+        let v1 = Vector3f::new(3.0, -3.0, 1.0);
+        let v2 = Vector3f::new(4.0, 9.0, 2.0);
+        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross(v2));
     }
 
     #[test]
     fn vector_normal_cross() {
-        // TODO test vector.cross(normal)
+        let v1 = Vector3i::new(3, -3, 1);
+        let n = Normal3i::new(4, 9, 2);
+        assert_eq!(Vector3i::new(-15, -2, 39), v1.cross_normal(n));
+
+        let v1 = Vector3f::new(3.0, -3.0, 1.0);
+        let n = Normal3f::new(4.0, 9.0, 2.0);
+        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross_normal(n));
     }
 
     #[test]

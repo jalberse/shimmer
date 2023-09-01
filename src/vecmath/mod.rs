@@ -37,6 +37,8 @@ pub use normal::{Normal3f, Normal3i};
 pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
+use crate::float::Float;
+
 // TODO consider moving away from glam. If nothing else, I don't love not being able to access fields directly
 //   as required by the newtype pattern. We could implement optimizations ourselves, and long-term that's likely
 //   something we want to do as we e.g. use SIMD to process ray clusters. We likely want more control.
@@ -66,6 +68,8 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
 // TODO our AngleBetween() implementation:
 //   We *do* want to roll our own here, as Vec3::angle_between() does not do this accuracy fix.
+
+// TODO These all need accessors, really. Possibly tied to traits?
 
 // TODO Possibly debug assertions checking for NaN as pbrt does. Obviously requires a nan checking fn
 
