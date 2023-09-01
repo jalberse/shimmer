@@ -60,6 +60,18 @@ impl Normal3i {
         Self(IVec3::splat(v))
     }
 
+    pub fn x(&self) -> i32 {
+        self.0.x
+    }
+
+    pub fn y(&self) -> i32 {
+        self.0.y
+    }
+
+    pub fn z(&self) -> i32 {
+        self.0.z
+    }
+
     /// Compute the dot product of two normals.
     pub fn dot(self, n: Self) -> i32 {
         self.0.dot(n.0)
@@ -190,6 +202,18 @@ impl Normal3f {
         Self(Vec3f::splat(v))
     }
 
+    pub fn x(&self) -> Float {
+        self.0.x
+    }
+
+    pub fn y(&self) -> Float {
+        self.0.y
+    }
+
+    pub fn z(&self) -> Float {
+        self.0.z
+    }
+
     pub fn has_nan(self) -> bool {
         self.0.is_nan()
     }
@@ -233,13 +257,30 @@ impl Normal3f {
         Float::abs(self.dot_vector(v))
     }
 
-    pub fn cross(self, v: Vector3f) -> Vector3f {
-        // TODO share this
-        Vector3f::new(
-            difference_of_products(self.0.y, v.0.z, self.0.z, v.0.y),
-            difference_of_products(self.0.z, v.0.x, self.0.x, v.0.z),
-            difference_of_products(self.0.x, v.0.y, self.0.y, v.0.x),
-        )
+    /// Takes the cross of this normal with a vector.
+    /// Note that you cannot take the cross product of two normals.
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64. See PBRTv4 3.3.2.
+    pub fn cross(&self, v: &Vector3f) -> Vector3f {
+        super::cross::<Normal3f, Vector3f, Vector3f>(self, v)
+    }
+}
+
+impl super::Vector3<Float> for Normal3f {
+    fn new(x: Float, y: Float, z: Float) -> Self {
+        Self::new(x, y, z)
+    }
+
+    fn x(&self) -> Float {
+        self.x()
+    }
+
+    fn y(&self) -> Float {
+        self.y()
+    }
+
+    fn z(&self) -> Float {
+        self.z()
     }
 }
 
@@ -389,7 +430,7 @@ mod tests {
 
         let n = Normal3f::new(3.0, -3.0, 1.0);
         let v = Vector3f::new(4.0, 9.0, 2.0);
-        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), n.cross(v));
+        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), n.cross(&v));
     }
 
     #[test]

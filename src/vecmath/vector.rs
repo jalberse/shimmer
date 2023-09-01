@@ -51,6 +51,14 @@ impl Vector2i {
         Self(IVec2::splat(v))
     }
 
+    pub fn x(&self) -> i32 {
+        self.0.x
+    }
+
+    pub fn y(&self) -> i32 {
+        self.0.y
+    }
+
     /// Compute the dot product.
     pub fn dot(self, v: Self) -> i32 {
         self.0.dot(v.0)
@@ -158,6 +166,18 @@ impl Vector3i {
     #[inline]
     pub const fn splat(v: i32) -> Self {
         Self(IVec3::splat(v))
+    }
+
+    pub fn x(&self) -> i32 {
+        self.0.x
+    }
+
+    pub fn y(&self) -> i32 {
+        self.0.y
+    }
+
+    pub fn z(&self) -> i32 {
+        self.0.z
     }
 
     /// Compute the dot product
@@ -291,6 +311,14 @@ impl Vector2f {
         Self(Vec2f::splat(v))
     }
 
+    pub fn x(&self) -> Float {
+        self.0.x
+    }
+
+    pub fn y(&self) -> Float {
+        self.0.y
+    }
+
     pub fn has_nan(self) -> bool {
         self.0.is_nan()
     }
@@ -421,6 +449,18 @@ impl Vector3f {
         Self(Vec3f::splat(v))
     }
 
+    pub fn x(&self) -> Float {
+        self.0.x
+    }
+
+    pub fn y(&self) -> Float {
+        self.0.y
+    }
+
+    pub fn z(&self) -> Float {
+        self.0.z
+    }
+
     pub fn has_nan(self) -> bool {
         self.0.is_nan()
     }
@@ -466,30 +506,34 @@ impl Vector3f {
 
     /// Take the cross product of this and a vector v.
     /// Uses an EFT method for calculating the value with minimal error without
-    /// casting to f64.
-    pub fn cross(self, v: Self) -> Self {
-        // TODO We'd like to share this implementation across Vector and Normal (and various combos)
-        // We could do that by having a cross() that takes tuples or 6 scalars, but even the latter of
-        // those would require an into() copy on the return type.
-        // Instead, we can create some trait that both Vector3f and Normal3f satisfy that you can access
-        // the x, y, z and get a Float, and implement our cross() with that generic type.
-        // This lets us share the code without any copies.
-        // Such a trait would also let us define e.g. a dot() helper if we move away from glam.
-        Self::new(
-            difference_of_products(self.0.y, v.0.z, self.0.z, v.0.y),
-            difference_of_products(self.0.z, v.0.x, self.0.x, v.0.z),
-            difference_of_products(self.0.x, v.0.y, self.0.y, v.0.x),
-        )
+    /// casting to f64. See PBRTv4 3.3.2.
+    pub fn cross(&self, v: &Self) -> Self {
+        super::cross::<Vector3f, Vector3f, Vector3f>(self, v)
     }
 
     /// Take the cross product of this and a normal n.
-    pub fn cross_normal(self, n: Normal3f) -> Self {
-        // TODO share this
-        Self::new(
-            difference_of_products(self.0.y, n.0.z, self.0.z, n.0.y),
-            difference_of_products(self.0.z, n.0.x, self.0.x, n.0.z),
-            difference_of_products(self.0.x, n.0.y, self.0.y, n.0.x),
-        )
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64. See PBRTv4 3.3.2.
+    pub fn cross_normal(&self, n: &Normal3f) -> Self {
+        super::cross::<Vector3f, Normal3f, Vector3f>(self, n)
+    }
+}
+
+impl super::Vector3<Float> for Vector3f {
+    fn new(x: Float, y: Float, z: Float) -> Self {
+        Self::new(x, y, z)
+    }
+
+    fn x(&self) -> Float {
+        self.x()
+    }
+
+    fn y(&self) -> Float {
+        self.y()
+    }
+
+    fn z(&self) -> Float {
+        self.z()
     }
 }
 
@@ -673,7 +717,7 @@ mod tests {
 
         let v1 = Vector3f::new(3.0, -3.0, 1.0);
         let v2 = Vector3f::new(4.0, 9.0, 2.0);
-        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross(v2));
+        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross(&v2));
     }
 
     #[test]
@@ -684,7 +728,7 @@ mod tests {
 
         let v1 = Vector3f::new(3.0, -3.0, 1.0);
         let n = Normal3f::new(4.0, 9.0, 2.0);
-        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross_normal(n));
+        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross_normal(&n));
     }
 
     #[test]
