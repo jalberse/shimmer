@@ -37,13 +37,11 @@ impl Point2i {
     /// A unit-length vector pointing along the negative Y axis.
     pub const NEG_Y: Self = Self(IVec2::NEG_Y);
 
-    #[inline(always)]
     pub const fn new(x: i32, y: i32) -> Self {
         Self(IVec2::new(x, y))
     }
 
     /// Creates a vector with all elements set to `v`.
-    #[inline]
     pub const fn splat(v: i32) -> Self {
         Self(IVec2::splat(v))
     }
@@ -65,7 +63,6 @@ impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Point2i with i32 { 
 // Point + Vector -> Point
 impl Add<Vector2i> for Point2i {
     type Output = Point2i;
-    #[inline]
     fn add(self, rhs: Vector2i) -> Point2i {
         Point2i(self.0 + rhs.0)
     }
@@ -73,7 +70,6 @@ impl Add<Vector2i> for Point2i {
 // Vector + Point -> Point
 impl Add<Point2i> for Vector2i {
     type Output = Point2i;
-    #[inline]
     fn add(self, rhs: Point2i) -> Point2i {
         Point2i(self.0 + rhs.0)
     }
@@ -81,7 +77,6 @@ impl Add<Point2i> for Vector2i {
 
 // Point += Vector
 impl AddAssign<Vector2i> for Point2i {
-    #[inline]
     fn add_assign(&mut self, rhs: Vector2i) {
         self.0 += rhs.0;
     }
@@ -90,7 +85,6 @@ impl AddAssign<Vector2i> for Point2i {
 // Point - Vector -> Point
 impl Sub<Vector2i> for Point2i {
     type Output = Point2i;
-    #[inline]
     fn sub(self, rhs: Vector2i) -> Point2i {
         Point2i(self.0 - rhs.0)
     }
@@ -98,7 +92,6 @@ impl Sub<Vector2i> for Point2i {
 
 // Point -= Vector
 impl SubAssign<Vector2i> for Point2i {
-    #[inline]
     fn sub_assign(&mut self, rhs: Vector2i) {
         self.0 -= rhs.0;
     }
@@ -107,42 +100,36 @@ impl SubAssign<Vector2i> for Point2i {
 // Point - Point -> Vector
 impl Sub<Point2i> for Point2i {
     type Output = Vector2i;
-    #[inline]
     fn sub(self, rhs: Point2i) -> Vector2i {
         Vector2i(self.0 - rhs.0)
     }
 }
 
 impl From<Vector2i> for Point2i {
-    #[inline]
     fn from(value: Vector2i) -> Self {
         Point2i(value.0)
     }
 }
 
 impl From<[i32; 2]> for Point2i {
-    #[inline]
     fn from(value: [i32; 2]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Point2i> for [i32; 2] {
-    #[inline]
     fn from(value: Point2i) -> Self {
         value.0.into()
     }
 }
 
 impl From<(i32, i32)> for Point2i {
-    #[inline]
     fn from(value: (i32, i32)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Point2i> for (i32, i32) {
-    #[inline]
     fn from(value: Point2i) -> Self {
         value.0.into()
     }
@@ -183,12 +170,10 @@ impl Point3i {
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self(IVec3::NEG_Z);
 
-    #[inline(always)]
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self(IVec3::new(x, y, z))
     }
 
-    #[inline]
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: i32) -> Self {
         Self(IVec3::splat(v))
@@ -211,7 +196,6 @@ impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Point3i with i32 { 
 // Point + Vector -> Point
 impl Add<Vector3i> for Point3i {
     type Output = Point3i;
-    #[inline]
     fn add(self, rhs: Vector3i) -> Point3i {
         Point3i(self.0 + rhs.0)
     }
@@ -220,7 +204,6 @@ impl Add<Vector3i> for Point3i {
 // Vector + Point -> Point
 impl Add<Point3i> for Vector3i {
     type Output = Point3i;
-    #[inline]
     fn add(self, rhs: Point3i) -> Point3i {
         Point3i(self.0 + rhs.0)
     }
@@ -228,7 +211,6 @@ impl Add<Point3i> for Vector3i {
 
 // Point += Vector
 impl AddAssign<Vector3i> for Point3i {
-    #[inline]
     fn add_assign(&mut self, rhs: Vector3i) {
         self.0 += rhs.0;
     }
@@ -237,7 +219,6 @@ impl AddAssign<Vector3i> for Point3i {
 // Point - Vector -> Point
 impl Sub<Vector3i> for Point3i {
     type Output = Point3i;
-    #[inline]
     fn sub(self, rhs: Vector3i) -> Point3i {
         Point3i(self.0 - rhs.0)
     }
@@ -245,7 +226,6 @@ impl Sub<Vector3i> for Point3i {
 
 // Point -= Vector
 impl SubAssign<Vector3i> for Point3i {
-    #[inline]
     fn sub_assign(&mut self, rhs: Vector3i) {
         self.0 -= rhs.0;
     }
@@ -254,42 +234,36 @@ impl SubAssign<Vector3i> for Point3i {
 // Point - Point -> Vector
 impl Sub<Point3i> for Point3i {
     type Output = Vector3i;
-    #[inline]
     fn sub(self, rhs: Point3i) -> Vector3i {
         Vector3i(self.0 - rhs.0)
     }
 }
 
 impl From<Vector3i> for Point3i {
-    #[inline]
     fn from(value: Vector3i) -> Self {
         Point3i(value.0)
     }
 }
 
 impl From<[i32; 3]> for Point3i {
-    #[inline]
     fn from(value: [i32; 3]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Point3i> for [i32; 3] {
-    #[inline]
     fn from(value: Point3i) -> Self {
         value.0.into()
     }
 }
 
 impl From<(i32, i32, i32)> for Point3i {
-    #[inline]
     fn from(value: (i32, i32, i32)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Point3i> for (i32, i32, i32) {
-    #[inline]
     fn from(value: Point3i) -> Self {
         value.0.into()
     }
@@ -323,13 +297,11 @@ impl Point2f {
     /// A unit-length vector pointing along the negative Y axis.
     pub const NEG_Y: Self = Self(Vec2f::NEG_Y);
 
-    #[inline(always)]
     pub const fn new(x: Float, y: Float) -> Self {
         Self(Vec2f::new(x, y))
     }
 
     /// Creates a vector with all elements set to `v`.
-    #[inline]
     pub const fn splat(v: Float) -> Self {
         Self(Vec2f::splat(v))
     }
@@ -365,7 +337,6 @@ impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Point2f with Float 
 // Point + Vector -> Point
 impl Add<Vector2f> for Point2f {
     type Output = Point2f;
-    #[inline]
     fn add(self, rhs: Vector2f) -> Point2f {
         Point2f(self.0 + rhs.0)
     }
@@ -374,7 +345,6 @@ impl Add<Vector2f> for Point2f {
 // Vector + Point -> Point
 impl Add<Point2f> for Vector2f {
     type Output = Point2f;
-    #[inline]
     fn add(self, rhs: Point2f) -> Point2f {
         Point2f(self.0 + rhs.0)
     }
@@ -382,7 +352,6 @@ impl Add<Point2f> for Vector2f {
 
 // Point += Vector
 impl AddAssign<Vector2f> for Point2f {
-    #[inline]
     fn add_assign(&mut self, rhs: Vector2f) {
         self.0 += rhs.0;
     }
@@ -391,7 +360,6 @@ impl AddAssign<Vector2f> for Point2f {
 // Point - Vector -> Point
 impl Sub<Vector2f> for Point2f {
     type Output = Point2f;
-    #[inline]
     fn sub(self, rhs: Vector2f) -> Point2f {
         Point2f(self.0 - rhs.0)
     }
@@ -399,7 +367,6 @@ impl Sub<Vector2f> for Point2f {
 
 // Point -= Vector
 impl SubAssign<Vector2f> for Point2f {
-    #[inline]
     fn sub_assign(&mut self, rhs: Vector2f) {
         self.0 -= rhs.0;
     }
@@ -408,7 +375,6 @@ impl SubAssign<Vector2f> for Point2f {
 // Point - Point -> Vector
 impl Sub<Point2f> for Point2f {
     type Output = Vector2f;
-    #[inline]
     fn sub(self, rhs: Point2f) -> Vector2f {
         Vector2f(self.0 - rhs.0)
     }
@@ -421,28 +387,24 @@ impl From<Vector2f> for Point2f {
 }
 
 impl From<[Float; 2]> for Point2f {
-    #[inline]
     fn from(value: [Float; 2]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Point2f> for [Float; 2] {
-    #[inline]
     fn from(value: Point2f) -> Self {
         value.0.into()
     }
 }
 
 impl From<(Float, Float)> for Point2f {
-    #[inline]
     fn from(value: (Float, Float)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Point2f> for (Float, Float) {
-    #[inline]
     fn from(value: Point2f) -> Self {
         value.0.into()
     }
@@ -483,13 +445,11 @@ impl Point3f {
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self(Vec3f::NEG_Z);
 
-    #[inline(always)]
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
         Self(Vec3f::new(x, y, z))
     }
 
     /// Creates a vector with all elements set to `v`.
-    #[inline]
     pub const fn splat(v: Float) -> Self {
         Self(Vec3f::splat(v))
     }
@@ -524,7 +484,6 @@ impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Point3f with Float 
 // Point + Vector -> Point
 impl Add<Vector3f> for Point3f {
     type Output = Point3f;
-    #[inline]
     fn add(self, rhs: Vector3f) -> Point3f {
         Point3f(self.0 + rhs.0)
     }
@@ -533,7 +492,6 @@ impl Add<Vector3f> for Point3f {
 // Vector + Point -> Point
 impl Add<Point3f> for Vector3f {
     type Output = Point3f;
-    #[inline]
     fn add(self, rhs: Point3f) -> Point3f {
         Point3f(self.0 + rhs.0)
     }
@@ -541,7 +499,6 @@ impl Add<Point3f> for Vector3f {
 
 // Point += Vector
 impl AddAssign<Vector3f> for Point3f {
-    #[inline]
     fn add_assign(&mut self, rhs: Vector3f) {
         self.0 += rhs.0;
     }
@@ -550,7 +507,6 @@ impl AddAssign<Vector3f> for Point3f {
 // Point - Vector -> Point
 impl Sub<Vector3f> for Point3f {
     type Output = Point3f;
-    #[inline]
     fn sub(self, rhs: Vector3f) -> Point3f {
         Point3f(self.0 - rhs.0)
     }
@@ -558,7 +514,6 @@ impl Sub<Vector3f> for Point3f {
 
 // Point -= Vector
 impl SubAssign<Vector3f> for Point3f {
-    #[inline]
     fn sub_assign(&mut self, rhs: Vector3f) {
         self.0 -= rhs.0;
     }
@@ -567,7 +522,6 @@ impl SubAssign<Vector3f> for Point3f {
 // Point - Point -> Vector
 impl Sub<Point3f> for Point3f {
     type Output = Vector3f;
-    #[inline]
     fn sub(self, rhs: Point3f) -> Vector3f {
         Vector3f(self.0 - rhs.0)
     }
@@ -580,28 +534,24 @@ impl From<Vector3f> for Point3f {
 }
 
 impl From<[Float; 3]> for Point3f {
-    #[inline]
     fn from(value: [Float; 3]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Point3f> for [Float; 3] {
-    #[inline]
     fn from(value: Point3f) -> Self {
         value.0.into()
     }
 }
 
 impl From<(Float, Float, Float)> for Point3f {
-    #[inline]
     fn from(value: (Float, Float, Float)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Point3f> for (Float, Float, Float) {
-    #[inline]
     fn from(value: Point3f) -> Self {
         value.0.into()
     }
