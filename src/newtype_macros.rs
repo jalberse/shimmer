@@ -6,11 +6,11 @@
 //! macros for some common cases.
 //!
 //! For every macro, the underlying type of the newtype must implement
-//! the trait already for the appropraite types, or else an error will occur.
+//! the trait already for the appropriate types, or else an error will occur.
 
 /// Implements a unary operation (e.g. Neg) trait for the newtype,
 /// where the LHS and the result are both of the newtype.
-/// 
+///
 /// ```
 /// # #[macro_use] extern crate shimmer; fn main() {
 /// # use std::ops::Neg;
