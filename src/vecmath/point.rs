@@ -337,6 +337,16 @@ impl Point2f {
     pub fn has_nan(self) -> bool {
         self.0.is_nan()
     }
+
+    pub fn distance(self, p: Point2f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length()
+    }
+
+    pub fn distance_squared(self, p: Point2f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length_squared()
+    }
 }
 
 impl Default for Point2f {
@@ -487,6 +497,16 @@ impl Point3f {
     pub fn has_nan(self) -> bool {
         self.0.is_nan()
     }
+
+    pub fn distance(self, p: Point3f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length()
+    }
+
+    pub fn distance_squared(self, p: Point3f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length_squared()
+    }
 }
 impl Default for Point3f {
     fn default() -> Self {
@@ -612,12 +632,16 @@ mod tests {
 
     #[test]
     fn point_point_distance() {
-        // TODO this
+        let p1 = Point2f::new(0.0, 0.0);
+        let p2 = Point2f::new(3.0, 4.0);
+        assert_eq!(5.0, p1.distance(p2));
     }
 
     #[test]
     fn point_point_distance_squared() {
-        // TODO this
+        let p1 = Point2f::new(0.0, 0.0);
+        let p2 = Point2f::new(3.0, 4.0);
+        assert_eq!(25.0, p1.distance_squared(p2));
     }
 
     #[test]
