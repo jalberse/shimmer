@@ -2,7 +2,6 @@ use super::vec_types::Vec3f;
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
 use crate::impl_unary_op_for_nt;
-use crate::math::difference_of_products;
 use crate::newtype_macros::{
     impl_binary_op_assign_for_nt_with_other, impl_binary_op_assign_trait_for_nt,
     impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,

@@ -42,6 +42,9 @@ use crate::{float::Float, math::difference_of_products};
 // TODO consider moving away from glam. If nothing else, I don't love not being able to access fields directly
 //   as required by the newtype pattern. We could implement optimizations ourselves, and long-term that's likely
 //   something we want to do as we e.g. use SIMD to process ray clusters. We likely want more control.
+//   In such a case we could get rid of our newtype_macros.rs, since it's only useful specifically for
+//   newtype trait implementations (though I'd like to shove that into a repo and keep it, it's situationally useful).
+//   We could just use impl_ops instead if we're rolling our own types from scratch instead of using newtypes.
 
 // We use glam as it is a optimized vector math library which includes SIMD optimization.
 // We wrap the glam vector classes using the newtype pattern. This accomplishes two things:
@@ -62,11 +65,7 @@ use crate::{float::Float, math::difference_of_products};
 
 // TODO These all need accessors, really. Possibly tied to traits?
 
-// TODO Possibly debug assertions checking for NaN as pbrt does. Obviously requires a nan checking fn
-
 // TODO note I think that Product trait impl from glam types is the HProd from pbrt, so use that.
-
-// TODO Go back and make our methods take &self, I was being silly and forgot that. We're dropping all over!
 
 /// Define a basic trait that allows us to define shared functions for Vector and Normal types.
 /// We won't expose this outside this module, since we'll dictate the permissible behaviors for

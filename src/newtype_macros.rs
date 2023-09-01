@@ -7,6 +7,12 @@
 //!
 //! For every macro, the underlying type of the newtype must implement
 //! the trait already for the appropriate types, or else an error will occur.
+//!
+//! Note that these macros implement for `self` rather than `&self`. This is
+//! how std::ops traits are defined. To implement an op for references to a type,
+//! you'd need to implement the trait on the reference type itself i.e. &MyType.
+//! That's really true for any implementation for std::ops, though, rather
+//! than something unique to these macros.
 
 /// Implements a unary operation (e.g. Neg) trait for the newtype,
 /// where the LHS and the result are both of the newtype.
