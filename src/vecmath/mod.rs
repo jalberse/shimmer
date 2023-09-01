@@ -55,7 +55,7 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 //   note that f64::mul_add and f32::mul_add are FMA, in std rust!
 //   pbrt's FMA actually does use std::fma, which is the C++ equivalent.
 //   Their FMA just deals with picking appropriate type.
-//   So, our integer structs don't need to bother, use glam's default cross()
+//   our integer structs don't need to bother, use glam's default cross()
 //   But for our float structs, create a DifferenceOfProducts() that does that error correction.
 //   glam doesn't do this because it's more expensive, and most users of glam probably don't need that precision.
 //   But, we do for our purposes to avoid visual artifacts in some scenarios.
