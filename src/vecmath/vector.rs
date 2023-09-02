@@ -175,23 +175,23 @@ impl Vector3i {
     }
 
     /// Compute the dot product
-    pub fn dot(&self, v: &Self) -> i32 {
-        self.0.dot(v.0)
+    pub fn dot(self, v: Self) -> i32 {
+        super::dot(self, v)
     }
 
     /// Dot this vector with a normal.
-    pub fn dot_normal(&self, n: &Normal3i) -> i32 {
-        self.0.dot(n.0)
+    pub fn dot_normal(self, n: Normal3i) -> i32 {
+        super::dot(self, n)
     }
 
     /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(&self, v: &Self) -> i32 {
-        i32::abs(self.dot(v))
+    pub fn abs_dot(self, v: Self) -> i32 {
+        super::abs_dot(self, v)
     }
 
     /// Dot this vector with a normal and take the absolute value.
-    pub fn abs_dot_normal(&self, n: &Normal3i) -> i32 {
-        i32::abs(self.dot_normal(n))
+    pub fn abs_dot_normal(self, n: Normal3i) -> i32 {
+        super::abs_dot(self, n)
     }
 
     /// Take the cross product of this and a vector v
@@ -221,6 +221,12 @@ impl Tuple3<i32> for Vector3i {
 
     fn z(&self) -> i32 {
         self.0.z
+    }
+}
+
+impl HasNan for Vector3i {
+    fn has_nan(&self) -> bool {
+        false
     }
 }
 
@@ -659,7 +665,7 @@ mod tests {
 
         let v1 = Vector3i::new(0, 1, 2);
         let v2 = Vector3i::new(3, 4, 5);
-        assert_eq!(14, v1.dot(&v2));
+        assert_eq!(14, v1.dot(v2));
 
         let v1 = Vector2f::new(0.0, 1.0);
         let v2 = Vector2f::new(2.0, 3.0);
@@ -678,7 +684,7 @@ mod tests {
 
         let v1 = Vector3i::new(0, 1, 2);
         let n = Normal3i::new(3, 4, 5);
-        assert_eq!(14, v1.dot_normal(&n));
+        assert_eq!(14, v1.dot_normal(n));
     }
 
     #[test]
@@ -689,7 +695,7 @@ mod tests {
 
         let v1 = Vector3i::new(0, 1, 2);
         let v2 = -Vector3i::new(3, 4, 5);
-        assert_eq!(14, v1.abs_dot(&v2));
+        assert_eq!(14, v1.abs_dot(v2));
 
         let v1 = Vector2f::new(0.0, 1.0);
         let v2 = -Vector2f::new(2.0, 3.0);
@@ -708,7 +714,7 @@ mod tests {
 
         let v1 = Vector3i::new(0, 1, 2);
         let n = -Normal3i::new(3, 4, 5);
-        assert_eq!(14, v1.abs_dot_normal(&n));
+        assert_eq!(14, v1.abs_dot_normal(n));
     }
 
     #[test]

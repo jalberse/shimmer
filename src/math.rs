@@ -10,6 +10,22 @@ impl Sqrt for Float {
     }
 }
 
+pub trait Abs {
+    fn abs(self) -> Self;
+}
+
+impl Abs for Float {
+    fn abs(self) -> Self {
+        Float::abs(self)
+    }
+}
+
+impl Abs for i32 {
+    fn abs(self) -> Self {
+        i32::abs(self)
+    }
+}
+
 pub fn lerp(x: Float, a: Float, b: Float) -> Float {
     (1.0 - x) * a + x * b
 }

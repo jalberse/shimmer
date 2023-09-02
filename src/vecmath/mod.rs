@@ -43,7 +43,7 @@ mod tuple;
 mod vec_types;
 pub mod vector;
 
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, Sub};
 
 pub use normal::{Normal3f, Normal3i};
 pub use point::{Point2f, Point2i, Point3f, Point3i};
@@ -51,10 +51,10 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
 use crate::{
     float::{Float, PI_F},
-    math::{difference_of_products, safe_asin},
+    math::{difference_of_products, safe_asin, Abs},
 };
 
-use self::{length::Length, tuple::Tuple3};
+use self::{has_nan::HasNan, length::Length, tuple::Tuple3};
 
 // TODO consider moving away from glam. If nothing else, I don't love not being able to access fields directly
 //   as required by the newtype pattern. We could implement optimizations ourselves, and long-term that's likely
@@ -87,11 +87,6 @@ use self::{length::Length, tuple::Tuple3};
 
 // TODO also the list of functions on page 85
 
-// TODO rather than a Vector3 trait that we share, we should just have traits for each
-//   little normalize(), length(), etc call, and have those traits as constraints on the functions
-//   that need them. That's much cleaner, and lets us share with the integer versions as well.
-//   Alright yeah, that whips.
-
 /// Computes the cross product of two vectors. Generic because we want to be able
 /// to use this for Vector and Normal types alike, and combinations of them.
 ///
@@ -116,20 +111,24 @@ where
 }
 
 /// Take the dot product of two vectors.
-fn dot<V1, V2>(v: V1, w: V2) -> Float
+fn dot<V1, V2, T>(v: V1, w: V2) -> T
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
+    V1: Tuple3<T> + HasNan,
+    V2: Tuple3<T> + HasNan,
+    T: Mul<Output = T> + Add<Output = T>,
 {
+    debug_assert!(!v.has_nan());
+    debug_assert!(!w.has_nan());
     v.x() * w.x() + v.y() * w.y() + v.z() * w.z()
 }
 
-fn abs_dot<V1, V2>(v: V1, w: V2) -> Float
+fn abs_dot<V1, V2, T>(v: V1, w: V2) -> T
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
+    V1: Tuple3<T> + HasNan,
+    V2: Tuple3<T> + HasNan,
+    T: Mul<Output = T> + Add<Output = T> + Abs,
 {
-    Float::abs(dot(v, w))
+    T::abs(dot(v, w))
 }
 
 /// Computes the angle between two vectors. Generic because we want to be able
@@ -142,10 +141,12 @@ where
 ///   We just use the third type to be able to specify that that is the case.
 fn angle_between<V1, V2, V3>(v: V1, w: V2) -> Float
 where
-    V1: Tuple3<Float> + Add<V2, Output = V3> + Copy + Clone,
-    V2: Tuple3<Float> + Add<V1, Output = V1> + Sub<V1, Output = V3> + Copy + Clone,
+    V1: Tuple3<Float> + HasNan + Add<V2, Output = V3> + Copy + Clone,
+    V2: Tuple3<Float> + HasNan + Add<V1, Output = V1> + Sub<V1, Output = V3> + Copy + Clone,
     V3: Tuple3<Float> + Length<Float>,
 {
+    debug_assert!(!v.has_nan());
+    debug_assert!(!w.has_nan());
     if dot(v, w) < 0.0 {
         PI_F - 2.0 * safe_asin((v + w).length() / 2.0)
     } else {

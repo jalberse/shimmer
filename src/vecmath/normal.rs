@@ -74,22 +74,22 @@ impl Normal3i {
 
     /// Compute the dot product of two normals.
     pub fn dot(self, n: Self) -> i32 {
-        self.0.dot(n.0)
+        super::dot(self, n)
     }
 
     /// Compute the dot product with a vector.
     pub fn dot_vector(self, v: Vector3i) -> i32 {
-        self.0.dot(v.0)
+        super::dot(self, v)
     }
 
     /// Compute the dot product of two normals and take the absolute value.
     pub fn abs_dot(self, n: Self) -> i32 {
-        i32::abs(self.dot(n))
+        super::abs_dot(self, n)
     }
 
     /// Compute the dot product with a vector and take the absolute value.
     pub fn abs_dot_vector(self, v: Vector3i) -> i32 {
-        i32::abs(self.dot_vector(v))
+        super::abs_dot(self, v)
     }
 
     /// Cross this normal with a vector.
@@ -115,6 +115,12 @@ impl Tuple3<i32> for Normal3i {
 
     fn z(&self) -> i32 {
         self.0.z
+    }
+}
+
+impl HasNan for Normal3i {
+    fn has_nan(&self) -> bool {
+        false
     }
 }
 
@@ -244,26 +250,22 @@ impl Normal3f {
 
     /// Compute the dot product of two normals.
     pub fn dot(self, n: Self) -> Float {
-        debug_assert!(!self.has_nan());
-        debug_assert!(!n.has_nan());
-        self.0.dot(n.0)
+        super::dot(self, n)
     }
 
     /// Compute the dot with a vector.
     pub fn dot_vector(self, v: Vector3f) -> Float {
-        debug_assert!(!self.has_nan());
-        debug_assert!(!v.has_nan());
-        self.0.dot(v.0)
+        super::dot(self, v)
     }
 
     /// Compute the dot product of two normals and take the absolute value.
     pub fn abs_dot(self, n: Self) -> Float {
-        Float::abs(self.dot(n))
+        super::abs_dot(self, n)
     }
 
     /// Compute the dot with a vector and take the absolute value.
     pub fn abs_dot_vector(self, v: Vector3f) -> Float {
-        Float::abs(self.dot_vector(v))
+        super::abs_dot(self, v)
     }
 
     /// Takes the cross of this normal with a vector.
