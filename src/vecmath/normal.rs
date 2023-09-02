@@ -1,7 +1,6 @@
 use super::has_nan::{has_nan3, HasNan};
 use super::length::{length3, length_squared3, Length};
 use super::normalize::Normalize;
-use super::vec_types::Vec3f;
 use super::{Tuple3, Vector3f, Vector3i};
 use crate::float::Float;
 use crate::impl_unary_op_for_nt;
@@ -10,6 +9,7 @@ use crate::newtype_macros::{
     impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
     impl_binary_op_trait_for_nt,
 };
+use auto_ops::*;
 use glam::IVec3;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -181,43 +181,47 @@ impl From<Normal3i> for (i32, i32, i32) {
 /// Normals and points cannot be added together, and
 /// you cannot take the cross product of two normals.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Normal3f(pub Vec3f);
+pub struct Normal3f {
+    pub x: Float,
+    pub y: Float,
+    pub z: Float,
+}
 
 impl Normal3f {
     /// All zeroes.
-    pub const ZERO: Self = Self(Vec3f::ZERO);
+    pub const ZERO: Self = Self::splat(0.0);
 
     /// All ones.
-    pub const ONE: Self = Self(Vec3f::ONE);
+    pub const ONE: Self = Self::splat(1.0);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(Vec3f::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1.0);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(Vec3f::X);
+    pub const X: Self = Self::new(1.0, 0.0, 0.0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(Vec3f::Y);
+    pub const Y: Self = Self::new(0.0, 1.0, 0.0);
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self(Vec3f::Z);
+    pub const Z: Self = Self::new(0.0, 0.0, 1.0);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(Vec3f::NEG_X);
+    pub const NEG_X: Self = Self::new(-1.0, 0.0, 0.0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(Vec3f::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0.0, -1.0, 0.0);
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self(Vec3f::NEG_Z);
+    pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
 
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self(Vec3f::new(x, y, z))
+        Self { x, y, z }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
-        Self(Vec3f::splat(v))
+        Self { x: v, y: v, z: v }
     }
 
     pub fn x(&self) -> Float {
@@ -294,15 +298,15 @@ impl Tuple3<Float> for Normal3f {
     }
 
     fn x(&self) -> Float {
-        self.0.x
+        self.x
     }
 
     fn y(&self) -> Float {
-        self.0.y
+        self.y
     }
 
     fn z(&self) -> Float {
-        self.0.z
+        self.z
     }
 }
 
@@ -326,66 +330,86 @@ impl Normalize<Float> for Normal3f {}
 
 impl Default for Normal3f {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
+
+// TODO Okay we're swapping away from glam.
+//  So we need to implement all the operators.
+//  We'll use impl_op_ex, we'll need to get rid of the newtype macros (but keep the file
+//  around, I might want to make them into a crate)
+//  But also, we can have functions with a Tuple bound to avoid repeating
+//  implementations, same as we have for e.g. dot().
+
+impl_op_ex!(-|n: Normal3f| -> Normal3f { Normal3f::new(-n.x, -n.y, -n.z) });
 
 // Normals can add and subtract with other normals
-impl_unary_op_for_nt!( impl Neg for Normal3f { fn neg } );
-impl_binary_op_trait_for_nt!( impl Add for Normal3f { fn add } );
-impl_binary_op_trait_for_nt!( impl Sub for Normal3f { fn sub } );
+impl_op_ex!(+ |n1: Normal3f, n2: Normal3f| -> Normal3f { Normal3f::new(n1.x + n2.x, n1.y + n2.y, n1.z + n2.z)});
+impl_op_ex!(-|n1: Normal3f, n2: Normal3f| -> Normal3f {
+    Normal3f::new(n1.x - n2.x, n1.y - n2.y, n1.z - n2.z)
+});
+impl_op_ex!(+= |n1: &mut Normal3f, n2: Normal3f| {
+    n1.x += n2.x;
+    n1.y += n2.y;
+    n1.z += n2.z;
+});
+impl_op_ex!(-= |n1: &mut Normal3f, n2: Normal3f| {
+    n1.x -= n2.x;
+    n1.y -= n2.y;
+    n1.z -= n2.z;
+});
+
 // Normals can be scaled
-impl_binary_op_for_nt_with_other!( impl Mul for Normal3f with Float { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Normal3f with Float { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for Float with Normal3f { fn mul } );
-impl_binary_op_assign_trait_for_nt!( impl AddAssign for Normal3f { fn add_assign });
-impl_binary_op_assign_trait_for_nt!( impl SubAssign for Normal3f { fn sub_assign });
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Normal3f with Float { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Normal3f with Float { fn div_assign });
+impl_op_ex_commutative!(*|n: Normal3f, s: Float| -> Normal3f {
+    Normal3f::new(n.x * s, n.y * s, n.z * s)
+});
+impl_op_ex!(/ |n: Normal3f, s: Float| -> Normal3f { Normal3f::new(n.x / s, n.y / s, n.z / s) });
+impl_op_ex!(*= |n1: &mut Normal3f, s: Float| {
+    n1.x *= s;
+    n1.y *= s;
+    n1.z *= s;
+});
+impl_op_ex!(/= |n1: &mut Normal3f, s: Float| {
+    n1.x /= s;
+    n1.y /= s;
+    n1.z /= s;
+});
 
-impl Sub<Vector3f> for Normal3f {
-    type Output = Vector3f;
-
-    fn sub(self, rhs: Vector3f) -> Self::Output {
-        Vector3f(self.0 - rhs.0)
-    }
-}
-
-impl Add<Vector3f> for Normal3f {
-    type Output = Vector3f;
-
-    fn add(self, rhs: Vector3f) -> Self::Output {
-        Vector3f(self.0 + rhs.0)
-    }
-}
+// Normals can add and subtract with vectors to create a new vector
+impl_op_ex!(-|n: Normal3f, v: Vector3f| -> Vector3f {
+    Vector3f::new(n.x - v.0.x, n.y - v.0.y, n.z - v.0.z)
+});
+impl_op_ex!(+|n: Normal3f, v: Vector3f| -> Vector3f {
+    Vector3f::new(n.x + v.0.x, n.y + v.0.y, n.z + v.0.z)
+});
 
 impl From<Vector3f> for Normal3f {
     fn from(value: Vector3f) -> Normal3f {
-        Normal3f(value.0)
+        Normal3f::new(value.x(), value.y(), value.z())
     }
 }
 
 impl From<[Float; 3]> for Normal3f {
     fn from(value: [Float; 3]) -> Self {
-        Self(value.into())
+        Self::new(value[0], value[1], value[2])
     }
 }
 
 impl From<Normal3f> for [Float; 3] {
     fn from(value: Normal3f) -> Self {
-        value.0.into()
+        [value.x, value.y, value.z]
     }
 }
 
 impl From<(Float, Float, Float)> for Normal3f {
     fn from(value: (Float, Float, Float)) -> Self {
-        Self(value.into())
+        Self::new(value.0, value.1, value.2)
     }
 }
 
 impl From<Normal3f> for (Float, Float, Float) {
     fn from(value: Normal3f) -> Self {
-        value.0.into()
+        (value.x, value.y, value.z)
     }
 }
 
