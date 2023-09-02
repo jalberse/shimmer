@@ -54,7 +54,11 @@ use crate::{
     math::{difference_of_products, safe_asin, Abs},
 };
 
-use self::{has_nan::HasNan, length::Length, tuple::Tuple3};
+use self::{
+    has_nan::HasNan,
+    length::Length,
+    tuple::{Tuple2, Tuple3},
+};
 
 // TODO consider moving away from glam. If nothing else, I don't love not being able to access fields directly
 //   as required by the newtype pattern. We could implement optimizations ourselves, and long-term that's likely
@@ -111,7 +115,7 @@ where
 }
 
 /// Take the dot product of two vectors.
-fn dot<V1, V2, T>(v: V1, w: V2) -> T
+fn dot3<V1, V2, T>(v: V1, w: V2) -> T
 where
     V1: Tuple3<T> + HasNan,
     V2: Tuple3<T> + HasNan,
@@ -122,13 +126,36 @@ where
     v.x() * w.x() + v.y() * w.y() + v.z() * w.z()
 }
 
-fn abs_dot<V1, V2, T>(v: V1, w: V2) -> T
+/// Take the dot product of two vectors then take the absolute value.
+fn abs_dot3<V1, V2, T>(v: V1, w: V2) -> T
 where
     V1: Tuple3<T> + HasNan,
     V2: Tuple3<T> + HasNan,
     T: Mul<Output = T> + Add<Output = T> + Abs,
 {
-    T::abs(dot(v, w))
+    T::abs(dot3(v, w))
+}
+
+/// Take the dot product of two vectors.
+fn dot2<V1, V2, T>(v: V1, w: V2) -> T
+where
+    V1: Tuple2<T> + HasNan,
+    V2: Tuple2<T> + HasNan,
+    T: Mul<Output = T> + Add<Output = T>,
+{
+    debug_assert!(!v.has_nan());
+    debug_assert!(!w.has_nan());
+    v.x() * w.x() + v.y() * w.y()
+}
+
+/// Take the dot product of two vectors then take the absolute value.
+fn abs_dot2<V1, V2, T>(v: V1, w: V2) -> T
+where
+    V1: Tuple2<T> + HasNan,
+    V2: Tuple2<T> + HasNan,
+    T: Mul<Output = T> + Add<Output = T> + Abs,
+{
+    T::abs(dot2(v, w))
 }
 
 // TODO Consider some NormalizedVector, NormalizedNormal type or some other
@@ -156,7 +183,7 @@ where
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
-    if dot(v, w) < 0.0 {
+    if dot3(v, w) < 0.0 {
         PI_F - 2.0 * safe_asin((v + w).length() / 2.0)
     } else {
         2.0 * safe_asin((w - v).length() / 2.0)

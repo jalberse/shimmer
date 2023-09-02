@@ -1,8 +1,9 @@
-use super::has_nan::HasNan;
-use super::length::{length3, length_squared3, Length};
+use super::has_nan::{has_nan2, HasNan};
+use super::length::{length2, length3, length_squared2, length_squared3, Length};
 use super::normalize::Normalize;
+use super::tuple::Tuple2;
 use super::vec_types::{Vec2f, Vec3f};
-use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Tuple3};
+use super::{abs_dot2, dot2, Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Tuple3};
 use crate::float::Float;
 use crate::impl_unary_op_for_nt;
 use crate::newtype_macros::{
@@ -53,21 +54,41 @@ impl Vector2i {
     }
 
     pub fn x(&self) -> i32 {
-        self.0.x
+        Tuple2::x(self)
     }
 
     pub fn y(&self) -> i32 {
-        self.0.y
+        Tuple2::y(self)
     }
 
     /// Compute the dot product.
-    pub fn dot(&self, v: &Self) -> i32 {
-        self.0.dot(v.0)
+    pub fn dot(self, v: Self) -> i32 {
+        super::dot2(self, v)
     }
 
     /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(&self, v: &Self) -> i32 {
-        i32::abs(self.dot(v))
+    pub fn abs_dot(self, v: Self) -> i32 {
+        super::abs_dot2(self, v)
+    }
+}
+
+impl Tuple2<i32> for Vector2i {
+    fn new(x: i32, y: i32) -> Self {
+        Self::new(x, y)
+    }
+
+    fn x(&self) -> i32 {
+        self.0.x
+    }
+
+    fn y(&self) -> i32 {
+        self.0.y
+    }
+}
+
+impl HasNan for Vector2i {
+    fn has_nan(&self) -> bool {
+        false
     }
 }
 
@@ -176,22 +197,22 @@ impl Vector3i {
 
     /// Compute the dot product
     pub fn dot(self, v: Self) -> i32 {
-        super::dot(self, v)
+        super::dot3(self, v)
     }
 
     /// Dot this vector with a normal.
     pub fn dot_normal(self, n: Normal3i) -> i32 {
-        super::dot(self, n)
+        super::dot3(self, n)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(self, v: Self) -> i32 {
-        super::abs_dot(self, v)
+        super::abs_dot3(self, v)
     }
 
     /// Dot this vector with a normal and take the absolute value.
     pub fn abs_dot_normal(self, n: Normal3i) -> i32 {
-        super::abs_dot(self, n)
+        super::abs_dot3(self, n)
     }
 
     /// Take the cross product of this and a vector v
@@ -322,44 +343,71 @@ impl Vector2f {
     }
 
     pub fn x(&self) -> Float {
-        self.0.x
+        Tuple2::x(self)
     }
 
     pub fn y(&self) -> Float {
-        self.0.y
+        Tuple2::y(self)
     }
 
     pub fn has_nan(&self) -> bool {
-        self.0.is_nan()
+        HasNan::has_nan(self)
     }
 
     pub fn length_squared(&self) -> Float {
-        debug_assert!(!self.has_nan());
-        self.0.length_squared()
+        Length::length_squared(self)
     }
 
     pub fn length(&self) -> Float {
-        debug_assert!(!self.has_nan());
-        self.0.length()
+        Length::length(self)
     }
 
-    pub fn normalize(&self) -> Self {
-        debug_assert!(!self.has_nan());
-        Self(self.0.normalize())
+    pub fn normalize(self) -> Self {
+        Normalize::normalize(self)
     }
 
     /// Compute the dot product.
-    pub fn dot(&self, v: &Self) -> Float {
-        debug_assert!(!self.has_nan());
-        debug_assert!(!v.has_nan());
-        self.0.dot(v.0)
+    pub fn dot(self, v: Self) -> Float {
+        dot2(self, v)
     }
 
     /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(&self, v: &Self) -> Float {
-        Float::abs(self.dot(v))
+    pub fn abs_dot(self, v: Self) -> Float {
+        abs_dot2(self, v)
     }
 }
+
+impl Tuple2<Float> for Vector2f {
+    fn new(x: Float, y: Float) -> Self {
+        Self::new(x, y)
+    }
+
+    fn x(&self) -> Float {
+        self.0.x
+    }
+
+    fn y(&self) -> Float {
+        self.0.y
+    }
+}
+
+impl HasNan for Vector2f {
+    fn has_nan(&self) -> bool {
+        has_nan2(self)
+    }
+}
+
+impl Length<Float> for Vector2f {
+    fn length_squared(&self) -> Float {
+        length_squared2(self)
+    }
+
+    fn length(&self) -> Float {
+        length2(self)
+    }
+}
+
+impl Normalize<Float> for Vector2f {}
 
 impl Default for Vector2f {
     fn default() -> Self {
@@ -482,22 +530,22 @@ impl Vector3f {
 
     /// Compute the dot product.
     pub fn dot(&self, v: &Self) -> Float {
-        super::dot(*self, *v)
+        super::dot3(*self, *v)
     }
 
     /// Dot this vector with a normal.
     pub fn dot_normal(&self, n: &Normal3f) -> Float {
-        super::dot(*self, *n)
+        super::dot3(*self, *n)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(&self, v: &Self) -> Float {
-        super::abs_dot(*self, *v)
+        super::abs_dot3(*self, *v)
     }
 
     /// Dot this vector with a normal and take its absolute value.
     pub fn abs_dot_normal(&self, n: &Normal3f) -> Float {
-        super::abs_dot(*self, *n)
+        super::abs_dot3(*self, *n)
     }
 
     /// Take the cross product of this and a vector v.
@@ -697,11 +745,11 @@ mod tests {
 
         let v1 = Vector2f::new(0.0, 1.0);
         let v2 = Vector2f::new(2.0, 3.0);
-        assert_eq!(3.0, v1.dot(&v2));
+        assert_eq!(3.0, v1.dot(v2));
 
         let v1 = Vector2i::new(0, 1);
         let v2 = Vector2i::new(2, 3);
-        assert_eq!(3, v1.dot(&v2));
+        assert_eq!(3, v1.dot(v2));
     }
 
     #[test]
@@ -727,11 +775,11 @@ mod tests {
 
         let v1 = Vector2f::new(0.0, 1.0);
         let v2 = -Vector2f::new(2.0, 3.0);
-        assert_eq!(3.0, v1.abs_dot(&v2));
+        assert_eq!(3.0, v1.abs_dot(v2));
 
         let v1 = Vector2i::new(0, 1);
         let v2 = -Vector2i::new(2, 3);
-        assert_eq!(3, v1.abs_dot(&v2));
+        assert_eq!(3, v1.abs_dot(v2));
     }
 
     #[test]

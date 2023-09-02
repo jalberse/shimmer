@@ -74,22 +74,22 @@ impl Normal3i {
 
     /// Compute the dot product of two normals.
     pub fn dot(self, n: Self) -> i32 {
-        super::dot(self, n)
+        super::dot3(self, n)
     }
 
     /// Compute the dot product with a vector.
     pub fn dot_vector(self, v: Vector3i) -> i32 {
-        super::dot(self, v)
+        super::dot3(self, v)
     }
 
     /// Compute the dot product of two normals and take the absolute value.
     pub fn abs_dot(self, n: Self) -> i32 {
-        super::abs_dot(self, n)
+        super::abs_dot3(self, n)
     }
 
     /// Compute the dot product with a vector and take the absolute value.
     pub fn abs_dot_vector(self, v: Vector3i) -> i32 {
-        super::abs_dot(self, v)
+        super::abs_dot3(self, v)
     }
 
     /// Cross this normal with a vector.
@@ -250,22 +250,22 @@ impl Normal3f {
 
     /// Compute the dot product of two normals.
     pub fn dot(self, n: Self) -> Float {
-        super::dot(self, n)
+        super::dot3(self, n)
     }
 
     /// Compute the dot with a vector.
     pub fn dot_vector(self, v: Vector3f) -> Float {
-        super::dot(self, v)
+        super::dot3(self, v)
     }
 
     /// Compute the dot product of two normals and take the absolute value.
     pub fn abs_dot(self, n: Self) -> Float {
-        super::abs_dot(self, n)
+        super::abs_dot3(self, n)
     }
 
     /// Compute the dot with a vector and take the absolute value.
     pub fn abs_dot_vector(self, v: Vector3f) -> Float {
-        super::abs_dot(self, v)
+        super::abs_dot3(self, v)
     }
 
     /// Takes the cross of this normal with a vector.
