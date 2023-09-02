@@ -341,8 +341,8 @@ impl Default for Normal3f {
 //  But also, we can have functions with a Tuple bound to avoid repeating
 //  implementations, same as we have for e.g. dot().
 
+// Normals can be negated
 impl_op_ex!(-|n: Normal3f| -> Normal3f { Normal3f::new(-n.x, -n.y, -n.z) });
-
 // Normals can add and subtract with other normals
 impl_op_ex!(+ |n1: Normal3f, n2: Normal3f| -> Normal3f { Normal3f::new(n1.x + n2.x, n1.y + n2.y, n1.z + n2.z)});
 impl_op_ex!(-|n1: Normal3f, n2: Normal3f| -> Normal3f {
@@ -377,10 +377,13 @@ impl_op_ex!(/= |n1: &mut Normal3f, s: Float| {
 
 // Normals can add and subtract with vectors to create a new vector
 impl_op_ex!(-|n: Normal3f, v: Vector3f| -> Vector3f {
-    Vector3f::new(n.x - v.0.x, n.y - v.0.y, n.z - v.0.z)
+    Vector3f::new(n.x - v.x, n.y - v.y, n.z - v.z)
 });
-impl_op_ex!(+|n: Normal3f, v: Vector3f| -> Vector3f {
-    Vector3f::new(n.x + v.0.x, n.y + v.0.y, n.z + v.0.z)
+impl_op_ex!(-|v: Vector3f, n: Normal3f| -> Vector3f {
+    Vector3f::new(v.x - n.x, v.y - n.y, v.z - n.z)
+});
+impl_op_ex_commutative!(+|n: Normal3f, v: Vector3f| -> Vector3f {
+    Vector3f::new(n.x + v.x, n.y + v.y, n.z + v.z)
 });
 
 impl From<Vector3f> for Normal3f {

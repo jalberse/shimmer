@@ -8,6 +8,7 @@ use crate::newtype_macros::{
     impl_binary_op_assign_for_nt_with_other, impl_binary_op_for_nt_with_other,
     impl_binary_op_for_other_with_nt,
 };
+use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 use glam::{IVec2, IVec3};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -305,37 +306,40 @@ impl From<Point3i> for (i32, i32, i32) {
 //        Point2f
 // ---------------------------------------------------------------------------
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Point2f(pub Vec2f);
+pub struct Point2f {
+    pub x: Float,
+    pub y: Float,
+}
 
 impl Point2f {
     /// All zeroes.
-    pub const ZERO: Self = Self(Vec2f::ZERO);
+    pub const ZERO: Self = Self::splat(0.0);
 
     /// All ones.
-    pub const ONE: Self = Self(Vec2f::ONE);
+    pub const ONE: Self = Self::splat(1.0);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(Vec2f::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1.0);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(Vec2f::X);
+    pub const X: Self = Self::new(1.0, 0.0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(Vec2f::Y);
+    pub const Y: Self = Self::new(0.0, 1.0);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(Vec2f::NEG_X);
+    pub const NEG_X: Self = Self::new(-1.0, 0.0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(Vec2f::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0.0, -1.0);
 
     pub const fn new(x: Float, y: Float) -> Self {
-        Self(Vec2f::new(x, y))
+        Self { x, y }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
-        Self(Vec2f::splat(v))
+        Self { x: v, y: v }
     }
 
     pub fn has_nan(&self) -> bool {
@@ -367,11 +371,11 @@ impl Tuple2<Float> for Point2f {
     }
 
     fn x(&self) -> Float {
-        self.0.x
+        self.x
     }
 
     fn y(&self) -> Float {
-        self.0.y
+        self.y
     }
 }
 
@@ -383,90 +387,72 @@ impl HasNan for Point2f {
 
 impl Default for Point2f {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
 
-impl_unary_op_for_nt!( impl Neg for Point2f { fn neg } );
-impl_binary_op_for_nt_with_other!( impl Mul for Point2f with Float { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Point2f with Float { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for Float with Point2f { fn mul } );
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Point2f with Float { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Point2f with Float { fn div_assign });
+impl_op_ex!(-|p: Point2f| -> Point2f { Point2f::new(-p.x, -p.y) });
+
+// Points can be scaled elementwise
+impl_op_ex_commutative!(*|p: Point2f, s: Float| -> Point2f { Point2f::new(p.x * s, p.y * s) });
+impl_op_ex!(/ |p: Point2f, s: Float| -> Point2f {
+    Point2f::new(p.x / s, p.y / s) });
+impl_op_ex!(*= |p: &mut Point2f, s: Float| {
+    p.x *= s;
+    p.y *= s;
+});
+impl_op_ex!(/= |p: &mut Point2f, s: Float| {
+    p.x /= s;
+    p.y /= s;
+});
 
 // Point + Vector -> Point
-impl Add<Vector2f> for Point2f {
-    type Output = Point2f;
-    fn add(self, rhs: Vector2f) -> Point2f {
-        Point2f(self.0 + rhs.0)
-    }
-}
-
-// Vector + Point -> Point
-impl Add<Point2f> for Vector2f {
-    type Output = Point2f;
-    fn add(self, rhs: Point2f) -> Point2f {
-        Point2f(self.0 + rhs.0)
-    }
-}
-
-// Point += Vector
-impl AddAssign<Vector2f> for Point2f {
-    fn add_assign(&mut self, rhs: Vector2f) {
-        self.0 += rhs.0;
-    }
-}
+impl_op_ex_commutative!(+ |p: Point2f, v: Vector2f| -> Point2f
+{
+    Point2f::new(p.x + v.x(), p.y + v.y())
+});
+impl_op_ex!(+=|p: &mut Point2f, v: Vector2f| {
+    p.x += v.x();
+    p.y += v.y();
+});
 
 // Point - Vector -> Point
-impl Sub<Vector2f> for Point2f {
-    type Output = Point2f;
-    fn sub(self, rhs: Vector2f) -> Point2f {
-        Point2f(self.0 - rhs.0)
-    }
-}
-
-// Point -= Vector
-impl SubAssign<Vector2f> for Point2f {
-    fn sub_assign(&mut self, rhs: Vector2f) {
-        self.0 -= rhs.0;
-    }
-}
+impl_op_ex!(-|p: Point2f, v: Vector2f| -> Point2f { Point2f::new(p.x - v.x(), p.y - v.y()) });
+impl_op_ex!(-=|p: &mut Point2f, v: Vector2f| {
+    p.x -= v.x();
+    p.y -= v.y();
+});
 
 // Point - Point -> Vector
-impl Sub<Point2f> for Point2f {
-    type Output = Vector2f;
-    fn sub(self, rhs: Point2f) -> Vector2f {
-        Vector2f(self.0 - rhs.0)
-    }
-}
+impl_op_ex!(-|p1: Point2f, p2: Point2f| -> Vector2f { Vector2f::new(p1.x + p2.x, p1.y + p2.y,) });
 
 impl From<Vector2f> for Point2f {
     fn from(value: Vector2f) -> Self {
-        Point2f(value.0)
+        Self::new(value.x(), value.y())
     }
 }
 
 impl From<[Float; 2]> for Point2f {
     fn from(value: [Float; 2]) -> Self {
-        Self(value.into())
+        Self::new(value[0], value[1])
     }
 }
 
 impl From<Point2f> for [Float; 2] {
     fn from(value: Point2f) -> Self {
-        value.0.into()
+        [value.x, value.y]
     }
 }
 
 impl From<(Float, Float)> for Point2f {
     fn from(value: (Float, Float)) -> Self {
-        Self(value.into())
+        Self::new(value.0, value.1)
     }
 }
 
 impl From<Point2f> for (Float, Float) {
     fn from(value: Point2f) -> Self {
-        value.0.into()
+        (value.x, value.y)
     }
 }
 

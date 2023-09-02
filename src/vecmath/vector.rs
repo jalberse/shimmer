@@ -12,6 +12,7 @@ use crate::newtype_macros::{
     impl_binary_op_trait_for_nt,
 };
 use crate::vecmath::has_nan::has_nan3;
+use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 use glam::{IVec2, IVec3};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -309,37 +310,41 @@ impl From<Vector3i> for (i32, i32, i32) {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vector2f(pub Vec2f);
+pub struct Vector2f
+{
+    x: Float,
+    y: Float,
+}
 
 impl Vector2f {
     /// All zeroes.
-    pub const ZERO: Self = Self(Vec2f::ZERO);
+    pub const ZERO: Self = Self::splat(0.0);
 
     /// All ones.
-    pub const ONE: Self = Self(Vec2f::ONE);
+    pub const ONE: Self = Self::splat(1.0);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(Vec2f::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1.0);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(Vec2f::X);
+    pub const X: Self = Self::new(1.0, 0.0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(Vec2f::Y);
+    pub const Y: Self = Self::new(0.0, 1.0);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(Vec2f::NEG_X);
+    pub const NEG_X: Self = Self::new(-1.0, 0.0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(Vec2f::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0.0, -1.0);
 
     pub const fn new(x: Float, y: Float) -> Self {
-        Self(Vec2f::new(x, y))
+        Self{ x, y }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
-        Self(Vec2f::splat(v))
+        Self{ x: v, y: v }
     }
 
     pub fn x(&self) -> Float {
@@ -383,11 +388,11 @@ impl Tuple2<Float> for Vector2f {
     }
 
     fn x(&self) -> Float {
-        self.0.x
+        self.x
     }
 
     fn y(&self) -> Float {
-        self.0.y
+        self.y
     }
 }
 
@@ -411,48 +416,71 @@ impl Normalize<Float> for Vector2f {}
 
 impl Default for Vector2f {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
 
-impl_unary_op_for_nt!( impl Neg for Vector2f { fn neg } );
-impl_binary_op_trait_for_nt!( impl Add for Vector2f { fn add } );
-impl_binary_op_trait_for_nt!( impl Sub for Vector2f { fn sub } );
-impl_binary_op_for_nt_with_other!( impl Mul for Vector2f with Float { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Vector2f with Float { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for Float with Vector2f { fn mul } );
-impl_binary_op_assign_trait_for_nt!( impl AddAssign for Vector2f { fn add_assign });
-impl_binary_op_assign_trait_for_nt!( impl SubAssign for Vector2f { fn sub_assign });
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector2f with Float { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector2f with Float { fn div_assign });
+
+// Vectors can be negated
+impl_op_ex!(-|v: Vector2f| -> Vector2f { 
+    Vector2f::new(-v.x, -v.y) });
+// Vectors can add and subtract with other vectors
+impl_op_ex!(+ |v1: Vector2f, v2: Vector2f| -> Vector2f { 
+    Vector2f::new(v1.x + v2.x, v1.y + v2.y)});
+impl_op_ex!(-|v1: Vector2f, v2: Vector2f| -> Vector2f {
+    Vector2f::new(v1.x - v2.x, v1.y - v2.y)
+});
+impl_op_ex!(+= |v1: &mut Vector2f, v2: Vector2f| {
+    v1.x += v2.x;
+    v1.y += v2.y;
+});
+impl_op_ex!(-= |n1: &mut Vector2f, n2: Vector2f| {
+    n1.x -= n2.x;
+    n1.y -= n2.y;
+});
+
+// Vectors can be scaled
+impl_op_ex_commutative!(*|v: Vector2f, s: Float| -> Vector2f {
+    Vector2f::new(v.x * s, v.y * s)
+});
+impl_op_ex!(/ |v: Vector2f, s: Float| -> Vector2f {
+    Vector2f::new(v.x / s, v.y / s) });
+impl_op_ex!(*= |v1: &mut Vector2f, s: Float| {
+    v1.x *= s;
+    v1.y *= s;
+});
+impl_op_ex!(/= |v1: &mut Vector2f, s: Float| {
+    v1.x /= s;
+    v1.y /= s;
+});
 
 impl From<Point2f> for Vector2f {
     fn from(value: Point2f) -> Self {
-        Self(value.0)
+        Self::new(value.x(), value.y())
     }
 }
 
 impl From<[Float; 2]> for Vector2f {
     fn from(value: [Float; 2]) -> Self {
-        Self(value.into())
+        Self::new(value[0], value[1])
     }
 }
 
 impl From<Vector2f> for [Float; 2] {
     fn from(value: Vector2f) -> Self {
-        value.0.into()
+        [value.x, value.y]
     }
 }
 
 impl From<(Float, Float)> for Vector2f {
     fn from(value: (Float, Float)) -> Self {
-        Self(value.into())
+        Self::new(value.0, value.1)
     }
 }
 
 impl From<Vector2f> for (Float, Float) {
     fn from(value: Vector2f) -> Self {
-        value.0.into()
+        (value.x, value.y)
     }
 }
 
@@ -461,43 +489,47 @@ impl From<Vector2f> for (Float, Float) {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vector3f(pub Vec3f);
+pub struct Vector3f{
+    pub x: Float,
+    pub y: Float,
+    pub z: Float,
+}
 
 impl Vector3f {
     /// All zeroes.
-    pub const ZERO: Self = Self(Vec3f::ZERO);
+    pub const ZERO: Self = Self::splat(0.0);
 
     /// All ones.
-    pub const ONE: Self = Self(Vec3f::ONE);
+    pub const ONE: Self = Self::splat(1.0);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(Vec3f::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1.0);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(Vec3f::X);
+    pub const X: Self = Self::new(1.0, 0.0, 0.0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(Vec3f::Y);
+    pub const Y: Self = Self::new(0.0, 1.0, 0.0);
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self(Vec3f::Z);
+    pub const Z: Self = Self::new(0.0, 0.0, 1.0);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(Vec3f::NEG_X);
+    pub const NEG_X: Self = Self::new(-1.0, 0.0, 0.0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(Vec3f::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0.0, -1.0, 0.0);
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self(Vec3f::NEG_Z);
+    pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
 
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self(Vec3f::new(x, y, z))
+        Self::new(x, y, z)
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
-        Self(Vec3f::splat(v))
+        Self::splat(v)
     }
 
     pub fn x(&self) -> Float {
@@ -581,15 +613,15 @@ impl Tuple3<Float> for Vector3f {
     }
 
     fn x(&self) -> Float {
-        self.0.x
+        self.x
     }
 
     fn y(&self) -> Float {
-        self.0.y
+        self.y
     }
 
     fn z(&self) -> Float {
-        self.0.z
+        self.z
     }
 }
 
@@ -613,70 +645,79 @@ impl Normalize<Float> for Vector3f {}
 
 impl Default for Vector3f {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
 
-impl_unary_op_for_nt!( impl Neg for Vector3f { fn neg } );
-impl_binary_op_trait_for_nt!( impl Add for Vector3f { fn add } );
-impl_binary_op_trait_for_nt!( impl Sub for Vector3f { fn sub } );
-impl_binary_op_for_nt_with_other!( impl Mul for Vector3f with Float { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Vector3f with Float { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for Float with Vector3f { fn mul } );
-impl_binary_op_assign_trait_for_nt!( impl AddAssign for Vector3f { fn add_assign });
-impl_binary_op_assign_trait_for_nt!( impl SubAssign for Vector3f { fn sub_assign });
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector3f with Float { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector3f with Float { fn div_assign });
+// Vectors can be negated
+impl_op_ex!(-|v: Vector3f| -> Vector3f { 
+    Vector3f::new(-v.x, -v.y, -v.z) });
+// Vectors can add and subtract with other vectors
+impl_op_ex!(+ |v1: Vector3f, v2: Vector3f| -> Vector3f { 
+    Vector3f::new(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z)});
+impl_op_ex!(-|v1: Vector3f, v2: Vector3f| -> Vector3f {
+    Vector3f::new(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z)
+});
+impl_op_ex!(+= |v1: &mut Vector3f, v2: Vector3f| {
+    v1.x += v2.x;
+    v1.y += v2.y;
+    v1.z += v2.z;
+});
+impl_op_ex!(-= |n1: &mut Vector3f, n2: Vector3f| {
+    n1.x -= n2.x;
+    n1.y -= n2.y;
+    n1.z -= n2.z;
+});
 
-impl Add<Normal3f> for Vector3f {
-    type Output = Vector3f;
-
-    fn add(self, rhs: Normal3f) -> Self::Output {
-        Vector3f(self.0 + rhs.0)
-    }
-}
-
-impl Sub<Normal3f> for Vector3f {
-    type Output = Vector3f;
-
-    fn sub(self, rhs: Normal3f) -> Self::Output {
-        Vector3f(self.0 - rhs.0)
-    }
-}
+// Vectors can be scaled
+impl_op_ex_commutative!(*|v: Vector3f, s: Float| -> Vector3f {
+    Vector3f::new(v.x * s, v.y * s, v.z * s)
+});
+impl_op_ex!(/ |v: Vector3f, s: Float| -> Vector3f { Vector3f::new(v.x / s, v.y / s, v.z / s) });
+impl_op_ex!(*= |v1: &mut Vector3f, s: Float| {
+    v1.x *= s;
+    v1.y *= s;
+    v1.z *= s;
+});
+impl_op_ex!(/= |v1: &mut Vector3f, s: Float| {
+    v1.x /= s;
+    v1.y /= s;
+    v1.z /= s;
+});
 
 impl From<Point3f> for Vector3f {
     fn from(value: Point3f) -> Self {
-        Self(value.0)
+        Self::new(value.x(), value.y(), value.z())
     }
 }
 
 impl From<Normal3f> for Vector3f {
     fn from(value: Normal3f) -> Self {
-        Self(value.0)
+        Self::new(value.x(), value.y(), value.z())
     }
 }
 
 impl From<[Float; 3]> for Vector3f {
     fn from(value: [Float; 3]) -> Self {
-        Self(value.into())
+        Self::new(value[0], value[1], value[2])
     }
 }
 
 impl From<Vector3f> for [Float; 3] {
     fn from(value: Vector3f) -> Self {
-        value.0.into()
+        [value.x, value.y, value.z]
     }
 }
 
 impl From<(Float, Float, Float)> for Vector3f {
     fn from(value: (Float, Float, Float)) -> Self {
-        Self(value.into())
+        Self::new(value.0, value.1, value.2)
     }
 }
 
 impl From<Vector3f> for (Float, Float, Float) {
     fn from(value: Vector3f) -> Self {
-        value.0.into()
+        (value.x, value.y, value.z)
     }
 }
 
