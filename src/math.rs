@@ -1,5 +1,15 @@
 use crate::float::Float;
 
+pub trait Sqrt {
+    fn sqrt(self) -> Self;
+}
+
+impl Sqrt for Float {
+    fn sqrt(self) -> Self {
+        Float::sqrt(self)
+    }
+}
+
 pub fn lerp(x: Float, a: Float, b: Float) -> Float {
     (1.0 - x) * a + x * b
 }
@@ -11,6 +21,18 @@ pub fn difference_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
     let difference = Float::mul_add(a, b, -cd);
     let error = Float::mul_add(-c, d, cd);
     difference + error
+}
+
+/// asin, with a check to ensure output is not slightly outside the legal range [-1, 1]
+/// See PBRTv4 8.2.3
+pub fn safe_asin(x: Float) -> Float {
+    Float::asin(Float::clamp(x, -1.0, 1.0))
+}
+
+/// acos, with a check to ensure output is not slightly outside the legal range [-1, 1]
+/// See PBRTv4 8.2.3
+pub fn safe_acos(x: Float) -> Float {
+    Float::asin(Float::clamp(x, -1.0, 1.0))
 }
 
 mod tests {

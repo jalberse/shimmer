@@ -1,6 +1,5 @@
 #[cfg(use_f64)]
 pub type Float = f64;
-
 #[cfg(not(use_f64))]
 pub type Float = f32;
 
@@ -8,6 +7,21 @@ pub type Float = f32;
 pub type FloatAsBits = u64;
 #[cfg(not(use_f64))]
 pub type FloatAsBits = u32;
+
+#[cfg(use_f64)]
+pub const PI_F: Float = std::f64::consts::PI;
+#[cfg(not(use_f64))]
+pub const PI_F: Float = std::f32::consts::PI;
+
+pub trait IsNan {
+    fn is_nan(self) -> bool;
+}
+
+impl IsNan for Float {
+    fn is_nan(self) -> bool {
+        Float::is_nan(self)
+    }
+}
 
 /// Use **unsafe**
 /// [std::mem::transmute_copy][transmute_copy]

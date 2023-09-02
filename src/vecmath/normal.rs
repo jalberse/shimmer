@@ -7,6 +7,7 @@ use crate::newtype_macros::{
     impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
     impl_binary_op_trait_for_nt,
 };
+use crate::vecmath::Vector3;
 use glam::IVec3;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -48,12 +49,10 @@ impl Normal3i {
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self(IVec3::NEG_Z);
 
-    #[inline(always)]
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self(IVec3::new(x, y, z))
     }
 
-    #[inline]
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: i32) -> Self {
         Self(IVec3::splat(v))
@@ -125,28 +124,24 @@ impl From<Vector3i> for Normal3i {
 }
 
 impl From<[i32; 3]> for Normal3i {
-    #[inline]
     fn from(value: [i32; 3]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Normal3i> for [i32; 3] {
-    #[inline]
     fn from(value: Normal3i) -> Self {
         value.0.into()
     }
 }
 
 impl From<(i32, i32, i32)> for Normal3i {
-    #[inline]
     fn from(value: (i32, i32, i32)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Normal3i> for (i32, i32, i32) {
-    #[inline]
     fn from(value: Normal3i) -> Self {
         value.0.into()
     }
@@ -190,41 +185,33 @@ impl Normal3f {
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self(Vec3f::NEG_Z);
 
-    #[inline(always)]
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
         Self(Vec3f::new(x, y, z))
     }
 
-    #[inline]
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
         Self(Vec3f::splat(v))
     }
 
     pub fn x(&self) -> Float {
-        self.0.x
+        Vector3::x(self)
     }
 
     pub fn y(&self) -> Float {
-        self.0.y
+        Vector3::y(self)
     }
 
     pub fn z(&self) -> Float {
-        self.0.z
+        Vector3::z(self)
     }
 
-    pub fn has_nan(self) -> bool {
-        self.0.is_nan()
+    pub fn length(&self) -> Float {
+        Vector3::length(self)
     }
 
-    pub fn length_squared(self) -> Float {
-        debug_assert!(!self.has_nan());
-        self.0.length_squared()
-    }
-
-    pub fn length(self) -> Float {
-        debug_assert!(!self.has_nan());
-        self.0.length()
+    pub fn length_squared(&self) -> Float {
+        Vector3::length_squared(self)
     }
 
     pub fn normalize(self) -> Self {
@@ -271,15 +258,15 @@ impl super::Vector3<Float> for Normal3f {
     }
 
     fn x(&self) -> Float {
-        self.x()
+        self.0.x
     }
 
     fn y(&self) -> Float {
-        self.y()
+        self.0.y
     }
 
     fn z(&self) -> Float {
-        self.z()
+        self.0.z
     }
 }
 
@@ -309,28 +296,24 @@ impl From<Vector3f> for Normal3f {
 }
 
 impl From<[Float; 3]> for Normal3f {
-    #[inline]
     fn from(value: [Float; 3]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Normal3f> for [Float; 3] {
-    #[inline]
     fn from(value: Normal3f) -> Self {
         value.0.into()
     }
 }
 
 impl From<(Float, Float, Float)> for Normal3f {
-    #[inline]
     fn from(value: (Float, Float, Float)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Normal3f> for (Float, Float, Float) {
-    #[inline]
     fn from(value: Normal3f) -> Self {
         value.0.into()
     }
@@ -338,7 +321,7 @@ impl From<Normal3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::float::Float;
+    use crate::{float::Float, vecmath::Vector3};
 
     use super::{Normal3f, Normal3i, Vector3f, Vector3i};
 

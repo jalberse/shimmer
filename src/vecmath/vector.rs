@@ -7,6 +7,7 @@ use crate::newtype_macros::{
     impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
     impl_binary_op_trait_for_nt,
 };
+use crate::vecmath::Vector3;
 use glam::{IVec2, IVec3};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -39,13 +40,11 @@ impl Vector2i {
     /// A unit-length vector pointing along the negative Y axis.
     pub const NEG_Y: Self = Self(IVec2::NEG_Y);
 
-    #[inline(always)]
     pub const fn new(x: i32, y: i32) -> Self {
         Self(IVec2 { x, y })
     }
 
     /// Creates a vector with all elements set to `v`.
-    #[inline]
     pub const fn splat(v: i32) -> Self {
         Self(IVec2::splat(v))
     }
@@ -87,35 +86,30 @@ impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector2i with i32 {
 impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector2i with i32 { fn div_assign });
 
 impl From<Point2i> for Vector2i {
-    #[inline]
     fn from(value: Point2i) -> Self {
         Self(value.0)
     }
 }
 
 impl From<[i32; 2]> for Vector2i {
-    #[inline]
     fn from(value: [i32; 2]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Vector2i> for [i32; 2] {
-    #[inline]
     fn from(value: Vector2i) -> Self {
         value.0.into()
     }
 }
 
 impl From<(i32, i32)> for Vector2i {
-    #[inline]
     fn from(value: (i32, i32)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Vector2i> for (i32, i32) {
-    #[inline]
     fn from(value: Vector2i) -> Self {
         value.0.into()
     }
@@ -156,13 +150,11 @@ impl Vector3i {
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self(IVec3::NEG_Z);
 
-    #[inline(always)]
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self(IVec3 { x, y, z })
     }
 
     /// Creates a vector with all elements set to `v`.
-    #[inline]
     pub const fn splat(v: i32) -> Self {
         Self(IVec3::splat(v))
     }
@@ -229,42 +221,36 @@ impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector3i with i32 {
 impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector3i with i32 { fn div_assign });
 
 impl From<Point3i> for Vector3i {
-    #[inline]
     fn from(value: Point3i) -> Self {
         Self(value.0)
     }
 }
 
 impl From<Normal3i> for Vector3i {
-    #[inline]
     fn from(value: Normal3i) -> Self {
         Self(value.0)
     }
 }
 
 impl From<[i32; 3]> for Vector3i {
-    #[inline]
     fn from(value: [i32; 3]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Vector3i> for [i32; 3] {
-    #[inline]
     fn from(value: Vector3i) -> Self {
         value.0.into()
     }
 }
 
 impl From<(i32, i32, i32)> for Vector3i {
-    #[inline]
     fn from(value: (i32, i32, i32)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Vector3i> for (i32, i32, i32) {
-    #[inline]
     fn from(value: Vector3i) -> Self {
         value.0.into()
     }
@@ -299,13 +285,11 @@ impl Vector2f {
     /// A unit-length vector pointing along the negative Y axis.
     pub const NEG_Y: Self = Self(Vec2f::NEG_Y);
 
-    #[inline(always)]
     pub const fn new(x: Float, y: Float) -> Self {
         Self(Vec2f::new(x, y))
     }
 
     /// Creates a vector with all elements set to `v`.
-    #[inline]
     pub const fn splat(v: Float) -> Self {
         Self(Vec2f::splat(v))
     }
@@ -368,35 +352,30 @@ impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector2f with Float
 impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector2f with Float { fn div_assign });
 
 impl From<Point2f> for Vector2f {
-    #[inline]
     fn from(value: Point2f) -> Self {
         Self(value.0)
     }
 }
 
 impl From<[Float; 2]> for Vector2f {
-    #[inline]
     fn from(value: [Float; 2]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Vector2f> for [Float; 2] {
-    #[inline]
     fn from(value: Vector2f) -> Self {
         value.0.into()
     }
 }
 
 impl From<(Float, Float)> for Vector2f {
-    #[inline]
     fn from(value: (Float, Float)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Vector2f> for (Float, Float) {
-    #[inline]
     fn from(value: Vector2f) -> Self {
         value.0.into()
     }
@@ -437,41 +416,37 @@ impl Vector3f {
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self(Vec3f::NEG_Z);
 
-    #[inline(always)]
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
         Self(Vec3f::new(x, y, z))
     }
 
     /// Creates a vector with all elements set to `v`.
-    #[inline]
     pub const fn splat(v: Float) -> Self {
         Self(Vec3f::splat(v))
     }
 
     pub fn x(&self) -> Float {
-        self.0.x
+        Vector3::x(self)
     }
 
     pub fn y(&self) -> Float {
-        self.0.y
+        Vector3::y(self)
     }
 
     pub fn z(&self) -> Float {
-        self.0.z
-    }
-
-    pub fn has_nan(&self) -> bool {
-        self.0.is_nan()
-    }
-
-    pub fn length_squared(&self) -> Float {
-        debug_assert!(!self.has_nan());
-        self.0.length_squared()
+        Vector3::z(self)
     }
 
     pub fn length(&self) -> Float {
-        debug_assert!(!self.has_nan());
-        self.0.length()
+        // To avoid users needing to import the Vector3 trait, which we really only need
+        // internal to the vecmath module, we include the length() function here, but
+        // just have it call the Trait implementation. Other methods in this and other
+        // structs file a similar pattern in this module.
+        Vector3::length(self)
+    }
+
+    pub fn length_squared(&self) -> Float {
+        Vector3::length_squared(self)
     }
 
     pub fn normalize(&self) -> Self {
@@ -524,15 +499,15 @@ impl super::Vector3<Float> for Vector3f {
     }
 
     fn x(&self) -> Float {
-        self.x()
+        self.0.x
     }
 
     fn y(&self) -> Float {
-        self.y()
+        self.0.y
     }
 
     fn z(&self) -> Float {
-        self.z()
+        self.0.z
     }
 }
 
@@ -554,42 +529,36 @@ impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector3f with Float
 impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector3f with Float { fn div_assign });
 
 impl From<Point3f> for Vector3f {
-    #[inline]
     fn from(value: Point3f) -> Self {
         Self(value.0)
     }
 }
 
 impl From<Normal3f> for Vector3f {
-    #[inline]
     fn from(value: Normal3f) -> Self {
         Self(value.0)
     }
 }
 
 impl From<[Float; 3]> for Vector3f {
-    #[inline]
     fn from(value: [Float; 3]) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Vector3f> for [Float; 3] {
-    #[inline]
     fn from(value: Vector3f) -> Self {
         value.0.into()
     }
 }
 
 impl From<(Float, Float, Float)> for Vector3f {
-    #[inline]
     fn from(value: (Float, Float, Float)) -> Self {
         Self(value.into())
     }
 }
 
 impl From<Vector3f> for (Float, Float, Float) {
-    #[inline]
     fn from(value: Vector3f) -> Self {
         value.0.into()
     }
@@ -597,7 +566,7 @@ impl From<Vector3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::float::Float;
+    use crate::{float::Float, vecmath::Vector3};
 
     use super::{
         Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Vector2f, Vector2i, Vector3f,
