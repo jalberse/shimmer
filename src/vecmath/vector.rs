@@ -312,8 +312,8 @@ impl From<Vector3i> for (i32, i32, i32) {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vector2f
 {
-    x: Float,
-    y: Float,
+    pub x: Float,
+    pub y: Float,
 }
 
 impl Vector2f {
@@ -524,12 +524,12 @@ impl Vector3f {
     pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
 
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self::new(x, y, z)
+        Self{ x, y, z }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
-        Self::splat(v)
+        Self::new(v, v, v)
     }
 
     pub fn x(&self) -> Float {
