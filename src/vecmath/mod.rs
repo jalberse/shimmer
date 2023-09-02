@@ -33,7 +33,7 @@ pub mod point;
 mod vec_types;
 pub mod vector;
 
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 pub use normal::{Normal3f, Normal3i};
 pub use point::{Point2f, Point2i, Point3f, Point3i};
@@ -80,6 +80,7 @@ use crate::{
 /// Define a basic trait that allows us to define shared operations for Vector and Normal types.
 trait Vector3<T>
 where
+    Self: Div<T, Output = Self> + Sized + Copy + Clone,
     T: Mul<Output = T> + Add<Output = T> + Sqrt + IsNan,
 {
     fn new(x: T, y: T, z: T) -> Self;
@@ -103,7 +104,10 @@ where
         self.length_squared().sqrt()
     }
 
-    // TODO bring normalize() into here too I think
+    fn normalize(&self) -> Self {
+        debug_assert!(!self.has_nan());
+        *self / self.length()
+    }
 }
 
 /// Computes the cross product of two vectors. Generic because we want to be able

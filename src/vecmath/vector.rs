@@ -450,8 +450,7 @@ impl Vector3f {
     }
 
     pub fn normalize(&self) -> Self {
-        debug_assert!(!self.has_nan());
-        Self(self.0.normalize())
+        Vector3::normalize(self)
     }
 
     /// Compute the dot product.

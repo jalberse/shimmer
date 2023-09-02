@@ -214,9 +214,8 @@ impl Normal3f {
         Vector3::length_squared(self)
     }
 
-    pub fn normalize(self) -> Self {
-        debug_assert!(!self.has_nan());
-        Self(self.0.normalize())
+    pub fn normalize(&self) -> Self {
+        Vector3::normalize(self)
     }
 
     /// Compute the dot product of two normals.
