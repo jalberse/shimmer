@@ -513,6 +513,18 @@ impl Vector3f {
     pub fn cross_normal(&self, n: &Normal3f) -> Self {
         super::cross::<Vector3f, Normal3f, Vector3f>(self, n)
     }
+
+    /// Find the andle between this vector and another vector.
+    /// Both vectors must be normalized.
+    pub fn angle_between(self, v: Self) -> Float {
+        super::angle_between(self, v)
+    }
+
+    /// Find the angle between this vector and a normal
+    /// Both vectors must be normalized.
+    pub fn angle_between_normal(self, n: Normal3f) -> Float {
+        super::angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
+    }
 }
 
 impl Tuple3<Float> for Vector3f {
@@ -567,6 +579,22 @@ impl_binary_op_assign_trait_for_nt!( impl AddAssign for Vector3f { fn add_assign
 impl_binary_op_assign_trait_for_nt!( impl SubAssign for Vector3f { fn sub_assign });
 impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector3f with Float { fn mul_assign });
 impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector3f with Float { fn div_assign });
+
+impl Add<Normal3f> for Vector3f {
+    type Output = Vector3f;
+
+    fn add(self, rhs: Normal3f) -> Self::Output {
+        Vector3f(self.0 + rhs.0)
+    }
+}
+
+impl Sub<Normal3f> for Vector3f {
+    type Output = Vector3f;
+
+    fn sub(self, rhs: Normal3f) -> Self::Output {
+        Vector3f(self.0 - rhs.0)
+    }
+}
 
 impl From<Point3f> for Vector3f {
     fn from(value: Point3f) -> Self {
@@ -741,12 +769,18 @@ mod tests {
 
     #[test]
     fn vector_vector_angle_between() {
-        // TODO this
+        let v1 = Vector3f::new(1.0, 2.0, 3.0).normalize();
+        let v2 = Vector3f::new(3.0, 4.0, 5.0).normalize();
+
+        assert_eq!(0.18623877, v1.angle_between(v2));
     }
 
     #[test]
     fn vector_normal_angle_between() {
-        // TODO this
+        let v = Vector3f::new(1.0, 2.0, 3.0).normalize();
+        let n = Normal3f::new(3.0, 4.0, 5.0).normalize();
+
+        assert_eq!(0.18623877, v.angle_between_normal(n));
     }
 
     #[test]

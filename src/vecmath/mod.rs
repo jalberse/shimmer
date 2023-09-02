@@ -131,8 +131,17 @@ where
     T::abs(dot(v, w))
 }
 
-/// Computes the angle between two vectors. Generic because we want to be able
+// TODO Consider some NormalizedVector, NormalizedNormal type or some other
+// mechanism for enforcing that a vector must be normalized for an operation like angle_between.
+// It's certainly possible with a type system but that's a lot of code to write.
+// You would need the normalize() functions to return the Normalized* type,
+// and then define operations on the Normalized* type as appropriate (where scaling
+// would for example make it not-normalized).
+
+/// Computes the angle between two vectors in radians. Generic because we want to be able
 /// to use this for Vector and Normal types alike, and combinations of them.
+///
+/// Vectors must be normalized.
 ///
 /// V1: A vector (e.g. Vector3f or a Normal3f).
 /// V2: A vector (e.g. Vector3f or a Normal3f).
@@ -142,7 +151,7 @@ where
 fn angle_between<V1, V2, V3>(v: V1, w: V2) -> Float
 where
     V1: Tuple3<Float> + HasNan + Add<V2, Output = V3> + Copy + Clone,
-    V2: Tuple3<Float> + HasNan + Add<V1, Output = V1> + Sub<V1, Output = V3> + Copy + Clone,
+    V2: Tuple3<Float> + HasNan + Add<V1, Output = V3> + Sub<V1, Output = V3> + Copy + Clone,
     V3: Tuple3<Float> + Length<Float>,
 {
     debug_assert!(!v.has_nan());
@@ -150,6 +159,6 @@ where
     if dot(v, w) < 0.0 {
         PI_F - 2.0 * safe_asin((v + w).length() / 2.0)
     } else {
-        2.0 * safe_asin((w - v).length()) / 2.0
+        2.0 * safe_asin((w - v).length() / 2.0)
     }
 }
