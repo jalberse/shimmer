@@ -28,21 +28,33 @@
 //! their relationship to a particular surface, they behave differently
 //! than vectors in some situations, particularly when applying transformations.
 
+// This module contains traits (Tuple, Length, Normalize, etc) which are created
+// to allow us to share logic across our various types (Vectors, Normals, Points).
+// However, we don't export the traits, and make their functions available within
+// the public structs (calling the trait implementation). This way, users don't
+// need to import the traits to use the structs.
+
+mod has_nan;
+mod length;
 pub mod normal;
+mod normalize;
 pub mod point;
+mod tuple;
 mod vec_types;
 pub mod vector;
 
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Sub};
 
 pub use normal::{Normal3f, Normal3i};
 pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
 use crate::{
-    float::{Float, IsNan, PI_F},
-    math::{difference_of_products, safe_asin, Sqrt},
+    float::{Float, PI_F},
+    math::{difference_of_products, safe_asin},
 };
+
+use self::{length::Length, tuple::Tuple3};
 
 // TODO consider moving away from glam. If nothing else, I don't love not being able to access fields directly
 //   as required by the newtype pattern. We could implement optimizations ourselves, and long-term that's likely
@@ -66,49 +78,19 @@ use crate::{
 // But, this trade-off is worth it to be able to leverage the type system for correctness.
 // The newtype pattern should have no associated runtime cost here, optimized by the compiler.
 
+// TODO There's spots that I copy instead of use reference, mostly due to not implementing additions etc
+//    on the reference type. I guess we could go through and change things to &self where possible.
+//    Implementing on reference types becomes much easier when I'm not using newtype around glam, too,
+//    since we can just use impl_op_ex(). So yeah, make the change away from glam and then do this.
+
 // TODO and go add calls to has_nan() in other functions, wrapping in debug_assert().
-
-// TODO our AngleBetween() implementation:
-//   We *do* want to roll our own here, as Vec3::angle_between() does not do this accuracy fix.
-
-// TODO These all need accessors, really. Possibly tied to traits?
-
-// TODO note I think that Product trait impl from glam types is the HProd from pbrt, so use that.
 
 // TODO also the list of functions on page 85
 
-/// Define a basic trait that allows us to define shared operations for Vector and Normal types.
-trait Vector3<T>
-where
-    Self: Div<T, Output = Self> + Sized + Copy + Clone,
-    T: Mul<Output = T> + Add<Output = T> + Sqrt + IsNan,
-{
-    fn new(x: T, y: T, z: T) -> Self;
-
-    fn x(&self) -> T;
-    fn y(&self) -> T;
-    fn z(&self) -> T;
-
-    fn has_nan(&self) -> bool {
-        self.x().is_nan() || self.y().is_nan() || self.z().is_nan()
-    }
-
-    fn length_squared(&self) -> T {
-        debug_assert!(!self.has_nan());
-        self.x() * self.x() + self.y() * self.y() + self.z() * self.z()
-    }
-
-    fn length(&self) -> T {
-        // PAPERDOC - PBRTv4 has a discussion on page 88 about an odd usage of std::sqrt().
-        // We see here that Rust's trait system obviates the issue.
-        self.length_squared().sqrt()
-    }
-
-    fn normalize(&self) -> Self {
-        debug_assert!(!self.has_nan());
-        *self / self.length()
-    }
-}
+// TODO rather than a Vector3 trait that we share, we should just have traits for each
+//   little normalize(), length(), etc call, and have those traits as constraints on the functions
+//   that need them. That's much cleaner, and lets us share with the integer versions as well.
+//   Alright yeah, that whips.
 
 /// Computes the cross product of two vectors. Generic because we want to be able
 /// to use this for Vector and Normal types alike, and combinations of them.
@@ -122,9 +104,9 @@ where
 /// V3: The type of the output cross product.
 fn cross<V1, V2, V3>(v1: &V1, v2: &V2) -> V3
 where
-    V1: Vector3<Float>,
-    V2: Vector3<Float>,
-    V3: Vector3<Float>,
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
+    V3: Tuple3<Float>,
 {
     V3::new(
         difference_of_products(v1.y(), v2.z(), v1.z(), v2.y()),
@@ -136,10 +118,18 @@ where
 /// Take the dot product of two vectors.
 fn dot<V1, V2>(v: V1, w: V2) -> Float
 where
-    V1: Vector3<Float>,
-    V2: Vector3<Float>,
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
 {
     v.x() * w.x() + v.y() * w.y() + v.z() * w.z()
+}
+
+fn abs_dot<V1, V2>(v: V1, w: V2) -> Float
+where
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
+{
+    Float::abs(dot(v, w))
 }
 
 /// Computes the angle between two vectors. Generic because we want to be able
@@ -152,9 +142,9 @@ where
 ///   We just use the third type to be able to specify that that is the case.
 fn angle_between<V1, V2, V3>(v: V1, w: V2) -> Float
 where
-    V1: Vector3<Float> + Add<V2, Output = V3> + Copy + Clone,
-    V2: Vector3<Float> + Add<V1, Output = V1> + Sub<V1, Output = V3> + Copy + Clone,
-    V3: Vector3<Float>,
+    V1: Tuple3<Float> + Add<V2, Output = V3> + Copy + Clone,
+    V2: Tuple3<Float> + Add<V1, Output = V1> + Sub<V1, Output = V3> + Copy + Clone,
+    V3: Tuple3<Float> + Length<Float>,
 {
     if dot(v, w) < 0.0 {
         PI_F - 2.0 * safe_asin((v + w).length() / 2.0)

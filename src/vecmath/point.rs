@@ -1,3 +1,5 @@
+use super::has_nan::{has_nan2, has_nan3, HasNan};
+use super::tuple::{Tuple2, Tuple3};
 use super::vec_types::{Vec2f, Vec3f};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
@@ -6,7 +8,6 @@ use crate::newtype_macros::{
     impl_binary_op_assign_for_nt_with_other, impl_binary_op_for_nt_with_other,
     impl_binary_op_for_other_with_nt,
 };
-use crate::vecmath::Vector3;
 use glam::{IVec2, IVec3};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -179,6 +180,36 @@ impl Point3i {
     pub const fn splat(v: i32) -> Self {
         Self(IVec3::splat(v))
     }
+
+    pub fn x(&self) -> i32 {
+        Tuple3::x(self)
+    }
+
+    pub fn y(&self) -> i32 {
+        Tuple3::y(self)
+    }
+
+    pub fn z(&self) -> i32 {
+        Tuple3::z(self)
+    }
+}
+
+impl Tuple3<i32> for Point3i {
+    fn new(x: i32, y: i32, z: i32) -> Self {
+        Self::new(x, y, z)
+    }
+
+    fn x(&self) -> i32 {
+        self.0.x
+    }
+
+    fn y(&self) -> i32 {
+        self.0.y
+    }
+
+    fn z(&self) -> i32 {
+        self.0.z
+    }
 }
 
 impl Default for Point3i {
@@ -307,8 +338,16 @@ impl Point2f {
         Self(Vec2f::splat(v))
     }
 
-    pub fn has_nan(self) -> bool {
-        self.0.is_nan()
+    pub fn has_nan(&self) -> bool {
+        HasNan::has_nan(self)
+    }
+
+    pub fn x(&self) -> Float {
+        Tuple2::x(self)
+    }
+
+    pub fn y(&self) -> Float {
+        Tuple2::y(self)
     }
 
     pub fn distance(self, p: Point2f) -> Float {
@@ -319,6 +358,26 @@ impl Point2f {
     pub fn distance_squared(self, p: Point2f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length_squared()
+    }
+}
+
+impl Tuple2<Float> for Point2f {
+    fn new(x: Float, y: Float) -> Self {
+        Self::new(x, y)
+    }
+
+    fn x(&self) -> Float {
+        self.0.x
+    }
+
+    fn y(&self) -> Float {
+        self.0.y
+    }
+}
+
+impl HasNan for Point2f {
+    fn has_nan(&self) -> bool {
+        has_nan2(self)
     }
 }
 
@@ -455,8 +514,20 @@ impl Point3f {
         Self(Vec3f::splat(v))
     }
 
-    pub fn has_nan(self) -> bool {
-        self.0.is_nan()
+    pub fn has_nan(&self) -> bool {
+        HasNan::has_nan(self)
+    }
+
+    pub fn x(&self) -> Float {
+        Tuple3::x(self)
+    }
+
+    pub fn y(&self) -> Float {
+        Tuple3::y(self)
+    }
+
+    pub fn z(&self) -> Float {
+        Tuple3::z(self)
     }
 
     pub fn distance(self, p: Point3f) -> Float {
@@ -469,6 +540,31 @@ impl Point3f {
         (self - p).length_squared()
     }
 }
+
+impl Tuple3<Float> for Point3f {
+    fn new(x: Float, y: Float, z: Float) -> Self {
+        Self::new(x, y, z)
+    }
+
+    fn x(&self) -> Float {
+        self.0.x
+    }
+
+    fn y(&self) -> Float {
+        self.0.y
+    }
+
+    fn z(&self) -> Float {
+        self.0.z
+    }
+}
+
+impl HasNan for Point3f {
+    fn has_nan(&self) -> bool {
+        has_nan3(self)
+    }
+}
+
 impl Default for Point3f {
     fn default() -> Self {
         Self(Default::default())

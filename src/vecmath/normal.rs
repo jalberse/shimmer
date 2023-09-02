@@ -1,5 +1,8 @@
+use super::has_nan::{has_nan3, HasNan};
+use super::length::{length3, length_squared3, Length};
+use super::normalize::Normalize;
 use super::vec_types::Vec3f;
-use super::{Vector3f, Vector3i};
+use super::{Tuple3, Vector3f, Vector3i};
 use crate::float::Float;
 use crate::impl_unary_op_for_nt;
 use crate::newtype_macros::{
@@ -7,7 +10,6 @@ use crate::newtype_macros::{
     impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
     impl_binary_op_trait_for_nt,
 };
-use crate::vecmath::Vector3;
 use glam::IVec3;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -59,15 +61,15 @@ impl Normal3i {
     }
 
     pub fn x(&self) -> i32 {
-        self.0.x
+        Tuple3::x(self)
     }
 
     pub fn y(&self) -> i32 {
-        self.0.y
+        Tuple3::y(self)
     }
 
     pub fn z(&self) -> i32 {
-        self.0.z
+        Tuple3::z(self)
     }
 
     /// Compute the dot product of two normals.
@@ -95,6 +97,24 @@ impl Normal3i {
     pub fn cross(self, v: Vector3i) -> Vector3i {
         // Note that integer based vectors don't need EFT methods.
         Vector3i(self.0.cross(v.0))
+    }
+}
+
+impl Tuple3<i32> for Normal3i {
+    fn new(x: i32, y: i32, z: i32) -> Self {
+        Self::new(x, y, z)
+    }
+
+    fn x(&self) -> i32 {
+        self.0.x
+    }
+
+    fn y(&self) -> i32 {
+        self.0.y
+    }
+
+    fn z(&self) -> i32 {
+        self.0.z
     }
 }
 
@@ -195,27 +215,31 @@ impl Normal3f {
     }
 
     pub fn x(&self) -> Float {
-        Vector3::x(self)
+        Tuple3::x(self)
     }
 
     pub fn y(&self) -> Float {
-        Vector3::y(self)
+        Tuple3::y(self)
     }
 
     pub fn z(&self) -> Float {
-        Vector3::z(self)
+        Tuple3::z(self)
+    }
+
+    pub fn has_nan(&self) -> bool {
+        HasNan::has_nan(self)
     }
 
     pub fn length(&self) -> Float {
-        Vector3::length(self)
+        Length::length(self)
     }
 
     pub fn length_squared(&self) -> Float {
-        Vector3::length_squared(self)
+        Length::length_squared(self)
     }
 
-    pub fn normalize(&self) -> Self {
-        Vector3::normalize(self)
+    pub fn normalize(self) -> Self {
+        Normalize::normalize(self)
     }
 
     /// Compute the dot product of two normals.
@@ -251,7 +275,7 @@ impl Normal3f {
     }
 }
 
-impl super::Vector3<Float> for Normal3f {
+impl Tuple3<Float> for Normal3f {
     fn new(x: Float, y: Float, z: Float) -> Self {
         Self::new(x, y, z)
     }
@@ -268,6 +292,24 @@ impl super::Vector3<Float> for Normal3f {
         self.0.z
     }
 }
+
+impl HasNan for Normal3f {
+    fn has_nan(&self) -> bool {
+        has_nan3(self)
+    }
+}
+
+impl Length<Float> for Normal3f {
+    fn length_squared(&self) -> Float {
+        length_squared3(self)
+    }
+
+    fn length(&self) -> Float {
+        length3(self)
+    }
+}
+
+impl Normalize<Float> for Normal3f {}
 
 impl Default for Normal3f {
     fn default() -> Self {
@@ -320,7 +362,7 @@ impl From<Normal3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{float::Float, vecmath::Vector3};
+    use crate::float::Float;
 
     use super::{Normal3f, Normal3i, Vector3f, Vector3i};
 

@@ -1,5 +1,8 @@
+use super::has_nan::HasNan;
+use super::length::{length3, length_squared3, Length};
+use super::normalize::Normalize;
 use super::vec_types::{Vec2f, Vec3f};
-use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
+use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Tuple3};
 use crate::float::Float;
 use crate::impl_unary_op_for_nt;
 use crate::newtype_macros::{
@@ -7,7 +10,7 @@ use crate::newtype_macros::{
     impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
     impl_binary_op_trait_for_nt,
 };
-use crate::vecmath::Vector3;
+use crate::vecmath::has_nan::has_nan3;
 use glam::{IVec2, IVec3};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -160,15 +163,15 @@ impl Vector3i {
     }
 
     pub fn x(&self) -> i32 {
-        self.0.x
+        Tuple3::x(self)
     }
 
     pub fn y(&self) -> i32 {
-        self.0.y
+        Tuple3::y(self)
     }
 
     pub fn z(&self) -> i32 {
-        self.0.z
+        Tuple3::z(self)
     }
 
     /// Compute the dot product
@@ -200,6 +203,24 @@ impl Vector3i {
     /// Take the cross product of this and a normal n
     pub fn cross_normal(&self, n: &Normal3i) -> Self {
         Self(self.0.cross(n.0))
+    }
+}
+
+impl Tuple3<i32> for Vector3i {
+    fn new(x: i32, y: i32, z: i32) -> Self {
+        Self::new(x, y, z)
+    }
+
+    fn x(&self) -> i32 {
+        self.0.x
+    }
+
+    fn y(&self) -> i32 {
+        self.0.y
+    }
+
+    fn z(&self) -> i32 {
+        self.0.z
     }
 }
 
@@ -426,55 +447,51 @@ impl Vector3f {
     }
 
     pub fn x(&self) -> Float {
-        Vector3::x(self)
+        Tuple3::x(self)
     }
 
     pub fn y(&self) -> Float {
-        Vector3::y(self)
+        Tuple3::y(self)
     }
 
     pub fn z(&self) -> Float {
-        Vector3::z(self)
+        Tuple3::z(self)
+    }
+
+    pub fn has_nan(&self) -> bool {
+        HasNan::has_nan(self)
     }
 
     pub fn length(&self) -> Float {
-        // To avoid users needing to import the Vector3 trait, which we really only need
-        // internal to the vecmath module, we include the length() function here, but
-        // just have it call the Trait implementation. Other methods in this and other
-        // structs file a similar pattern in this module.
-        Vector3::length(self)
+        Length::length(self)
     }
 
     pub fn length_squared(&self) -> Float {
-        Vector3::length_squared(self)
+        Length::length_squared(self)
     }
 
-    pub fn normalize(&self) -> Self {
-        Vector3::normalize(self)
+    pub fn normalize(self) -> Self {
+        Normalize::normalize(self)
     }
 
     /// Compute the dot product.
     pub fn dot(&self, v: &Self) -> Float {
-        debug_assert!(!self.has_nan());
-        debug_assert!(!v.has_nan());
-        self.0.dot(v.0)
+        super::dot(*self, *v)
     }
 
     /// Dot this vector with a normal.
     pub fn dot_normal(&self, n: &Normal3f) -> Float {
-        debug_assert!(!self.has_nan());
-        debug_assert!(!n.has_nan());
-        self.0.dot(n.0)
+        super::dot(*self, *n)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(&self, v: &Self) -> Float {
-        Float::abs(self.dot(v))
+        super::abs_dot(*self, *v)
     }
 
     /// Dot this vector with a normal and take its absolute value.
     pub fn abs_dot_normal(&self, n: &Normal3f) -> Float {
-        Float::abs(self.dot_normal(n))
+        super::abs_dot(*self, *n)
     }
 
     /// Take the cross product of this and a vector v.
@@ -492,7 +509,7 @@ impl Vector3f {
     }
 }
 
-impl super::Vector3<Float> for Vector3f {
+impl Tuple3<Float> for Vector3f {
     fn new(x: Float, y: Float, z: Float) -> Self {
         Self::new(x, y, z)
     }
@@ -509,6 +526,24 @@ impl super::Vector3<Float> for Vector3f {
         self.0.z
     }
 }
+
+impl HasNan for Vector3f {
+    fn has_nan(&self) -> bool {
+        has_nan3(self)
+    }
+}
+
+impl Length<Float> for Vector3f {
+    fn length_squared(&self) -> Float {
+        length_squared3(self)
+    }
+
+    fn length(&self) -> Float {
+        length3(self)
+    }
+}
+
+impl Normalize<Float> for Vector3f {}
 
 impl Default for Vector3f {
     fn default() -> Self {
@@ -565,7 +600,7 @@ impl From<Vector3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{float::Float, vecmath::Vector3};
+    use crate::float::Float;
 
     use super::{
         Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Vector2f, Vector2i, Vector3f,
