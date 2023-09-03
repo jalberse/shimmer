@@ -60,14 +60,7 @@ impl Floor for i32 {
     }
 }
 
-pub fn lerp<T>(t: Float, a: T, b: T) -> T
-where
-    T: Add<T, Output = T> + Mul<Float, Output = T>,
-{
-    a * (1.0 - t) + b * t
-}
-
-pub fn lerp_ref<'a, T>(t: Float, a: &'a T, b: &'a T) -> T
+pub fn lerp<'a, T>(t: Float, a: &'a T, b: &'a T) -> T
 where
     T: Add<T, Output = T>,
     &'a T: Mul<Float, Output = T>,
@@ -102,7 +95,7 @@ mod tests {
         let a = 0.0;
         let b = 10.0;
         let x = 0.45;
-        assert_eq!(4.5, super::lerp(x, a, b));
+        assert_eq!(4.5, super::lerp(x, &a, &b));
     }
 
     #[test]

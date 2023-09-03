@@ -70,7 +70,7 @@ pub fn linear_pdf(x: Float, a: Float, b: Float) -> Float {
     if x < 0.0 || x > 1.0 {
         0.0
     } else {
-        2.0 * lerp(x, a, b) / (a + b)
+        2.0 * lerp(x, &a, &b) / (a + b)
     }
 }
 
@@ -79,7 +79,7 @@ pub fn sample_linear(u: Float, a: Float, b: Float) -> Float {
     if u == 0.0 && a == 0.0 {
         return 0.0;
     }
-    let x = u * (a + b) / (a + Float::sqrt(lerp(u, a * a, b * b)));
+    let x = u * (a + b) / (a + Float::sqrt(lerp(u, &(a * a), &(b * b))));
     Float::min(x, 1.0 - Float::EPSILON)
 }
 

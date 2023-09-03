@@ -248,9 +248,9 @@ impl Tuple3<i32> for Point3i {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         Point3i {
-            x: math::lerp(t, a.x as Float, b.x as Float) as i32,
-            y: math::lerp(t, a.y as Float, b.y as Float) as i32,
-            z: math::lerp(t, a.z as Float, b.z as Float) as i32,
+            x: math::lerp(t, &(a.x as Float), &(b.x as Float)) as i32,
+            y: math::lerp(t, &(a.y as Float), &(b.y as Float)) as i32,
+            z: math::lerp(t, &(a.z as Float), &(b.z as Float)) as i32,
         }
     }
 }
@@ -464,8 +464,8 @@ impl Tuple2<Float> for Point2f {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         Point2f {
-            x: lerp(t, a.x, b.x),
-            y: lerp(t, a.y, b.y),
+            x: lerp(t, &a.x, &b.x),
+            y: lerp(t, &a.y, &b.y),
         }
     }
 }
@@ -641,9 +641,9 @@ impl Tuple3<Float> for Point3f {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         Self {
-            x: math::lerp(t, a.x, b.x),
-            y: math::lerp(t, a.y, b.y),
-            z: math::lerp(t, a.z, b.z),
+            x: math::lerp(t, &a.x, &b.x),
+            y: math::lerp(t, &a.y, &b.y),
+            z: math::lerp(t, &a.z, &b.z),
         }
     }
 }

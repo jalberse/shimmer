@@ -6,7 +6,7 @@ use super::tuple::{
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
-use crate::math::{self, lerp_ref};
+use crate::math::lerp;
 use crate::vecmath::has_nan::has_nan3;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
@@ -84,7 +84,7 @@ impl Tuple2<i32> for Vector2i {
     }
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
-        lerp_ref(t, a, b)
+        lerp(t, a, b)
     }
 }
 
@@ -323,7 +323,7 @@ impl Tuple3<i32> for Vector3i {
     }
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
-        lerp_ref(t, a, b)
+        lerp(t, a, b)
     }
 }
 
@@ -569,7 +569,7 @@ impl Tuple2<Float> for Vector2f {
     }
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
-        lerp_ref(t, a, b)
+        lerp(t, a, b)
     }
 }
 
@@ -798,7 +798,7 @@ impl Tuple3<Float> for Vector3f {
     }
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
-        lerp_ref(t, a, b)
+        lerp(t, a, b)
     }
 }
 

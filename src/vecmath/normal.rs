@@ -4,7 +4,7 @@ use super::normalize::Normalize;
 use super::tuple::{abs_dot3, angle_between, cross, cross_i32, dot3, Tuple3};
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
-use crate::math::lerp_ref;
+use crate::math::lerp;
 use auto_ops::*;
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ impl Tuple3<i32> for Normal3i {
     }
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
-        lerp_ref(t, a, b)
+        lerp(t, a, b)
     }
 }
 
@@ -384,7 +384,7 @@ impl Tuple3<Float> for Normal3f {
     }
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
-        lerp_ref(t, a, b)
+        lerp(t, a, b)
     }
 }
 
