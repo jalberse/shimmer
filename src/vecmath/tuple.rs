@@ -9,21 +9,37 @@ use super::{has_nan::HasNan, length::Length};
 
 /// A tuple with 3 elements.
 /// Used for sharing logic across e.g. Vector3f and Normal3f and Point3f.
-pub trait Tuple3<T> {
+pub trait Tuple3<T>
+where
+    Self: Sized,
+    T: Abs,
+{
     fn new(x: T, y: T, z: T) -> Self;
 
     fn x(&self) -> T;
     fn y(&self) -> T;
     fn z(&self) -> T;
+
+    fn abs(&self) -> Self {
+        Self::new(Abs::abs(self.x()), Abs::abs(self.y()), Abs::abs(self.z()))
+    }
 }
 
 /// A tuple with 2 elements.
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
-pub trait Tuple2<T> {
+pub trait Tuple2<T>
+where
+    Self: Sized,
+    T: Abs,
+{
     fn new(x: T, y: T) -> Self;
 
     fn x(&self) -> T;
     fn y(&self) -> T;
+
+    fn abs(&self) -> Self {
+        Self::new(Abs::abs(self.x()), Abs::abs(self.y()))
+    }
 }
 
 /// Computes the cross product of two vectors. Generic because we want to be able
@@ -67,7 +83,7 @@ pub fn dot3<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple3<T> + HasNan,
     V2: Tuple3<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T>,
+    T: Mul<Output = T> + Add<Output = T> + Abs,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -89,7 +105,7 @@ pub fn dot2<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple2<T> + HasNan,
     V2: Tuple2<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T>,
+    T: Mul<Output = T> + Add<Output = T> + Abs,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());

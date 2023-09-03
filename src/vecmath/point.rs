@@ -82,18 +82,6 @@ impl_op_ex!(/=|p1: &mut Point2i, p2: Point2i|
     p1.y /= p2.y;
 });
 
-impl_op_ex!(+=|p1: &mut Point2i, s: i32|
-{
-    p1.x += s;
-    p1.y += s;
-});
-
-impl_op_ex!(-=|p1: &mut Point2i, s: i32|
-{
-    p1.x -= s;
-    p1.y -= s;
-});
-
 impl_op_ex!(*=|p1: &mut Point2i, s: i32|
 {
     p1.x *= s;

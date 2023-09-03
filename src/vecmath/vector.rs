@@ -836,7 +836,7 @@ impl From<Vector3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::float::Float;
+    use crate::{float::Float, vecmath::tuple::{Tuple3, Tuple2}};
 
     use super::{
         Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Vector2f, Vector2i, Vector3f,
@@ -1038,6 +1038,16 @@ mod tests {
         assert_eq!(Vector3f::new(-3.0, 30.0, 60.0), vec * 3.0);
         assert_eq!(Vector3f::new(-3.0, 30.0, 60.0), 3.0 * vec);
         assert_eq!(Vector3f::new(-0.5, 5.0, 10.0), vec / 2.0);
+    }
+
+    #[test]
+    fn vector_abs()
+    {
+        let v = Vector3f::new(-1.0, 2.0, -3.5);
+        assert_eq!(Vector3f::new(1.0, 2.0, 3.5), v.abs());
+
+        let v = Vector2f::new(-1.0, 2.0);
+        assert_eq!(Vector2f::new(1.0, 2.0), v.abs());
     }
 
     #[test]
