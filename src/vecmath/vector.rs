@@ -500,22 +500,6 @@ impl Vector2f {
         Self { x: v, y: v }
     }
 
-    pub fn has_nan(&self) -> bool {
-        HasNan::has_nan(self)
-    }
-
-    pub fn length_squared(&self) -> Float {
-        Length::length_squared(self)
-    }
-
-    pub fn length(&self) -> Float {
-        Length::length(self)
-    }
-
-    pub fn normalize(self) -> Self {
-        Normalize::normalize(self)
-    }
-
     /// Compute the dot product.
     pub fn dot(&self, v: &Self) -> Float {
         dot2(self, v)
@@ -675,34 +659,6 @@ impl Vector3f {
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
         Self::new(v, v, v)
-    }
-
-    pub fn x(&self) -> Float {
-        Tuple3::x(self)
-    }
-
-    pub fn y(&self) -> Float {
-        Tuple3::y(self)
-    }
-
-    pub fn z(&self) -> Float {
-        Tuple3::z(self)
-    }
-
-    pub fn has_nan(&self) -> bool {
-        HasNan::has_nan(self)
-    }
-
-    pub fn length(&self) -> Float {
-        Length::length(self)
-    }
-
-    pub fn length_squared(&self) -> Float {
-        Length::length_squared(self)
-    }
-
-    pub fn normalize(self) -> Self {
-        Normalize::normalize(self)
     }
 
     /// Compute the dot product.
@@ -872,8 +828,8 @@ impl From<Vector3f> for (Float, Float, Float) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        float::Float,
-        vecmath::tuple::{Tuple2, Tuple3},
+        vecmath::{HasNan, Length, Normalize, Tuple2, Tuple3},
+        Float,
     };
 
     use super::{

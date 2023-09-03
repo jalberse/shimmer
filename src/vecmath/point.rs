@@ -3,6 +3,7 @@ use super::tuple::{Tuple2, Tuple3};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
 use crate::math::{self, lerp};
+use crate::vecmath::Length;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 // ---------------------------------------------------------------------------
@@ -414,10 +415,7 @@ impl Point2f {
         Self { x: v, y: v }
     }
 
-    pub fn has_nan(&self) -> bool {
-        HasNan::has_nan(self)
-    }
-
+    // TODO we can make a Distance trait that Points can implement.
     pub fn distance(self, p: Point2f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length()
@@ -575,10 +573,6 @@ impl Point3f {
         Self::new(v, v, v)
     }
 
-    pub fn has_nan(&self) -> bool {
-        HasNan::has_nan(self)
-    }
-
     pub fn distance(self, p: Point3f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length()
@@ -706,7 +700,7 @@ impl From<Point3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::float::Float;
+    use crate::{vecmath::HasNan, Float};
 
     use super::{Point2f, Point2i, Point3f, Point3i, Vector2f, Vector2i, Vector3f, Vector3i};
 

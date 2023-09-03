@@ -28,22 +28,6 @@
 //! their relationship to a particular surface, they behave differently
 //! than vectors in some situations, particularly when applying transformations.
 
-// This module contains traits (Tuple, Length, Normalize, etc) which are created
-// to allow us to share logic across our various types (Vectors, Normals, Points).
-// However, we don't export the traits, and make their functions available within
-// the public structs (calling the trait implementation). This way, users don't
-// need to import the traits to use the structs.
-
-// TODO Consider making the traits public.
-//  I had previously thought we would keep them private and expose the API only through the structs,
-//  so that users don't need to import the traits to use them.
-//  Actually, I guess it can still make sense to keep the traits private and expose only within the structs.
-//  Even if there's something like Lerp that I dont' want taking &self (since I think lerp(t, a, b) is cleaner than a.lerp(t, b),
-//  we can still do that by adding it to the struct.)
-//  I don't want callers of vecmath to implement on these traits necesssarily, so there's not a great reason to expose them.
-// It's extra maintanence to ensure that we make a function in the struct to expose something in the trait,
-// when really we should just design the trait that it's something we'd be happy exposing.
-
 pub mod has_nan;
 pub mod length;
 pub mod normal;
@@ -52,9 +36,18 @@ pub mod point;
 pub mod tuple;
 pub mod vector;
 
+pub use has_nan::HasNan;
+pub use length::Length;
 pub use normal::{Normal3f, Normal3i};
+pub use normalize::Normalize;
 pub use point::{Point2f, Point2i, Point3f, Point3i};
+pub use tuple::{Tuple2, Tuple3};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
+
+// TODO While I think we want to expose the traits as public so that users can import them and use them on the structs,
+//   I think that we want to keep e.g. our helper cross() methods private to the vecmath module.
+// I think we would do it by making some length_helpers() module or similar, and using that inside of vecmath.
+//   But we would not make it a public module here.
 
 // TODO Our impl_op_ex* methods are not all tested; test them.
 

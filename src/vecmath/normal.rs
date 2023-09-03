@@ -286,22 +286,6 @@ impl Normal3f {
         Self { x: v, y: v, z: v }
     }
 
-    pub fn has_nan(&self) -> bool {
-        HasNan::has_nan(self)
-    }
-
-    pub fn length(&self) -> Float {
-        Length::length(self)
-    }
-
-    pub fn length_squared(&self) -> Float {
-        Length::length_squared(self)
-    }
-
-    pub fn normalize(self) -> Self {
-        Normalize::normalize(self)
-    }
-
     /// Compute the dot product of two normals.
     pub fn dot(&self, n: &Self) -> Float {
         dot3(self, n)
@@ -466,7 +450,10 @@ impl From<Normal3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::float::Float;
+    use crate::{
+        float::Float,
+        vecmath::{HasNan, Length, Normalize},
+    };
 
     use super::{Normal3f, Normal3i, Vector3f, Vector3i};
 
