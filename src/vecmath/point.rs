@@ -1,5 +1,6 @@
-use super::has_nan::{has_nan2, has_nan3, HasNan};
+use super::has_nan::HasNan;
 use super::tuple::{Tuple2, Tuple3};
+use super::tuple_fns::{has_nan2, has_nan3};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
 use crate::math::{self, lerp};

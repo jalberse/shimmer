@@ -1,7 +1,9 @@
-use super::has_nan::{has_nan3, HasNan};
-use super::length::{length3, length_squared3, Length};
+use super::has_nan::HasNan;
+use super::length::Length;
+use super::length_fns::{length3, length_squared3};
 use super::normalize::Normalize;
-use super::tuple::{abs_dot3, angle_between, cross, cross_i32, dot3, Tuple3};
+use super::tuple::Tuple3;
+use super::tuple_fns::{abs_dot3, angle_between, cross, cross_i32, dot3, has_nan3};
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
 use crate::math::lerp;

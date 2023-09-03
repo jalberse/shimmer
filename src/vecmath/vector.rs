@@ -1,13 +1,14 @@
-use super::has_nan::{has_nan2, HasNan};
-use super::length::{length2, length3, length_squared2, length_squared3, Length};
+use super::has_nan::HasNan;
+use super::length::Length;
+use super::length_fns::{length2, length3, length_squared2, length_squared3};
 use super::normalize::Normalize;
-use super::tuple::{
-    abs_dot2, abs_dot3, angle_between, cross, cross_i32, dot2, dot3, Tuple2, Tuple3,
+use super::tuple::{Tuple2, Tuple3};
+use super::tuple_fns::{
+    abs_dot2, abs_dot3, angle_between, cross, cross_i32, dot2, dot3, has_nan2, has_nan3,
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
 use crate::math::lerp;
-use crate::vecmath::has_nan::has_nan3;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 // ---------------------------------------------------------------------------

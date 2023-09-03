@@ -30,10 +30,12 @@
 
 pub mod has_nan;
 pub mod length;
+mod length_fns;
 pub mod normal;
 pub mod normalize;
 pub mod point;
 pub mod tuple;
+mod tuple_fns;
 pub mod vector;
 
 pub use has_nan::HasNan;
