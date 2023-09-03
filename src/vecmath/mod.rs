@@ -131,7 +131,7 @@ where
 }
 
 /// Take the dot product of two vectors.
-fn dot3<V1, V2, T>(v: V1, w: V2) -> T
+fn dot3<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple3<T> + HasNan,
     V2: Tuple3<T> + HasNan,
@@ -143,7 +143,7 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-fn abs_dot3<V1, V2, T>(v: V1, w: V2) -> T
+fn abs_dot3<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple3<T> + HasNan,
     V2: Tuple3<T> + HasNan,
@@ -153,7 +153,7 @@ where
 }
 
 /// Take the dot product of two vectors.
-fn dot2<V1, V2, T>(v: V1, w: V2) -> T
+fn dot2<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple2<T> + HasNan,
     V2: Tuple2<T> + HasNan,
@@ -165,7 +165,7 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-fn abs_dot2<V1, V2, T>(v: V1, w: V2) -> T
+fn abs_dot2<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple2<T> + HasNan,
     V2: Tuple2<T> + HasNan,
@@ -191,7 +191,7 @@ where
 /// V3: The resulting type from adding or subtracting V1 and V2.
 ///   That is typically a Vector3f.
 ///   We just use the third type to be able to specify that that is the case.
-fn angle_between<V1, V2, V3>(v: V1, w: V2) -> Float
+fn angle_between<V1, V2, V3>(v: &V1, w: &V2) -> Float
 where
     V1: Tuple3<Float> + HasNan + Add<V2, Output = V3> + Copy + Clone,
     V2: Tuple3<Float> + HasNan + Add<V1, Output = V3> + Sub<V1, Output = V3> + Copy + Clone,

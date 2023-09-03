@@ -58,12 +58,12 @@ impl Vector2i {
     }
 
     /// Compute the dot product.
-    pub fn dot(self, v: Self) -> i32 {
+    pub fn dot(&self, v: &Self) -> i32 {
         super::dot2(self, v)
     }
 
     /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(self, v: Self) -> i32 {
+    pub fn abs_dot(&self, v: &Self) -> i32 {
         super::abs_dot2(self, v)
     }
 }
@@ -259,22 +259,22 @@ impl Vector3i {
     }
 
     /// Compute the dot product
-    pub fn dot(self, v: Self) -> i32 {
+    pub fn dot(&self, v: &Self) -> i32 {
         super::dot3(self, v)
     }
 
     /// Dot this vector with a normal.
-    pub fn dot_normal(self, n: Normal3i) -> i32 {
+    pub fn dot_normal(&self, n: &Normal3i) -> i32 {
         super::dot3(self, n)
     }
 
     /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(self, v: Self) -> i32 {
+    pub fn abs_dot(&self, v: &Self) -> i32 {
         super::abs_dot3(self, v)
     }
 
     /// Dot this vector with a normal and take the absolute value.
-    pub fn abs_dot_normal(self, n: Normal3i) -> i32 {
+    pub fn abs_dot_normal(&self, n: &Normal3i) -> i32 {
         super::abs_dot3(self, n)
     }
 
@@ -497,12 +497,12 @@ impl Vector2f {
     }
 
     /// Compute the dot product.
-    pub fn dot(self, v: Self) -> Float {
+    pub fn dot(&self, v: &Self) -> Float {
         dot2(self, v)
     }
 
     /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(self, v: Self) -> Float {
+    pub fn abs_dot(&self, v: &Self) -> Float {
         abs_dot2(self, v)
     }
 }
@@ -687,22 +687,22 @@ impl Vector3f {
 
     /// Compute the dot product.
     pub fn dot(&self, v: &Self) -> Float {
-        super::dot3(*self, *v)
+        super::dot3(self, v)
     }
 
     /// Dot this vector with a normal.
     pub fn dot_normal(&self, n: &Normal3f) -> Float {
-        super::dot3(*self, *n)
+        super::dot3(self, n)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(&self, v: &Self) -> Float {
-        super::abs_dot3(*self, *v)
+        super::abs_dot3(self, v)
     }
 
     /// Dot this vector with a normal and take its absolute value.
     pub fn abs_dot_normal(&self, n: &Normal3f) -> Float {
-        super::abs_dot3(*self, *n)
+        super::abs_dot3(self, n)
     }
 
     /// Take the cross product of this and a vector v.
@@ -907,15 +907,15 @@ mod tests {
 
         let v1 = Vector3i::new(0, 1, 2);
         let v2 = Vector3i::new(3, 4, 5);
-        assert_eq!(14, v1.dot(v2));
+        assert_eq!(14, v1.dot(&v2));
 
         let v1 = Vector2f::new(0.0, 1.0);
         let v2 = Vector2f::new(2.0, 3.0);
-        assert_eq!(3.0, v1.dot(v2));
+        assert_eq!(3.0, v1.dot(&v2));
 
         let v1 = Vector2i::new(0, 1);
         let v2 = Vector2i::new(2, 3);
-        assert_eq!(3, v1.dot(v2));
+        assert_eq!(3, v1.dot(&v2));
     }
 
     #[test]
@@ -926,7 +926,7 @@ mod tests {
 
         let v1 = Vector3i::new(0, 1, 2);
         let n = Normal3i::new(3, 4, 5);
-        assert_eq!(14, v1.dot_normal(n));
+        assert_eq!(14, v1.dot_normal(&n));
     }
 
     #[test]
@@ -937,15 +937,15 @@ mod tests {
 
         let v1 = Vector3i::new(0, 1, 2);
         let v2 = -Vector3i::new(3, 4, 5);
-        assert_eq!(14, v1.abs_dot(v2));
+        assert_eq!(14, v1.abs_dot(&v2));
 
         let v1 = Vector2f::new(0.0, 1.0);
         let v2 = -Vector2f::new(2.0, 3.0);
-        assert_eq!(3.0, v1.abs_dot(v2));
+        assert_eq!(3.0, v1.abs_dot(&v2));
 
         let v1 = Vector2i::new(0, 1);
         let v2 = -Vector2i::new(2, 3);
-        assert_eq!(3, v1.abs_dot(v2));
+        assert_eq!(3, v1.abs_dot(&v2));
     }
 
     #[test]
@@ -956,7 +956,7 @@ mod tests {
 
         let v1 = Vector3i::new(0, 1, 2);
         let n = -Normal3i::new(3, 4, 5);
-        assert_eq!(14, v1.abs_dot_normal(n));
+        assert_eq!(14, v1.abs_dot_normal(&n));
     }
 
     #[test]
