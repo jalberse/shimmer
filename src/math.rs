@@ -60,6 +60,23 @@ impl Floor for i32 {
     }
 }
 
+pub trait Min {
+    // Take the minimum of self and a
+    fn min(self, a: Self) -> Self;
+}
+
+impl Min for Float {
+    fn min(self, a: Self) -> Self {
+        Float::min(self, a)
+    }
+}
+
+impl Min for i32 {
+    fn min(self, a: Self) -> Self {
+        <i32 as Ord>::min(self, a)
+    }
+}
+
 /// Provides the equivalent of f32::mul_add for the specified type.
 /// Really just provided so that we can use a common interface for Float
 /// and integer types, even if the integer types won't benefit from this form.

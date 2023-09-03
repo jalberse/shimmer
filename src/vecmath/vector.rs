@@ -1009,6 +1009,25 @@ mod tests {
     }
 
     #[test]
+    fn vector_min() {
+        let v1 = Vector3f::new(100.0, 0.0, 0.0);
+        let v2 = Vector3f::new(0.0, 10.0, 100.0);
+        assert_eq!(Vector3f::new(0.0, 0.0, 0.0), Tuple3::min(&v1, &v2));
+
+        let v1 = Vector3i::new(100, 0, 0);
+        let v2 = Vector3i::new(0, 10, 100);
+        assert_eq!(Vector3i::new(0, 0, 0), Tuple3::min(&v1, &v2));
+
+        let v1 = Vector2f::new(100.0, 0.0);
+        let v2 = Vector2f::new(0.0, 10.0);
+        assert_eq!(Vector2f::new(0.0, 0.0), Tuple2::min(&v1, &v2));
+
+        let v1 = Vector2i::new(100, 0);
+        let v2 = Vector2i::new(0, 10);
+        assert_eq!(Vector2i::new(0, 0), Tuple2::min(&v1, &v2));
+    }
+
+    #[test]
     fn vector_binary_ops() {
         let vec = Vector2i::new(-2, 10);
         // Vector + Vector -> Vector

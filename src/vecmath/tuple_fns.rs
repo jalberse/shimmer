@@ -6,7 +6,7 @@ use std::ops::{Add, Mul, Sub};
 use crate::{
     float::PI_F,
     is_nan::IsNan,
-    math::{difference_of_products, safe_asin, sum_of_products, Abs, Ceil, Floor, MulAdd},
+    math::{difference_of_products, safe_asin, sum_of_products, Abs, Ceil, Floor, Min, MulAdd},
     Float,
 };
 
@@ -15,7 +15,7 @@ use super::{HasNan, Length, Tuple2, Tuple3};
 pub fn has_nan3<V, T>(v: &V) -> bool
 where
     V: Tuple3<T>,
-    T: IsNan + Abs + Ceil + Floor,
+    T: IsNan + Abs + Ceil + Floor + Min,
 {
     v.x().is_nan() || v.y().is_nan() || v.z().is_nan()
 }
@@ -23,7 +23,7 @@ where
 pub fn has_nan2<V, T>(v: &V) -> bool
 where
     V: Tuple2<T>,
-    T: IsNan + Abs + Ceil + Floor,
+    T: IsNan + Abs + Ceil + Floor + Min,
 {
     v.x().is_nan() || v.y().is_nan()
 }

@@ -1,6 +1,6 @@
 use crate::{
     float::Float,
-    math::{Abs, Ceil, Floor},
+    math::{Abs, Ceil, Floor, Min},
 };
 
 /// A tuple with 3 elements.
@@ -10,7 +10,7 @@ use crate::{
 /// then that can be represented in a separate trait which they can implement. Composition!
 pub trait Tuple3<T>: Sized
 where
-    T: Abs + Ceil + Floor,
+    T: Abs + Ceil + Floor + Min,
 {
     fn new(x: T, y: T, z: T) -> Self;
 
@@ -37,13 +37,22 @@ where
     // not be able to be lerp'd if they can't be summed, but it's useful to be able to
     // interpolate points even if we typically can't want to allow summing them.
     fn lerp(t: Float, a: &Self, b: &Self) -> Self;
+
+    // Take the componentwise minimum of the two tuples.
+    fn min(a: &Self, b: &Self) -> Self {
+        Self::new(
+            T::min(a.x(), b.x()),
+            T::min(a.y(), b.y()),
+            T::min(a.z(), b.z()),
+        )
+    }
 }
 
 /// A tuple with 2 elements.
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
 pub trait Tuple2<T>: Sized
 where
-    T: Abs + Ceil + Floor,
+    T: Abs + Ceil + Floor + Min,
 {
     fn new(x: T, y: T) -> Self;
 
@@ -63,4 +72,9 @@ where
     }
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self;
+
+    // Take the componentwise minimum of the two tuples.
+    fn min(a: &Self, b: &Self) -> Self {
+        Self::new(T::min(a.x(), b.x()), T::min(a.y(), b.y()))
+    }
 }
