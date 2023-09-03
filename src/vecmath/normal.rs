@@ -440,7 +440,7 @@ impl_op_ex_commutative!(+|n: Normal3f, v: Vector3f| -> Vector3f {
 
 impl From<Vector3f> for Normal3f {
     fn from(value: Vector3f) -> Normal3f {
-        Normal3f::new(value.x(), value.y(), value.z())
+        Normal3f::new(value.x, value.y, value.z)
     }
 }
 

@@ -81,14 +81,18 @@ use self::{
 // But, this trade-off is worth it to be able to leverage the type system for correctness.
 // The newtype pattern should have no associated runtime cost here, optimized by the compiler.
 
-// TODO There's spots that I copy instead of use reference, mostly due to not implementing additions etc
-//    on the reference type. I guess we could go through and change things to &self where possible.
-//    Implementing on reference types becomes much easier when I'm not using newtype around glam, too,
-//    since we can just use impl_op_ex(). So yeah, make the change away from glam and then do this.
+// TODO Now that we've got std::ops::* implemented on our types, we can go back
+//   and use &self in a bunch of places where we were passing by value before.
+//   I don't know if it would even impact performance, but for convention's sake.
 
-// TODO and go add calls to has_nan() in other functions, wrapping in debug_assert().
+// TODO Our impl_op_ex* methods are not all tested; test them.
 
-// TODO also the list of functions on page 85
+// TODO Run a test coverage software and ensure full coverage. I know I'm missing a bit. https://lib.rs/crates/cargo-llvm-cov
+//   Also hook that up into GitHub actions.
+
+// TODO ensure we debug_assert() with has_nan() where appropriate.
+
+// TODO also implement the list of functions on page 85
 
 /// Computes the cross product of two vectors. Generic because we want to be able
 /// to use this for Vector and Normal types alike, and combinations of them.

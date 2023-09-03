@@ -487,18 +487,18 @@ impl_op_ex!(/= |p: &mut Point2f, s: Float| {
 // Point + Vector -> Point
 impl_op_ex_commutative!(+ |p: Point2f, v: Vector2f| -> Point2f
 {
-    Point2f::new(p.x + v.x(), p.y + v.y())
+    Point2f::new(p.x + v.x, p.y + v.y)
 });
 impl_op_ex!(+=|p: &mut Point2f, v: Vector2f| {
-    p.x += v.x();
-    p.y += v.y();
+    p.x += v.x;
+    p.y += v.y;
 });
 
 // Point - Vector -> Point
 impl_op_ex!(-|p: Point2f, v: Vector2f| -> Point2f { Point2f::new(p.x - v.x, p.y - v.y) });
 impl_op_ex!(-=|p: &mut Point2f, v: Vector2f| {
-    p.x -= v.x();
-    p.y -= v.y();
+    p.x -= v.x;
+    p.y -= v.y;
 });
 
 // Point - Point -> Vector

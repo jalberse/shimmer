@@ -581,7 +581,7 @@ impl_op_ex!(/= |v1: &mut Vector2f, s: Float| {
 
 impl From<Point2f> for Vector2f {
     fn from(value: Point2f) -> Self {
-        Self::new(value.x(), value.y())
+        Self::new(value.x, value.y)
     }
 }
 
@@ -812,13 +812,13 @@ impl_op_ex!(/= |v1: &mut Vector3f, s: Float| {
 
 impl From<Point3f> for Vector3f {
     fn from(value: Point3f) -> Self {
-        Self::new(value.x(), value.y(), value.z())
+        Self::new(value.x, value.y, value.z)
     }
 }
 
 impl From<Normal3f> for Vector3f {
     fn from(value: Normal3f) -> Self {
-        Self::new(value.x(), value.y(), value.z())
+        Self::new(value.x, value.y, value.z)
     }
 }
 
