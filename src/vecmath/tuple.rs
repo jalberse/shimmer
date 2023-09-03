@@ -9,6 +9,9 @@ use super::{has_nan::HasNan, length::Length};
 
 /// A tuple with 3 elements.
 /// Used for sharing logic across e.g. Vector3f and Normal3f and Point3f.
+/// Note that only those functions that are shared across all three types are
+/// within this trait; if there's something that only one or two of them have,
+/// then that can be represented in a separate trait which they can implement. Composition!
 pub trait Tuple3<T>
 where
     Self: Sized,
@@ -31,6 +34,14 @@ where
     fn floor(&self) -> Self {
         Self::new(self.x().floor(), self.y().floor(), self.z().floor())
     }
+
+    // Since lerp requires Self: Add<Self>, but we don't want to allow Point + Point
+    // and thus can't put that constraint on the trait bounds, we can't have a default
+    // implementation here. But we can provide use free common implementation for types
+    // which do implement Add<Self>. Though you could make an argument that Points should
+    // not be able to be lerp'd if they can't be summed, but it's useful to be able to
+    // interpolate points even if we typically can't want to allow summing them.
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self;
 }
 
 /// A tuple with 2 elements.
@@ -56,6 +67,8 @@ where
     fn floor(&self) -> Self {
         Self::new(self.x().floor(), self.y().floor())
     }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self;
 }
 
 /// Computes the cross product of two vectors. Generic because we want to be able

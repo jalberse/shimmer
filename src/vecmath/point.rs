@@ -2,6 +2,7 @@ use super::has_nan::{has_nan2, has_nan3, HasNan};
 use super::tuple::{Tuple2, Tuple3};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
+use crate::math::{self, lerp};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 // ---------------------------------------------------------------------------
@@ -244,6 +245,14 @@ impl Tuple3<i32> for Point3i {
     fn z(&self) -> i32 {
         self.z
     }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        Point3i {
+            x: math::lerp(t, a.x as Float, b.x as Float) as i32,
+            y: math::lerp(t, a.y as Float, b.y as Float) as i32,
+            z: math::lerp(t, a.z as Float, b.z as Float) as i32,
+        }
+    }
 }
 
 impl Default for Point3i {
@@ -252,7 +261,7 @@ impl Default for Point3i {
     }
 }
 
-impl_op_ex!(-|p: Point3i| -> Point3i {
+impl_op_ex!(-|p: &Point3i| -> Point3i {
     Point3i {
         x: p.x.neg(),
         y: p.y.neg(),
@@ -260,13 +269,22 @@ impl_op_ex!(-|p: Point3i| -> Point3i {
     }
 });
 
-impl_op_ex_commutative!(*|p: Point3i, s: i32| -> Point3i {
+impl_op_ex_commutative!(*|p: &Point3i, s: i32| -> Point3i {
     Point3i {
         x: p.x * s,
         y: p.y * s,
         z: p.z * s,
     }
 });
+
+impl_op_ex_commutative!(*|p: &Point3i, s: Float| -> Point3i {
+    Point3i {
+        x: (p.x as Float * s) as i32,
+        y: (p.y as Float * s) as i32,
+        z: (p.z as Float * s) as i32,
+    }
+});
+
 impl_op_ex!(*=|p: &mut Point3i, s: i32|
 {
     p.x *= s;
@@ -274,7 +292,7 @@ impl_op_ex!(*=|p: &mut Point3i, s: i32|
     p.z *= s;
 });
 
-impl_op_ex!(/|p: Point3i, s: i32| -> Point3i
+impl_op_ex!(/|p: &Point3i, s: i32| -> Point3i
 {
     Point3i {
         x: p.x / s,
@@ -290,19 +308,19 @@ impl_op_ex!(/=|p: &mut Point3i, s: i32|
 });
 
 // Point + Vector -> Point
-impl_op_ex_commutative!(+|p: Point3i, v: Vector3i| -> Point3i
+impl_op_ex_commutative!(+|p: &Point3i, v: &Vector3i| -> Point3i
 {
     Point3i { x: p.x + v.x, y: p.y + v.y, z: p.z + v.z }
 });
 
-impl_op_ex!(+=|p: &mut Point3i, v: Vector3i|
+impl_op_ex!(+=|p: &mut Point3i, v: &Vector3i|
 {
     p.x += v.x;
     p.y += v.y;
     p.z += v.z;
 });
 
-impl_op_ex!(-|p: Point3i, v: Vector3i| -> Point3i {
+impl_op_ex!(-|p: &Point3i, v: &Vector3i| -> Point3i {
     Point3i {
         x: p.x - v.x,
         y: p.y - v.y,
@@ -310,7 +328,7 @@ impl_op_ex!(-|p: Point3i, v: Vector3i| -> Point3i {
     }
 });
 
-impl_op_ex!(-=|p: &mut Point3i, v: Vector3i|
+impl_op_ex!(-=|p: &mut Point3i, v: &Vector3i|
 {
     p.x -= v.x;
     p.y -= v.y;
@@ -318,7 +336,7 @@ impl_op_ex!(-=|p: &mut Point3i, v: Vector3i|
 });
 
 // Point - Point -> Vector
-impl_op_ex!(-|p1: Point3i, p2: Point3i| -> Vector3i {
+impl_op_ex!(-|p1: &Point3i, p2: &Point3i| -> Vector3i {
     Vector3i {
         x: p1.x - p2.x,
         y: p1.y - p2.y,
@@ -443,6 +461,13 @@ impl Tuple2<Float> for Point2f {
     fn y(&self) -> Float {
         self.y
     }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        Point2f {
+            x: lerp(t, a.x, b.x),
+            y: lerp(t, a.y, b.y),
+        }
+    }
 }
 
 impl HasNan for Point2f {
@@ -457,11 +482,11 @@ impl Default for Point2f {
     }
 }
 
-impl_op_ex!(-|p: Point2f| -> Point2f { Point2f::new(-p.x, -p.y) });
+impl_op_ex!(-|p: &Point2f| -> Point2f { Point2f::new(-p.x, -p.y) });
 
 // Points can be scaled elementwise
-impl_op_ex_commutative!(*|p: Point2f, s: Float| -> Point2f { Point2f::new(p.x * s, p.y * s) });
-impl_op_ex!(/ |p: Point2f, s: Float| -> Point2f {
+impl_op_ex_commutative!(*|p: &Point2f, s: Float| -> Point2f { Point2f::new(p.x * s, p.y * s) });
+impl_op_ex!(/ |p: &Point2f, s: Float| -> Point2f {
     Point2f::new(p.x / s, p.y / s) });
 impl_op_ex!(*= |p: &mut Point2f, s: Float| {
     p.x *= s;
@@ -473,24 +498,24 @@ impl_op_ex!(/= |p: &mut Point2f, s: Float| {
 });
 
 // Point + Vector -> Point
-impl_op_ex_commutative!(+ |p: Point2f, v: Vector2f| -> Point2f
+impl_op_ex_commutative!(+ |p: &Point2f, v: &Vector2f| -> Point2f
 {
     Point2f::new(p.x + v.x, p.y + v.y)
 });
-impl_op_ex!(+=|p: &mut Point2f, v: Vector2f| {
+impl_op_ex!(+=|p: &mut Point2f, v: &Vector2f| {
     p.x += v.x;
     p.y += v.y;
 });
 
 // Point - Vector -> Point
-impl_op_ex!(-|p: Point2f, v: Vector2f| -> Point2f { Point2f::new(p.x - v.x, p.y - v.y) });
-impl_op_ex!(-=|p: &mut Point2f, v: Vector2f| {
+impl_op_ex!(-|p: &Point2f, v: &Vector2f| -> Point2f { Point2f::new(p.x - v.x, p.y - v.y) });
+impl_op_ex!(-=|p: &mut Point2f, v: &Vector2f| {
     p.x -= v.x;
     p.y -= v.y;
 });
 
 // Point - Point -> Vector
-impl_op_ex!(-|p1: Point2f, p2: Point2f| -> Vector2f { Vector2f::new(p1.x - p2.x, p1.y - p2.y,) });
+impl_op_ex!(-|p1: &Point2f, p2: &Point2f| -> Vector2f { Vector2f::new(p1.x - p2.x, p1.y - p2.y,) });
 
 impl From<Vector2f> for Point2f {
     fn from(value: Vector2f) -> Self {
@@ -612,6 +637,14 @@ impl Tuple3<Float> for Point3f {
 
     fn z(&self) -> Float {
         self.z
+    }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        Self {
+            x: math::lerp(t, a.x, b.x),
+            y: math::lerp(t, a.y, b.y),
+            z: math::lerp(t, a.z, b.z),
+        }
     }
 }
 

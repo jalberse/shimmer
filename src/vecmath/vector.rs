@@ -1,9 +1,12 @@
 use super::has_nan::{has_nan2, HasNan};
 use super::length::{length2, length3, length_squared2, length_squared3, Length};
 use super::normalize::Normalize;
-use super::tuple::{Tuple2, dot3, abs_dot3, cross_i32, dot2, abs_dot2, cross, angle_between, Tuple3};
+use super::tuple::{
+    abs_dot2, abs_dot3, angle_between, cross, cross_i32, dot2, dot3, Tuple2, Tuple3,
+};
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
+use crate::math::{self, lerp_ref};
 use crate::vecmath::has_nan::has_nan3;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
@@ -12,8 +15,7 @@ use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Vector2i
-{
+pub struct Vector2i {
     pub x: i32,
     pub y: i32,
 }
@@ -41,7 +43,7 @@ impl Vector2i {
     pub const NEG_Y: Self = Self::new(0, -1);
 
     pub const fn new(x: i32, y: i32) -> Self {
-        Self{ x, y }
+        Self { x, y }
     }
 
     /// Creates a vector with all elements set to `v`.
@@ -80,6 +82,10 @@ impl Tuple2<i32> for Vector2i {
     fn y(&self) -> i32 {
         self.y
     }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        lerp_ref(t, a, b)
+    }
 }
 
 impl HasNan for Vector2i {
@@ -94,50 +100,63 @@ impl Default for Vector2i {
     }
 }
 
-impl_op_ex!(-|v: Vector2i| -> Vector2i
-{
-    Vector2i { x: v.x.neg(), y: v.y.neg() }
+impl_op_ex!(-|v: &Vector2i| -> Vector2i {
+    Vector2i {
+        x: v.x.neg(),
+        y: v.y.neg(),
+    }
 });
 
-impl_op_ex!(+|v1: Vector2i, v2: Vector2i| -> Vector2i
+impl_op_ex!(+|v1: &Vector2i, v2: &Vector2i| -> Vector2i
 {
     Vector2i { x: v1.x + v2.x, y: v1.y + v2.y }
 });
 
-impl_op_ex!(-|v1: Vector2i, v2: Vector2i| -> Vector2i
-{
-    Vector2i { x: v1.x - v2.x, y: v1.y - v2.y }
+impl_op_ex!(-|v1: &Vector2i, v2: &Vector2i| -> Vector2i {
+    Vector2i {
+        x: v1.x - v2.x,
+        y: v1.y - v2.y,
+    }
 });
 
-impl_op_ex_commutative!(*|v: Vector2i, s: i32| -> Vector2i
-{
-    Vector2i { x: v.x * s, y: v.y * s }
+impl_op_ex_commutative!(*|v: &Vector2i, s: i32| -> Vector2i {
+    Vector2i {
+        x: v.x * s,
+        y: v.y * s,
+    }
 });
 
-impl_op_ex!(/|v: Vector2i, s: i32| -> Vector2i
+impl_op_ex_commutative!(*|v: &Vector2i, s: Float| -> Vector2i {
+    Vector2i {
+        x: (v.x as Float * s) as i32,
+        y: (v.y as Float * s) as i32,
+    }
+});
+
+impl_op_ex!(/|v: &Vector2i, s: i32| -> Vector2i
 {
     Vector2i { x: v.x / s, y: v.y / s }
 });
 
-impl_op_ex!(+=|v1: &mut Vector2i, v2: Vector2i|
+impl_op_ex!(+=|v1: &mut Vector2i, v2: &Vector2i|
 {
     v1.x += v2.x;
     v1.y += v2.y;
 });
 
-impl_op_ex!(-=|v1: &mut Vector2i, v2: Vector2i|
+impl_op_ex!(-=|v1: &mut Vector2i, v2: &Vector2i|
 {
     v1.x -= v2.x;
     v1.y -= v2.y;
 });
 
-impl_op_ex!(*=|v1: &mut Vector2i, v2: Vector2i|
+impl_op_ex!(*=|v1: &mut Vector2i, v2: &Vector2i|
 {
     v1.x *= v2.x;
     v1.y *= v2.y;
 });
 
-impl_op_ex!(/=|v1: &mut Vector2i, v2: Vector2i|
+impl_op_ex!(/=|v1: &mut Vector2i, v2: &Vector2i|
 {
     v1.x /= v2.x;
     v1.y /= v2.y;
@@ -157,13 +176,19 @@ impl_op_ex!(/=|v1: &mut Vector2i, s: i32|
 
 impl From<Point2i> for Vector2i {
     fn from(value: Point2i) -> Self {
-        Vector2i { x: value.x, y: value.y }
+        Vector2i {
+            x: value.x,
+            y: value.y,
+        }
     }
 }
 
 impl From<[i32; 2]> for Vector2i {
     fn from(value: [i32; 2]) -> Self {
-        Vector2i { x: value[0], y: value[1] }
+        Vector2i {
+            x: value[0],
+            y: value[1],
+        }
     }
 }
 
@@ -175,7 +200,10 @@ impl From<Vector2i> for [i32; 2] {
 
 impl From<(i32, i32)> for Vector2i {
     fn from(value: (i32, i32)) -> Self {
-        Vector2i { x: value.0, y: value.1 }
+        Vector2i {
+            x: value.0,
+            y: value.1,
+        }
     }
 }
 
@@ -190,8 +218,7 @@ impl From<Vector2i> for (i32, i32) {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Vector3i
-{
+pub struct Vector3i {
     pub x: i32,
     pub y: i32,
     pub z: i32,
@@ -226,7 +253,7 @@ impl Vector3i {
     pub const NEG_Z: Self = Self::new(0, 0, -1);
 
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self{ x, y, z }
+        Self { x, y, z }
     }
 
     /// Creates a vector with all elements set to `v`.
@@ -294,6 +321,10 @@ impl Tuple3<i32> for Vector3i {
     fn z(&self) -> i32 {
         self.z
     }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        lerp_ref(t, a, b)
+    }
 }
 
 impl HasNan for Vector3i {
@@ -308,7 +339,7 @@ impl Default for Vector3i {
     }
 }
 
-impl_op_ex!(-|v: Vector3i| -> Vector3i {
+impl_op_ex!(-|v: &Vector3i| -> Vector3i {
     Vector3i {
         x: v.x.neg(),
         y: v.y.neg(),
@@ -316,7 +347,7 @@ impl_op_ex!(-|v: Vector3i| -> Vector3i {
     }
 });
 
-impl_op_ex!(+|v1: Vector3i, v2: Vector3i| -> Vector3i
+impl_op_ex!(+|v1: &Vector3i, v2: &Vector3i| -> Vector3i
 {
     Vector3i{
         x: v1.x + v2.x,
@@ -325,57 +356,71 @@ impl_op_ex!(+|v1: Vector3i, v2: Vector3i| -> Vector3i
     }
 });
 
-impl_op_ex!(-|v1: Vector3i, v2: Vector3i| -> Vector3i
-{
-    Vector3i { x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z }
+impl_op_ex!(-|v1: &Vector3i, v2: &Vector3i| -> Vector3i {
+    Vector3i {
+        x: v1.x - v2.x,
+        y: v1.y - v2.y,
+        z: v1.z - v2.z,
+    }
 });
 
-impl_op_ex_commutative!(*|v: Vector3i, s: i32| -> Vector3i
-{
-    Vector3i { x: v.x * s, y: v.y * s, z: v.z * s }
+impl_op_ex_commutative!(*|v: &Vector3i, s: i32| -> Vector3i {
+    Vector3i {
+        x: v.x * s,
+        y: v.y * s,
+        z: v.z * s,
+    }
 });
 
-impl_op_ex!(/|v: Vector3i, s: i32| -> Vector3i
+impl_op_ex_commutative!(*|p: &Vector3i, s: Float| -> Vector3i {
+    Vector3i {
+        x: (p.x as Float * s) as i32,
+        y: (p.y as Float * s) as i32,
+        z: (p.z as Float * s) as i32,
+    }
+});
+
+impl_op_ex!(/|v: &Vector3i, s: i32| -> Vector3i
 {
     Vector3i { x: v.x / s, y: v.y / s, z: v.z / s }
 });
 
-impl_op_ex!(+=|v1: &mut Vector3i, v2: Vector3i| 
+impl_op_ex!(+=|v1: &mut Vector3i, v2: &Vector3i|
 {
     v1.x += v2.x;
     v1.y += v2.y;
     v1.z += v2.z;
 });
 
-impl_op_ex!(-=|v1: &mut Vector3i, v2: Vector3i| 
+impl_op_ex!(-=|v1: &mut Vector3i, v2: &Vector3i|
 {
     v1.x -= v2.x;
     v1.y -= v2.y;
     v1.z -= v2.z;
 });
 
-impl_op_ex!(*=|v1: &mut Vector3i, v2: Vector3i| 
+impl_op_ex!(*=|v1: &mut Vector3i, v2: &Vector3i|
 {
     v1.x *= v2.x;
     v1.y *= v2.y;
     v1.z *= v2.z;
 });
 
-impl_op_ex!(/=|v1: &mut Vector3i, v2: Vector3i| 
+impl_op_ex!(/=|v1: &mut Vector3i, v2: &Vector3i|
 {
     v1.x /= v2.x;
     v1.y /= v2.y;
     v1.z /= v2.z;
 });
 
-impl_op_ex!(*=|v1: &mut Vector3i, s: i32| 
+impl_op_ex!(*=|v1: &mut Vector3i, s: i32|
 {
     v1.x *= s;
     v1.y *= s;
     v1.z *= s;
 });
 
-impl_op_ex!(/=|v1: &mut Vector3i, s: i32| 
+impl_op_ex!(/=|v1: &mut Vector3i, s: i32|
 {
     v1.x /= s;
     v1.y /= s;
@@ -384,19 +429,31 @@ impl_op_ex!(/=|v1: &mut Vector3i, s: i32|
 
 impl From<Point3i> for Vector3i {
     fn from(value: Point3i) -> Self {
-        Vector3i { x: value.x, y: value.y, z: value.z }
+        Vector3i {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+        }
     }
 }
 
 impl From<Normal3i> for Vector3i {
     fn from(value: Normal3i) -> Self {
-        Vector3i { x: value.x, y: value.y, z: value.z }
+        Vector3i {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+        }
     }
 }
 
 impl From<[i32; 3]> for Vector3i {
     fn from(value: [i32; 3]) -> Self {
-        Vector3i { x: value[0], y: value[1], z: value[2] }
+        Vector3i {
+            x: value[0],
+            y: value[1],
+            z: value[2],
+        }
     }
 }
 
@@ -408,7 +465,11 @@ impl From<Vector3i> for [i32; 3] {
 
 impl From<(i32, i32, i32)> for Vector3i {
     fn from(value: (i32, i32, i32)) -> Self {
-        Vector3i { x: value.0, y: value.1, z: value.2 }
+        Vector3i {
+            x: value.0,
+            y: value.1,
+            z: value.2,
+        }
     }
 }
 
@@ -423,8 +484,7 @@ impl From<Vector3i> for (i32, i32, i32) {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vector2f
-{
+pub struct Vector2f {
     pub x: Float,
     pub y: Float,
 }
@@ -452,12 +512,12 @@ impl Vector2f {
     pub const NEG_Y: Self = Self::new(0.0, -1.0);
 
     pub const fn new(x: Float, y: Float) -> Self {
-        Self{ x, y }
+        Self { x, y }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
-        Self{ x: v, y: v }
+        Self { x: v, y: v }
     }
 
     pub fn x(&self) -> Float {
@@ -507,6 +567,10 @@ impl Tuple2<Float> for Vector2f {
     fn y(&self) -> Float {
         self.y
     }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        lerp_ref(t, a, b)
+    }
 }
 
 impl HasNan for Vector2f {
@@ -533,12 +597,10 @@ impl Default for Vector2f {
     }
 }
 
-
 // Vectors can be negated
-impl_op_ex!(-|v: &Vector2f| -> Vector2f { 
-    Vector2f::new(-v.x, -v.y) });
+impl_op_ex!(-|v: &Vector2f| -> Vector2f { Vector2f::new(-v.x, -v.y) });
 // Vectors can add and subtract with other vectors
-impl_op_ex!(+ |v1: &Vector2f, v2: &Vector2f| -> Vector2f { 
+impl_op_ex!(+ |v1: &Vector2f, v2: &Vector2f| -> Vector2f {
     Vector2f::new(v1.x + v2.x, v1.y + v2.y)});
 impl_op_ex!(-|v1: &Vector2f, v2: &Vector2f| -> Vector2f {
     Vector2f::new(v1.x - v2.x, v1.y - v2.y)
@@ -553,9 +615,7 @@ impl_op_ex!(-= |n1: &mut Vector2f, n2: &Vector2f| {
 });
 
 // Vectors can be scaled
-impl_op_ex_commutative!(*|v: &Vector2f, s: Float| -> Vector2f {
-    Vector2f::new(v.x * s, v.y * s)
-});
+impl_op_ex_commutative!(*|v: &Vector2f, s: Float| -> Vector2f { Vector2f::new(v.x * s, v.y * s) });
 impl_op_ex!(/ |v: &Vector2f, s: Float| -> Vector2f {
     Vector2f::new(v.x / s, v.y / s) });
 impl_op_ex!(*= |v1: &mut Vector2f, s: Float| {
@@ -602,7 +662,7 @@ impl From<Vector2f> for (Float, Float) {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vector3f{
+pub struct Vector3f {
     pub x: Float,
     pub y: Float,
     pub z: Float,
@@ -637,7 +697,7 @@ impl Vector3f {
     pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
 
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self{ x, y, z }
+        Self { x, y, z }
     }
 
     /// Creates a vector with all elements set to `v`.
@@ -736,6 +796,10 @@ impl Tuple3<Float> for Vector3f {
     fn z(&self) -> Float {
         self.z
     }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        lerp_ref(t, a, b)
+    }
 }
 
 impl HasNan for Vector3f {
@@ -763,8 +827,7 @@ impl Default for Vector3f {
 }
 
 // Vectors can be negated
-impl_op_ex!(-|v: &Vector3f| -> Vector3f {
-    Vector3f::new(-v.x, -v.y, -v.z) });
+impl_op_ex!(-|v: &Vector3f| -> Vector3f { Vector3f::new(-v.x, -v.y, -v.z) });
 // Vectors can add and subtract with other vectors
 impl_op_ex!(+ |v1: &Vector3f, v2: &Vector3f| -> Vector3f {
     Vector3f::new(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z)});
@@ -836,7 +899,10 @@ impl From<Vector3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{float::Float, vecmath::tuple::{Tuple3, Tuple2}};
+    use crate::{
+        float::Float,
+        vecmath::tuple::{Tuple2, Tuple3},
+    };
 
     use super::{
         Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Vector2f, Vector2i, Vector3f,
@@ -1006,6 +1072,13 @@ mod tests {
     }
 
     #[test]
+    fn vector_lerp() {
+        let v1 = Vector3f::new(0.0, 0.0, 0.0);
+        let v2 = Vector3f::new(1.0, 10.0, 100.0);
+        assert_eq!(Vector3f::new(0.5, 5.0, 50.0), Tuple3::lerp(0.5, &v1, &v2))
+    }
+
+    #[test]
     fn vector_binary_ops() {
         let vec = Vector2i::new(-2, 10);
         // Vector + Vector -> Vector
@@ -1041,8 +1114,7 @@ mod tests {
     }
 
     #[test]
-    fn vector_abs()
-    {
+    fn vector_abs() {
         let v = Vector3f::new(-1.0, 2.0, -3.5);
         assert_eq!(Vector3f::new(1.0, 2.0, 3.5), v.abs());
 
@@ -1051,8 +1123,7 @@ mod tests {
     }
 
     #[test]
-    fn vector_ceil()
-    {
+    fn vector_ceil() {
         let v = Vector3f::new(-1.5, 1.5, 1.6);
         assert_eq!(Vector3f::new(-1.0, 2.0, 2.0), v.ceil());
 
@@ -1061,8 +1132,7 @@ mod tests {
     }
 
     #[test]
-    fn vector_floor()
-    {
+    fn vector_floor() {
         let v = Vector3f::new(-1.5, 1.5, 1.6);
         assert_eq!(Vector3f::new(-2.0, 1.0, 1.0), v.floor());
 

@@ -4,6 +4,7 @@ use super::normalize::Normalize;
 use super::tuple::{abs_dot3, angle_between, cross, cross_i32, dot3, Tuple3};
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
+use crate::math::lerp_ref;
 use auto_ops::*;
 
 // ---------------------------------------------------------------------------
@@ -113,6 +114,10 @@ impl Tuple3<i32> for Normal3i {
     fn z(&self) -> i32 {
         self.z
     }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        lerp_ref(t, a, b)
+    }
 }
 
 impl HasNan for Normal3i {
@@ -170,6 +175,15 @@ impl_op_ex_commutative!(*|n: &Normal3i, s: i32| -> Normal3i {
         z: n.z * s,
     }
 });
+
+impl_op_ex_commutative!(*|p: &Normal3i, s: Float| -> Normal3i {
+    Normal3i {
+        x: (p.x as Float * s) as i32,
+        y: (p.y as Float * s) as i32,
+        z: (p.z as Float * s) as i32,
+    }
+});
+
 impl_op_ex!(*=|n1: &mut Normal3i, s: i32|
 {
     n1.x *= s;
@@ -367,6 +381,10 @@ impl Tuple3<Float> for Normal3f {
 
     fn z(&self) -> Float {
         self.z
+    }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        lerp_ref(t, a, b)
     }
 }
 

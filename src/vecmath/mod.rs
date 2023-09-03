@@ -34,6 +34,13 @@
 // the public structs (calling the trait implementation). This way, users don't
 // need to import the traits to use the structs.
 
+// TODO Consider making the traits public.
+//  I had previously thought we would keep them private and expose the API only through the structs,
+//  so that users don't need to import the traits to use them.
+
+// TODO delete the x() etc accessors in the structs. It's pointless since the fields are public.
+//  They're useful in the trait for shared implementations only.
+
 mod has_nan;
 mod length;
 pub mod normal;
@@ -45,18 +52,6 @@ pub mod vector;
 pub use normal::{Normal3f, Normal3i};
 pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
-
-// We use glam as it is a optimized vector math library which includes SIMD optimization.
-// We wrap the glam vector classes using the newtype pattern. This accomplishes two things:
-//  1. Points, Vectors, and Normals can be defined as distinct types,
-//     which is useful as they are distinct mathematical entities and should be treated as such, and
-//  2. It allows for us to deviate from glam's implementations of certain operations as needed,
-//     and include/exclude operations for each type as appropriate for each type.
-//
-// A disadvantage of the newtype approach is the associated boilerplate, and some arguably unnecessary abstraction,
-// such as being unable to access x, y, z directly (requiring getters or tuple access, i.e. some_vec.0.x).
-// But, this trade-off is worth it to be able to leverage the type system for correctness.
-// The newtype pattern should have no associated runtime cost here, optimized by the compiler.
 
 // TODO Our impl_op_ex* methods are not all tested; test them.
 
