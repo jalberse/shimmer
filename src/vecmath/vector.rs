@@ -2,56 +2,51 @@ use super::has_nan::{has_nan2, HasNan};
 use super::length::{length2, length3, length_squared2, length_squared3, Length};
 use super::normalize::Normalize;
 use super::tuple::Tuple2;
-use super::vec_types::{Vec2f, Vec3f};
 use super::{abs_dot2, dot2, Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Tuple3};
 use crate::float::Float;
-use crate::impl_unary_op_for_nt;
-use crate::newtype_macros::{
-    impl_binary_op_assign_for_nt_with_other, impl_binary_op_assign_trait_for_nt,
-    impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
-    impl_binary_op_trait_for_nt,
-};
 use crate::vecmath::has_nan::has_nan3;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
-use glam::{IVec2, IVec3};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 // ---------------------------------------------------------------------------
 //        Vector2i
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Vector2i(pub IVec2);
+pub struct Vector2i
+{
+    pub x: i32,
+    pub y: i32,
+}
 
 impl Vector2i {
     /// All zeroes.
-    pub const ZERO: Self = Self(IVec2::ZERO);
+    pub const ZERO: Self = Self::splat(0);
 
     /// All ones.
-    pub const ONE: Self = Self(IVec2::ONE);
+    pub const ONE: Self = Self::splat(1);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(IVec2::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(IVec2::X);
+    pub const X: Self = Self::new(1, 0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(IVec2::Y);
+    pub const Y: Self = Self::new(0, 1);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(IVec2::NEG_X);
+    pub const NEG_X: Self = Self::new(-1, 0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(IVec2::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0, -1);
 
     pub const fn new(x: i32, y: i32) -> Self {
-        Self(IVec2 { x, y })
+        Self{ x, y }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: i32) -> Self {
-        Self(IVec2::splat(v))
+        Self::new(v, v)
     }
 
     pub fn x(&self) -> i32 {
@@ -79,11 +74,11 @@ impl Tuple2<i32> for Vector2i {
     }
 
     fn x(&self) -> i32 {
-        self.0.x
+        self.x
     }
 
     fn y(&self) -> i32 {
-        self.0.y
+        self.y
     }
 }
 
@@ -95,48 +90,110 @@ impl HasNan for Vector2i {
 
 impl Default for Vector2i {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
 
-impl_unary_op_for_nt!( impl Neg for Vector2i { fn neg } );
-impl_binary_op_trait_for_nt!( impl Add for Vector2i { fn add } );
-impl_binary_op_trait_for_nt!( impl Sub for Vector2i { fn sub } );
-impl_binary_op_for_nt_with_other!( impl Mul for Vector2i with i32 { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Vector2i with i32 { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for i32 with Vector2i { fn mul } );
-impl_binary_op_assign_trait_for_nt!( impl AddAssign for Vector2i { fn add_assign });
-impl_binary_op_assign_trait_for_nt!( impl SubAssign for Vector2i { fn sub_assign });
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector2i with i32 { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector2i with i32 { fn div_assign });
+impl_op_ex!(-|v: Vector2i| -> Vector2i
+{
+    Vector2i { x: v.x.neg(), y: v.y.neg() }
+});
+
+impl_op_ex!(+|v1: Vector2i, v2: Vector2i| -> Vector2i
+{
+    Vector2i { x: v1.x + v2.x, y: v1.y + v2.y }
+});
+
+impl_op_ex!(-|v1: Vector2i, v2: Vector2i| -> Vector2i
+{
+    Vector2i { x: v1.x - v2.x, y: v1.y - v2.y }
+});
+
+impl_op_ex_commutative!(*|v: Vector2i, s: i32| -> Vector2i
+{
+    Vector2i { x: v.x * s, y: v.y * s }
+});
+
+impl_op_ex!(/|v: Vector2i, s: i32| -> Vector2i
+{
+    Vector2i { x: v.x / s, y: v.y / s }
+});
+
+impl_op_ex!(+=|v1: &mut Vector2i, v2: Vector2i|
+{
+    v1.x += v2.x;
+    v1.y += v2.y;
+});
+
+impl_op_ex!(-=|v1: &mut Vector2i, v2: Vector2i|
+{
+    v1.x -= v2.x;
+    v1.y -= v2.y;
+});
+
+impl_op_ex!(*=|v1: &mut Vector2i, v2: Vector2i|
+{
+    v1.x *= v2.x;
+    v1.y *= v2.y;
+});
+
+impl_op_ex!(/=|v1: &mut Vector2i, v2: Vector2i|
+{
+    v1.x /= v2.x;
+    v1.y /= v2.y;
+});
+
+impl_op_ex!(+=|v1: &mut Vector2i, s: i32|
+{
+    v1.x += s;
+    v1.y += s;
+});
+
+impl_op_ex!(-=|v1: &mut Vector2i, s: i32|
+{
+    v1.x -= s;
+    v1.y -= s;
+});
+
+impl_op_ex!(*=|v1: &mut Vector2i, s: i32|
+{
+    v1.x *= s;
+    v1.y *= s;
+});
+
+impl_op_ex!(/=|v1: &mut Vector2i, s: i32|
+{
+    v1.x /= s;
+    v1.y /= s;
+});
 
 impl From<Point2i> for Vector2i {
     fn from(value: Point2i) -> Self {
-        Self(value.0)
+        Vector2i { x: value.x, y: value.y }
     }
 }
 
 impl From<[i32; 2]> for Vector2i {
     fn from(value: [i32; 2]) -> Self {
-        Self(value.into())
+        Vector2i { x: value[0], y: value[1] }
     }
 }
 
 impl From<Vector2i> for [i32; 2] {
     fn from(value: Vector2i) -> Self {
-        value.0.into()
+        [value.x, value.y]
     }
 }
 
 impl From<(i32, i32)> for Vector2i {
     fn from(value: (i32, i32)) -> Self {
-        Self(value.into())
+        Vector2i { x: value.0, y: value.1 }
     }
 }
 
 impl From<Vector2i> for (i32, i32) {
     fn from(value: Vector2i) -> Self {
-        value.0.into()
+        (value.x, value.y)
     }
 }
 
@@ -145,43 +202,48 @@ impl From<Vector2i> for (i32, i32) {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Vector3i(pub IVec3);
+pub struct Vector3i
+{
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+}
 
 impl Vector3i {
     /// All zeroes.
-    pub const ZERO: Self = Self(IVec3::ZERO);
+    pub const ZERO: Self = Self::splat(0);
 
     /// All ones.
-    pub const ONE: Self = Self(IVec3::ONE);
+    pub const ONE: Self = Self::splat(1);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(IVec3::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(IVec3::X);
+    pub const X: Self = Self::new(1, 0, 0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(IVec3::Y);
+    pub const Y: Self = Self::new(0, 1, 0);
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self(IVec3::Z);
+    pub const Z: Self = Self::new(0, 0, 1);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(IVec3::NEG_X);
+    pub const NEG_X: Self = Self::new(-1, 0, 0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(IVec3::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0, -1, 0);
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self(IVec3::NEG_Z);
+    pub const NEG_Z: Self = Self::new(0, 0, -1);
 
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self(IVec3 { x, y, z })
+        Self{ x, y, z }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: i32) -> Self {
-        Self(IVec3::splat(v))
+        Self::new(v, v, v)
     }
 
     pub fn x(&self) -> i32 {
@@ -219,12 +281,12 @@ impl Vector3i {
     /// Take the cross product of this and a vector v
     pub fn cross(&self, v: &Self) -> Self {
         // Integer vectors do not need to use EFT methods for accuracy.
-        Self(self.0.cross(v.0))
+        super::cross_i32(self, v)
     }
 
     /// Take the cross product of this and a normal n
     pub fn cross_normal(&self, n: &Normal3i) -> Self {
-        Self(self.0.cross(n.0))
+        super::cross_i32(self, n)
     }
 }
 
@@ -234,15 +296,15 @@ impl Tuple3<i32> for Vector3i {
     }
 
     fn x(&self) -> i32 {
-        self.0.x
+        self.x
     }
 
     fn y(&self) -> i32 {
-        self.0.y
+        self.y
     }
 
     fn z(&self) -> i32 {
-        self.0.z
+        self.z
     }
 }
 
@@ -254,54 +316,117 @@ impl HasNan for Vector3i {
 
 impl Default for Vector3i {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
 
-impl_unary_op_for_nt!( impl Neg for Vector3i { fn neg } );
-impl_binary_op_trait_for_nt!( impl Add for Vector3i { fn add } );
-impl_binary_op_trait_for_nt!( impl Sub for Vector3i { fn sub } );
-impl_binary_op_for_nt_with_other!( impl Mul for Vector3i with i32 { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Vector3i with i32 { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for i32 with Vector3i { fn mul } );
-impl_binary_op_assign_trait_for_nt!( impl AddAssign for Vector3i { fn add_assign });
-impl_binary_op_assign_trait_for_nt!( impl SubAssign for Vector3i { fn sub_assign });
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Vector3i with i32 { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Vector3i with i32 { fn div_assign });
+impl_op_ex!(-|v: Vector3i| -> Vector3i {
+    Vector3i {
+        x: v.x.neg(),
+        y: v.y.neg(),
+        z: v.z.neg(),
+    }
+});
+
+impl_op_ex!(+|v1: Vector3i, v2: Vector3i| -> Vector3i
+{
+    Vector3i{
+        x: v1.x + v2.x,
+        y: v1.y + v2.y,
+        z: v1.z + v2.z
+    }
+});
+
+impl_op_ex!(-|v1: Vector3i, v2: Vector3i| -> Vector3i
+{
+    Vector3i { x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z }
+});
+
+impl_op_ex_commutative!(*|v: Vector3i, s: i32| -> Vector3i
+{
+    Vector3i { x: v.x * s, y: v.y * s, z: v.z * s }
+});
+
+impl_op_ex!(/|v: Vector3i, s: i32| -> Vector3i
+{
+    Vector3i { x: v.x / s, y: v.y / s, z: v.z / s }
+});
+
+impl_op_ex!(+=|v1: &mut Vector3i, v2: Vector3i| 
+{
+    v1.x += v2.x;
+    v1.y += v2.y;
+    v1.z += v2.z;
+});
+
+impl_op_ex!(-=|v1: &mut Vector3i, v2: Vector3i| 
+{
+    v1.x -= v2.x;
+    v1.y -= v2.y;
+    v1.z -= v2.z;
+});
+
+impl_op_ex!(*=|v1: &mut Vector3i, v2: Vector3i| 
+{
+    v1.x *= v2.x;
+    v1.y *= v2.y;
+    v1.z *= v2.z;
+});
+
+impl_op_ex!(/=|v1: &mut Vector3i, v2: Vector3i| 
+{
+    v1.x /= v2.x;
+    v1.y /= v2.y;
+    v1.z /= v2.z;
+});
+
+impl_op_ex!(*=|v1: &mut Vector3i, s: i32| 
+{
+    v1.x *= s;
+    v1.y *= s;
+    v1.z *= s;
+});
+
+impl_op_ex!(/=|v1: &mut Vector3i, s: i32| 
+{
+    v1.x /= s;
+    v1.y /= s;
+    v1.z /= s;
+});
 
 impl From<Point3i> for Vector3i {
     fn from(value: Point3i) -> Self {
-        Self(value.0)
+        Vector3i { x: value.x, y: value.y, z: value.z }
     }
 }
 
 impl From<Normal3i> for Vector3i {
     fn from(value: Normal3i) -> Self {
-        Self(value.0)
+        Vector3i { x: value.x, y: value.y, z: value.z }
     }
 }
 
 impl From<[i32; 3]> for Vector3i {
     fn from(value: [i32; 3]) -> Self {
-        Self(value.into())
+        Vector3i { x: value[0], y: value[1], z: value[2] }
     }
 }
 
 impl From<Vector3i> for [i32; 3] {
     fn from(value: Vector3i) -> Self {
-        value.0.into()
+        [value.x, value.y, value.z]
     }
 }
 
 impl From<(i32, i32, i32)> for Vector3i {
     fn from(value: (i32, i32, i32)) -> Self {
-        Self(value.into())
+        Vector3i { x: value.0, y: value.1, z: value.2 }
     }
 }
 
 impl From<Vector3i> for (i32, i32, i32) {
     fn from(value: Vector3i) -> Self {
-        value.0.into()
+        (value.x, value.y, value.z)
     }
 }
 

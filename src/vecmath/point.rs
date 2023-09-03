@@ -1,140 +1,181 @@
 use super::has_nan::{has_nan2, has_nan3, HasNan};
 use super::tuple::{Tuple2, Tuple3};
-use super::vec_types::{Vec2f, Vec3f};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
-use crate::impl_unary_op_for_nt;
-use crate::newtype_macros::{
-    impl_binary_op_assign_for_nt_with_other, impl_binary_op_for_nt_with_other,
-    impl_binary_op_for_other_with_nt,
-};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
-use glam::{IVec2, IVec3};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 // ---------------------------------------------------------------------------
 //        Point2i
 // ---------------------------------------------------------------------------
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Point2i(pub IVec2);
+pub struct Point2i {
+    pub x: i32,
+    pub y: i32,
+}
 
 impl Point2i {
     /// All zeroes.
-    pub const ZERO: Self = Self(IVec2::ZERO);
+    pub const ZERO: Self = Self::splat(0);
 
     /// All ones.
-    pub const ONE: Self = Self(IVec2::ONE);
+    pub const ONE: Self = Self::splat(1);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(IVec2::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(IVec2::X);
+    pub const X: Self = Self::new(1, 0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(IVec2::Y);
+    pub const Y: Self = Self::new(0, 1);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(IVec2::NEG_X);
+    pub const NEG_X: Self = Self::new(-1, 0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(IVec2::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0, -1);
 
     pub const fn new(x: i32, y: i32) -> Self {
-        Self(IVec2::new(x, y))
+        Self { x, y }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: i32) -> Self {
-        Self(IVec2::splat(v))
+        Self::new(v, v)
     }
 }
 
 impl Default for Point2i {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
 
-impl_unary_op_for_nt!( impl Neg for Point2i { fn neg } );
-impl_binary_op_for_nt_with_other!( impl Mul for Point2i with i32 { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Point2i with i32 { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for i32 with Point2i { fn mul } );
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Point2i with i32 { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Point2i with i32 { fn div_assign });
+impl_op_ex!(-|p: Point2i| -> Point2i {
+    Point2i {
+        x: p.x.neg(),
+        y: p.y.neg(),
+    }
+});
+
+impl_op_ex_commutative!(*|v: Point2i, s: i32| -> Point2i {
+    Point2i {
+        x: v.x * s,
+        y: v.y * s,
+    }
+});
+
+impl_op_ex!(/|v: Point2i, s: i32| -> Point2i
+{
+    Point2i { x: v.x / s, y: v.y / s }
+});
+
+impl_op_ex!(*=|p1: &mut Point2i, p2: Point2i|
+{
+    p1.x *= p2.x;
+    p1.y *= p2.y;
+});
+
+impl_op_ex!(/=|p1: &mut Point2i, p2: Point2i|
+{
+    p1.x /= p2.x;
+    p1.y /= p2.y;
+});
+
+impl_op_ex!(+=|p1: &mut Point2i, s: i32|
+{
+    p1.x += s;
+    p1.y += s;
+});
+
+impl_op_ex!(-=|p1: &mut Point2i, s: i32|
+{
+    p1.x -= s;
+    p1.y -= s;
+});
+
+impl_op_ex!(*=|p1: &mut Point2i, s: i32|
+{
+    p1.x *= s;
+    p1.y *= s;
+});
+
+impl_op_ex!(/=|p1: &mut Point2i, s: i32|
+{
+    p1.x /= s;
+    p1.y /= s;
+});
 
 // Point + Vector -> Point
-impl Add<Vector2i> for Point2i {
-    type Output = Point2i;
-    fn add(self, rhs: Vector2i) -> Point2i {
-        Point2i(self.0 + rhs.0)
-    }
-}
-// Vector + Point -> Point
-impl Add<Point2i> for Vector2i {
-    type Output = Point2i;
-    fn add(self, rhs: Point2i) -> Point2i {
-        Point2i(self.0 + rhs.0)
-    }
-}
+impl_op_ex_commutative!(+|p: Point2i, v: Vector2i| -> Point2i
+{
+    Point2i { x: v.x + p.x, y: v.y + p.y }
+});
 
-// Point += Vector
-impl AddAssign<Vector2i> for Point2i {
-    fn add_assign(&mut self, rhs: Vector2i) {
-        self.0 += rhs.0;
-    }
-}
+impl_op_ex!(+=|p: &mut Point2i, v: Vector2i|
+{
+    p.x += v.x;
+    p.y += v.y;
+});
 
 // Point - Vector -> Point
-impl Sub<Vector2i> for Point2i {
-    type Output = Point2i;
-    fn sub(self, rhs: Vector2i) -> Point2i {
-        Point2i(self.0 - rhs.0)
+impl_op_ex_commutative!(-|p: Point2i, v: Vector2i| -> Point2i {
+    Point2i {
+        x: p.x - v.x,
+        y: p.y - v.y,
     }
-}
+});
 
-// Point -= Vector
-impl SubAssign<Vector2i> for Point2i {
-    fn sub_assign(&mut self, rhs: Vector2i) {
-        self.0 -= rhs.0;
-    }
-}
+impl_op_ex!(-=|p: &mut Point2i, v: Vector2i|
+{
+    p.x -= v.x;
+    p.y -= v.y;
+});
 
 // Point - Point -> Vector
-impl Sub<Point2i> for Point2i {
-    type Output = Vector2i;
-    fn sub(self, rhs: Point2i) -> Vector2i {
-        Vector2i(self.0 - rhs.0)
+impl_op_ex!(-|p1: Point2i, p2: Point2i| -> Vector2i {
+    Vector2i {
+        x: p1.x - p2.x,
+        y: p1.y - p2.y,
     }
-}
+});
 
 impl From<Vector2i> for Point2i {
     fn from(value: Vector2i) -> Self {
-        Point2i(value.0)
+        Point2i {
+            x: value.x,
+            y: value.y,
+        }
     }
 }
 
 impl From<[i32; 2]> for Point2i {
     fn from(value: [i32; 2]) -> Self {
-        Self(value.into())
+        Point2i {
+            x: value[0],
+            y: value[1],
+        }
     }
 }
 
 impl From<Point2i> for [i32; 2] {
     fn from(value: Point2i) -> Self {
-        value.0.into()
+        [value.x, value.y]
     }
 }
 
 impl From<(i32, i32)> for Point2i {
     fn from(value: (i32, i32)) -> Self {
-        Self(value.into())
+        Point2i {
+            x: value.0,
+            y: value.1,
+        }
     }
 }
 
 impl From<Point2i> for (i32, i32) {
     fn from(value: Point2i) -> Self {
-        value.0.into()
+        (value.x, value.y)
     }
 }
 
@@ -143,43 +184,47 @@ impl From<Point2i> for (i32, i32) {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Point3i(pub IVec3);
+pub struct Point3i {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+}
 
 impl Point3i {
     /// All zeroes.
-    pub const ZERO: Self = Self(IVec3::ZERO);
+    pub const ZERO: Self = Self::splat(0);
 
     /// All ones.
-    pub const ONE: Self = Self(IVec3::ONE);
+    pub const ONE: Self = Self::splat(1);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(IVec3::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(IVec3::X);
+    pub const X: Self = Self::new(1, 0, 0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(IVec3::Y);
+    pub const Y: Self = Self::new(0, 1, 0);
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self(IVec3::Z);
+    pub const Z: Self = Self::new(0, 0, 1);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(IVec3::NEG_X);
+    pub const NEG_X: Self = Self::new(-1, 0, 0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(IVec3::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0, -1, 0);
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self(IVec3::NEG_Z);
+    pub const NEG_Z: Self = Self::new(0, 0, -1);
 
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self(IVec3::new(x, y, z))
+        Self { x, y, z }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: i32) -> Self {
-        Self(IVec3::splat(v))
+        Self::new(v, v, v)
     }
 
     pub fn x(&self) -> i32 {
@@ -201,104 +246,137 @@ impl Tuple3<i32> for Point3i {
     }
 
     fn x(&self) -> i32 {
-        self.0.x
+        self.x
     }
 
     fn y(&self) -> i32 {
-        self.0.y
+        self.y
     }
 
     fn z(&self) -> i32 {
-        self.0.z
+        self.z
     }
 }
 
 impl Default for Point3i {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
 
-impl_unary_op_for_nt!( impl Neg for Point3i { fn neg } );
-impl_binary_op_for_nt_with_other!( impl Mul for Point3i with i32 { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Point3i with i32 { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for i32 with Point3i { fn mul } );
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Point3i with i32 { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Point3i with i32 { fn div_assign });
+impl_op_ex!(-|p: Point3i| -> Point3i {
+    Point3i {
+        x: p.x.neg(),
+        y: p.y.neg(),
+        z: p.z.neg(),
+    }
+});
+
+impl_op_ex_commutative!(*|p: Point3i, s: i32| -> Point3i {
+    Point3i {
+        x: p.x * s,
+        y: p.y * s,
+        z: p.z * s,
+    }
+});
+impl_op_ex!(*=|p: &mut Point3i, s: i32|
+{
+    p.x *= s;
+    p.y *= s;
+    p.z *= s;
+});
+
+impl_op_ex!(/|p: Point3i, s: i32| -> Point3i
+{
+    Point3i {
+        x: p.x / s,
+        y: p.y / s,
+        z: p.z / s,
+    }
+});
+impl_op_ex!(/=|p: &mut Point3i, s: i32|
+{
+    p.x /= s;
+    p.y /= s;
+    p.z /= s;
+});
 
 // Point + Vector -> Point
-impl Add<Vector3i> for Point3i {
-    type Output = Point3i;
-    fn add(self, rhs: Vector3i) -> Point3i {
-        Point3i(self.0 + rhs.0)
-    }
-}
+impl_op_ex_commutative!(+|p: Point3i, v: Vector3i| -> Point3i
+{
+    Point3i { x: p.x + v.x, y: p.y + v.y, z: p.z + v.z }
+});
 
-// Vector + Point -> Point
-impl Add<Point3i> for Vector3i {
-    type Output = Point3i;
-    fn add(self, rhs: Point3i) -> Point3i {
-        Point3i(self.0 + rhs.0)
-    }
-}
+impl_op_ex!(+=|p: &mut Point3i, v: Vector3i|
+{
+    p.x += v.x;
+    p.y += v.y;
+    p.z += v.z;
+});
 
-// Point += Vector
-impl AddAssign<Vector3i> for Point3i {
-    fn add_assign(&mut self, rhs: Vector3i) {
-        self.0 += rhs.0;
+impl_op_ex!(-|p: Point3i, v: Vector3i| -> Point3i {
+    Point3i {
+        x: p.x - v.x,
+        y: p.y - v.y,
+        z: p.z - v.z,
     }
-}
+});
 
-// Point - Vector -> Point
-impl Sub<Vector3i> for Point3i {
-    type Output = Point3i;
-    fn sub(self, rhs: Vector3i) -> Point3i {
-        Point3i(self.0 - rhs.0)
-    }
-}
-
-// Point -= Vector
-impl SubAssign<Vector3i> for Point3i {
-    fn sub_assign(&mut self, rhs: Vector3i) {
-        self.0 -= rhs.0;
-    }
-}
+impl_op_ex!(-=|p: &mut Point3i, v: Vector3i|
+{
+    p.x -= v.x;
+    p.y -= v.y;
+    p.z -= v.z;
+});
 
 // Point - Point -> Vector
-impl Sub<Point3i> for Point3i {
-    type Output = Vector3i;
-    fn sub(self, rhs: Point3i) -> Vector3i {
-        Vector3i(self.0 - rhs.0)
+impl_op_ex!(-|p1: Point3i, p2: Point3i| -> Vector3i {
+    Vector3i {
+        x: p1.x - p2.x,
+        y: p1.y - p2.y,
+        z: p1.z - p2.z,
     }
-}
+});
 
 impl From<Vector3i> for Point3i {
     fn from(value: Vector3i) -> Self {
-        Point3i(value.0)
+        Point3i {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+        }
     }
 }
 
 impl From<[i32; 3]> for Point3i {
     fn from(value: [i32; 3]) -> Self {
-        Self(value.into())
+        Point3i {
+            x: value[0],
+            y: value[1],
+            z: value[2],
+        }
     }
 }
 
 impl From<Point3i> for [i32; 3] {
     fn from(value: Point3i) -> Self {
-        value.0.into()
+        [value.x, value.y, value.z]
     }
 }
 
 impl From<(i32, i32, i32)> for Point3i {
     fn from(value: (i32, i32, i32)) -> Self {
-        Self(value.into())
+        Point3i {
+            x: value.0,
+            y: value.1,
+            z: value.2,
+        }
     }
 }
 
 impl From<Point3i> for (i32, i32, i32) {
     fn from(value: Point3i) -> Self {
-        value.0.into()
+        (value.x, value.y, value.z)
     }
 }
 

@@ -3,15 +3,7 @@ use super::length::{length3, length_squared3, Length};
 use super::normalize::Normalize;
 use super::{Tuple3, Vector3f, Vector3i};
 use crate::float::Float;
-use crate::impl_unary_op_for_nt;
-use crate::newtype_macros::{
-    impl_binary_op_assign_for_nt_with_other, impl_binary_op_assign_trait_for_nt,
-    impl_binary_op_for_nt_with_other, impl_binary_op_for_other_with_nt,
-    impl_binary_op_trait_for_nt,
-};
 use auto_ops::*;
-use glam::IVec3;
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 // ---------------------------------------------------------------------------
 //        Normal3i
@@ -21,43 +13,47 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssi
 /// Normals and points cannot be added together, and
 /// you cannot take the cross product of two normals.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Normal3i(pub IVec3);
+pub struct Normal3i {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+}
 
 impl Normal3i {
     /// All zeroes.
-    pub const ZERO: Self = Self(IVec3::ZERO);
+    pub const ZERO: Self = Self::splat(0);
 
     /// All ones.
-    pub const ONE: Self = Self(IVec3::ONE);
+    pub const ONE: Self = Self::splat(1);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self(IVec3::NEG_ONE);
+    pub const NEG_ONE: Self = Self::splat(-1);
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self(IVec3::X);
+    pub const X: Self = Self::new(1, 0, 0);
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self(IVec3::Y);
+    pub const Y: Self = Self::new(0, 1, 0);
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self(IVec3::Z);
+    pub const Z: Self = Self::new(0, 0, 1);
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self(IVec3::NEG_X);
+    pub const NEG_X: Self = Self::new(-1, 0, 0);
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self(IVec3::NEG_Y);
+    pub const NEG_Y: Self = Self::new(0, -1, 0);
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self(IVec3::NEG_Z);
+    pub const NEG_Z: Self = Self::new(0, 0, -1);
 
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self(IVec3::new(x, y, z))
+        Self { x, y, z }
     }
 
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: i32) -> Self {
-        Self(IVec3::splat(v))
+        Self::new(v, v, v)
     }
 
     pub fn x(&self) -> i32 {
@@ -94,9 +90,9 @@ impl Normal3i {
 
     /// Cross this normal with a vector.
     /// Note that you cannot take the cross product of two normals.
-    pub fn cross(self, v: Vector3i) -> Vector3i {
+    pub fn cross(&self, v: &Vector3i) -> Vector3i {
         // Note that integer based vectors don't need EFT methods.
-        Vector3i(self.0.cross(v.0))
+        super::cross_i32(self, v)
     }
 }
 
@@ -106,15 +102,15 @@ impl Tuple3<i32> for Normal3i {
     }
 
     fn x(&self) -> i32 {
-        self.0.x
+        self.x
     }
 
     fn y(&self) -> i32 {
-        self.0.y
+        self.y
     }
 
     fn z(&self) -> i32 {
-        self.0.z
+        self.z
     }
 }
 
@@ -126,50 +122,113 @@ impl HasNan for Normal3i {
 
 impl Default for Normal3i {
     fn default() -> Self {
-        Self(Default::default())
+        Self::ZERO
     }
 }
 
+impl_op_ex!(-|n: Normal3i| -> Normal3i {
+    Normal3i {
+        x: n.x.neg(),
+        y: n.y.neg(),
+        z: n.z.neg(),
+    }
+});
+
 // Normals can add and subtract with other normals
-impl_unary_op_for_nt!( impl Neg for Normal3i { fn neg } );
-impl_binary_op_trait_for_nt!( impl Add for Normal3i { fn add } );
-impl_binary_op_trait_for_nt!( impl Sub for Normal3i { fn sub } );
-// Normals can be scaled
-impl_binary_op_for_nt_with_other!( impl Mul for Normal3i with i32 { fn mul } );
-impl_binary_op_for_nt_with_other!( impl Div for Normal3i with i32 { fn div } );
-impl_binary_op_for_other_with_nt!( impl Mul for i32 with Normal3i { fn mul } );
-impl_binary_op_assign_trait_for_nt!( impl AddAssign for Normal3i { fn add_assign });
-impl_binary_op_assign_trait_for_nt!( impl SubAssign for Normal3i { fn sub_assign });
-impl_binary_op_assign_for_nt_with_other!( impl MulAssign for Normal3i with i32 { fn mul_assign });
-impl_binary_op_assign_for_nt_with_other!( impl DivAssign for Normal3i with i32 { fn div_assign });
+impl_op_ex!(+|n1: Normal3i, n2: Normal3i| -> Normal3i
+{
+    Normal3i { x: n1.x + n2.y, y: n1.y + n2.y, z: n1.z + n2.z }
+});
+
+impl_op_ex!(+=|n1: &mut Normal3i, n2: Normal3i|
+{
+    n1.x += n2.x;
+    n1.y += n2.y;
+    n1.z += n2.z;
+});
+
+impl_op_ex!(-|n1: Normal3i, n2: Normal3i| -> Normal3i {
+    Normal3i {
+        x: n1.x - n2.x,
+        y: n1.y - n2.y,
+        z: n1.z - n2.z,
+    }
+});
+
+impl_op_ex!(-=|n1: &mut Normal3i, n2: Normal3i|
+{
+    n1.x -= n2.x;
+    n1.y -= n2.y;
+    n1.z -= n2.z;
+});
+
+impl_op_ex_commutative!(*|n: Normal3i, s: i32| -> Normal3i {
+    Normal3i {
+        x: n.x * s,
+        y: n.y * s,
+        z: n.z * s,
+    }
+});
+impl_op_ex!(*=|n1: &mut Normal3i, s: i32|
+{
+    n1.x *= s;
+    n1.y *= s;
+    n1.z *= s;
+});
+
+impl_op_ex!(/|n: Normal3i, s: i32| -> Normal3i {
+    Normal3i {
+        x: n.x / s,
+        y: n.y / s,
+        z: n.z / s,
+    }
+});
+impl_op_ex!(/=|n1: &mut Normal3i, s: i32|
+{
+    n1.x /= s;
+    n1.y /= s;
+    n1.z /= s;
+});
 
 impl From<Vector3i> for Normal3i {
     fn from(value: Vector3i) -> Normal3i {
-        Normal3i(value.0)
+        Normal3i {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+        }
     }
 }
 
 impl From<[i32; 3]> for Normal3i {
     fn from(value: [i32; 3]) -> Self {
-        Self(value.into())
+        Normal3i {
+            x: value[0],
+            y: value[1],
+            z: value[2],
+        }
     }
 }
 
 impl From<Normal3i> for [i32; 3] {
     fn from(value: Normal3i) -> Self {
-        value.0.into()
+        [value.x, value.y, value.z]
     }
 }
 
 impl From<(i32, i32, i32)> for Normal3i {
     fn from(value: (i32, i32, i32)) -> Self {
-        Self(value.into())
+        Normal3i {
+            x: value.0,
+            y: value.1,
+            z: value.2,
+        }
     }
 }
 
 impl From<Normal3i> for (i32, i32, i32) {
     fn from(value: Normal3i) -> Self {
-        value.0.into()
+        (value.x, value.y, value.z)
     }
 }
 
@@ -333,13 +392,6 @@ impl Default for Normal3f {
         Self::ZERO
     }
 }
-
-// TODO Okay we're swapping away from glam.
-//  So we need to implement all the operators.
-//  We'll use impl_op_ex, we'll need to get rid of the newtype macros (but keep the file
-//  around, I might want to make them into a crate)
-//  But also, we can have functions with a Tuple bound to avoid repeating
-//  implementations, same as we have for e.g. dot().
 
 // Normals can be negated
 impl_op_ex!(-|n: Normal3f| -> Normal3f { Normal3f::new(-n.x, -n.y, -n.z) });
@@ -505,7 +557,7 @@ mod tests {
 
         let n = Normal3i::new(3, -3, 1);
         let v = Vector3i::new(4, 9, 2);
-        assert_eq!(Vector3i::new(-15, -2, 39), n.cross(v));
+        assert_eq!(Vector3i::new(-15, -2, 39), n.cross(&v));
 
         let n = Normal3f::new(3.0, -3.0, 1.0);
         let v = Vector3f::new(4.0, 9.0, 2.0);
