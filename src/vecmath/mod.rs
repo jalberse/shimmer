@@ -41,13 +41,15 @@
 //  Even if there's something like Lerp that I dont' want taking &self (since I think lerp(t, a, b) is cleaner than a.lerp(t, b),
 //  we can still do that by adding it to the struct.)
 //  I don't want callers of vecmath to implement on these traits necesssarily, so there's not a great reason to expose them.
+// It's extra maintanence to ensure that we make a function in the struct to expose something in the trait,
+// when really we should just design the trait that it's something we'd be happy exposing.
 
-mod has_nan;
-mod length;
+pub mod has_nan;
+pub mod length;
 pub mod normal;
-mod normalize;
+pub mod normalize;
 pub mod point;
-mod tuple;
+pub mod tuple;
 pub mod vector;
 
 pub use normal::{Normal3f, Normal3i};

@@ -253,18 +253,6 @@ impl Vector3i {
         Self::new(v, v, v)
     }
 
-    pub fn x(&self) -> i32 {
-        Tuple3::x(self)
-    }
-
-    pub fn y(&self) -> i32 {
-        Tuple3::y(self)
-    }
-
-    pub fn z(&self) -> i32 {
-        Tuple3::z(self)
-    }
-
     /// Compute the dot product
     pub fn dot(&self, v: &Self) -> i32 {
         dot3(self, v)
@@ -510,14 +498,6 @@ impl Vector2f {
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
         Self { x: v, y: v }
-    }
-
-    pub fn x(&self) -> Float {
-        Tuple2::x(self)
-    }
-
-    pub fn y(&self) -> Float {
-        Tuple2::y(self)
     }
 
     pub fn has_nan(&self) -> bool {
