@@ -3,7 +3,9 @@ use super::length::Length;
 use super::length_fns::{length3, length_squared3};
 use super::normalize::Normalize;
 use super::tuple::Tuple3;
-use super::tuple_fns::{abs_dot3, angle_between, cross, cross_i32, dot3, has_nan3};
+use super::tuple_fns::{
+    abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot3, dot3i, has_nan3,
+};
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
 use crate::math::lerp;
@@ -62,22 +64,22 @@ impl Normal3i {
 
     /// Compute the dot product of two normals.
     pub fn dot(&self, n: &Self) -> i32 {
-        dot3(self, n)
+        dot3i(self, n)
     }
 
     /// Compute the dot product with a vector.
     pub fn dot_vector(&self, v: &Vector3i) -> i32 {
-        dot3(self, v)
+        dot3i(self, v)
     }
 
     /// Compute the dot product of two normals and take the absolute value.
     pub fn abs_dot(&self, n: &Self) -> i32 {
-        abs_dot3(self, n)
+        abs_dot3i(self, n)
     }
 
     /// Compute the dot product with a vector and take the absolute value.
     pub fn abs_dot_vector(&self, v: &Vector3i) -> i32 {
-        abs_dot3(self, v)
+        abs_dot3i(self, v)
     }
 
     /// Cross this normal with a vector.

@@ -60,6 +60,25 @@ impl Floor for i32 {
     }
 }
 
+/// Provides the equivalent of f32::mul_add for the specified type.
+/// Really just provided so that we can use a common interface for Float
+/// and integer types, even if the integer types won't benefit from this form.
+pub trait MulAdd {
+    fn mul_add(self, a: Self, b: Self) -> Self;
+}
+
+impl MulAdd for Float {
+    fn mul_add(self, a: Self, b: Self) -> Self {
+        Float::mul_add(self, a, b)
+    }
+}
+
+impl MulAdd for i32 {
+    fn mul_add(self, a: Self, b: Self) -> Self {
+        self * a + b
+    }
+}
+
 pub fn lerp<'a, T>(t: Float, a: &'a T, b: &'a T) -> T
 where
     T: Add<T, Output = T>,
@@ -75,6 +94,12 @@ pub fn difference_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
     let difference = Float::mul_add(a, b, -cd);
     let error = Float::mul_add(-c, d, cd);
     difference + error
+}
+
+/// Computes a * b + c * d using an error-free transformation (EFT) method.
+/// See PBRT B.2.9.
+pub fn sum_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
+    difference_of_products(a, b, -c, d)
 }
 
 /// asin, with a check to ensure output is not slightly outside the legal range [-1, 1]

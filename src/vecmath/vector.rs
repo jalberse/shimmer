@@ -4,7 +4,8 @@ use super::length_fns::{length2, length3, length_squared2, length_squared3};
 use super::normalize::Normalize;
 use super::tuple::{Tuple2, Tuple3};
 use super::tuple_fns::{
-    abs_dot2, abs_dot3, angle_between, cross, cross_i32, dot2, dot3, has_nan2, has_nan3,
+    abs_dot2, abs_dot2i, abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot2, dot2i, dot3,
+    dot3i, has_nan2, has_nan3,
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
@@ -54,12 +55,12 @@ impl Vector2i {
 
     /// Compute the dot product.
     pub fn dot(&self, v: &Self) -> i32 {
-        dot2(self, v)
+        dot2i(self, v)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(&self, v: &Self) -> i32 {
-        abs_dot2(self, v)
+        abs_dot2i(self, v)
     }
 }
 
@@ -256,22 +257,22 @@ impl Vector3i {
 
     /// Compute the dot product
     pub fn dot(&self, v: &Self) -> i32 {
-        dot3(self, v)
+        dot3i(self, v)
     }
 
     /// Dot this vector with a normal.
     pub fn dot_normal(&self, n: &Normal3i) -> i32 {
-        dot3(self, n)
+        dot3i(self, n)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(&self, v: &Self) -> i32 {
-        abs_dot3(self, v)
+        abs_dot3i(self, v)
     }
 
     /// Dot this vector with a normal and take the absolute value.
     pub fn abs_dot_normal(&self, n: &Normal3i) -> i32 {
-        abs_dot3(self, n)
+        abs_dot3i(self, n)
     }
 
     /// Take the cross product of this and a vector v

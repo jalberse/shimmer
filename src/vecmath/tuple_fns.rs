@@ -6,7 +6,7 @@ use std::ops::{Add, Mul, Sub};
 use crate::{
     float::PI_F,
     is_nan::IsNan,
-    math::{difference_of_products, safe_asin, Abs, Ceil, Floor},
+    math::{difference_of_products, safe_asin, sum_of_products, Abs, Ceil, Floor, MulAdd},
     Float,
 };
 
@@ -65,33 +65,65 @@ where
 }
 
 /// Take the dot product of two vectors.
-pub fn dot3<V1, V2, T>(v: &V1, w: &V2) -> T
+pub fn dot3<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple3<T> + HasNan,
-    V2: Tuple3<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T> + Abs + Ceil + Floor,
+    V1: Tuple3<Float> + HasNan,
+    V2: Tuple3<Float> + HasNan,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
+
+    MulAdd::mul_add(v.x(), w.x(), sum_of_products(v.y(), w.y(), v.z(), w.z()))
+}
+
+/// Take the dot product of two vectors.
+pub fn dot3i<V1, V2>(v: &V1, w: &V2) -> i32
+where
+    V1: Tuple3<i32> + HasNan,
+    V2: Tuple3<i32> + HasNan,
+{
+    debug_assert!(!v.has_nan());
+    debug_assert!(!w.has_nan());
+
     v.x() * w.x() + v.y() * w.y() + v.z() * w.z()
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-pub fn abs_dot3<V1, V2, T>(v: &V1, w: &V2) -> T
+pub fn abs_dot3<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple3<T> + HasNan,
-    V2: Tuple3<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T> + Abs + Ceil + Floor,
+    V1: Tuple3<Float> + HasNan,
+    V2: Tuple3<Float> + HasNan,
 {
-    T::abs(dot3(v, w))
+    Float::abs(dot3(v, w))
+}
+
+/// Take the dot product of two vectors then take the absolute value.
+pub fn abs_dot3i<V1, V2>(v: &V1, w: &V2) -> i32
+where
+    V1: Tuple3<i32> + HasNan,
+    V2: Tuple3<i32> + HasNan,
+{
+    i32::abs(dot3i(v, w))
+}
+
+// TODO can also use sum_of_products for the dot2 ones.
+
+/// Take the dot product of two vectors.
+pub fn dot2<V1, V2>(v: &V1, w: &V2) -> Float
+where
+    V1: Tuple2<Float> + HasNan,
+    V2: Tuple2<Float> + HasNan,
+{
+    debug_assert!(!v.has_nan());
+    debug_assert!(!w.has_nan());
+    sum_of_products(v.x(), w.x(), v.y(), w.y())
 }
 
 /// Take the dot product of two vectors.
-pub fn dot2<V1, V2, T>(v: &V1, w: &V2) -> T
+pub fn dot2i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple2<T> + HasNan,
-    V2: Tuple2<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T> + Abs + Ceil + Floor,
+    V1: Tuple2<i32> + HasNan,
+    V2: Tuple2<i32> + HasNan,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -99,13 +131,21 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-pub fn abs_dot2<V1, V2, T>(v: &V1, w: &V2) -> T
+pub fn abs_dot2<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple2<T> + HasNan,
-    V2: Tuple2<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T> + Abs + Ceil + Floor,
+    V1: Tuple2<Float> + HasNan,
+    V2: Tuple2<Float> + HasNan,
 {
-    T::abs(dot2(v, w))
+    Float::abs(dot2(v, w))
+}
+
+/// Take the dot product of two vectors then take the absolute value.
+pub fn abs_dot2i<V1, V2>(v: &V1, w: &V2) -> i32
+where
+    V1: Tuple2<i32> + HasNan,
+    V2: Tuple2<i32> + HasNan,
+{
+    i32::abs(dot2i(v, w))
 }
 
 // TODO Consider some NormalizedVector, NormalizedNormal type or some other
