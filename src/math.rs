@@ -76,6 +76,22 @@ impl Min for i32 {
         <i32 as Ord>::min(self, a)
     }
 }
+pub trait Max {
+    // Take the maximum of self and a
+    fn max(self, a: Self) -> Self;
+}
+
+impl Max for Float {
+    fn max(self, a: Self) -> Self {
+        Float::max(self, a)
+    }
+}
+
+impl Max for i32 {
+    fn max(self, a: Self) -> Self {
+        <i32 as Ord>::max(self, a)
+    }
+}
 
 /// Provides the equivalent of f32::mul_add for the specified type.
 /// Really just provided so that we can use a common interface for Float

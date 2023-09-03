@@ -1,12 +1,14 @@
 //! A set of functions which help us implement the tuple traits for various types,
 //! but that we don't want exposed external to the vecmath module.
 
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Sub};
 
 use crate::{
     float::PI_F,
     is_nan::IsNan,
-    math::{difference_of_products, safe_asin, sum_of_products, Abs, Ceil, Floor, Min, MulAdd},
+    math::{
+        difference_of_products, safe_asin, sum_of_products, Abs, Ceil, Floor, Max, Min, MulAdd,
+    },
     Float,
 };
 
@@ -15,7 +17,7 @@ use super::{HasNan, Length, Tuple2, Tuple3};
 pub fn has_nan3<V, T>(v: &V) -> bool
 where
     V: Tuple3<T>,
-    T: IsNan + Abs + Ceil + Floor + Min,
+    T: IsNan + Abs + Ceil + Floor + Min + Max,
 {
     v.x().is_nan() || v.y().is_nan() || v.z().is_nan()
 }
@@ -23,7 +25,7 @@ where
 pub fn has_nan2<V, T>(v: &V) -> bool
 where
     V: Tuple2<T>,
-    T: IsNan + Abs + Ceil + Floor + Min,
+    T: IsNan + Abs + Ceil + Floor + Min + Max,
 {
     v.x().is_nan() || v.y().is_nan()
 }

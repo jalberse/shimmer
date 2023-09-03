@@ -1,6 +1,6 @@
 use crate::{
     float::Float,
-    math::{Abs, Ceil, Floor, Min},
+    math::{Abs, Ceil, Floor, Max, Min},
 };
 
 /// A tuple with 3 elements.
@@ -10,7 +10,7 @@ use crate::{
 /// then that can be represented in a separate trait which they can implement. Composition!
 pub trait Tuple3<T>: Sized
 where
-    T: Abs + Ceil + Floor + Min,
+    T: Abs + Ceil + Floor + Min + Max,
 {
     fn new(x: T, y: T, z: T) -> Self;
 
@@ -46,13 +46,22 @@ where
             T::min(a.z(), b.z()),
         )
     }
+
+    // Take the componentwise minimum of the two tuples.
+    fn max(a: &Self, b: &Self) -> Self {
+        Self::new(
+            T::max(a.x(), b.x()),
+            T::max(a.y(), b.y()),
+            T::max(a.z(), b.z()),
+        )
+    }
 }
 
 /// A tuple with 2 elements.
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
 pub trait Tuple2<T>: Sized
 where
-    T: Abs + Ceil + Floor + Min,
+    T: Abs + Ceil + Floor + Min + Max,
 {
     fn new(x: T, y: T) -> Self;
 
@@ -76,5 +85,10 @@ where
     // Take the componentwise minimum of the two tuples.
     fn min(a: &Self, b: &Self) -> Self {
         Self::new(T::min(a.x(), b.x()), T::min(a.y(), b.y()))
+    }
+
+    // Take the componentwise maximum of the two tuples.
+    fn max(a: &Self, b: &Self) -> Self {
+        Self::new(T::max(a.x(), b.x()), T::max(a.y(), b.y()))
     }
 }
