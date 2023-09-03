@@ -42,6 +42,22 @@ impl Ceil for i32 {
     }
 }
 
+pub trait Floor {
+    fn floor(self) -> Self;
+}
+
+impl Floor for Float {
+    fn floor(self) -> Self {
+        Float::floor(self)
+    }
+}
+
+impl Floor for i32 {
+    fn floor(self) -> Self {
+        self
+    }
+}
+
 pub fn lerp(x: Float, a: Float, b: Float) -> Float {
     (1.0 - x) * a + x * b
 }

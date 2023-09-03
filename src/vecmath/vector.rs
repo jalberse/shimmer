@@ -1061,6 +1061,16 @@ mod tests {
     }
 
     #[test]
+    fn vector_floor()
+    {
+        let v = Vector3f::new(-1.5, 1.5, 1.6);
+        assert_eq!(Vector3f::new(-2.0, 1.0, 1.0), v.floor());
+
+        let v = Vector2f::new(-1.5, 1.5);
+        assert_eq!(Vector2f::new(-2.0, 1.0), v.floor());
+    }
+
+    #[test]
     fn vector_assignment_ops() {
         // Vector2i
         // +=
