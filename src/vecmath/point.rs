@@ -215,18 +215,6 @@ impl Point3i {
     pub const fn splat(v: i32) -> Self {
         Self::new(v, v, v)
     }
-
-    pub fn x(&self) -> i32 {
-        Tuple3::x(self)
-    }
-
-    pub fn y(&self) -> i32 {
-        Tuple3::y(self)
-    }
-
-    pub fn z(&self) -> i32 {
-        Tuple3::z(self)
-    }
 }
 
 impl Tuple3<i32> for Point3i {
@@ -430,14 +418,6 @@ impl Point2f {
         HasNan::has_nan(self)
     }
 
-    pub fn x(&self) -> Float {
-        Tuple2::x(self)
-    }
-
-    pub fn y(&self) -> Float {
-        Tuple2::y(self)
-    }
-
     pub fn distance(self, p: Point2f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length()
@@ -597,18 +577,6 @@ impl Point3f {
 
     pub fn has_nan(&self) -> bool {
         HasNan::has_nan(self)
-    }
-
-    pub fn x(&self) -> Float {
-        Tuple3::x(self)
-    }
-
-    pub fn y(&self) -> Float {
-        Tuple3::y(self)
-    }
-
-    pub fn z(&self) -> Float {
-        Tuple3::z(self)
     }
 
     pub fn distance(self, p: Point3f) -> Float {

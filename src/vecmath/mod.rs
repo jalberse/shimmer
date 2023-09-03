@@ -37,9 +37,10 @@
 // TODO Consider making the traits public.
 //  I had previously thought we would keep them private and expose the API only through the structs,
 //  so that users don't need to import the traits to use them.
-
-// TODO delete the x() etc accessors in the structs. It's pointless since the fields are public.
-//  They're useful in the trait for shared implementations only.
+//  Actually, I guess it can still make sense to keep the traits private and expose only within the structs.
+//  Even if there's something like Lerp that I dont' want taking &self (since I think lerp(t, a, b) is cleaner than a.lerp(t, b),
+//  we can still do that by adding it to the struct.)
+//  I don't want callers of vecmath to implement on these traits necesssarily, so there's not a great reason to expose them.
 
 mod has_nan;
 mod length;

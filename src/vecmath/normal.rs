@@ -58,18 +58,6 @@ impl Normal3i {
         Self::new(v, v, v)
     }
 
-    pub fn x(&self) -> i32 {
-        Tuple3::x(self)
-    }
-
-    pub fn y(&self) -> i32 {
-        Tuple3::y(self)
-    }
-
-    pub fn z(&self) -> i32 {
-        Tuple3::z(self)
-    }
-
     /// Compute the dot product of two normals.
     pub fn dot(&self, n: &Self) -> i32 {
         dot3(self, n)
@@ -296,18 +284,6 @@ impl Normal3f {
     /// Creates a vector with all elements set to `v`.
     pub const fn splat(v: Float) -> Self {
         Self { x: v, y: v, z: v }
-    }
-
-    pub fn x(&self) -> Float {
-        Tuple3::x(self)
-    }
-
-    pub fn y(&self) -> Float {
-        Tuple3::y(self)
-    }
-
-    pub fn z(&self) -> Float {
-        Tuple3::z(self)
     }
 
     pub fn has_nan(&self) -> bool {

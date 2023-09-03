@@ -51,14 +51,6 @@ impl Vector2i {
         Self::new(v, v)
     }
 
-    pub fn x(&self) -> i32 {
-        Tuple2::x(self)
-    }
-
-    pub fn y(&self) -> i32 {
-        Tuple2::y(self)
-    }
-
     /// Compute the dot product.
     pub fn dot(&self, v: &Self) -> i32 {
         dot2(self, v)
