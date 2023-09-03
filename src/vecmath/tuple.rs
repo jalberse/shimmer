@@ -2,7 +2,7 @@ use std::ops::{Add, Mul, Sub};
 
 use crate::{
     float::{Float, PI_F},
-    math::{difference_of_products, safe_asin, Abs},
+    math::{difference_of_products, safe_asin, Abs, Ceil},
 };
 
 use super::{has_nan::HasNan, length::Length};
@@ -12,7 +12,7 @@ use super::{has_nan::HasNan, length::Length};
 pub trait Tuple3<T>
 where
     Self: Sized,
-    T: Abs,
+    T: Abs + Ceil,
 {
     fn new(x: T, y: T, z: T) -> Self;
 
@@ -23,6 +23,10 @@ where
     fn abs(&self) -> Self {
         Self::new(Abs::abs(self.x()), Abs::abs(self.y()), Abs::abs(self.z()))
     }
+
+    fn ceil(&self) -> Self {
+        Self::new(self.x().ceil(), self.y().ceil(), self.z().ceil())
+    }
 }
 
 /// A tuple with 2 elements.
@@ -30,7 +34,7 @@ where
 pub trait Tuple2<T>
 where
     Self: Sized,
-    T: Abs,
+    T: Abs + Ceil,
 {
     fn new(x: T, y: T) -> Self;
 
@@ -39,6 +43,10 @@ where
 
     fn abs(&self) -> Self {
         Self::new(Abs::abs(self.x()), Abs::abs(self.y()))
+    }
+
+    fn ceil(&self) -> Self {
+        Self::new(self.x().ceil(), self.y().ceil())
     }
 }
 
@@ -83,7 +91,7 @@ pub fn dot3<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple3<T> + HasNan,
     V2: Tuple3<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T> + Abs,
+    T: Mul<Output = T> + Add<Output = T> + Abs + Ceil,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -95,7 +103,7 @@ pub fn abs_dot3<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple3<T> + HasNan,
     V2: Tuple3<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T> + Abs,
+    T: Mul<Output = T> + Add<Output = T> + Abs + Ceil,
 {
     T::abs(dot3(v, w))
 }
@@ -105,7 +113,7 @@ pub fn dot2<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple2<T> + HasNan,
     V2: Tuple2<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T> + Abs,
+    T: Mul<Output = T> + Add<Output = T> + Abs + Ceil,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -117,7 +125,7 @@ pub fn abs_dot2<V1, V2, T>(v: &V1, w: &V2) -> T
 where
     V1: Tuple2<T> + HasNan,
     V2: Tuple2<T> + HasNan,
-    T: Mul<Output = T> + Add<Output = T> + Abs,
+    T: Mul<Output = T> + Add<Output = T> + Abs + Ceil,
 {
     T::abs(dot2(v, w))
 }

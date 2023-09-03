@@ -26,6 +26,22 @@ impl Abs for i32 {
     }
 }
 
+pub trait Ceil {
+    fn ceil(self) -> Self;
+}
+
+impl Ceil for Float {
+    fn ceil(self) -> Self {
+        Float::ceil(self)
+    }
+}
+
+impl Ceil for i32 {
+    fn ceil(self) -> Self {
+        self
+    }
+}
+
 pub fn lerp(x: Float, a: Float, b: Float) -> Float {
     (1.0 - x) * a + x * b
 }

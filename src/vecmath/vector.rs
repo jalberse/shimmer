@@ -1051,6 +1051,16 @@ mod tests {
     }
 
     #[test]
+    fn vector_ceil()
+    {
+        let v = Vector3f::new(-1.5, 1.5, 1.6);
+        assert_eq!(Vector3f::new(-1.0, 2.0, 2.0), v.ceil());
+
+        let v = Vector2f::new(-1.5, 1.5);
+        assert_eq!(Vector2f::new(-1.0, 2.0), v.ceil());
+    }
+
+    #[test]
     fn vector_assignment_ops() {
         // Vector2i
         // +=
