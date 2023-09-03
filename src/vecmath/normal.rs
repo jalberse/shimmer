@@ -1,3 +1,5 @@
+use std::ops::{Sub, SubAssign};
+
 use super::has_nan::{has_nan3, HasNan};
 use super::length::{length3, length_squared3, Length};
 use super::normalize::Normalize;
@@ -126,7 +128,7 @@ impl Default for Normal3i {
     }
 }
 
-impl_op_ex!(-|n: Normal3i| -> Normal3i {
+impl_op_ex!(-|n: &Normal3i| -> Normal3i {
     Normal3i {
         x: n.x.neg(),
         y: n.y.neg(),
@@ -135,19 +137,19 @@ impl_op_ex!(-|n: Normal3i| -> Normal3i {
 });
 
 // Normals can add and subtract with other normals
-impl_op_ex!(+|n1: Normal3i, n2: Normal3i| -> Normal3i
+impl_op_ex!(+|n1: &Normal3i, n2: &Normal3i| -> Normal3i
 {
     Normal3i { x: n1.x + n2.y, y: n1.y + n2.y, z: n1.z + n2.z }
 });
 
-impl_op_ex!(+=|n1: &mut Normal3i, n2: Normal3i|
+impl_op_ex!(+=|n1: &mut Normal3i, n2: &Normal3i|
 {
     n1.x += n2.x;
     n1.y += n2.y;
     n1.z += n2.z;
 });
 
-impl_op_ex!(-|n1: Normal3i, n2: Normal3i| -> Normal3i {
+impl_op_ex!(-|n1: &Normal3i, n2: &Normal3i| -> Normal3i {
     Normal3i {
         x: n1.x - n2.x,
         y: n1.y - n2.y,
@@ -155,14 +157,14 @@ impl_op_ex!(-|n1: Normal3i, n2: Normal3i| -> Normal3i {
     }
 });
 
-impl_op_ex!(-=|n1: &mut Normal3i, n2: Normal3i|
+impl_op_ex!(-=|n1: &mut Normal3i, n2: &Normal3i|
 {
     n1.x -= n2.x;
     n1.y -= n2.y;
     n1.z -= n2.z;
 });
 
-impl_op_ex_commutative!(*|n: Normal3i, s: i32| -> Normal3i {
+impl_op_ex_commutative!(*|n: &Normal3i, s: i32| -> Normal3i {
     Normal3i {
         x: n.x * s,
         y: n.y * s,
@@ -176,7 +178,7 @@ impl_op_ex!(*=|n1: &mut Normal3i, s: i32|
     n1.z *= s;
 });
 
-impl_op_ex!(/|n: Normal3i, s: i32| -> Normal3i {
+impl_op_ex!(/|n: &Normal3i, s: i32| -> Normal3i {
     Normal3i {
         x: n.x / s,
         y: n.y / s,
@@ -341,12 +343,12 @@ impl Normal3f {
 
     /// Get the angle between this and another normal.
     /// Both must be normalized.
-    pub fn angle_between(self, n: Normal3f) -> Float {
-        super::angle_between(self, n)
+    pub fn angle_between(&self, n: &Normal3f) -> Float {
+        super::angle_between::<Normal3f, Normal3f, Normal3f>(self, n)
     }
 
     /// Get the angle between this normal and a vector.
-    pub fn angle_between_vector(self, v: Vector3f) -> Float {
+    pub fn angle_between_vector(&self, v: &Vector3f) -> Float {
         super::angle_between::<Normal3f, Vector3f, Vector3f>(self, v)
     }
 }
@@ -394,28 +396,28 @@ impl Default for Normal3f {
 }
 
 // Normals can be negated
-impl_op_ex!(-|n: Normal3f| -> Normal3f { Normal3f::new(-n.x, -n.y, -n.z) });
+impl_op_ex!(-|n: &Normal3f| -> Normal3f { Normal3f::new(-n.x, -n.y, -n.z) });
 // Normals can add and subtract with other normals
-impl_op_ex!(+ |n1: Normal3f, n2: Normal3f| -> Normal3f { Normal3f::new(n1.x + n2.x, n1.y + n2.y, n1.z + n2.z)});
-impl_op_ex!(-|n1: Normal3f, n2: Normal3f| -> Normal3f {
+impl_op_ex!(+ |n1: &Normal3f, n2: &Normal3f| -> Normal3f { Normal3f::new(n1.x + n2.x, n1.y + n2.y, n1.z + n2.z)});
+impl_op_ex!(-|n1: &Normal3f, n2: &Normal3f| -> Normal3f {
     Normal3f::new(n1.x - n2.x, n1.y - n2.y, n1.z - n2.z)
 });
-impl_op_ex!(+= |n1: &mut Normal3f, n2: Normal3f| {
+impl_op_ex!(+= |n1: &mut Normal3f, n2: &Normal3f| {
     n1.x += n2.x;
     n1.y += n2.y;
     n1.z += n2.z;
 });
-impl_op_ex!(-= |n1: &mut Normal3f, n2: Normal3f| {
+impl_op_ex!(-= |n1: &mut Normal3f, n2: &Normal3f| {
     n1.x -= n2.x;
     n1.y -= n2.y;
     n1.z -= n2.z;
 });
 
 // Normals can be scaled
-impl_op_ex_commutative!(*|n: Normal3f, s: Float| -> Normal3f {
+impl_op_ex_commutative!(*|n: &Normal3f, s: Float| -> Normal3f {
     Normal3f::new(n.x * s, n.y * s, n.z * s)
 });
-impl_op_ex!(/ |n: Normal3f, s: Float| -> Normal3f { Normal3f::new(n.x / s, n.y / s, n.z / s) });
+impl_op_ex!(/ |n: &Normal3f, s: Float| -> Normal3f { Normal3f::new(n.x / s, n.y / s, n.z / s) });
 impl_op_ex!(*= |n1: &mut Normal3f, s: Float| {
     n1.x *= s;
     n1.y *= s;
@@ -428,13 +430,14 @@ impl_op_ex!(/= |n1: &mut Normal3f, s: Float| {
 });
 
 // Normals can add and subtract with vectors to create a new vector
-impl_op_ex!(-|n: Normal3f, v: Vector3f| -> Vector3f {
+impl_op_ex!(-|n: &Normal3f, v: &Vector3f| -> Vector3f {
     Vector3f::new(n.x - v.x, n.y - v.y, n.z - v.z)
 });
-impl_op_ex!(-|v: Vector3f, n: Normal3f| -> Vector3f {
+
+impl_op_ex!(-|v: &Vector3f, n: &Normal3f| -> Vector3f {
     Vector3f::new(v.x - n.x, v.y - n.y, v.z - n.z)
 });
-impl_op_ex_commutative!(+|n: Normal3f, v: Vector3f| -> Vector3f {
+impl_op_ex_commutative!(+|n: &Normal3f, v: &Vector3f| -> Vector3f {
     Vector3f::new(n.x + v.x, n.y + v.y, n.z + v.z)
 });
 
@@ -569,7 +572,7 @@ mod tests {
         let n1 = Normal3f::new(1.0, 2.0, 3.0).normalize();
         let n2 = Normal3f::new(3.0, 4.0, 5.0).normalize();
 
-        assert_eq!(0.18623877, n1.angle_between(n2));
+        assert_eq!(0.18623877, n1.angle_between(&n2));
     }
 
     #[test]
@@ -577,7 +580,7 @@ mod tests {
         let n1 = Normal3f::new(1.0, 2.0, 3.0).normalize();
         let v2 = Vector3f::new(3.0, 4.0, 5.0).normalize();
 
-        assert_eq!(0.18623877, n1.angle_between_vector(v2));
+        assert_eq!(0.18623877, n1.angle_between_vector(&v2));
     }
 
     #[test]

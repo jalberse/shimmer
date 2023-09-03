@@ -547,28 +547,28 @@ impl Default for Vector2f {
 
 
 // Vectors can be negated
-impl_op_ex!(-|v: Vector2f| -> Vector2f { 
+impl_op_ex!(-|v: &Vector2f| -> Vector2f { 
     Vector2f::new(-v.x, -v.y) });
 // Vectors can add and subtract with other vectors
-impl_op_ex!(+ |v1: Vector2f, v2: Vector2f| -> Vector2f { 
+impl_op_ex!(+ |v1: &Vector2f, v2: &Vector2f| -> Vector2f { 
     Vector2f::new(v1.x + v2.x, v1.y + v2.y)});
-impl_op_ex!(-|v1: Vector2f, v2: Vector2f| -> Vector2f {
+impl_op_ex!(-|v1: &Vector2f, v2: &Vector2f| -> Vector2f {
     Vector2f::new(v1.x - v2.x, v1.y - v2.y)
 });
-impl_op_ex!(+= |v1: &mut Vector2f, v2: Vector2f| {
+impl_op_ex!(+= |v1: &mut Vector2f, v2: &Vector2f| {
     v1.x += v2.x;
     v1.y += v2.y;
 });
-impl_op_ex!(-= |n1: &mut Vector2f, n2: Vector2f| {
+impl_op_ex!(-= |n1: &mut Vector2f, n2: &Vector2f| {
     n1.x -= n2.x;
     n1.y -= n2.y;
 });
 
 // Vectors can be scaled
-impl_op_ex_commutative!(*|v: Vector2f, s: Float| -> Vector2f {
+impl_op_ex_commutative!(*|v: &Vector2f, s: Float| -> Vector2f {
     Vector2f::new(v.x * s, v.y * s)
 });
-impl_op_ex!(/ |v: Vector2f, s: Float| -> Vector2f {
+impl_op_ex!(/ |v: &Vector2f, s: Float| -> Vector2f {
     Vector2f::new(v.x / s, v.y / s) });
 impl_op_ex!(*= |v1: &mut Vector2f, s: Float| {
     v1.x *= s;
@@ -721,13 +721,13 @@ impl Vector3f {
 
     /// Find the andle between this vector and another vector.
     /// Both vectors must be normalized.
-    pub fn angle_between(self, v: Self) -> Float {
+    pub fn angle_between(&self, v: &Self) -> Float {
         super::angle_between(self, v)
     }
 
     /// Find the angle between this vector and a normal
     /// Both vectors must be normalized.
-    pub fn angle_between_normal(self, n: Normal3f) -> Float {
+    pub fn angle_between_normal(&self, n: &Normal3f) -> Float {
         super::angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
     }
 }
@@ -775,30 +775,30 @@ impl Default for Vector3f {
 }
 
 // Vectors can be negated
-impl_op_ex!(-|v: Vector3f| -> Vector3f { 
+impl_op_ex!(-|v: &Vector3f| -> Vector3f { 
     Vector3f::new(-v.x, -v.y, -v.z) });
 // Vectors can add and subtract with other vectors
-impl_op_ex!(+ |v1: Vector3f, v2: Vector3f| -> Vector3f { 
+impl_op_ex!(+ |v1: &Vector3f, v2: &Vector3f| -> Vector3f { 
     Vector3f::new(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z)});
-impl_op_ex!(-|v1: Vector3f, v2: Vector3f| -> Vector3f {
+impl_op_ex!(-|v1: &Vector3f, v2: &Vector3f| -> Vector3f {
     Vector3f::new(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z)
 });
-impl_op_ex!(+= |v1: &mut Vector3f, v2: Vector3f| {
+impl_op_ex!(+= |v1: &mut Vector3f, v2: &Vector3f| {
     v1.x += v2.x;
     v1.y += v2.y;
     v1.z += v2.z;
 });
-impl_op_ex!(-= |n1: &mut Vector3f, n2: Vector3f| {
+impl_op_ex!(-= |n1: &mut Vector3f, n2: &Vector3f| {
     n1.x -= n2.x;
     n1.y -= n2.y;
     n1.z -= n2.z;
 });
 
 // Vectors can be scaled
-impl_op_ex_commutative!(*|v: Vector3f, s: Float| -> Vector3f {
+impl_op_ex_commutative!(*|v: &Vector3f, s: Float| -> Vector3f {
     Vector3f::new(v.x * s, v.y * s, v.z * s)
 });
-impl_op_ex!(/ |v: Vector3f, s: Float| -> Vector3f { Vector3f::new(v.x / s, v.y / s, v.z / s) });
+impl_op_ex!(/ |v: &Vector3f, s: Float| -> Vector3f { Vector3f::new(v.x / s, v.y / s, v.z / s) });
 impl_op_ex!(*= |v1: &mut Vector3f, s: Float| {
     v1.x *= s;
     v1.y *= s;
@@ -986,7 +986,7 @@ mod tests {
         let v1 = Vector3f::new(1.0, 2.0, 3.0).normalize();
         let v2 = Vector3f::new(3.0, 4.0, 5.0).normalize();
 
-        assert_eq!(0.18623877, v1.angle_between(v2));
+        assert_eq!(0.18623877, v1.angle_between(&v2));
     }
 
     #[test]
@@ -994,7 +994,7 @@ mod tests {
         let v = Vector3f::new(1.0, 2.0, 3.0).normalize();
         let n = Normal3f::new(3.0, 4.0, 5.0).normalize();
 
-        assert_eq!(0.18623877, v.angle_between_normal(n));
+        assert_eq!(0.18623877, v.angle_between_normal(&n));
     }
 
     #[test]

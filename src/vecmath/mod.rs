@@ -59,16 +59,6 @@ use self::{
     tuple::{Tuple2, Tuple3},
 };
 
-// TODO consider moving away from glam. If nothing else, I don't love not being able to access fields directly
-//   as required by the newtype pattern. We could implement optimizations ourselves, and long-term that's likely
-//   something we want to do as we e.g. use SIMD to process ray clusters. We likely want more control.
-//   In such a case we could get rid of our newtype_macros.rs, since it's only useful specifically for
-//   newtype trait implementations (though I'd like to shove that into a repo and keep it, it's situationally useful).
-//   We could just use impl_ops instead if we're rolling our own types from scratch instead of using newtypes.
-//   Also at this point I think that with my necessary traits for Normal/Vector interaction (at least, to follow DRY),
-//   and with the optimizations that are not present in glam (because glam is general-purpose), I'm implementing so much
-//   myself that I'd rather just roll everything myself.
-//
 // We use glam as it is a optimized vector math library which includes SIMD optimization.
 // We wrap the glam vector classes using the newtype pattern. This accomplishes two things:
 //  1. Points, Vectors, and Normals can be defined as distinct types,
@@ -80,10 +70,6 @@ use self::{
 // such as being unable to access x, y, z directly (requiring getters or tuple access, i.e. some_vec.0.x).
 // But, this trade-off is worth it to be able to leverage the type system for correctness.
 // The newtype pattern should have no associated runtime cost here, optimized by the compiler.
-
-// TODO Now that we've got std::ops::* implemented on our types, we can go back
-//   and use &self in a bunch of places where we were passing by value before.
-//   I don't know if it would even impact performance, but for convention's sake.
 
 // TODO Our impl_op_ex* methods are not all tested; test them.
 
@@ -183,6 +169,7 @@ where
 
 /// Computes the angle between two vectors in radians. Generic because we want to be able
 /// to use this for Vector and Normal types alike, and combinations of them.
+/// Uses some numerical methods to be more accurate than a naive method.
 ///
 /// Vectors must be normalized.
 ///
@@ -191,17 +178,19 @@ where
 /// V3: The resulting type from adding or subtracting V1 and V2.
 ///   That is typically a Vector3f.
 ///   We just use the third type to be able to specify that that is the case.
-fn angle_between<V1, V2, V3>(v: &V1, w: &V2) -> Float
+fn angle_between<'a, V1, V2, V3>(v1: &'a V1, v2: &'a V2) -> Float
 where
-    V1: Tuple3<Float> + HasNan + Add<V2, Output = V3> + Copy + Clone,
-    V2: Tuple3<Float> + HasNan + Add<V1, Output = V3> + Sub<V1, Output = V3> + Copy + Clone,
+    V1: Tuple3<Float> + HasNan,
+    V2: Tuple3<Float> + HasNan,
     V3: Tuple3<Float> + Length<Float>,
+    &'a V1: Add<&'a V2, Output = V3>,
+    &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,
 {
-    debug_assert!(!v.has_nan());
-    debug_assert!(!w.has_nan());
-    if dot3(v, w) < 0.0 {
-        PI_F - 2.0 * safe_asin((v + w).length() / 2.0)
+    debug_assert!(!v1.has_nan());
+    debug_assert!(!v2.has_nan());
+    if dot3(v1, v2) < 0.0 {
+        PI_F - 2.0 * safe_asin((v1 + v2).length() / 2.0)
     } else {
-        2.0 * safe_asin((w - v).length() / 2.0)
+        2.0 * safe_asin((v2 - v1).length() / 2.0)
     }
 }
