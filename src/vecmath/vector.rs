@@ -1,8 +1,8 @@
 use super::has_nan::{has_nan2, HasNan};
 use super::length::{length2, length3, length_squared2, length_squared3, Length};
 use super::normalize::Normalize;
-use super::tuple::Tuple2;
-use super::{abs_dot2, dot2, Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Tuple3};
+use super::tuple::{Tuple2, dot3, abs_dot3, cross_i32, dot2, abs_dot2, cross, angle_between, Tuple3};
+use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
 use crate::vecmath::has_nan::has_nan3;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
@@ -59,12 +59,12 @@ impl Vector2i {
 
     /// Compute the dot product.
     pub fn dot(&self, v: &Self) -> i32 {
-        super::dot2(self, v)
+        dot2(self, v)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(&self, v: &Self) -> i32 {
-        super::abs_dot2(self, v)
+        abs_dot2(self, v)
     }
 }
 
@@ -141,18 +141,6 @@ impl_op_ex!(/=|v1: &mut Vector2i, v2: Vector2i|
 {
     v1.x /= v2.x;
     v1.y /= v2.y;
-});
-
-impl_op_ex!(+=|v1: &mut Vector2i, s: i32|
-{
-    v1.x += s;
-    v1.y += s;
-});
-
-impl_op_ex!(-=|v1: &mut Vector2i, s: i32|
-{
-    v1.x -= s;
-    v1.y -= s;
 });
 
 impl_op_ex!(*=|v1: &mut Vector2i, s: i32|
@@ -260,33 +248,33 @@ impl Vector3i {
 
     /// Compute the dot product
     pub fn dot(&self, v: &Self) -> i32 {
-        super::dot3(self, v)
+        dot3(self, v)
     }
 
     /// Dot this vector with a normal.
     pub fn dot_normal(&self, n: &Normal3i) -> i32 {
-        super::dot3(self, n)
+        dot3(self, n)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(&self, v: &Self) -> i32 {
-        super::abs_dot3(self, v)
+        abs_dot3(self, v)
     }
 
     /// Dot this vector with a normal and take the absolute value.
     pub fn abs_dot_normal(&self, n: &Normal3i) -> i32 {
-        super::abs_dot3(self, n)
+        abs_dot3(self, n)
     }
 
     /// Take the cross product of this and a vector v
     pub fn cross(&self, v: &Self) -> Self {
         // Integer vectors do not need to use EFT methods for accuracy.
-        super::cross_i32(self, v)
+        cross_i32(self, v)
     }
 
     /// Take the cross product of this and a normal n
     pub fn cross_normal(&self, n: &Normal3i) -> Self {
-        super::cross_i32(self, n)
+        cross_i32(self, n)
     }
 }
 
@@ -687,48 +675,48 @@ impl Vector3f {
 
     /// Compute the dot product.
     pub fn dot(&self, v: &Self) -> Float {
-        super::dot3(self, v)
+        dot3(self, v)
     }
 
     /// Dot this vector with a normal.
     pub fn dot_normal(&self, n: &Normal3f) -> Float {
-        super::dot3(self, n)
+        dot3(self, n)
     }
 
     /// Compute the dot product and take the absolute value.
     pub fn abs_dot(&self, v: &Self) -> Float {
-        super::abs_dot3(self, v)
+        abs_dot3(self, v)
     }
 
     /// Dot this vector with a normal and take its absolute value.
     pub fn abs_dot_normal(&self, n: &Normal3f) -> Float {
-        super::abs_dot3(self, n)
+        abs_dot3(self, n)
     }
 
     /// Take the cross product of this and a vector v.
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
     pub fn cross(&self, v: &Self) -> Self {
-        super::cross::<Vector3f, Vector3f, Vector3f>(self, v)
+        cross::<Vector3f, Vector3f, Vector3f>(self, v)
     }
 
     /// Take the cross product of this and a normal n.
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
     pub fn cross_normal(&self, n: &Normal3f) -> Self {
-        super::cross::<Vector3f, Normal3f, Vector3f>(self, n)
+        cross::<Vector3f, Normal3f, Vector3f>(self, n)
     }
 
     /// Find the andle between this vector and another vector.
     /// Both vectors must be normalized.
     pub fn angle_between(&self, v: &Self) -> Float {
-        super::angle_between(self, v)
+        angle_between(self, v)
     }
 
     /// Find the angle between this vector and a normal
     /// Both vectors must be normalized.
     pub fn angle_between_normal(&self, n: &Normal3f) -> Float {
-        super::angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
+        angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
     }
 }
 
@@ -775,10 +763,10 @@ impl Default for Vector3f {
 }
 
 // Vectors can be negated
-impl_op_ex!(-|v: &Vector3f| -> Vector3f { 
+impl_op_ex!(-|v: &Vector3f| -> Vector3f {
     Vector3f::new(-v.x, -v.y, -v.z) });
 // Vectors can add and subtract with other vectors
-impl_op_ex!(+ |v1: &Vector3f, v2: &Vector3f| -> Vector3f { 
+impl_op_ex!(+ |v1: &Vector3f, v2: &Vector3f| -> Vector3f {
     Vector3f::new(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z)});
 impl_op_ex!(-|v1: &Vector3f, v2: &Vector3f| -> Vector3f {
     Vector3f::new(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z)
