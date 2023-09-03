@@ -108,8 +108,6 @@ where
     i32::abs(dot3i(v, w))
 }
 
-// TODO can also use sum_of_products for the dot2 ones.
-
 /// Take the dot product of two vectors.
 pub fn dot2<V1, V2>(v: &V1, w: &V2) -> Float
 where

@@ -46,16 +46,10 @@ pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use tuple::{Tuple2, Tuple3};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
-// TODO While I think we want to expose the traits as public so that users can import them and use them on the structs,
-//   I think that we want to keep e.g. our helper cross() methods private to the vecmath module.
-// I think we would do it by making some length_helpers() module or similar, and using that inside of vecmath.
-//   But we would not make it a public module here.
-
-// TODO Our impl_op_ex* methods are not all tested; test them.
-
-// TODO Run a test coverage software and ensure full coverage. I know I'm missing a bit. https://lib.rs/crates/cargo-llvm-cov
-//   Also hook that up into GitHub actions.
-
+// TODO Finish implementing the functions in 85, less FMA (it looks like that's not actually in their current version).
+// TODO And finish gramm schmidt, coordinate sys from vectors, and face forward functions.
+//   After that, just polish up vecmath and we can merge into master.
+//   I think we'd be missing some slight things such as FMA on tuples but really I'd like to move on and implement anything else as it comes up as needed.
 // TODO ensure we debug_assert() with has_nan() where appropriate.
-
-// TODO also implement the list of functions on page 85
+// TODO Our impl_op_ex* methods are not all tested; test them.
+// TODO Run a test coverage software and ensure full coverage.
