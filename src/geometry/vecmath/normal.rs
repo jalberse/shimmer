@@ -54,6 +54,13 @@ where
     /// Cross this normal with a vector.
     /// Note that you cannot take the cross product of two normals.
     fn cross(&self, v: &Self::AssociatedVectorType) -> Self::AssociatedVectorType;
+
+    /// Get the angle between this and another normal.
+    /// Both must be normalized.
+    fn angle_between(&self, n: &Self) -> Float;
+
+    /// Get the angle between this normal and a vector.
+    fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +164,14 @@ impl Normal3<i32> for Normal3i {
     fn cross(&self, v: &Vector3i) -> Vector3i {
         // Note that integer based vectors don't need EFT methods.
         cross_i32(self, v)
+    }
+
+    fn angle_between(&self, n: &Normal3i) -> Float {
+        angle_between::<Normal3f, Normal3f, Normal3f>(&Normal3f::from(self), &Normal3f::from(n))
+    }
+
+    fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float {
+        angle_between::<Normal3f, Vector3f, Vector3f>(&Normal3f::from(self), &Vector3f::from(v))
     }
 }
 
@@ -303,25 +318,13 @@ pub struct Normal3f {
 
 impl Normal3f {
     /// All zeroes.
-    pub const ZERO: Self = Normal3f {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
+    pub const ZERO: Self = Normal3f::new(0.0, 0.0, 0.0);
 
     /// All ones.
-    pub const ONE: Self = Normal3f {
-        x: 1.0,
-        y: 1.0,
-        z: 1.0,
-    };
+    pub const ONE: Self = Normal3f::new(1.0, 1.0, 1.0);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Normal3f {
-        x: -1.0,
-        y: -1.0,
-        z: -1.0,
-    };
+    pub const NEG_ONE: Self = Normal3f::new(-1.0, -1.0, -1.0);
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1.0, 0.0, 0.0);
@@ -344,45 +347,6 @@ impl Normal3f {
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
         Self { x, y, z }
     }
-
-    /// Compute the dot product of two normals.
-    pub fn dot(&self, n: &Self) -> Float {
-        dot3(self, n)
-    }
-
-    /// Compute the dot with a vector.
-    pub fn dot_vector(&self, v: &Vector3f) -> Float {
-        dot3(self, v)
-    }
-
-    /// Compute the dot product of two normals and take the absolute value.
-    pub fn abs_dot(&self, n: &Self) -> Float {
-        abs_dot3(self, n)
-    }
-
-    /// Compute the dot with a vector and take the absolute value.
-    pub fn abs_dot_vector(&self, v: &Vector3f) -> Float {
-        abs_dot3(self, v)
-    }
-
-    /// Takes the cross of this normal with a vector.
-    /// Note that you cannot take the cross product of two normals.
-    /// Uses an EFT method for calculating the value with minimal error without
-    /// casting to f64. See PBRTv4 3.3.2.
-    pub fn cross(&self, v: &Vector3f) -> Vector3f {
-        cross::<Normal3f, Vector3f, Vector3f>(self, v)
-    }
-
-    /// Get the angle between this and another normal.
-    /// Both must be normalized.
-    pub fn angle_between(&self, n: &Normal3f) -> Float {
-        angle_between::<Normal3f, Normal3f, Normal3f>(self, n)
-    }
-
-    /// Get the angle between this normal and a vector.
-    pub fn angle_between_vector(&self, v: &Vector3f) -> Float {
-        angle_between::<Normal3f, Vector3f, Vector3f>(self, v)
-    }
 }
 
 impl Tuple3<Float> for Normal3f {
@@ -404,6 +368,49 @@ impl Tuple3<Float> for Normal3f {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
+    }
+}
+
+impl Normal3<Float> for Normal3f {
+    type AssociatedVectorType = Vector3f;
+
+    /// Compute the dot product of two normals.
+    fn dot(&self, n: &Self) -> Float {
+        dot3(self, n)
+    }
+
+    /// Compute the dot with a vector.
+    fn dot_vector(&self, v: &Vector3f) -> Float {
+        dot3(self, v)
+    }
+
+    /// Compute the dot product of two normals and take the absolute value.
+    fn abs_dot(&self, n: &Self) -> Float {
+        abs_dot3(self, n)
+    }
+
+    /// Compute the dot with a vector and take the absolute value.
+    fn abs_dot_vector(&self, v: &Vector3f) -> Float {
+        abs_dot3(self, v)
+    }
+
+    /// Takes the cross of this normal with a vector.
+    /// Note that you cannot take the cross product of two normals.
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64. See PBRTv4 3.3.2.
+    fn cross(&self, v: &Vector3f) -> Vector3f {
+        cross::<Normal3f, Vector3f, Vector3f>(self, v)
+    }
+
+    /// Get the angle between this and another normal.
+    /// Both must be normalized.
+    fn angle_between(&self, n: &Normal3f) -> Float {
+        angle_between::<Normal3f, Normal3f, Normal3f>(self, n)
+    }
+
+    /// Get the angle between this normal and a vector.
+    fn angle_between_vector(&self, v: &Vector3f) -> Float {
+        angle_between::<Normal3f, Vector3f, Vector3f>(self, v)
     }
 }
 
@@ -504,6 +511,26 @@ impl From<(Float, Float, Float)> for Normal3f {
 impl From<Normal3f> for (Float, Float, Float) {
     fn from(value: Normal3f) -> Self {
         (value.x, value.y, value.z)
+    }
+}
+
+impl From<Normal3i> for Normal3f {
+    fn from(value: Normal3i) -> Self {
+        Normal3f {
+            x: value.x as Float,
+            y: value.y as Float,
+            z: value.z as Float,
+        }
+    }
+}
+
+impl From<&Normal3i> for Normal3f {
+    fn from(value: &Normal3i) -> Self {
+        Normal3f {
+            x: value.x as Float,
+            y: value.y as Float,
+            z: value.z as Float,
+        }
     }
 }
 

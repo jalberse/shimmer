@@ -212,7 +212,7 @@ impl From<Vector2i> for (i32, i32) {
     }
 }
 
-pub trait Vector3<T>: Tuple3<T>
+pub trait Vector3<T>: Tuple3<T> + Length<T>
 where
     T: Abs + Ceil + Floor + Max + Min + Copy + Clone + PartialOrd,
 {
@@ -334,6 +334,16 @@ impl Vector3<i32> for Vector3i {}
 impl HasNan for Vector3i {
     fn has_nan(&self) -> bool {
         false
+    }
+}
+
+impl Length<i32> for Vector3i {
+    fn length_squared(&self) -> i32 {
+        length_squared3(self)
+    }
+
+    fn length(&self) -> i32 {
+        length3(self)
     }
 }
 
@@ -776,6 +786,8 @@ impl Tuple3<Float> for Vector3f {
     }
 }
 
+impl Vector3<Float> for Vector3f {}
+
 impl HasNan for Vector3f {
     fn has_nan(&self) -> bool {
         has_nan3(self)
@@ -868,6 +880,12 @@ impl From<(Float, Float, Float)> for Vector3f {
 impl From<Vector3f> for (Float, Float, Float) {
     fn from(value: Vector3f) -> Self {
         (value.x, value.y, value.z)
+    }
+}
+
+impl From<&Vector3i> for Vector3f {
+    fn from(value: &Vector3i) -> Self {
+        Self::new(value.x as Float, value.y as Float, value.z as Float)
     }
 }
 

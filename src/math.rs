@@ -12,6 +12,12 @@ impl Sqrt for Float {
     }
 }
 
+impl Sqrt for i32 {
+    fn sqrt(self) -> Self {
+        (self as f32).sqrt() as i32
+    }
+}
+
 pub trait Abs {
     fn abs(self) -> Self;
 }
