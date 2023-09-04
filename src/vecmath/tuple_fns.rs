@@ -17,7 +17,7 @@ use super::{HasNan, Length, Tuple2, Tuple3};
 pub fn has_nan3<V, T>(v: &V) -> bool
 where
     V: Tuple3<T>,
-    T: IsNan + Abs + Ceil + Floor + Min + Max,
+    T: IsNan + Abs + Ceil + Floor + Min + Max + PartialOrd,
 {
     v.x().is_nan() || v.y().is_nan() || v.z().is_nan()
 }
@@ -25,7 +25,7 @@ where
 pub fn has_nan2<V, T>(v: &V) -> bool
 where
     V: Tuple2<T>,
-    T: IsNan + Abs + Ceil + Floor + Min + Max,
+    T: IsNan + Abs + Ceil + Floor + Min + Max + PartialOrd,
 {
     v.x().is_nan() || v.y().is_nan()
 }

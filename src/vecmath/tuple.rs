@@ -10,7 +10,7 @@ use crate::{
 /// then that can be represented in a separate trait which they can implement. Composition!
 pub trait Tuple3<T>: Sized
 where
-    T: Abs + Ceil + Floor + Min + Max,
+    T: Abs + Ceil + Floor + Min + Max + PartialOrd,
 {
     fn new(x: T, y: T, z: T) -> Self;
 
@@ -55,13 +55,33 @@ where
             T::max(a.z(), b.z()),
         )
     }
+
+    fn min_component_value(&self) -> T {
+        T::min(self.x(), T::min(self.y(), self.z()))
+    }
+
+    fn min_component_index(&self) -> usize {
+        if self.x() < self.y() {
+            if self.x() < self.z() {
+                return 0;
+            } else {
+                return 2;
+            }
+        } else {
+            if self.y() < self.z() {
+                return 1;
+            } else {
+                return 2;
+            }
+        }
+    }
 }
 
 /// A tuple with 2 elements.
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
 pub trait Tuple2<T>: Sized
 where
-    T: Abs + Ceil + Floor + Min + Max,
+    T: Abs + Ceil + Floor + Min + Max + PartialOrd,
 {
     fn new(x: T, y: T) -> Self;
 
@@ -90,5 +110,17 @@ where
     // Take the componentwise maximum of the two tuples.
     fn max(a: &Self, b: &Self) -> Self {
         Self::new(T::max(a.x(), b.x()), T::max(a.y(), b.y()))
+    }
+
+    fn min_component_value(&self) -> T {
+        T::min(self.x(), self.y())
+    }
+
+    fn min_component_index(&self) -> usize {
+        if self.x() < self.y() {
+            0
+        } else {
+            1
+        }
     }
 }
