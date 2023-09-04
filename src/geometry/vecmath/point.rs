@@ -45,7 +45,7 @@ impl Point2i {
 
 impl Tuple2<i32> for Point2i {
     fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
+        Self::new(x, y)
     }
 
     fn x(&self) -> i32 {
