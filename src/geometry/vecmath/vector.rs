@@ -870,7 +870,7 @@ impl From<Vector3f> for (Float, Float, Float) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        vecmath::{HasNan, Length, Normalize, Tuple2, Tuple3},
+        geometry::vecmath::{HasNan, Length, Normalize, Tuple2, Tuple3},
         Float,
     };
 

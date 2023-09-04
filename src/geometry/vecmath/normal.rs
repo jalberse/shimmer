@@ -456,7 +456,7 @@ impl From<Normal3f> for (Float, Float, Float) {
 mod tests {
     use crate::{
         float::Float,
-        vecmath::{HasNan, Length, Normalize},
+        geometry::vecmath::{HasNan, Length, Normalize},
     };
 
     use super::{Normal3f, Normal3i, Vector3f, Vector3i};
