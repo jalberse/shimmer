@@ -1,17 +1,14 @@
-use std::ops::{Add, Div, Mul};
-
-use crate::math::Sqrt;
+use std::ops::Div;
 
 use super::{has_nan::HasNan, length::Length};
 
 pub trait Normalize<T>: HasNan + Length<T>
 where
-    Self: Sized + Div<T, Output = Self> + Copy + Clone,
-    T: Mul<T, Output = T> + Add<T, Output = T> + Sqrt,
+    Self: Sized + Div<T, Output = Self>,
 {
-    // TODO I think we can take a reference here instead.
     fn normalize(self) -> Self {
+        let len = self.length();
         debug_assert!(!self.has_nan());
-        self / self.length()
+        self / len
     }
 }
