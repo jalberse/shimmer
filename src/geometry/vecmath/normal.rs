@@ -27,13 +27,17 @@ pub struct Normal3i {
 
 impl Normal3i {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0);
+    pub const ZERO: Self = Normal3i { x: 0, y: 0, z: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1);
+    pub const ONE: Self = Normal3i { x: 1, y: 1, z: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1);
+    pub const NEG_ONE: Self = Normal3i {
+        x: -1,
+        y: -1,
+        z: -1,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1, 0, 0);
@@ -55,11 +59,6 @@ impl Normal3i {
 
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: i32) -> Self {
-        Self::new(v, v, v)
     }
 
     /// Compute the dot product of two normals.
@@ -255,13 +254,25 @@ pub struct Normal3f {
 
 impl Normal3f {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0.0);
+    pub const ZERO: Self = Normal3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1.0);
+    pub const ONE: Self = Normal3f {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+    };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1.0);
+    pub const NEG_ONE: Self = Normal3f {
+        x: -1.0,
+        y: -1.0,
+        z: -1.0,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1.0, 0.0, 0.0);
@@ -283,11 +294,6 @@ impl Normal3f {
 
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
         Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: Float) -> Self {
-        Self { x: v, y: v, z: v }
     }
 
     /// Compute the dot product of two normals.

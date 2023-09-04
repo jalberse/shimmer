@@ -13,9 +13,13 @@ use crate::{
 /// then that can be represented in a separate trait which they can implement. Composition!
 pub trait Tuple3<T>: Sized
 where
-    T: Abs + Ceil + Floor + Min + Max + PartialOrd,
+    T: Abs + Ceil + Floor + Min + Max + PartialOrd + Copy + Clone,
 {
     fn new(x: T, y: T, z: T) -> Self;
+
+    fn splat(v: T) -> Self {
+        Self::new(v, v, v)
+    }
 
     fn x(&self) -> T;
     fn y(&self) -> T;
@@ -141,9 +145,13 @@ where
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
 pub trait Tuple2<T>: Sized
 where
-    T: Abs + Ceil + Floor + Min + Max + PartialOrd,
+    T: Abs + Ceil + Floor + Min + Max + PartialOrd + Copy + Clone,
 {
     fn new(x: T, y: T) -> Self;
+
+    fn splat(v: T) -> Self {
+        Self::new(v, v)
+    }
 
     fn x(&self) -> T;
     fn y(&self) -> T;

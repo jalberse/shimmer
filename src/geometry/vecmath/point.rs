@@ -18,13 +18,13 @@ pub struct Point2i {
 
 impl Point2i {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0);
+    pub const ZERO: Self = Point2i { x: 0, y: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1);
+    pub const ONE: Self = Point2i { x: 1, y: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1);
+    pub const NEG_ONE: Self = Point2i { x: -1, y: -1 };
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1, 0);
@@ -41,10 +41,26 @@ impl Point2i {
     pub const fn new(x: i32, y: i32) -> Self {
         Self { x, y }
     }
+}
 
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: i32) -> Self {
-        Self::new(v, v)
+impl Tuple2<i32> for Point2i {
+    fn new(x: i32, y: i32) -> Self {
+        Self { x, y }
+    }
+
+    fn x(&self) -> i32 {
+        self.x
+    }
+
+    fn y(&self) -> i32 {
+        self.y
+    }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        Point2i {
+            x: math::lerp(t, &(a.x as Float), &(b.x as Float)) as i32,
+            y: math::lerp(t, &(a.y as Float), &(b.y as Float)) as i32,
+        }
     }
 }
 
@@ -183,13 +199,17 @@ pub struct Point3i {
 
 impl Point3i {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0);
+    pub const ZERO: Self = Point3i { x: 0, y: 0, z: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1);
+    pub const ONE: Self = Point3i { x: 1, y: 1, z: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1);
+    pub const NEG_ONE: Self = Point3i {
+        x: -1,
+        y: -1,
+        z: -1,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1, 0, 0);
@@ -211,11 +231,6 @@ impl Point3i {
 
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: i32) -> Self {
-        Self::new(v, v, v)
     }
 }
 
@@ -387,13 +402,13 @@ pub struct Point2f {
 
 impl Point2f {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0.0);
+    pub const ZERO: Self = Point2f { x: 0.0, y: 0.0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1.0);
+    pub const ONE: Self = Point2f { x: 1.0, y: 1.0 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1.0);
+    pub const NEG_ONE: Self = Point2f { x: -1.0, y: -1.0 };
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1.0, 0.0);
@@ -409,11 +424,6 @@ impl Point2f {
 
     pub const fn new(x: Float, y: Float) -> Self {
         Self { x, y }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: Float) -> Self {
-        Self { x: v, y: v }
     }
 
     // TODO we can make a Distance trait that Points can implement.
@@ -539,13 +549,25 @@ pub struct Point3f {
 
 impl Point3f {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0.0);
+    pub const ZERO: Self = Point3f {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1.0);
+    pub const ONE: Self = Point3f {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+    };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1.0);
+    pub const NEG_ONE: Self = Point3f {
+        x: -1.0,
+        y: -1.0,
+        z: -1.0,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1.0, 0.0, 0.0);
@@ -567,11 +589,6 @@ impl Point3f {
 
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
         Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: Float) -> Self {
-        Self::new(v, v, v)
     }
 
     pub fn distance(self, p: Point3f) -> Float {
