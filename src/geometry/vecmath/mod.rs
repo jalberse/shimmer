@@ -50,3 +50,13 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 // TODO Face forward functions.
 // TODO ensure we debug_assert() with has_nan() where appropriate.
 // TODO Improve testing coverage.
+// TODO Consider some NormalizedVector, NormalizedNormal type or some other
+// mechanism for enforcing that a vector must be normalized for an operation like angle_between.
+// It's certainly possible with a type system but that's a lot of code to write.
+// You would need the normalize() functions to return the Normalized* type,
+// and then define operations on the Normalized* type as appropriate (where scaling
+// would for example make it not-normalized).
+// TODO We could share gram_schmidt() implementations for Vector types if we had
+//  dot as a separate trait which both Vector2 and Vector3 become supertraits of.
+//  This way we can place the trait constraints Dot + Mul + Sub onto a helper function
+//  which all the various structs may call in their implementation.

@@ -105,7 +105,7 @@ where
 
     fn permute(self, permutation: (usize, usize, usize)) -> Self {
         // TODO We could likely implement this more efficiently if we used some accessor/Indexing
-        // rather than branching. But it's not simle to impl Index for Tule due to Tuple
+        // rather than branching. But it's not simle to impl Index for Tuple due to Tuple
         // requiring Sized. So without evidence this really matters, this is fine for now.
         let x = if permutation.0 == 0 {
             self.x()
