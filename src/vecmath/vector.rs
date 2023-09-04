@@ -62,6 +62,16 @@ impl Vector2i {
     pub fn abs_dot(&self, v: &Self) -> i32 {
         abs_dot2i(self, v)
     }
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    pub fn gram_schmidt(&self, w: &Self) -> Self {
+        // TODO We should share this implementation; possibly by making dot() into
+        //   a Trait we can use as a bound for some GramSchmidt trait that our Vector types
+        //   implement (a default implementation would suffice). I'm just rushing right now.
+        self - self.dot(w) * w
+    }
 }
 
 impl Tuple2<i32> for Vector2i {
@@ -284,6 +294,16 @@ impl Vector3i {
     /// Take the cross product of this and a normal n
     pub fn cross_normal(&self, n: &Normal3i) -> Self {
         cross_i32(self, n)
+    }
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    pub fn gram_schmidt(&self, w: &Self) -> Self {
+        // TODO We should share this implementation; possibly by making dot() into
+        //   a Trait we can use as a bound for some GramSchmidt trait that our Vector types
+        //   implement (a default implementation would suffice). I'm just rushing right now.
+        self - self.dot(w) * w
     }
 }
 
@@ -511,6 +531,16 @@ impl Vector2f {
     pub fn abs_dot(&self, v: &Self) -> Float {
         abs_dot2(self, v)
     }
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    pub fn gram_schmidt(&self, w: &Self) -> Self {
+        // TODO We should share this implementation; possibly by making dot() into
+        //   a Trait we can use as a bound for some GramSchmidt trait that our Vector types
+        //   implement (a default implementation would suffice). I'm just rushing right now.
+        self - self.dot(w) * w
+    }
 }
 
 impl Tuple2<Float> for Vector2f {
@@ -708,6 +738,16 @@ impl Vector3f {
     pub fn angle_between_normal(&self, n: &Normal3f) -> Float {
         angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
     }
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    pub fn gram_schmidt(&self, w: &Self) -> Self {
+        // TODO We should share this implementation; possibly by making dot() into
+        //   a Trait we can use as a bound for some GramSchmidt trait that our Vector types
+        //   implement (a default implementation would suffice). I'm just rushing right now.
+        self - self.dot(w) * w
+    }
 }
 
 impl Tuple3<Float> for Vector3f {
@@ -838,6 +878,8 @@ mod tests {
         Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i, Vector2f, Vector2i, Vector3f,
         Vector3i,
     };
+
+    use float_cmp::approx_eq;
 
     #[test]
     fn has_nan() {
@@ -998,7 +1040,18 @@ mod tests {
 
     #[test]
     fn gram_schmidt() {
-        // TODO
+        let v1 = Vector3f::new(1.0, -1.0, 1.0);
+        let v2 = Vector3f::new(1.0, 0.0, 1.0);
+
+        let v2_schmidted = v2.gram_schmidt(&v1.normalize());
+
+        let expected_x: Float = 1.0 / 3.0;
+        let expected_y: Float = 2.0 / 3.0;
+        let expected_z: Float = 1.0 / 3.0;
+
+        assert!(approx_eq!(Float, expected_x, v2_schmidted.x));
+        assert!(approx_eq!(Float, expected_y, v2_schmidted.y));
+        assert!(approx_eq!(Float, expected_z, v2_schmidted.z));
     }
 
     #[test]
