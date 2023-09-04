@@ -46,9 +46,7 @@ pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use tuple::{Tuple2, Tuple3};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
-// TODO And finish gramm schmidt, coordinate sys from vectors, and face forward functions.
-//   After that, just polish up vecmath and we can merge into master.
-//   I think we'd be missing some slight things such as FMA on tuples but really I'd like to move on and implement anything else as it comes up as needed.
+// TODO Coordinate sys from vectors
+// TODO Face forward functions.
 // TODO ensure we debug_assert() with has_nan() where appropriate.
-// TODO Our impl_op_ex* methods are not all tested; test them.
-// TODO Run a test coverage software and ensure full coverage.
+// TODO Improve testing coverage.
