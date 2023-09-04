@@ -4,13 +4,11 @@ use crate::{
 };
 
 // See PBRT v4 2.14
-#[inline]
 pub fn balance_heuristic(nf: u8, f_pdf: Float, ng: u8, g_pdf: Float) -> Float {
     (nf as Float * f_pdf) / (nf as Float * f_pdf + ng as Float * g_pdf)
 }
 
 // See PBRT v4 2.15
-#[inline]
 pub fn power_heuristic(nf: u8, f_pdf: Float, ng: u8, g_pdf: Float) -> Float {
     let f = nf as Float * f_pdf;
     let g = ng as Float * g_pdf;
@@ -22,7 +20,6 @@ pub fn power_heuristic(nf: u8, f_pdf: Float, ng: u8, g_pdf: Float) -> Float {
 // If weights is empty, None is returned.
 // If pmf is provided, it will be populated with the value of the pmf for the sample.
 // If u_remapped is provided, it will be populated with a new uniform random sample derived from u.
-#[inline]
 pub fn sample_discrete(
     weights: &[Float],
     u: Float,
@@ -68,27 +65,24 @@ pub fn sample_discrete(
     Some(offset)
 }
 
-#[inline]
 pub fn linear_pdf(x: Float, a: Float, b: Float) -> Float {
     debug_assert!(a >= 0.0 && b >= 0.0);
     if x < 0.0 || x > 1.0 {
         0.0
     } else {
-        2.0 * lerp(x, a, b) / (a + b)
+        2.0 * lerp(x, &a, &b) / (a + b)
     }
 }
 
-#[inline]
 pub fn sample_linear(u: Float, a: Float, b: Float) -> Float {
     debug_assert!(a >= 0.0 && b >= 0.0);
     if u == 0.0 && a == 0.0 {
         return 0.0;
     }
-    let x = u * (a + b) / (a + Float::sqrt(lerp(u, a * a, b * b)));
+    let x = u * (a + b) / (a + Float::sqrt(lerp(u, &(a * a), &(b * b))));
     Float::min(x, 1.0 - Float::EPSILON)
 }
 
-#[inline]
 pub fn invert_linear_sample(x: Float, a: Float, b: Float) -> Float {
     x * (a * (2.0 - x) + b * x) / (a + b)
 }

@@ -1,6 +1,5 @@
 #[cfg(use_f64)]
 pub type Float = f64;
-
 #[cfg(not(use_f64))]
 pub type Float = f32;
 
@@ -9,12 +8,16 @@ pub type FloatAsBits = u64;
 #[cfg(not(use_f64))]
 pub type FloatAsBits = u32;
 
+#[cfg(use_f64)]
+pub const PI_F: Float = std::f64::consts::PI;
+#[cfg(not(use_f64))]
+pub const PI_F: Float = std::f32::consts::PI;
+
 /// Use **unsafe**
 /// [std::mem::transmute_copy][transmute_copy]
 /// to convert *f32* to *u32* (or *u64* to *f64* if use_f64 enabled)
 ///
 /// [transmute_copy]: https://doc.rust-lang.org/std/mem/fn.transmute_copy.html
-#[inline]
 #[cfg(not(use_f64))]
 pub fn float_to_bits(f: Float) -> FloatAsBits {
     // uint64_t ui;
@@ -33,7 +36,6 @@ pub fn float_to_bits(f: Float) -> FloatAsBits {
 /// to convert *u32* to *f32* (or *u64* to *f64* if use_f64 enabled)
 ///
 /// [transmute_copy]: https://doc.rust-lang.org/std/mem/fn.transmute_copy.html
-#[inline]
 #[cfg(not(use_f64))]
 pub fn bits_to_float(ui: FloatAsBits) -> Float {
     let rf: Float;
@@ -46,7 +48,6 @@ pub fn bits_to_float(ui: FloatAsBits) -> Float {
 
 /// Bump a floating-point value up to the next greater representable
 /// floating-point value.
-#[inline]
 pub fn next_float_up(v: Float) -> Float {
     if v.is_infinite() && v > 0.0 {
         v
@@ -64,7 +65,6 @@ pub fn next_float_up(v: Float) -> Float {
 
 /// Bump a floating-point value down to the next smaller representable
 /// floating-point value.
-#[inline]
 pub fn next_float_down(v: Float) -> Float {
     if v.is_infinite() && v < 0.0 {
         v
