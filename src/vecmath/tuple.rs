@@ -75,6 +75,26 @@ where
             }
         }
     }
+
+    fn max_component_value(&self) -> T {
+        T::max(self.x(), T::max(self.y(), self.z()))
+    }
+
+    fn max_component_index(&self) -> usize {
+        if self.x() > self.y() {
+            if self.x() > self.z() {
+                return 0;
+            } else {
+                return 2;
+            }
+        } else {
+            if self.y() > self.z() {
+                return 1;
+            } else {
+                return 2;
+            }
+        }
+    }
 }
 
 /// A tuple with 2 elements.
@@ -118,6 +138,18 @@ where
 
     fn min_component_index(&self) -> usize {
         if self.x() < self.y() {
+            0
+        } else {
+            1
+        }
+    }
+
+    fn max_component_value(&self) -> T {
+        T::max(self.x(), self.y())
+    }
+
+    fn max_component_index(&self) -> usize {
+        if self.x() > self.y() {
             0
         } else {
             1

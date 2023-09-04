@@ -1017,6 +1017,21 @@ mod tests {
     }
 
     #[test]
+    fn vector_max_component() {
+        let v1 = Vector3f::new(10.0, 20.0, 30.0);
+        assert_eq!(2, v1.max_component_index());
+        assert_eq!(30.0, v1.max_component_value());
+
+        let v1 = Vector3f::new(999.0, 20.0, 30.0);
+        assert_eq!(0, v1.max_component_index());
+        assert_eq!(999.0, v1.max_component_value());
+
+        let v1 = Vector3f::new(999.0, 1000.0, 30.0);
+        assert_eq!(1, v1.max_component_index());
+        assert_eq!(1000.0, v1.max_component_value());
+    }
+
+    #[test]
     fn vector_lerp() {
         let v1 = Vector3f::new(0.0, 0.0, 0.0);
         let v2 = Vector3f::new(1.0, 10.0, 100.0);
