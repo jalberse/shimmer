@@ -46,7 +46,6 @@ pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use tuple::{Tuple2, Tuple3};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
-// TODO Finish implementing the functions in 85, less FMA (it looks like that's not actually in their current version).
 // TODO And finish gramm schmidt, coordinate sys from vectors, and face forward functions.
 //   After that, just polish up vecmath and we can merge into master.
 //   I think we'd be missing some slight things such as FMA on tuples but really I'd like to move on and implement anything else as it comes up as needed.

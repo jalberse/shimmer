@@ -1032,6 +1032,21 @@ mod tests {
     }
 
     #[test]
+    fn vector_permute() {
+        let v = Vector3i::new(0, 1, 2);
+        assert_eq!(Vector3i::new(2, 1, 0), v.permute((2, 1, 0)));
+        assert_eq!(Vector3i::new(2, 0, 1), v.permute((2, 0, 1)));
+        assert_eq!(Vector3i::new(1, 2, 0), v.permute((1, 2, 0)));
+        assert_eq!(Vector3i::new(1, 0, 2), v.permute((1, 0, 2)));
+        assert_eq!(Vector3i::new(0, 1, 2), v.permute((0, 1, 2)));
+        assert_eq!(Vector3i::new(0, 2, 1), v.permute((0, 2, 1)));
+
+        let v = Vector2i::new(0, 1);
+        assert_eq!(Vector2i::new(0, 1), v.permute((0, 1)));
+        assert_eq!(Vector2i::new(1, 0), v.permute((1, 0)));
+    }
+
+    #[test]
     fn vector_lerp() {
         let v1 = Vector3f::new(0.0, 0.0, 0.0);
         let v2 = Vector3f::new(1.0, 10.0, 100.0);

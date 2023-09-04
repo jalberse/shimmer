@@ -3,6 +3,9 @@ use crate::{
     math::{Abs, Ceil, Floor, Max, Min},
 };
 
+// TODO we likely need a FMA function for Tuple, but let's hold off implementing it until we do need it
+//   for something else. I've sent too long on vector math and not enough time on rendering.
+
 /// A tuple with 3 elements.
 /// Used for sharing logic across e.g. Vector3f and Normal3f and Point3f.
 /// Note that only those functions that are shared across all three types are
@@ -95,6 +98,43 @@ where
             }
         }
     }
+
+    fn permute(self, permutation: (usize, usize, usize)) -> Self {
+        // TODO We could likely implement this more efficiently if we used some accessor/Indexing
+        // rather than branching. But it's not simle to impl Index for Tule due to Tuple
+        // requiring Sized. So without evidence this really matters, this is fine for now.
+        let x = if permutation.0 == 0 {
+            self.x()
+        } else {
+            if permutation.0 == 1 {
+                self.y()
+            } else {
+                self.z()
+            }
+        };
+
+        let y = if permutation.1 == 0 {
+            self.x()
+        } else {
+            if permutation.1 == 1 {
+                self.y()
+            } else {
+                self.z()
+            }
+        };
+
+        let z = if permutation.2 == 0 {
+            self.x()
+        } else {
+            if permutation.2 == 1 {
+                self.y()
+            } else {
+                self.z()
+            }
+        };
+
+        Self::new(x, y, z)
+    }
 }
 
 /// A tuple with 2 elements.
@@ -154,5 +194,21 @@ where
         } else {
             1
         }
+    }
+
+    fn permute(self, permutation: (usize, usize)) -> Self {
+        let x = if permutation.0 == 0 {
+            self.x()
+        } else {
+            self.y()
+        };
+
+        let y = if permutation.1 == 0 {
+            self.x()
+        } else {
+            self.y()
+        };
+
+        Self::new(x, y)
     }
 }
