@@ -6,10 +6,55 @@ use super::tuple::Tuple3;
 use super::tuple_fns::{
     abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot3, dot3i, has_nan3,
 };
+use super::vector::Vector3;
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
-use crate::math::lerp;
+use crate::math::{lerp, Abs, Ceil, Floor, Max, Min};
 use auto_ops::*;
+
+// TODO maybe we want some Normal3<T> class instead?
+// and just pub type Normal3i = Normal3<i32> instead?
+// The constants you can just stick outside the struct.
+// The problem is differing implementations for dot and cross
+//  for integer and float types.
+// That's why I'm a bit motivated to instead have a Normal3<T> trait,
+//  with the integer and float versions being specializations of the trait with T = i32 and T = Float.
+// I guess that would work...
+
+// TODO the problem here then is the type of the other vector.
+//   I guess we'd need it to be a dyn trait Vector3<T> where Vector3 is a similar new trait for vectors?
+//   yeah okay, the impl trait syntax is what I need.
+pub trait Normal3<T>: Tuple3<T>
+where
+    T: Abs + Ceil + Floor + Max + Min + Copy + Clone + PartialOrd,
+{
+    type AssociatedVectorType: Vector3<T>;
+    // TODO We would like the following:
+    // fn cross(&self, v: &impl Vector3<T>) -> impl Vector3<T>;
+    // But returning impl trait within a trait (rather than a concrete
+    // struct) is not currently supported in Rust (available in nightly though).
+    // https://github.com/rust-lang/rust/issues/91611
+    // Instead, we'll define an associated AssociatedVectorType type here,
+    // and exect imlementations of this trait to specify the proper type.
+    // It's actually a bit convenient this way, since we can just
+    // use the AssociatedVectorType in parameters too instead of impl Vector3<T>.
+
+    /// Compute the dot product of two normals.
+    fn dot(&self, n: &Self) -> T;
+
+    /// Compute the dot product with a vector.
+    fn dot_vector(&self, v: &Self::AssociatedVectorType) -> T;
+
+    /// Compute the dot product of two normals and take the absolute value.
+    fn abs_dot(&self, n: &Self) -> T;
+
+    /// Compute the dot product with a vector and take the absolute value.
+    fn abs_dot_vector(&self, v: &Self::AssociatedVectorType) -> T;
+
+    /// Cross this normal with a vector.
+    /// Note that you cannot take the cross product of two normals.
+    fn cross(&self, v: &Self::AssociatedVectorType) -> Self::AssociatedVectorType;
+}
 
 // ---------------------------------------------------------------------------
 //        Normal3i
@@ -60,33 +105,6 @@ impl Normal3i {
     pub const fn new(x: i32, y: i32, z: i32) -> Self {
         Self { x, y, z }
     }
-
-    /// Compute the dot product of two normals.
-    pub fn dot(&self, n: &Self) -> i32 {
-        dot3i(self, n)
-    }
-
-    /// Compute the dot product with a vector.
-    pub fn dot_vector(&self, v: &Vector3i) -> i32 {
-        dot3i(self, v)
-    }
-
-    /// Compute the dot product of two normals and take the absolute value.
-    pub fn abs_dot(&self, n: &Self) -> i32 {
-        abs_dot3i(self, n)
-    }
-
-    /// Compute the dot product with a vector and take the absolute value.
-    pub fn abs_dot_vector(&self, v: &Vector3i) -> i32 {
-        abs_dot3i(self, v)
-    }
-
-    /// Cross this normal with a vector.
-    /// Note that you cannot take the cross product of two normals.
-    pub fn cross(&self, v: &Vector3i) -> Vector3i {
-        // Note that integer based vectors don't need EFT methods.
-        cross_i32(self, v)
-    }
 }
 
 impl Tuple3<i32> for Normal3i {
@@ -108,6 +126,37 @@ impl Tuple3<i32> for Normal3i {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
+    }
+}
+
+impl Normal3<i32> for Normal3i {
+    type AssociatedVectorType = Vector3i;
+
+    /// Compute the dot product of two normals.
+    fn dot(&self, n: &Self) -> i32 {
+        dot3i(self, n)
+    }
+
+    /// Compute the dot product with a vector.
+    fn dot_vector(&self, v: &Vector3i) -> i32 {
+        dot3i(self, v)
+    }
+
+    /// Compute the dot product of two normals and take the absolute value.
+    fn abs_dot(&self, n: &Self) -> i32 {
+        abs_dot3i(self, n)
+    }
+
+    /// Compute the dot product with a vector and take the absolute value.
+    fn abs_dot_vector(&self, v: &Vector3i) -> i32 {
+        abs_dot3i(self, v)
+    }
+
+    /// Cross this normal with a vector.
+    /// Note that you cannot take the cross product of two normals.
+    fn cross(&self, v: &Vector3i) -> Vector3i {
+        // Note that integer based vectors don't need EFT methods.
+        cross_i32(self, v)
     }
 }
 
@@ -462,7 +511,7 @@ impl From<Normal3f> for (Float, Float, Float) {
 mod tests {
     use crate::{
         float::Float,
-        geometry::vecmath::{HasNan, Length, Normalize},
+        geometry::vecmath::{normal::Normal3, HasNan, Length, Normalize},
     };
 
     use super::{Normal3f, Normal3i, Vector3f, Vector3i};

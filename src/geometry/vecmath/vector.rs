@@ -9,7 +9,7 @@ use super::tuple_fns::{
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
-use crate::math::lerp;
+use crate::math::{lerp, Abs, Ceil, Floor, Max, Min};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 // ---------------------------------------------------------------------------
@@ -212,6 +212,12 @@ impl From<Vector2i> for (i32, i32) {
     }
 }
 
+pub trait Vector3<T>: Tuple3<T>
+where
+    T: Abs + Ceil + Floor + Max + Min + Copy + Clone + PartialOrd,
+{
+}
+
 // ---------------------------------------------------------------------------
 //        Vector3i
 // ---------------------------------------------------------------------------
@@ -322,6 +328,8 @@ impl Tuple3<i32> for Vector3i {
         lerp(t, a, b)
     }
 }
+
+impl Vector3<i32> for Vector3i {}
 
 impl HasNan for Vector3i {
     fn has_nan(&self) -> bool {
