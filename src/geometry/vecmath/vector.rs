@@ -12,6 +12,11 @@ use crate::float::Float;
 use crate::math::{lerp, Abs, Ceil, Floor, Max, Min};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
+// TODO a Vector2 trait
+//  It won't have cross but should have dots, angle between, and gram schmidt (can we share that last one?)
+
+// TODO a Vector3 trait. It will have the same, and cross() functions.
+
 // ---------------------------------------------------------------------------
 //        Vector2i
 // ---------------------------------------------------------------------------
@@ -90,6 +95,16 @@ impl Tuple2<i32> for Vector2i {
 impl HasNan for Vector2i {
     fn has_nan(&self) -> bool {
         false
+    }
+}
+
+impl Length<i32> for Vector2i {
+    fn length_squared(&self) -> i32 {
+        length_squared2(self)
+    }
+
+    fn length(&self) -> i32 {
+        length2(self)
     }
 }
 

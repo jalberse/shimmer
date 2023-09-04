@@ -4,8 +4,17 @@ use super::tuple_fns::{has_nan2, has_nan3};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
 use crate::geometry::vecmath::Length;
-use crate::math::{self, lerp};
+use crate::math::{self, lerp, Abs, Ceil, Floor, Max, Min};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
+
+pub trait Point2<T>: Tuple2<T>
+where
+    T: Abs + Ceil + Floor + Max + Min + Copy + Clone + PartialOrd,
+{
+    fn distance(&self, p: &Self) -> Float;
+
+    fn distance_squared(&self, p: &Self) -> Float;
+}
 
 // ---------------------------------------------------------------------------
 //        Point2i
@@ -61,6 +70,24 @@ impl Tuple2<i32> for Point2i {
             x: math::lerp(t, &(a.x as Float), &(b.x as Float)) as i32,
             y: math::lerp(t, &(a.y as Float), &(b.y as Float)) as i32,
         }
+    }
+}
+
+impl Point2<i32> for Point2i {
+    fn distance(&self, p: &Self) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length() as Float
+    }
+
+    fn distance_squared(&self, p: &Self) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length_squared() as Float
+    }
+}
+
+impl HasNan for Point2i {
+    fn has_nan(&self) -> bool {
+        false
     }
 }
 
@@ -140,7 +167,7 @@ impl_op_ex!(-=|p: &mut Point2i, v: Vector2i|
 });
 
 // Point - Point -> Vector
-impl_op_ex!(-|p1: Point2i, p2: Point2i| -> Vector2i {
+impl_op_ex!(-|p1: &Point2i, p2: &Point2i| -> Vector2i {
     Vector2i {
         x: p1.x - p2.x,
         y: p1.y - p2.y,
@@ -425,17 +452,6 @@ impl Point2f {
     pub const fn new(x: Float, y: Float) -> Self {
         Self { x, y }
     }
-
-    // TODO we can make a Distance trait that Points can implement.
-    pub fn distance(self, p: Point2f) -> Float {
-        debug_assert!(!self.has_nan());
-        (self - p).length()
-    }
-
-    pub fn distance_squared(self, p: Point2f) -> Float {
-        debug_assert!(!self.has_nan());
-        (self - p).length_squared()
-    }
 }
 
 impl Tuple2<Float> for Point2f {
@@ -456,6 +472,18 @@ impl Tuple2<Float> for Point2f {
             x: lerp(t, &a.x, &b.x),
             y: lerp(t, &a.y, &b.y),
         }
+    }
+}
+
+impl Point2<Float> for Point2f {
+    fn distance(&self, p: &Point2f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length()
+    }
+
+    fn distance_squared(&self, p: &Point2f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length_squared()
     }
 }
 
@@ -718,7 +746,10 @@ impl From<Point3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{geometry::vecmath::HasNan, Float};
+    use crate::{
+        geometry::vecmath::{point::Point2, HasNan},
+        Float,
+    };
 
     use super::{Point2f, Point2i, Point3f, Point3i, Vector2f, Vector2i, Vector3f, Vector3i};
 
@@ -743,14 +774,14 @@ mod tests {
     fn point_point_distance() {
         let p1 = Point2f::new(0.0, 0.0);
         let p2 = Point2f::new(3.0, 4.0);
-        assert_eq!(5.0, p1.distance(p2));
+        assert_eq!(5.0, p1.distance(&p2));
     }
 
     #[test]
     fn point_point_distance_squared() {
         let p1 = Point2f::new(0.0, 0.0);
         let p2 = Point2f::new(3.0, 4.0);
-        assert_eq!(25.0, p1.distance_squared(p2));
+        assert_eq!(25.0, p1.distance_squared(&p2));
     }
 
     #[test]
