@@ -65,6 +65,7 @@ where
     /// Find the angle between this vector and a normal
     /// Both vectors must be normalized.
     fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float;
+
     /// Create a new vector orthogonal to w.
     /// w must be normalized.
     /// See PBRTv4 3.2

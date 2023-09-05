@@ -62,3 +62,6 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 //  which all the various structs may call in their implementation.
 // TODO we likely need a FMA function for Tuple, but let's hold off implementing it until we do need it
 //   for something else. I've sent too long on vector math and not enough time on rendering.
+// TODO Consider splitting e.g. Vector2 and Vector3 (and associated types imlementing them) into separate files.
+// TODO There's still chunks of code that are repeated, mainly in impl_op_ex()'s.
+//   I'd like to share them where possible, but that's not worth the effort at the time of writing.
