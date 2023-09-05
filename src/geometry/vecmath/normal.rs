@@ -58,17 +58,13 @@ pub struct Normal3i {
 
 impl Normal3i {
     /// All zeroes.
-    pub const ZERO: Self = Normal3i { x: 0, y: 0, z: 0 };
+    pub const ZERO: Self = Normal3i::new(0, 0, 0);
 
     /// All ones.
-    pub const ONE: Self = Normal3i { x: 1, y: 1, z: 1 };
+    pub const ONE: Self = Normal3i::new(1, 1, 1);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Normal3i {
-        x: -1,
-        y: -1,
-        z: -1,
-    };
+    pub const NEG_ONE: Self = Normal3i::new(-1, -1, -1);
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1, 0, 0);

@@ -596,25 +596,13 @@ pub struct Point3f {
 
 impl Point3f {
     /// All zeroes.
-    pub const ZERO: Self = Point3f {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
+    pub const ZERO: Self = Point3f::new(0.0, 0.0, 0.0);
 
     /// All ones.
-    pub const ONE: Self = Point3f {
-        x: 1.0,
-        y: 1.0,
-        z: 1.0,
-    };
+    pub const ONE: Self = Point3f::new(1.0, 1.0, 1.0);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Point3f {
-        x: -1.0,
-        y: -1.0,
-        z: -1.0,
-    };
+    pub const NEG_ONE: Self = Point3f::new(-1.0, -1.0, -1.0);
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1.0, 0.0, 0.0);

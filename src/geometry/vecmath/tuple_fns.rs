@@ -6,7 +6,7 @@ use std::ops::{Add, Sub};
 use crate::{
     float::PI_F,
     is_nan::IsNan,
-    math::{difference_of_products, safe_asin, sum_of_products, Abs, MulAdd},
+    math::{difference_of_products, safe_asin, sum_of_products, MulAdd},
     Float,
 };
 

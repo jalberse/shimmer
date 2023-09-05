@@ -84,13 +84,13 @@ pub struct Vector2i {
 
 impl Vector2i {
     /// All zeroes.
-    pub const ZERO: Self = Vector2i { x: 0, y: 0 };
+    pub const ZERO: Self = Vector2i::new(0, 0);
 
     /// All ones.
-    pub const ONE: Self = Vector2i { x: 1, y: 1 };
+    pub const ONE: Self = Vector2i::new(1, 1);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Vector2i { x: -1, y: -1 };
+    pub const NEG_ONE: Self = Vector2i::new(-1, -1);
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1, 0);
@@ -298,17 +298,13 @@ pub struct Vector3i {
 
 impl Vector3i {
     /// All zeroes.
-    pub const ZERO: Self = Self { x: 0, y: 0, z: 0 };
+    pub const ZERO: Self = Self::new(0, 0, 0);
 
     /// All ones.
-    pub const ONE: Self = Self { x: 1, y: 1, z: 1 };
+    pub const ONE: Self = Self::new(1, 1, 1);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self {
-        x: -1,
-        y: -1,
-        z: -1,
-    };
+    pub const NEG_ONE: Self = Self::new(-1, -1, -1);
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1, 0, 0);
@@ -579,13 +575,13 @@ pub struct Vector2f {
 
 impl Vector2f {
     /// All zeroes.
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
+    pub const ZERO: Self = Self::new(0.0, 0.0);
 
     /// All ones.
-    pub const ONE: Self = Self { x: 1.0, y: 1.0 };
+    pub const ONE: Self = Self::new(1.0, 1.0);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self { x: -1.0, y: -1.0 };
+    pub const NEG_ONE: Self = Self::new(-1.0, -1.0);
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1.0, 0.0);
@@ -751,25 +747,13 @@ pub struct Vector3f {
 
 impl Vector3f {
     /// All zeroes.
-    pub const ZERO: Self = Self {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
+    pub const ZERO: Self = Self::new(0.0, 0.0, 0.0);
 
     /// All ones.
-    pub const ONE: Self = Self {
-        x: 1.0,
-        y: 1.0,
-        z: 1.0,
-    };
+    pub const ONE: Self = Self::new(1.0, 1.0, 1.0);
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self {
-        x: -1.0,
-        y: -1.0,
-        z: -1.0,
-    };
+    pub const NEG_ONE: Self = Self::new(-1.0, -1.0, -1.0);
 
     /// A unit-length vector pointing along the positive X axis.
     pub const X: Self = Self::new(1.0, 0.0, 0.0);
