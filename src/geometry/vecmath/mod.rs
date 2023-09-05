@@ -60,3 +60,5 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 //  dot as a separate trait which both Vector2 and Vector3 become supertraits of.
 //  This way we can place the trait constraints Dot + Mul + Sub onto a helper function
 //  which all the various structs may call in their implementation.
+// TODO we likely need a FMA function for Tuple, but let's hold off implementing it until we do need it
+//   for something else. I've sent too long on vector math and not enough time on rendering.

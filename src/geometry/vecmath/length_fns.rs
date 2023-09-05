@@ -3,23 +3,14 @@
 
 use std::ops::{Add, Mul};
 
-use crate::math::{Abs, Ceil, Floor, Max, Min, Sqrt};
+use crate::math::Sqrt;
 
-use super::{HasNan, Tuple2, Tuple3};
+use super::{tuple::TupleElement, HasNan, Tuple2, Tuple3};
 
 pub fn length_squared3<V, T>(v: &V) -> T
 where
     V: Tuple3<T> + HasNan,
-    T: Copy
-        + Clone
-        + Mul<Output = T>
-        + Add<Output = T>
-        + Abs
-        + Ceil
-        + Floor
-        + Min
-        + Max
-        + PartialOrd,
+    T: TupleElement + Mul<Output = T> + Add<Output = T>,
 {
     debug_assert!(!v.has_nan());
     v.x() * v.x() + v.y() * v.y() + v.z() * v.z()
@@ -28,17 +19,7 @@ where
 pub fn length3<V, T>(v: &V) -> T
 where
     V: Tuple3<T> + HasNan,
-    T: Copy
-        + Clone
-        + Mul<Output = T>
-        + Add<Output = T>
-        + Sqrt
-        + Abs
-        + Ceil
-        + Floor
-        + Min
-        + Max
-        + PartialOrd,
+    T: TupleElement + Mul<Output = T> + Add<Output = T> + Sqrt,
 {
     // PAPERDOC - PBRTv4 has a discussion on page 88 about an odd usage of std::sqrt().
     // We see here that Rust's trait system obviates the issue.
@@ -48,16 +29,7 @@ where
 pub fn length_squared2<V, T>(v: &V) -> T
 where
     V: Tuple2<T> + HasNan,
-    T: Copy
-        + Clone
-        + Mul<Output = T>
-        + Add<Output = T>
-        + Abs
-        + Ceil
-        + Floor
-        + Min
-        + Max
-        + PartialOrd,
+    T: TupleElement + Mul<Output = T> + Add<Output = T>,
 {
     debug_assert!(!v.has_nan());
     v.x() * v.x() + v.y() * v.y()
@@ -66,17 +38,7 @@ where
 pub fn length2<V, T>(v: &V) -> T
 where
     V: Tuple2<T> + HasNan,
-    T: Copy
-        + Clone
-        + Mul<Output = T>
-        + Add<Output = T>
-        + Sqrt
-        + Abs
-        + Ceil
-        + Floor
-        + Min
-        + Max
-        + PartialOrd,
+    T: TupleElement + Mul<Output = T> + Add<Output = T> + Sqrt,
 {
     length_squared2(v).sqrt()
 }

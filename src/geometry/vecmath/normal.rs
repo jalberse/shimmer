@@ -2,19 +2,19 @@ use super::has_nan::HasNan;
 use super::length::Length;
 use super::length_fns::{length3, length_squared3};
 use super::normalize::Normalize;
-use super::tuple::Tuple3;
+use super::tuple::{Tuple3, TupleElement};
 use super::tuple_fns::{
     abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot3, dot3i, has_nan3,
 };
 use super::vector::Vector3;
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
-use crate::math::{lerp, Abs, Ceil, Floor, Max, Min};
+use crate::math::lerp;
 use auto_ops::*;
 
 pub trait Normal3<T>: Tuple3<T>
 where
-    T: Abs + Ceil + Floor + Max + Min + Copy + Clone + PartialOrd,
+    T: TupleElement,
 {
     type AssociatedVectorType: Vector3<T>;
 

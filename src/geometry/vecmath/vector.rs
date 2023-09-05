@@ -3,14 +3,14 @@ use super::length::Length;
 use super::length_fns::{length2, length3, length_squared2, length_squared3};
 use super::normal::Normal3;
 use super::normalize::Normalize;
-use super::tuple::{Tuple2, Tuple3};
+use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{
     abs_dot2, abs_dot2i, abs_dot3, abs_dot3i, angle_between, angle_between2, cross, cross_i32,
     dot2, dot2i, dot3, dot3i, has_nan2, has_nan3,
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
-use crate::math::{lerp, Abs, Ceil, Floor, Max, Min};
+use crate::math::lerp;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 pub trait Vector2<T> {
@@ -32,7 +32,7 @@ pub trait Vector2<T> {
 
 pub trait Vector3<T>: Tuple3<T>
 where
-    T: Abs + Ceil + Floor + Max + Min + Copy + Clone + PartialOrd,
+    T: TupleElement,
 {
     type AssociatedNormalType: Normal3<T>;
 

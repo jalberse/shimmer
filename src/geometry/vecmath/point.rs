@@ -1,19 +1,28 @@
 use super::has_nan::HasNan;
-use super::tuple::{Tuple2, Tuple3};
+use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{has_nan2, has_nan3};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
 use crate::geometry::vecmath::Length;
-use crate::math::{self, lerp, Abs, Ceil, Floor, Max, Min};
+use crate::math::{self, lerp};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 pub trait Point2<T>: Tuple2<T>
 where
-    T: Abs + Ceil + Floor + Max + Min + Copy + Clone + PartialOrd,
+    T: TupleElement,
 {
     fn distance(&self, p: &Self) -> Float;
 
     fn distance_squared(&self, p: &Self) -> Float;
+}
+
+pub trait Point3<T>: Tuple3<T>
+where
+    T: TupleElement,
+{
+    fn distance(&self, p: &Self) -> T;
+
+    fn distance_squared(&self, p: &Self) -> T;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +293,16 @@ impl Tuple3<i32> for Point3i {
             y: math::lerp(t, &(a.y as Float), &(b.y as Float)) as i32,
             z: math::lerp(t, &(a.z as Float), &(b.z as Float)) as i32,
         }
+    }
+}
+
+impl Point3<i32> for Point3i {
+    fn distance(&self, p: &Self) -> i32 {
+        (self - p).length()
+    }
+
+    fn distance_squared(&self, p: &Self) -> i32 {
+        (self - p).length_squared()
     }
 }
 
@@ -618,16 +637,6 @@ impl Point3f {
     pub const fn new(x: Float, y: Float, z: Float) -> Self {
         Self { x, y, z }
     }
-
-    pub fn distance(self, p: Point3f) -> Float {
-        debug_assert!(!self.has_nan());
-        (self - p).length()
-    }
-
-    pub fn distance_squared(self, p: Point3f) -> Float {
-        debug_assert!(!self.has_nan());
-        (self - p).length_squared()
-    }
 }
 
 impl Tuple3<Float> for Point3f {
@@ -656,6 +665,18 @@ impl Tuple3<Float> for Point3f {
     }
 }
 
+impl Point3<Float> for Point3f {
+    fn distance(&self, p: &Point3f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length()
+    }
+
+    fn distance_squared(&self, p: &Point3f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length_squared()
+    }
+}
+
 impl HasNan for Point3f {
     fn has_nan(&self) -> bool {
         has_nan3(self)
@@ -668,13 +689,13 @@ impl Default for Point3f {
     }
 }
 
-impl_op_ex!(-|v: Point3f| -> Point3f { Point3f::new(-v.x, -v.y, -v.z) });
+impl_op_ex!(-|v: &Point3f| -> Point3f { Point3f::new(-v.x, -v.y, -v.z) });
 
 // Points can be scaled elementwise
-impl_op_ex_commutative!(*|p: Point3f, s: Float| -> Point3f {
+impl_op_ex_commutative!(*|p: &Point3f, s: Float| -> Point3f {
     Point3f::new(p.x * s, p.y * s, p.z * s)
 });
-impl_op_ex!(/ |p: Point3f, s: Float| -> Point3f {
+impl_op_ex!(/ |p: &Point3f, s: Float| -> Point3f {
     Point3f::new(p.x / s, p.y / s, p.z / s) });
 impl_op_ex!(*= |p: &mut Point3f, s: Float| {
     p.x *= s;
@@ -700,17 +721,17 @@ impl_op_ex!(+=|p: &mut Point3f, v: Vector3f| {
 });
 
 // Point - Vector -> Point
-impl_op_ex!(-|p: Point3f, v: Vector3f| -> Point3f {
+impl_op_ex!(-|p: &Point3f, v: &Vector3f| -> Point3f {
     Point3f::new(p.x - v.x, p.y - v.y, p.z - v.z)
 });
-impl_op_ex!(-=|p: &mut Point3f, v: Vector3f| {
+impl_op_ex!(-=|p: &mut Point3f, v: &Vector3f| {
     p.x -= v.x;
     p.y -= v.y;
     p.z -= v.z;
 });
 
 // Point - Point -> Vector
-impl_op_ex!(-|p1: Point3f, p2: Point3f| -> Vector3f {
+impl_op_ex!(-|p1: &Point3f, p2: &Point3f| -> Vector3f {
     Vector3f::new(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z)
 });
 

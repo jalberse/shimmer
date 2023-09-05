@@ -3,8 +3,11 @@ use crate::{
     math::{Abs, Ceil, Floor, Max, Min},
 };
 
-// TODO we likely need a FMA function for Tuple, but let's hold off implementing it until we do need it
-//   for something else. I've sent too long on vector math and not enough time on rendering.
+/// A TupleElement satisfies all the necessary traits to be an element of a Tuple.
+pub trait TupleElement: Abs + Ceil + Floor + Min + Max + PartialOrd + Copy + Clone {}
+
+impl TupleElement for Float {}
+impl TupleElement for i32 {}
 
 /// A tuple with 3 elements.
 /// Used for sharing logic across e.g. Vector3f and Normal3f and Point3f.
@@ -13,7 +16,7 @@ use crate::{
 /// then that can be represented in a separate trait which they can implement. Composition!
 pub trait Tuple3<T>: Sized
 where
-    T: Abs + Ceil + Floor + Min + Max + PartialOrd + Copy + Clone,
+    T: TupleElement,
 {
     fn new(x: T, y: T, z: T) -> Self;
 
@@ -145,7 +148,7 @@ where
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
 pub trait Tuple2<T>: Sized
 where
-    T: Abs + Ceil + Floor + Min + Max + PartialOrd + Copy + Clone,
+    T: TupleElement,
 {
     fn new(x: T, y: T) -> Self;
 
