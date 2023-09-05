@@ -27,6 +27,17 @@
 //! in the type system as well: because normals are defined in terms of
 //! their relationship to a particular surface, they behave differently
 //! than vectors in some situations, particularly when applying transformations.
+//!
+//! Further, note that common behaviors are shared via traits in this module;
+//! we rely on monomorphization on generic functions in order to do static dispatch.
+//! It's not intended to use these traits as trait objects by e.g. creating a
+//! Vec<dyn Tuple3<Float>> for runtime polymorphism across Normals and Vectors;
+//! this would result in dynamic dispatch, which is not efficient.
+//! It's unlikely one would need such runtime polymorphism on these particular types,
+//! however, because of the discussion above, so we're okay with this.
+//! If we ever *did* want runtime polymorphism on these tyeps, we should
+//! use the enum_dispatch crate to generate an enum of implementing types and thus
+//! use static dispatch.
 
 pub mod has_nan;
 pub mod length;
