@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Index};
 
 use crate::{math::NumericLimit, Float};
 
@@ -61,6 +61,19 @@ where
     }
 }
 
+impl<P: Point2<T>, T: TupleElement> Index<usize> for Bounds2<P, T> {
+    type Output = P;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        debug_assert!(index < 2);
+        if index == 0 {
+            &self.min
+        } else {
+            &self.max
+        }
+    }
+}
+
 struct Bounds3<P, T>
 where
     P: Point3<T>,
@@ -105,6 +118,19 @@ where
             min: P::new(min_num, min_num, min_num),
             max: P::new(max_num, max_num, max_num),
             point_element_type: Default::default(),
+        }
+    }
+}
+
+impl<P: Point3<T>, T: TupleElement> Index<usize> for Bounds3<P, T> {
+    type Output = P;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        debug_assert!(index < 2);
+        if index == 0 {
+            &self.min
+        } else {
+            &self.max
         }
     }
 }
@@ -170,5 +196,23 @@ mod tests {
         let bounds = Bounds3f::from_points(p1, p2);
         assert_eq!(Point3f::new(0.0, 00.0, 5.0), bounds.min);
         assert_eq!(Point3f::new(10.0, 10.0, 100.0), bounds.max);
+    }
+
+    #[test]
+    fn bounds2_index() {
+        let p1 = Point2f::new(0.0, 10.0);
+        let p2 = Point2f::new(10.0, 0.0);
+        let bounds = Bounds2f::from_points(p1, p2);
+        assert_eq!(Point2f::new(0.0, 00.0), bounds[0]);
+        assert_eq!(Point2f::new(10.0, 10.0), bounds[1]);
+    }
+
+    #[test]
+    fn bounds3_index() {
+        let p1 = Point3f::new(0.0, 10.0, 100.0);
+        let p2 = Point3f::new(10.0, 0.0, 5.0);
+        let bounds = Bounds3f::from_points(p1, p2);
+        assert_eq!(Point3f::new(0.0, 00.0, 5.0), bounds[0]);
+        assert_eq!(Point3f::new(10.0, 10.0, 100.0), bounds[1]);
     }
 }
