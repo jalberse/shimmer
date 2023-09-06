@@ -17,7 +17,7 @@ impl TupleElement for i32 {}
 /// Note that only those functions that are shared across all three types are
 /// within this trait; if there's something that only one or two of them have,
 /// then that can be represented in a separate trait which they can implement. Composition!
-pub trait Tuple3<T>: Sized
+pub trait Tuple3<T>: Sized + Copy + Clone
 where
     T: TupleElement,
 {
@@ -149,7 +149,7 @@ where
 
 /// A tuple with 2 elements.
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
-pub trait Tuple2<T>: Sized
+pub trait Tuple2<T>: Sized + Copy + Clone
 where
     T: TupleElement,
 {
