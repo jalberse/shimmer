@@ -1,10 +1,13 @@
 use crate::{
     float::Float,
-    math::{Abs, Ceil, Floor, Max, Min},
+    math::{Abs, Ceil, Floor, Max, Min, NumericLimit},
 };
 
 /// A TupleElement satisfies all the necessary traits to be an element of a Tuple.
-pub trait TupleElement: Abs + Ceil + Floor + Min + Max + PartialOrd + Copy + Clone {}
+pub trait TupleElement:
+    Abs + Ceil + Floor + Min + Max + PartialOrd + Copy + Clone + NumericLimit
+{
+}
 
 impl TupleElement for Float {}
 impl TupleElement for i32 {}

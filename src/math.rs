@@ -99,6 +99,22 @@ impl Max for i32 {
     }
 }
 
+/// Provides the maximum and minimum possible representable number
+pub trait NumericLimit {
+    const MIN: Self;
+    const MAX: Self;
+}
+
+impl NumericLimit for i32 {
+    const MIN: i32 = i32::MIN;
+    const MAX: i32 = i32::MAX;
+}
+
+impl NumericLimit for Float {
+    const MIN: Float = Float::MIN;
+    const MAX: Float = Float::MAX;
+}
+
 /// Provides the equivalent of f32::mul_add for the specified type.
 /// Really just provided so that we can use a common interface for Float
 /// and integer types, even if the integer types won't benefit from this form.
