@@ -20,7 +20,6 @@ where
 {
     pub min: P,
     pub max: P,
-    // https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters
     point_element_type: PhantomData<T>,
 }
 
@@ -31,6 +30,5 @@ where
 {
     pub min: P,
     pub max: P,
-    // https://doc.rust-lang.org/std/marker/struct.PhantomData.html#unused-type-parameters
     point_element_type: PhantomData<T>,
 }
