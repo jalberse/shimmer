@@ -43,6 +43,12 @@ where
             point_element_type: Default::default(),
         }
     }
+
+    /// Returns a corner of the bounding box specified by `corner`.
+    fn corner(&self, corner: usize) -> P {
+        debug_assert!(corner < 4);
+        P::new(self[corner & 1].x(), self[(corner & 2 != 0) as usize].y())
+    }
 }
 
 impl<P, T> Default for Bounds2<P, T>
@@ -104,6 +110,16 @@ where
             point_element_type: Default::default(),
         }
     }
+
+    /// Returns a corner of the bounding box specified by `corner`.
+    fn corner(&self, corner: usize) -> P {
+        debug_assert!(corner < 8);
+        P::new(
+            self[corner & 1].x(),
+            self[(corner & 2 != 0) as usize].y(),
+            self[(corner & 4 != 0) as usize].z(),
+        )
+    }
 }
 
 impl<P, T> Default for Bounds3<P, T>
@@ -138,11 +154,13 @@ impl<P: Point3<T>, T: TupleElement> Index<usize> for Bounds3<P, T> {
 mod tests {
     use crate::{
         geometry::{
-            bounding_box::{Bounds2f, Bounds3f},
-            vecmath::{Point2f, Point3f},
+            bounding_box::{Bounds2f, Bounds3f, Bounds3i},
+            vecmath::{Point2f, Point2i, Point3f, Point3i},
         },
         Float,
     };
+
+    use super::Bounds2i;
 
     #[test]
     fn bounds2_default() {
@@ -214,5 +232,31 @@ mod tests {
         let bounds = Bounds3f::from_points(p1, p2);
         assert_eq!(Point3f::new(0.0, 00.0, 5.0), bounds[0]);
         assert_eq!(Point3f::new(10.0, 10.0, 100.0), bounds[1]);
+    }
+
+    #[test]
+    fn bounds2_corner() {
+        let p1 = Point2i::new(0, 0);
+        let p2 = Point2i::new(1, 1);
+        let bounds = Bounds2i::from_points(p1, p2);
+        assert_eq!(Point2i::new(0, 0), bounds.corner(0));
+        assert_eq!(Point2i::new(1, 0), bounds.corner(1));
+        assert_eq!(Point2i::new(0, 1), bounds.corner(2));
+        assert_eq!(Point2i::new(1, 1), bounds.corner(3));
+    }
+
+    #[test]
+    fn bounds3_corner() {
+        let p1 = Point3i::new(0, 0, 0);
+        let p2 = Point3i::new(1, 1, 1);
+        let bounds = Bounds3i::from_points(p1, p2);
+        assert_eq!(Point3i::new(0, 0, 0), bounds.corner(0));
+        assert_eq!(Point3i::new(1, 0, 0), bounds.corner(1));
+        assert_eq!(Point3i::new(0, 1, 0), bounds.corner(2));
+        assert_eq!(Point3i::new(1, 1, 0), bounds.corner(3));
+        assert_eq!(Point3i::new(0, 0, 1), bounds.corner(4));
+        assert_eq!(Point3i::new(1, 0, 1), bounds.corner(5));
+        assert_eq!(Point3i::new(0, 1, 1), bounds.corner(6));
+        assert_eq!(Point3i::new(1, 1, 1), bounds.corner(7));
     }
 }
