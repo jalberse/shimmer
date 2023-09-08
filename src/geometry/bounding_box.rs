@@ -465,4 +465,46 @@ mod tests {
             intersection.unwrap()
         )
     }
+
+    #[test]
+    fn bounds2_overlap() {
+        let min = Point2i::new(0, 0);
+        let max = Point2i::new(4, 4);
+        let bounds = Bounds2i::new(min, max);
+        let min2 = Point2i::new(5, 5);
+        let max2 = Point2i::new(11, 11);
+        let bounds2 = Bounds2i::new(min2, max2);
+
+        assert!(!bounds.overlaps(&bounds2));
+
+        let min = Point2i::new(0, 0);
+        let max = Point2i::new(7, 7);
+        let bounds = Bounds2i::new(min, max);
+        let min2 = Point2i::new(3, 3);
+        let max2 = Point2i::new(11, 11);
+        let bounds2 = Bounds2i::new(min2, max2);
+
+        assert!(bounds.overlaps(&bounds2));
+    }
+
+    #[test]
+    fn bounds3_overlap() {
+        let min = Point3i::new(0, 0, 0);
+        let max = Point3i::new(7, 7, 7);
+        let bounds = Bounds3i::new(min, max);
+        let min2 = Point3i::new(10, 10, 10);
+        let max2 = Point3i::new(11, 11, 11);
+        let bounds2 = Bounds3i::new(min2, max2);
+
+        assert!(!bounds.overlaps(&bounds2));
+
+        let min = Point3i::new(4, 4, 4);
+        let max = Point3i::new(7, 7, 7);
+        let bounds = Bounds3i::new(min, max);
+        let min2 = Point3i::new(3, 3, 3);
+        let max2 = Point3i::new(11, 11, 11);
+        let bounds2 = Bounds3i::new(min2, max2);
+
+        assert!(bounds.overlaps(&bounds2));
+    }
 }
