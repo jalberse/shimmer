@@ -28,18 +28,18 @@ where
     P: Point2<T>,
     T: TupleElement,
 {
-    fn from_point(point: P) -> Self {
+    fn new(p1: P, p2: P) -> Self {
         Self {
-            min: point,
-            max: point,
+            min: Tuple2::min(&p1, &p2),
+            max: Tuple2::max(&p1, &p2),
             point_element_type: Default::default(),
         }
     }
 
-    fn from_points(p1: P, p2: P) -> Self {
+    fn from_point(point: P) -> Self {
         Self {
-            min: Tuple2::min(&p1, &p2),
-            max: Tuple2::max(&p1, &p2),
+            min: point,
+            max: point,
             point_element_type: Default::default(),
         }
     }
@@ -53,7 +53,7 @@ where
     fn union_point(&self, p: P) -> Self {
         let min = Tuple2::min(&self.min, &p);
         let max = Tuple2::max(&self.max, &p);
-        Self::from_points(min, max)
+        Self::new(min, max)
     }
 }
 
@@ -101,18 +101,18 @@ where
     P: Point3<T>,
     T: TupleElement,
 {
-    fn from_point(point: P) -> Self {
+    fn new(p1: P, p2: P) -> Self {
         Self {
-            min: point,
-            max: point,
+            min: Tuple3::min(&p1, &p2),
+            max: Tuple3::max(&p1, &p2),
             point_element_type: Default::default(),
         }
     }
 
-    fn from_points(p1: P, p2: P) -> Self {
+    fn from_point(point: P) -> Self {
         Self {
-            min: Tuple3::min(&p1, &p2),
-            max: Tuple3::max(&p1, &p2),
+            min: point,
+            max: point,
             point_element_type: Default::default(),
         }
     }
@@ -130,7 +130,7 @@ where
     fn union_point(&self, p: P) -> Self {
         let min = Tuple3::min(&self.min, &p);
         let max = Tuple3::max(&self.max, &p);
-        Self::from_points(min, max)
+        Self::new(min, max)
     }
 }
 
@@ -214,7 +214,7 @@ mod tests {
     fn bounds2_from_points() {
         let p1 = Point2f::new(0.0, 10.0);
         let p2 = Point2f::new(10.0, 0.0);
-        let bounds = Bounds2f::from_points(p1, p2);
+        let bounds = Bounds2f::new(p1, p2);
         assert_eq!(Point2f::new(0.0, 00.0), bounds.min);
         assert_eq!(Point2f::new(10.0, 10.0), bounds.max);
     }
@@ -223,7 +223,7 @@ mod tests {
     fn bounds3_from_points() {
         let p1 = Point3f::new(0.0, 10.0, 100.0);
         let p2 = Point3f::new(10.0, 0.0, 5.0);
-        let bounds = Bounds3f::from_points(p1, p2);
+        let bounds = Bounds3f::new(p1, p2);
         assert_eq!(Point3f::new(0.0, 00.0, 5.0), bounds.min);
         assert_eq!(Point3f::new(10.0, 10.0, 100.0), bounds.max);
     }
@@ -232,7 +232,7 @@ mod tests {
     fn bounds2_index() {
         let p1 = Point2f::new(0.0, 10.0);
         let p2 = Point2f::new(10.0, 0.0);
-        let bounds = Bounds2f::from_points(p1, p2);
+        let bounds = Bounds2f::new(p1, p2);
         assert_eq!(Point2f::new(0.0, 00.0), bounds[0]);
         assert_eq!(Point2f::new(10.0, 10.0), bounds[1]);
     }
@@ -241,7 +241,7 @@ mod tests {
     fn bounds3_index() {
         let p1 = Point3f::new(0.0, 10.0, 100.0);
         let p2 = Point3f::new(10.0, 0.0, 5.0);
-        let bounds = Bounds3f::from_points(p1, p2);
+        let bounds = Bounds3f::new(p1, p2);
         assert_eq!(Point3f::new(0.0, 00.0, 5.0), bounds[0]);
         assert_eq!(Point3f::new(10.0, 10.0, 100.0), bounds[1]);
     }
@@ -250,7 +250,7 @@ mod tests {
     fn bounds2_corner() {
         let p1 = Point2i::new(0, 0);
         let p2 = Point2i::new(1, 1);
-        let bounds = Bounds2i::from_points(p1, p2);
+        let bounds = Bounds2i::new(p1, p2);
         assert_eq!(Point2i::new(0, 0), bounds.corner(0));
         assert_eq!(Point2i::new(1, 0), bounds.corner(1));
         assert_eq!(Point2i::new(0, 1), bounds.corner(2));
@@ -261,7 +261,7 @@ mod tests {
     fn bounds3_corner() {
         let p1 = Point3i::new(0, 0, 0);
         let p2 = Point3i::new(1, 1, 1);
-        let bounds = Bounds3i::from_points(p1, p2);
+        let bounds = Bounds3i::new(p1, p2);
         assert_eq!(Point3i::new(0, 0, 0), bounds.corner(0));
         assert_eq!(Point3i::new(1, 0, 0), bounds.corner(1));
         assert_eq!(Point3i::new(0, 1, 0), bounds.corner(2));
@@ -276,7 +276,7 @@ mod tests {
     fn bounds2_union_point() {
         let min = Point2i::new(0, 0);
         let max = Point2i::new(1, 1);
-        let bounds = Bounds2i::from_points(min, max);
+        let bounds = Bounds2i::new(min, max);
         let new_point = Point2i::new(-1, -1);
         let union = bounds.union_point(new_point);
         assert_eq!(Point2i::new(-1, -1), union.min);
@@ -287,7 +287,7 @@ mod tests {
     fn bounds3_union_point() {
         let min = Point3i::new(0, 0, 1);
         let max = Point3i::new(1, 1, 1);
-        let bounds = Bounds3i::from_points(min, max);
+        let bounds = Bounds3i::new(min, max);
         let new_point = Point3i::new(-1, -1, -1);
         let union = bounds.union_point(new_point);
         assert_eq!(Point3i::new(-1, -1, -1), union.min);
