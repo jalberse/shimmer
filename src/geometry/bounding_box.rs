@@ -113,6 +113,21 @@ where
             && p.y() >= self.min.y()
             && p.y() < self.max.y()
     }
+
+    /// Zero if the point is inside the bounds, else the squared distance from
+    /// the point to the bounding box.
+    fn distance_squared(&self, p: &P) -> T {
+        let dx = T::max(
+            T::max(T::zero(), self.min.x() - p.x()),
+            p.x() - self.max.x(),
+        );
+        let dy = T::max(
+            T::max(T::zero(), self.min.y() - p.y()),
+            p.y() - self.max.y(),
+        );
+
+        dx * dx + dy * dy
+    }
 }
 
 impl<P, T> Default for Bounds2<P, T>
@@ -131,7 +146,11 @@ where
     }
 }
 
-impl<P: Point2<T>, T: TupleElement> Index<usize> for Bounds2<P, T> {
+impl<P, T> Index<usize> for Bounds2<P, T>
+where
+    P: Point2<T>,
+    T: TupleElement,
+{
     type Output = P;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -255,6 +274,25 @@ where
             && p.y() < self.max.y()
             && p.z() >= self.min.z()
             && p.z() < self.max.z()
+    }
+
+    /// Zero if the point is inside the bounds, else the squared distance from
+    /// the point to the bounding box.
+    fn distance_squared(&self, p: &P) -> T {
+        let dx = T::max(
+            T::max(T::zero(), self.min.x() - p.x()),
+            p.x() - self.max.x(),
+        );
+        let dy = T::max(
+            T::max(T::zero(), self.min.y() - p.y()),
+            p.y() - self.max.y(),
+        );
+        let dz = T::max(
+            T::max(T::zero(), self.min.z() - p.z()),
+            p.z() - self.max.z(),
+        );
+
+        dx * dx + dy * dy + dz * dz
     }
 }
 
@@ -586,5 +624,27 @@ mod tests {
         let outside_point = Point3i::new(4, 4, 4);
         assert!(bounds.inside_exclusive(&inside_point));
         assert!(!bounds.inside_exclusive(&outside_point))
+    }
+
+    #[test]
+    fn bounds2_distance() {
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(4.0, 4.0);
+        let bounds = Bounds2f::new(min, max);
+        let inside_point = Point2f::new(1.0, 1.0);
+        let outside_point = Point2f::new(6.0, 4.0);
+        assert_eq!(0.0, bounds.distance_squared(&inside_point));
+        assert_eq!(4.0, bounds.distance_squared(&outside_point));
+    }
+
+    #[test]
+    fn bounds3_distance() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(4.0, 4.0, 4.0);
+        let bounds = Bounds3f::new(min, max);
+        let inside_point = Point3f::new(1.0, 1.0, 1.0);
+        let outside_point = Point3f::new(6.0, 4.0, 4.0);
+        assert_eq!(0.0, bounds.distance_squared(&inside_point));
+        assert_eq!(4.0, bounds.distance_squared(&outside_point));
     }
 }

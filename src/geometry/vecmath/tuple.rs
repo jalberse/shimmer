@@ -1,16 +1,42 @@
+use std::ops::{Add, Mul, Sub};
+
 use crate::{
     float::Float,
-    math::{Abs, Ceil, Floor, Max, Min, NumericLimit},
+    is_nan::IsNan,
+    math::{Abs, Ceil, Floor, Max, Min, NumericLimit, Sqrt},
 };
 
 /// A TupleElement satisfies all the necessary traits to be an element of a Tuple.
 pub trait TupleElement:
-    Abs + Ceil + Floor + Min + Max + PartialOrd + Copy + Clone + NumericLimit
+    Abs
+    + Ceil
+    + Floor
+    + Min
+    + Max
+    + PartialOrd
+    + Copy
+    + Clone
+    + NumericLimit
+    + Sqrt
+    + Mul<Self, Output = Self>
+    + Sub<Self, Output = Self>
+    + Add<Self, Output = Self>
+    + IsNan
 {
+    fn zero() -> Self;
 }
 
-impl TupleElement for Float {}
-impl TupleElement for i32 {}
+impl TupleElement for Float {
+    fn zero() -> Self {
+        0.0
+    }
+}
+
+impl TupleElement for i32 {
+    fn zero() -> Self {
+        0
+    }
+}
 
 /// A tuple with 3 elements.
 /// Used for sharing logic across e.g. Vector3f and Normal3f and Point3f.
