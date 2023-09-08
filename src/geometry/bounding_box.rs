@@ -128,6 +128,11 @@ where
 
         dx * dx + dy * dy
     }
+
+    fn distance(&self, p: &P) -> T {
+        // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
+        T::sqrt(self.distance_squared(p))
+    }
 }
 
 impl<P, T> Default for Bounds2<P, T>
@@ -293,6 +298,11 @@ where
         );
 
         dx * dx + dy * dy + dz * dz
+    }
+
+    fn distance(&self, p: &P) -> T {
+        // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
+        T::sqrt(self.distance_squared(p))
     }
 }
 
@@ -635,6 +645,7 @@ mod tests {
         let outside_point = Point2f::new(6.0, 4.0);
         assert_eq!(0.0, bounds.distance_squared(&inside_point));
         assert_eq!(4.0, bounds.distance_squared(&outside_point));
+        assert_eq!(2.0, bounds.distance(&outside_point));
     }
 
     #[test]
@@ -646,5 +657,6 @@ mod tests {
         let outside_point = Point3f::new(6.0, 4.0, 4.0);
         assert_eq!(0.0, bounds.distance_squared(&inside_point));
         assert_eq!(4.0, bounds.distance_squared(&outside_point));
+        assert_eq!(2.0, bounds.distance(&outside_point));
     }
 }
