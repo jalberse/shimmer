@@ -13,6 +13,7 @@ pub type Bounds2f = Bounds2<Point2f, Float>;
 pub type Bounds3i = Bounds3<Point3i, i32>;
 pub type Bounds3f = Bounds3<Point3f, Float>;
 
+#[derive(Debug, PartialEq)]
 struct Bounds2<P, T>
 where
     P: Point2<T>,
@@ -73,6 +74,29 @@ where
             point_element_type: Default::default(),
         }
     }
+
+    /// None if the bounds do not intersect.
+    /// Else, the intersection of the two bounds.
+    fn intersect(&self, other: &Self) -> Option<Self> {
+        let min = Tuple2::max(&self.min, &other.min);
+        let max = Tuple2::min(&self.max, &other.max);
+
+        if min.x() >= max.x() || min.y() >= max.y() {
+            return None;
+        }
+
+        Some(Self {
+            min,
+            max,
+            point_element_type: Default::default(),
+        })
+    }
+
+    fn overlaps(&self, other: &Self) -> bool {
+        let x_overlap = self.max.x() >= other.min.x() && self.min.x() <= other.max.x();
+        let y_overlap = self.max.y() >= other.min.y() && self.min.y() <= other.max.y();
+        x_overlap && y_overlap
+    }
 }
 
 impl<P, T> Default for Bounds2<P, T>
@@ -104,6 +128,7 @@ impl<P: Point2<T>, T: TupleElement> Index<usize> for Bounds2<P, T> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 struct Bounds3<P, T>
 where
     P: Point3<T>,
@@ -167,6 +192,33 @@ where
             max,
             point_element_type: Default::default(),
         }
+    }
+
+    /// None if the bounds do not intersect.
+    /// Else, the intersection of the two bounds.
+    fn intersect(&self, other: &Self) -> Option<Self> {
+        let min = Tuple3::max(&self.min, &other.min);
+        let max = Tuple3::min(&self.max, &other.max);
+
+        // PAPERDOC - PBRTv4 has an IsEmpty() function that must be called after this
+        // function in case the bounds don't intersect; but that intent is not clear
+        // from the function signature. An Option result type is more clear.
+        if min.x() >= max.x() || min.y() >= max.y() || min.z() >= max.z() {
+            return None;
+        }
+
+        Some(Self {
+            min,
+            max,
+            point_element_type: Default::default(),
+        })
+    }
+
+    fn overlaps(&self, other: &Self) -> bool {
+        let x_overlap = self.max.x() >= other.min.x() && self.min.x() <= other.max.x();
+        let y_overlap = self.max.y() >= other.min.y() && self.min.y() <= other.max.y();
+        let z_overlap = self.max.z() >= other.min.z() && self.min.z() <= other.max.z();
+        x_overlap && y_overlap && z_overlap
     }
 }
 
@@ -354,5 +406,63 @@ mod tests {
         let union = bounds.union(&bounds2);
         assert_eq!(Point3i::new(0, 0, 0), union.min);
         assert_eq!(Point3i::new(11, 11, 11), union.max);
+    }
+
+    #[test]
+    fn bounds2_intersect_none() {
+        let min = Point2i::new(0, 0);
+        let max = Point2i::new(1, 1);
+        let bounds = Bounds2i::new(min, max);
+        let min2 = Point2i::new(10, 10);
+        let max2 = Point2i::new(11, 11);
+        let bounds2 = Bounds2i::new(min2, max2);
+
+        assert!(bounds.intersect(&bounds2).is_none());
+    }
+
+    #[test]
+    fn bounds2_intersect_some() {
+        let min = Point2i::new(0, 0);
+        let max = Point2i::new(7, 7);
+        let bounds = Bounds2i::new(min, max);
+        let min2 = Point2i::new(3, 3);
+        let max2 = Point2i::new(11, 11);
+        let bounds2 = Bounds2i::new(min2, max2);
+
+        let intersection = bounds.intersect(&bounds2);
+        assert!(intersection.is_some());
+        assert_eq!(
+            Bounds2i::new(Point2i::new(3, 3), Point2i::new(7, 7)),
+            intersection.unwrap()
+        )
+    }
+
+    #[test]
+    fn bounds3_intersect_none() {
+        let min = Point3i::new(0, 0, 0);
+        let max = Point3i::new(1, 1, 1);
+        let bounds = Bounds3i::new(min, max);
+        let min2 = Point3i::new(10, 10, 10);
+        let max2 = Point3i::new(11, 11, 11);
+        let bounds2 = Bounds3i::new(min2, max2);
+
+        assert!(bounds.intersect(&bounds2).is_none());
+    }
+
+    #[test]
+    fn bounds3_intersect_some() {
+        let min = Point3i::new(0, 0, 0);
+        let max = Point3i::new(7, 7, 7);
+        let bounds = Bounds3i::new(min, max);
+        let min2 = Point3i::new(3, 3, 3);
+        let max2 = Point3i::new(11, 11, 11);
+        let bounds2 = Bounds3i::new(min2, max2);
+
+        let intersection = bounds.intersect(&bounds2);
+        assert!(intersection.is_some());
+        assert_eq!(
+            Bounds3i::new(Point3i::new(3, 3, 3), Point3i::new(7, 7, 7)),
+            intersection.unwrap()
+        )
     }
 }
