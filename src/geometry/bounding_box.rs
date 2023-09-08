@@ -49,6 +49,12 @@ where
         debug_assert!(corner < 4);
         P::new(self[corner & 1].x(), self[(corner & 2 != 0) as usize].y())
     }
+
+    fn union_point(&self, p: P) -> Self {
+        let min = Tuple2::min(&self.min, &p);
+        let max = Tuple2::max(&self.max, &p);
+        Self::from_points(min, max)
+    }
 }
 
 impl<P, T> Default for Bounds2<P, T>
@@ -119,6 +125,12 @@ where
             self[(corner & 2 != 0) as usize].y(),
             self[(corner & 4 != 0) as usize].z(),
         )
+    }
+
+    fn union_point(&self, p: P) -> Self {
+        let min = Tuple3::min(&self.min, &p);
+        let max = Tuple3::max(&self.max, &p);
+        Self::from_points(min, max)
     }
 }
 
@@ -258,5 +270,27 @@ mod tests {
         assert_eq!(Point3i::new(1, 0, 1), bounds.corner(5));
         assert_eq!(Point3i::new(0, 1, 1), bounds.corner(6));
         assert_eq!(Point3i::new(1, 1, 1), bounds.corner(7));
+    }
+
+    #[test]
+    fn bounds2_union_point() {
+        let min = Point2i::new(0, 0);
+        let max = Point2i::new(1, 1);
+        let bounds = Bounds2i::from_points(min, max);
+        let new_point = Point2i::new(-1, -1);
+        let union = bounds.union_point(new_point);
+        assert_eq!(Point2i::new(-1, -1), union.min);
+        assert_eq!(Point2i::new(1, 1), union.max);
+    }
+
+    #[test]
+    fn bounds3_union_point() {
+        let min = Point3i::new(0, 0, 1);
+        let max = Point3i::new(1, 1, 1);
+        let bounds = Bounds3i::from_points(min, max);
+        let new_point = Point3i::new(-1, -1, -1);
+        let union = bounds.union_point(new_point);
+        assert_eq!(Point3i::new(-1, -1, -1), union.min);
+        assert_eq!(Point3i::new(1, 1, 1), union.max);
     }
 }
