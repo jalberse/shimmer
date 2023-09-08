@@ -97,6 +97,14 @@ where
         let y_overlap = self.max.y() >= other.min.y() && self.min.y() <= other.max.y();
         x_overlap && y_overlap
     }
+
+    /// Checks if the point is inside the bounds (inclusive)
+    fn inside(&self, p: &P) -> bool {
+        p.x() >= self.min.x()
+            && p.x() <= self.max.x()
+            && p.y() >= self.min.y()
+            && p.y() <= self.max.y()
+    }
 }
 
 impl<P, T> Default for Bounds2<P, T>
@@ -219,6 +227,16 @@ where
         let y_overlap = self.max.y() >= other.min.y() && self.min.y() <= other.max.y();
         let z_overlap = self.max.z() >= other.min.z() && self.min.z() <= other.max.z();
         x_overlap && y_overlap && z_overlap
+    }
+
+    /// Checks if the point is inside the bounds (inclusive)
+    fn inside(&self, p: &P) -> bool {
+        p.x() >= self.min.x()
+            && p.x() <= self.max.x()
+            && p.y() >= self.min.y()
+            && p.y() <= self.max.y()
+            && p.z() >= self.min.z()
+            && p.z() <= self.max.z()
     }
 }
 
@@ -506,5 +524,27 @@ mod tests {
         let bounds2 = Bounds3i::new(min2, max2);
 
         assert!(bounds.overlaps(&bounds2));
+    }
+
+    #[test]
+    fn bounds2_inside() {
+        let min = Point2i::new(0, 0);
+        let max = Point2i::new(4, 4);
+        let bounds = Bounds2i::new(min, max);
+        let inside_point = Point2i::new(1, 1);
+        let outside_point = Point2i::new(1, 5);
+        assert!(bounds.inside(&inside_point));
+        assert!(!bounds.inside(&outside_point))
+    }
+
+    #[test]
+    fn bounds3_inside() {
+        let min = Point3i::new(0, 0, 0);
+        let max = Point3i::new(4, 4, 4);
+        let bounds = Bounds3i::new(min, max);
+        let inside_point = Point3i::new(1, 1, 1);
+        let outside_point = Point3i::new(1, 5, 5);
+        assert!(bounds.inside(&inside_point));
+        assert!(!bounds.inside(&outside_point))
     }
 }
