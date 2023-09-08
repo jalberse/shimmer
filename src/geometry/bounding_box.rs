@@ -50,9 +50,21 @@ where
         P::new(self[corner & 1].x(), self[(corner & 2 != 0) as usize].y())
     }
 
-    fn union_point(&self, p: P) -> Self {
+    fn union_point(&self, p: &P) -> Self {
         let min = Tuple2::min(&self.min, &p);
         let max = Tuple2::max(&self.max, &p);
+        // Set values directly to maintain degeneracy and avoid infinite extents.
+        // See PBRTv4 pg 99.
+        Self {
+            min,
+            max,
+            point_element_type: Default::default(),
+        }
+    }
+
+    fn union(&self, other: &Self) -> Self {
+        let min = Tuple2::min(&self.min, &other.min);
+        let max = Tuple2::max(&self.max, &other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
         Self {
@@ -133,9 +145,21 @@ where
         )
     }
 
-    fn union_point(&self, p: P) -> Self {
+    fn union_point(&self, p: &P) -> Self {
         let min = Tuple3::min(&self.min, &p);
         let max = Tuple3::max(&self.max, &p);
+        // Set values directly to maintain degeneracy and avoid infinite extents.
+        // See PBRTv4 pg 99.
+        Self {
+            min,
+            max,
+            point_element_type: Default::default(),
+        }
+    }
+
+    fn union(&self, other: &Self) -> Self {
+        let min = Tuple3::min(&self.min, &other.min);
+        let max = Tuple3::max(&self.max, &other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
         Self {
@@ -290,7 +314,7 @@ mod tests {
         let max = Point2i::new(1, 1);
         let bounds = Bounds2i::new(min, max);
         let new_point = Point2i::new(-1, -1);
-        let union = bounds.union_point(new_point);
+        let union = bounds.union_point(&new_point);
         assert_eq!(Point2i::new(-1, -1), union.min);
         assert_eq!(Point2i::new(1, 1), union.max);
     }
@@ -301,8 +325,34 @@ mod tests {
         let max = Point3i::new(1, 1, 1);
         let bounds = Bounds3i::new(min, max);
         let new_point = Point3i::new(-1, -1, -1);
-        let union = bounds.union_point(new_point);
+        let union = bounds.union_point(&new_point);
         assert_eq!(Point3i::new(-1, -1, -1), union.min);
         assert_eq!(Point3i::new(1, 1, 1), union.max);
+    }
+
+    #[test]
+    fn bounds2_union() {
+        let min = Point2i::new(0, 0);
+        let max = Point2i::new(1, 1);
+        let bounds = Bounds2i::new(min, max);
+        let min2 = Point2i::new(10, 10);
+        let max2 = Point2i::new(11, 11);
+        let bounds2 = Bounds2i::new(min2, max2);
+        let union = bounds.union(&bounds2);
+        assert_eq!(Point2i::new(0, 0), union.min);
+        assert_eq!(Point2i::new(11, 11), union.max);
+    }
+
+    #[test]
+    fn bounds3_union() {
+        let min = Point3i::new(0, 0, 0);
+        let max = Point3i::new(1, 1, 0);
+        let bounds = Bounds3i::new(min, max);
+        let min2 = Point3i::new(10, 10, 10);
+        let max2 = Point3i::new(11, 11, 11);
+        let bounds2 = Bounds3i::new(min2, max2);
+        let union = bounds.union(&bounds2);
+        assert_eq!(Point3i::new(0, 0, 0), union.min);
+        assert_eq!(Point3i::new(11, 11, 11), union.max);
     }
 }
