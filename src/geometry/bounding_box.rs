@@ -53,7 +53,13 @@ where
     fn union_point(&self, p: P) -> Self {
         let min = Tuple2::min(&self.min, &p);
         let max = Tuple2::max(&self.max, &p);
-        Self::new(min, max)
+        // Set values directly to maintain degeneracy and avoid infinite extents.
+        // See PBRTv4 pg 99.
+        Self {
+            min,
+            max,
+            point_element_type: Default::default(),
+        }
     }
 }
 
@@ -130,7 +136,13 @@ where
     fn union_point(&self, p: P) -> Self {
         let min = Tuple3::min(&self.min, &p);
         let max = Tuple3::max(&self.max, &p);
-        Self::new(min, max)
+        // Set values directly to maintain degeneracy and avoid infinite extents.
+        // See PBRTv4 pg 99.
+        Self {
+            min,
+            max,
+            point_element_type: Default::default(),
+        }
     }
 }
 
