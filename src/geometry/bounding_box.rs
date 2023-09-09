@@ -150,6 +150,11 @@ where
     fn diagonal(&self) -> V {
         self.max - self.min
     }
+
+    fn area(&self) -> P::ElementType {
+        let d = self.diagonal();
+        d.x() * d.y()
+    }
 }
 
 impl<P: Point2, V: Vector2> Default for Bounds2<P, V> {
@@ -727,6 +732,14 @@ mod tests {
         let bounds = Bounds3f::new(min, max);
         let diag = bounds.diagonal();
         assert_eq!(Vector3f::new(4.0, 4.0, 4.0), diag);
+    }
+
+    #[test]
+    fn bounds2_area() {
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(4.0, 4.0);
+        let bounds = Bounds2f::new(min, max);
+        assert_eq!(16.0, bounds.area());
     }
 
     #[test]
