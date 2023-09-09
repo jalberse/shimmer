@@ -25,7 +25,7 @@ pub trait Point2:
     + Neg
 {
     type ElementType: TupleElement;
-    type AssociatedVectorType: Vector2;
+    type AssociatedVectorType: Vector2 + From<Self>;
 
     fn distance(&self, p: &Self) -> Float;
 
@@ -42,12 +42,12 @@ pub trait Point3:
     + Mul<Self::ElementType, Output = Self>
     + Mul<Float, Output = Self>
     + MulAssign<Self::ElementType>
-    + Div<Self::ElementType>
+    + Div<Self::ElementType, Output = Self>
     + DivAssign<Self::ElementType>
     + Neg
 {
     type ElementType: TupleElement;
-    type AssociatedVectorType: Vector3;
+    type AssociatedVectorType: Vector3 + From<Self>;
 
     fn distance(&self, p: &Self) -> Self::ElementType;
 

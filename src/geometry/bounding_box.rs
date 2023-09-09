@@ -5,11 +5,14 @@ use crate::{
     Float,
 };
 
-use super::vecmath::{
-    point::{Point2, Point3},
-    tuple::TupleElement,
-    vector::{Vector2, Vector3},
-    Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3, Vector2f, Vector2i, Vector3f, Vector3i,
+use super::{
+    sphere::Sphere,
+    vecmath::{
+        point::{Point2, Point3},
+        tuple::TupleElement,
+        vector::{Vector2, Vector3},
+        Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3, Vector2f, Vector2i, Vector3f, Vector3i,
+    },
 };
 
 pub type Bounds2i = Bounds2<Point2i, Vector2i>;
@@ -237,7 +240,7 @@ struct Bounds3<P, V> {
 impl<P, V> Bounds3<P, V>
 where
     P: Point3<AssociatedVectorType = V>,
-    V: Vector3<ElementType = P::ElementType>,
+    V: Vector3<ElementType = P::ElementType> + From<P>,
 {
     fn new(p1: P, p2: P) -> Self {
         Self {
@@ -444,6 +447,16 @@ where
             out_init.z()
         };
         V::new(out_x, out_y, out_z)
+    }
+
+    fn bounding_sphere(&self) -> Sphere<P, P::ElementType> {
+        let center: P = (self.min + V::from(self.max)) / P::ElementType::from_i32(2);
+        let radius: P::ElementType = if self.inside(&center) {
+            center.distance(&self.max)
+        } else {
+            P::ElementType::from_i32(0)
+        };
+        Sphere::new(center, radius)
     }
 }
 
@@ -929,5 +942,15 @@ mod tests {
             Vector3f::new(0.5, 0.75, 0.1),
             bounds.offset(Point3f::new(2.0, 3.0, 1.0)),
         );
+    }
+
+    #[test]
+    fn bounds3_bounding_sphere() {
+        let min = Point3f::new(-4.0, -4.0, -10.0);
+        let max = Point3f::new(4.0, 4.0, 10.0);
+        let bounds = Bounds3f::new(min, max);
+        let bounding_sphere = bounds.bounding_sphere();
+        assert_eq!(Point3f::new(0.0, 0.0, 0.0), bounding_sphere.center);
+        assert_eq!(11.489125, bounding_sphere.radius);
     }
 }
