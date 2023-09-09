@@ -329,6 +329,13 @@ where
     fn diagonal(&self) -> V {
         self.max - self.min
     }
+
+    fn surface_area(&self) -> P::ElementType {
+        let d = self.diagonal();
+        // TODO how to allow multiplication on a generic ElementType?
+        //  Do we need like a generic Element<T> struct and impl From<T> for it?
+        2 * (d.x() * d.y() + d.x() * d.z() + d.y() * d.z())
+    }
 }
 
 impl<P: Point3, V: Vector3> Default for Bounds3<P, V> {
