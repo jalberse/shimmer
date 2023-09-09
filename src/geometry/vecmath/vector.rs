@@ -1,3 +1,5 @@
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
 use super::has_nan::HasNan;
 use super::length::Length;
 use super::length_fns::{length2, length3, length_squared2, length_squared3};
@@ -13,7 +15,22 @@ use crate::float::Float;
 use crate::math::lerp;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-pub trait Vector2: Tuple2<Self::ElementType> {
+pub trait Vector2:
+    Tuple2<Self::ElementType>
+    + Neg
+    + Add<Self, Output = Self>
+    + AddAssign<Self::ElementType>
+    + Sub<Self, Output = Self>
+    + SubAssign<Self>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType>
+    + DivAssign<Self::ElementType>
+    + Mul<Self, Output = Self>
+    + MulAssign<Self>
+    + Div<Self, Output = Self>
+    + DivAssign<Self>
+{
     type ElementType: TupleElement;
 
     /// Compute the dot product.
@@ -32,7 +49,22 @@ pub trait Vector2: Tuple2<Self::ElementType> {
     fn gram_schmidt(&self, w: &Self) -> Self;
 }
 
-pub trait Vector3: Tuple3<Self::ElementType> {
+pub trait Vector3:
+    Tuple3<Self::ElementType>
+    + Neg
+    + Add<Self, Output = Self>
+    + AddAssign<Self::ElementType>
+    + Sub<Self, Output = Self>
+    + SubAssign<Self>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType>
+    + DivAssign<Self::ElementType>
+    + Mul<Self, Output = Self>
+    + MulAssign<Self>
+    + Div<Self, Output = Self>
+    + DivAssign<Self>
+{
     type ElementType: TupleElement;
     type AssociatedNormalType: Normal3;
 
@@ -208,6 +240,12 @@ impl_op_ex!(/|v: &Vector2i, s: i32| -> Vector2i
     Vector2i { x: v.x / s, y: v.y / s }
 });
 
+impl_op_ex!(+=|v1: &mut Vector2i, v: &i32|
+{
+    v1.x += v;
+    v1.y += v;
+});
+
 impl_op_ex!(+=|v1: &mut Vector2i, v2: &Vector2i|
 {
     v1.x += v2.x;
@@ -226,10 +264,25 @@ impl_op_ex!(*=|v1: &mut Vector2i, v2: &Vector2i|
     v1.y *= v2.y;
 });
 
+impl_op_ex!(/|v1: &Vector2i, v2: &Vector2i| -> Vector2i
+{
+    Vector2i{
+        x: v1.x / v2.x,
+        y: v1.y / v2.y,
+    }
+});
+
 impl_op_ex!(/=|v1: &mut Vector2i, v2: &Vector2i|
 {
     v1.x /= v2.x;
     v1.y /= v2.y;
+});
+
+impl_op_ex!(*|v1: &Vector2i, v2: &Vector2i| -> Vector2i {
+    Vector2i {
+        x: v1.x * v2.x,
+        y: v1.y * v2.y,
+    }
 });
 
 impl_op_ex!(*=|v1: &mut Vector2i, s: i32|
@@ -468,6 +521,13 @@ impl_op_ex!(/|v: &Vector3i, s: i32| -> Vector3i
     Vector3i { x: v.x / s, y: v.y / s, z: v.z / s }
 });
 
+impl_op_ex!(+=|v1: &mut Vector3i, v: &i32|
+{
+    v1.x += v;
+    v1.y += v;
+    v1.z += v;
+});
+
 impl_op_ex!(+=|v1: &mut Vector3i, v2: &Vector3i|
 {
     v1.x += v2.x;
@@ -508,6 +568,14 @@ impl_op_ex!(/=|v1: &mut Vector3i, s: i32|
     v1.x /= s;
     v1.y /= s;
     v1.z /= s;
+});
+
+impl_op_ex!(/|v1: &Vector3i, v2: &Vector3i| -> Vector3i
+{
+    Vector3i::new(v1.x / v2.x, v1.y / v2.y, v1.z / v2.z)
+});
+impl_op_ex!(*|v1: &Vector3i, v2: &Vector3i| -> Vector3i {
+    Vector3i::new(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z)
 });
 
 impl From<Point3i> for Vector3i {
@@ -662,9 +730,7 @@ impl Default for Vector2f {
     }
 }
 
-// Vectors can be negated
 impl_op_ex!(-|v: &Vector2f| -> Vector2f { Vector2f::new(-v.x, -v.y) });
-// Vectors can add and subtract with other vectors
 impl_op_ex!(+ |v1: &Vector2f, v2: &Vector2f| -> Vector2f {
     Vector2f::new(v1.x + v2.x, v1.y + v2.y)});
 impl_op_ex!(-|v1: &Vector2f, v2: &Vector2f| -> Vector2f {
@@ -678,8 +744,6 @@ impl_op_ex!(-= |n1: &mut Vector2f, n2: &Vector2f| {
     n1.x -= n2.x;
     n1.y -= n2.y;
 });
-
-// Vectors can be scaled
 impl_op_ex_commutative!(*|v: &Vector2f, s: Float| -> Vector2f { Vector2f::new(v.x * s, v.y * s) });
 impl_op_ex!(/ |v: &Vector2f, s: Float| -> Vector2f {
     Vector2f::new(v.x / s, v.y / s) });
@@ -690,6 +754,30 @@ impl_op_ex!(*= |v1: &mut Vector2f, s: Float| {
 impl_op_ex!(/= |v1: &mut Vector2f, s: Float| {
     v1.x /= s;
     v1.y /= s;
+});
+impl_op_ex!(/= |v1: &mut Vector2f, v2: &Vector2f|
+{
+    v1.x /= v2.x;
+    v1.y /= v2.y;
+});
+impl_op_ex!(/ |v1: &Vector2f, v2: &Vector2f| -> Vector2f
+{
+    Vector2f::new(
+    v1.x / v2.x,
+    v1.y / v2.y)
+});
+impl_op_ex!(*= |v1: &mut Vector2f, v2: &Vector2f|
+{
+    v1.x *= v2.x;
+    v1.y *= v2.y;
+});
+impl_op_ex!(*|v1: &Vector2f, v2: &Vector2f| -> Vector2f {
+    Vector2f::new(v1.x * v2.x, v1.y * v2.y)
+});
+impl_op_ex!(+= |v1: &mut Vector2f, v: &Float|
+{
+    v1.x += v;
+    v1.y += v;
 });
 
 impl From<Point2f> for Vector2f {
@@ -935,6 +1023,11 @@ impl_op_ex_commutative!(*|v: &Vector3f, s: Float| -> Vector3f {
     Vector3f::new(v.x * s, v.y * s, v.z * s)
 });
 impl_op_ex!(/ |v: &Vector3f, s: Float| -> Vector3f { Vector3f::new(v.x / s, v.y / s, v.z / s) });
+impl_op_ex!(+= |v1: &mut Vector3f, s: Float| {
+    v1.x += s;
+    v1.y += s;
+    v1.z += s;
+});
 impl_op_ex!(*= |v1: &mut Vector3f, s: Float| {
     v1.x *= s;
     v1.y *= s;
@@ -944,6 +1037,25 @@ impl_op_ex!(/= |v1: &mut Vector3f, s: Float| {
     v1.x /= s;
     v1.y /= s;
     v1.z /= s;
+});
+impl_op_ex!(*= |v1: &mut Vector3f, v2: &Vector3f| {
+    v1.x *= v2.x;
+    v1.y *= v2.y;
+    v1.z *= v2.z;
+});
+impl_op_ex!(/= |v1: &mut Vector3f, v2: &Vector3f| {
+    v1.x /= v2.x;
+    v1.y /= v2.y;
+    v1.z /= v2.z;
+});
+impl_op_ex!(/ |v1: &Vector3f, v2: &Vector3f| -> Vector3f{
+    Vector3f::new(
+        v1.x / v2.x,
+        v1.y / v2.y,
+        v1.z / v2.z)
+});
+impl_op_ex!(*|v1: &Vector3f, v2: &Vector3f| -> Vector3f {
+    Vector3f::new(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z)
 });
 
 impl From<Point3f> for Vector3f {

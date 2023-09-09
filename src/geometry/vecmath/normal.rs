@@ -1,3 +1,5 @@
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
 use super::has_nan::HasNan;
 use super::length::Length;
 use super::length_fns::{length3, length_squared3};
@@ -12,7 +14,18 @@ use crate::float::Float;
 use crate::math::lerp;
 use auto_ops::*;
 
-pub trait Normal3: Tuple3<Self::ElementType> {
+pub trait Normal3:
+    Tuple3<Self::ElementType>
+    + Neg
+    + Add<Self, Output = Self>
+    + AddAssign<Self>
+    + Sub<Self, Output = Self>
+    + SubAssign<Self>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType, Output = Self>
+    + DivAssign<Self::ElementType>
+{
     type ElementType: TupleElement;
     type AssociatedVectorType: Vector3;
 
@@ -55,9 +68,6 @@ pub struct Normal3i {
 }
 
 impl Normal3i {
-    // TODO Okay since the new is in the trait now, we can't use const here.
-    //   That's fine, just use Self { } syntax. It's slightly less convenient here,
-    //   but it's better than the caller needing to disambiguate the new() call constantly in generic code.
     /// All zeroes.
     pub const ZERO: Self = Self { x: 0, y: 0, z: 0 };
 
@@ -448,9 +458,7 @@ impl Default for Normal3f {
     }
 }
 
-// Normals can be negated
 impl_op_ex!(-|n: &Normal3f| -> Normal3f { Normal3f::new(-n.x, -n.y, -n.z) });
-// Normals can add and subtract with other normals
 impl_op_ex!(+ |n1: &Normal3f, n2: &Normal3f| -> Normal3f { Normal3f::new(n1.x + n2.x, n1.y + n2.y, n1.z + n2.z)});
 impl_op_ex!(-|n1: &Normal3f, n2: &Normal3f| -> Normal3f {
     Normal3f::new(n1.x - n2.x, n1.y - n2.y, n1.z - n2.z)
@@ -465,8 +473,6 @@ impl_op_ex!(-= |n1: &mut Normal3f, n2: &Normal3f| {
     n1.y -= n2.y;
     n1.z -= n2.z;
 });
-
-// Normals can be scaled
 impl_op_ex_commutative!(*|n: &Normal3f, s: Float| -> Normal3f {
     Normal3f::new(n.x * s, n.y * s, n.z * s)
 });
@@ -481,12 +487,9 @@ impl_op_ex!(/= |n1: &mut Normal3f, s: Float| {
     n1.y /= s;
     n1.z /= s;
 });
-
-// Normals can add and subtract with vectors to create a new vector
 impl_op_ex!(-|n: &Normal3f, v: &Vector3f| -> Vector3f {
     Vector3f::new(n.x - v.x, n.y - v.y, n.z - v.z)
 });
-
 impl_op_ex!(-|v: &Vector3f, n: &Normal3f| -> Vector3f {
     Vector3f::new(v.x - n.x, v.y - n.y, v.z - n.z)
 });
