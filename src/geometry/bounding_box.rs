@@ -26,7 +26,7 @@ struct Bounds2<P, V> {
 
 impl<P, V> Bounds2<P, V>
 where
-    P: Point2 + Sub<V, Output = P> + Add<V, Output = P>,
+    P: Point2<AssociatedVectorType = V>,
     V: Vector2<ElementType = P::ElementType>,
 {
     fn new(p1: P, p2: P) -> Self {
@@ -148,6 +148,11 @@ where
             phantom_vector: PhantomData,
         }
     }
+
+    /// Vector along the box diagonal from the minimum to the maximum point.
+    fn diagonal(&self) -> V {
+        self.max - self.min
+    }
 }
 
 impl<P: Point2, V: Vector2> Default for Bounds2<P, V> {
@@ -184,7 +189,7 @@ struct Bounds3<P, V> {
 
 impl<P, V> Bounds3<P, V>
 where
-    P: Point3 + Sub<V, Output = P> + Add<V, Output = P>,
+    P: Point3<AssociatedVectorType = V>,
     V: Vector3<ElementType = P::ElementType>,
 {
     fn new(p1: P, p2: P) -> Self {
@@ -322,6 +327,11 @@ where
             phantom_vector: PhantomData,
         }
     }
+
+    /// Returns a vector across the diagonal of the box from the min point to the max point.
+    fn diagonal(&self) -> V {
+        self.max - self.min
+    }
 }
 
 impl<P: Point3, V: Vector3> Default for Bounds3<P, V> {
@@ -353,7 +363,7 @@ mod tests {
     use crate::{
         geometry::{
             bounding_box::{Bounds2f, Bounds3f, Bounds3i},
-            vecmath::{Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3},
+            vecmath::{Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3, Vector2f, Vector3f},
         },
         Float,
     };
@@ -692,5 +702,23 @@ mod tests {
         let expanded = bounds.expand(1.0);
         assert_eq!(Point3f::new(-1.0, -1.0, -1.0), expanded.min);
         assert_eq!(Point3f::new(5.0, 5.0, 5.0), expanded.max);
+    }
+
+    #[test]
+    fn bounds2_diagonal() {
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(4.0, 4.0);
+        let bounds = Bounds2f::new(min, max);
+        let diag = bounds.diagonal();
+        assert_eq!(Vector2f::new(4.0, 4.0), diag);
+    }
+
+    #[test]
+    fn bounds3_diagonal() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(4.0, 4.0, 4.0);
+        let bounds = Bounds3f::new(min, max);
+        let diag = bounds.diagonal();
+        assert_eq!(Vector3f::new(4.0, 4.0, 4.0), diag);
     }
 }

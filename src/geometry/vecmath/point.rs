@@ -1,3 +1,5 @@
+use std::ops::{Add, Sub};
+
 use super::has_nan::HasNan;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{has_nan2, has_nan3};
@@ -8,7 +10,16 @@ use crate::geometry::vecmath::Length;
 use crate::math::{self, lerp};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-pub trait Point2: Tuple2<Self::ElementType> {
+// TODO we should go through all the Tuple supertraits and make them supertraits on the valid ops for each type.
+//  That expresses intent really clearly and ensures we have everything implemented.
+//  It also ensures callers don't need to specify such bounds themselves.
+
+pub trait Point2:
+    Tuple2<Self::ElementType>
+    + Sub<Self, Output = Self::AssociatedVectorType>
+    + Sub<Self::AssociatedVectorType, Output = Self>
+    + Add<Self::AssociatedVectorType, Output = Self>
+{
     type ElementType: TupleElement;
     type AssociatedVectorType: Vector2;
 
@@ -17,7 +28,12 @@ pub trait Point2: Tuple2<Self::ElementType> {
     fn distance_squared(&self, p: &Self) -> Float;
 }
 
-pub trait Point3: Tuple3<Self::ElementType> {
+pub trait Point3:
+    Tuple3<Self::ElementType>
+    + Sub<Self, Output = Self::AssociatedVectorType>
+    + Sub<Self::AssociatedVectorType, Output = Self>
+    + Add<Self::AssociatedVectorType, Output = Self>
+{
     type ElementType: TupleElement;
     type AssociatedVectorType: Vector3;
 
@@ -162,14 +178,12 @@ impl_op_ex!(+=|p: &mut Point2i, v: Vector2i|
 });
 
 // Point - Vector -> Point
-impl_op_ex!(
-    -|p: Point2i, v: <Point2i as Point2>::AssociatedVectorType| -> Point2i {
-        Point2i {
-            x: p.x - v.x,
-            y: p.y - v.y,
-        }
+impl_op_ex!(-|p: Point2i, v: Vector2i| -> Point2i {
+    Point2i {
+        x: p.x - v.x,
+        y: p.y - v.y,
     }
-);
+});
 
 impl_op_ex!(-=|p: &mut Point2i, v: Vector2i|
 {
