@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use super::has_nan::HasNan;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
@@ -10,15 +10,18 @@ use crate::geometry::vecmath::Length;
 use crate::math::{self, lerp};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-// TODO we should go through all the Tuple supertraits and make them supertraits on the valid ops for each type.
-//  That expresses intent really clearly and ensures we have everything implemented.
-//  It also ensures callers don't need to specify such bounds themselves.
-
 pub trait Point2:
     Tuple2<Self::ElementType>
     + Sub<Self, Output = Self::AssociatedVectorType>
     + Sub<Self::AssociatedVectorType, Output = Self>
+    + SubAssign<Self::AssociatedVectorType>
     + Add<Self::AssociatedVectorType, Output = Self>
+    + AddAssign<Self::AssociatedVectorType>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType>
+    + DivAssign<Self::ElementType>
+    + Neg
 {
     type ElementType: TupleElement;
     type AssociatedVectorType: Vector2;
@@ -32,7 +35,14 @@ pub trait Point3:
     Tuple3<Self::ElementType>
     + Sub<Self, Output = Self::AssociatedVectorType>
     + Sub<Self::AssociatedVectorType, Output = Self>
+    + SubAssign<Self::AssociatedVectorType>
     + Add<Self::AssociatedVectorType, Output = Self>
+    + AddAssign<Self::AssociatedVectorType>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType>
+    + DivAssign<Self::ElementType>
+    + Neg
 {
     type ElementType: TupleElement;
     type AssociatedVectorType: Vector3;

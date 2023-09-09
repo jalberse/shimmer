@@ -1,7 +1,4 @@
-use std::{
-    marker::PhantomData,
-    ops::{Add, Index, Sub},
-};
+use std::{marker::PhantomData, ops::Index};
 
 use crate::math::{Max, NumericLimit, Sqrt};
 
