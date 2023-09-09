@@ -155,6 +155,15 @@ where
         let d = self.diagonal();
         d.x() * d.y()
     }
+
+    fn max_dimension(&self) -> usize {
+        let d = self.diagonal();
+        if d.x() > d.y() {
+            0
+        } else {
+            1
+        }
+    }
 }
 
 impl<P: Point2, V: Vector2> Default for Bounds2<P, V> {
@@ -343,6 +352,19 @@ where
     fn volume(&self) -> P::ElementType {
         let d = self.diagonal();
         d.x() * d.y() * d.z()
+    }
+
+    fn max_dimension(&self) -> usize {
+        let d = self.diagonal();
+        if d.x() > d.y() && d.x() > d.z() {
+            0
+        } else {
+            if d.y() > d.z() {
+                1
+            } else {
+                2
+            }
+        }
     }
 }
 
@@ -756,5 +778,36 @@ mod tests {
         let max = Point3f::new(4.0, 4.0, 4.0);
         let bounds = Bounds3f::new(min, max);
         assert_eq!(64.0, bounds.volume());
+    }
+
+    #[test]
+    fn bounds2_max_dimension() {
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(4.0, 3.0);
+        let bounds = Bounds2f::new(min, max);
+        assert_eq!(0, bounds.max_dimension());
+
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(2.0, 3.0);
+        let bounds = Bounds2f::new(min, max);
+        assert_eq!(1, bounds.max_dimension());
+    }
+
+    #[test]
+    fn bounds3_max_dimension() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(5.0, 4.0, 4.0);
+        let bounds = Bounds3f::new(min, max);
+        assert_eq!(0, bounds.max_dimension());
+
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(5.0, 6.0, 4.0);
+        let bounds = Bounds3f::new(min, max);
+        assert_eq!(1, bounds.max_dimension());
+
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(5.0, 4.0, 10.0);
+        let bounds = Bounds3f::new(min, max);
+        assert_eq!(2, bounds.max_dimension());
     }
 }
