@@ -164,7 +164,7 @@ impl_op_ex!(+=|p: &mut Point2i, v: Vector2i|
 });
 
 // Point - Vector -> Point
-impl_op_ex_commutative!(
+impl_op_ex!(
     -|p: Point2i, v: <Point2i as Point2>::AssociatedVectorType| -> Point2i {
         Point2i {
             x: p.x - v.x,
