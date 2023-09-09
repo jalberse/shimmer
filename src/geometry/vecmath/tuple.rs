@@ -1,21 +1,87 @@
+use std::ops::{Add, Div, Mul, Sub};
+
 use crate::{
     float::Float,
-    math::{Abs, Ceil, Floor, Max, Min},
+    is_nan::IsNan,
+    math::{Abs, Ceil, Floor, Max, Min, NumericLimit, Sqrt},
 };
 
-// TODO we likely need a FMA function for Tuple, but let's hold off implementing it until we do need it
-//   for something else. I've sent too long on vector math and not enough time on rendering.
+use super::HasNan;
+
+/// A TupleElement satisfies all the necessary traits to be an element of a Tuple.
+pub trait TupleElement:
+    Abs
+    + Ceil
+    + Floor
+    + Min
+    + Max
+    + PartialOrd
+    + Copy
+    + Clone
+    + NumericLimit
+    + Sqrt
+    + Mul<Self, Output = Self>
+    + Div<Self, Output = Self>
+    + Sub<Self, Output = Self>
+    + Add<Self, Output = Self>
+    + IsNan
+{
+    fn from_i32(val: i32) -> Self;
+    fn into_float(self) -> Float;
+    fn from_float(v: Float) -> Self;
+    fn zero() -> Self;
+}
+
+impl TupleElement for Float {
+    fn from_i32(val: i32) -> Self {
+        val as Self
+    }
+
+    fn zero() -> Self {
+        0.0
+    }
+
+    fn into_float(self) -> Float {
+        self
+    }
+
+    fn from_float(v: Float) -> Self {
+        v
+    }
+}
+
+impl TupleElement for i32 {
+    fn from_i32(val: i32) -> Self {
+        val as Self
+    }
+
+    fn zero() -> Self {
+        0
+    }
+
+    fn into_float(self) -> Float {
+        self as Float
+    }
+
+    fn from_float(v: Float) -> Self {
+        v as i32
+    }
+}
 
 /// A tuple with 3 elements.
 /// Used for sharing logic across e.g. Vector3f and Normal3f and Point3f.
 /// Note that only those functions that are shared across all three types are
 /// within this trait; if there's something that only one or two of them have,
 /// then that can be represented in a separate trait which they can implement. Composition!
-pub trait Tuple3<T>: Sized
+pub trait Tuple3<T>: Sized + Copy + Clone + HasNan
 where
-    T: Abs + Ceil + Floor + Min + Max + PartialOrd,
+    T: TupleElement,
 {
     fn new(x: T, y: T, z: T) -> Self;
+
+    fn splat(v: T) -> Self {
+        Self::new(v, v, v)
+    }
 
     fn x(&self) -> T;
     fn y(&self) -> T;
@@ -101,7 +167,7 @@ where
 
     fn permute(self, permutation: (usize, usize, usize)) -> Self {
         // TODO We could likely implement this more efficiently if we used some accessor/Indexing
-        // rather than branching. But it's not simle to impl Index for Tule due to Tuple
+        // rather than branching. But it's not simle to impl Index for Tuple due to Tuple
         // requiring Sized. So without evidence this really matters, this is fine for now.
         let x = if permutation.0 == 0 {
             self.x()
@@ -139,11 +205,15 @@ where
 
 /// A tuple with 2 elements.
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
-pub trait Tuple2<T>: Sized
+pub trait Tuple2<T>: Sized + Copy + Clone + HasNan
 where
-    T: Abs + Ceil + Floor + Min + Max + PartialOrd,
+    T: TupleElement,
 {
     fn new(x: T, y: T) -> Self;
+
+    fn splat(v: T) -> Self {
+        Self::new(v, v)
+    }
 
     fn x(&self) -> T;
     fn y(&self) -> T;

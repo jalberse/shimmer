@@ -1,15 +1,57 @@
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
 use super::has_nan::HasNan;
 use super::length::Length;
 use super::length_fns::{length3, length_squared3};
 use super::normalize::Normalize;
-use super::tuple::Tuple3;
+use super::tuple::{Tuple3, TupleElement};
 use super::tuple_fns::{
     abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot3, dot3i, has_nan3,
 };
+use super::vector::Vector3;
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
 use crate::math::lerp;
 use auto_ops::*;
+
+pub trait Normal3:
+    Tuple3<Self::ElementType>
+    + Neg
+    + Add<Self, Output = Self>
+    + AddAssign<Self>
+    + Sub<Self, Output = Self>
+    + SubAssign<Self>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType, Output = Self>
+    + DivAssign<Self::ElementType>
+{
+    type ElementType: TupleElement;
+    type AssociatedVectorType: Vector3;
+
+    /// Compute the dot product of two normals.
+    fn dot(&self, n: &Self) -> Self::ElementType;
+
+    /// Compute the dot product with a vector.
+    fn dot_vector(&self, v: &Self::AssociatedVectorType) -> Self::ElementType;
+
+    /// Compute the dot product of two normals and take the absolute value.
+    fn abs_dot(&self, n: &Self) -> Self::ElementType;
+
+    /// Compute the dot product with a vector and take the absolute value.
+    fn abs_dot_vector(&self, v: &Self::AssociatedVectorType) -> Self::ElementType;
+
+    /// Cross this normal with a vector.
+    /// Note that you cannot take the cross product of two normals.
+    fn cross(&self, v: &Self::AssociatedVectorType) -> Self::AssociatedVectorType;
+
+    /// Get the angle between this and another normal.
+    /// Both must be normalized.
+    fn angle_between(&self, n: &Self) -> Float;
+
+    /// Get the angle between this normal and a vector.
+    fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float;
+}
 
 // ---------------------------------------------------------------------------
 //        Normal3i
@@ -27,72 +69,40 @@ pub struct Normal3i {
 
 impl Normal3i {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0);
+    pub const ZERO: Self = Self { x: 0, y: 0, z: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1);
+    pub const ONE: Self = Self { x: 1, y: 1, z: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1);
+    pub const NEG_ONE: Self = Self {
+        x: -1,
+        y: -1,
+        z: -1,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1, 0, 0);
+    pub const X: Self = Self { x: 1, y: 0, z: 0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0, 1, 0);
+    pub const Y: Self = Self { x: 0, y: 1, z: 0 };
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self::new(0, 0, 1);
+    pub const Z: Self = Self { x: 0, y: 0, z: 1 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1, 0, 0);
+    pub const NEG_X: Self = Self { x: -1, y: 0, z: 0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0, -1, 0);
+    pub const NEG_Y: Self = Self { x: 0, y: -1, z: 0 };
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self::new(0, 0, -1);
-
-    pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: i32) -> Self {
-        Self::new(v, v, v)
-    }
-
-    /// Compute the dot product of two normals.
-    pub fn dot(&self, n: &Self) -> i32 {
-        dot3i(self, n)
-    }
-
-    /// Compute the dot product with a vector.
-    pub fn dot_vector(&self, v: &Vector3i) -> i32 {
-        dot3i(self, v)
-    }
-
-    /// Compute the dot product of two normals and take the absolute value.
-    pub fn abs_dot(&self, n: &Self) -> i32 {
-        abs_dot3i(self, n)
-    }
-
-    /// Compute the dot product with a vector and take the absolute value.
-    pub fn abs_dot_vector(&self, v: &Vector3i) -> i32 {
-        abs_dot3i(self, v)
-    }
-
-    /// Cross this normal with a vector.
-    /// Note that you cannot take the cross product of two normals.
-    pub fn cross(&self, v: &Vector3i) -> Vector3i {
-        // Note that integer based vectors don't need EFT methods.
-        cross_i32(self, v)
-    }
+    pub const NEG_Z: Self = Self { x: 0, y: 0, z: -1 };
 }
 
 impl Tuple3<i32> for Normal3i {
     fn new(x: i32, y: i32, z: i32) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> i32 {
@@ -109,6 +119,46 @@ impl Tuple3<i32> for Normal3i {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
+    }
+}
+
+impl Normal3 for Normal3i {
+    type ElementType = i32;
+    type AssociatedVectorType = Vector3i;
+
+    /// Compute the dot product of two normals.
+    fn dot(&self, n: &Self) -> i32 {
+        dot3i(self, n)
+    }
+
+    /// Compute the dot product with a vector.
+    fn dot_vector(&self, v: &Vector3i) -> i32 {
+        dot3i(self, v)
+    }
+
+    /// Compute the dot product of two normals and take the absolute value.
+    fn abs_dot(&self, n: &Self) -> i32 {
+        abs_dot3i(self, n)
+    }
+
+    /// Compute the dot product with a vector and take the absolute value.
+    fn abs_dot_vector(&self, v: &Vector3i) -> i32 {
+        abs_dot3i(self, v)
+    }
+
+    /// Cross this normal with a vector.
+    /// Note that you cannot take the cross product of two normals.
+    fn cross(&self, v: &Vector3i) -> Vector3i {
+        // Note that integer based vectors don't need EFT methods.
+        cross_i32(self, v)
+    }
+
+    fn angle_between(&self, n: &Normal3i) -> Float {
+        angle_between::<Normal3f, Normal3f, Normal3f>(&Normal3f::from(self), &Normal3f::from(n))
+    }
+
+    fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float {
+        angle_between::<Normal3f, Vector3f, Vector3f>(&Normal3f::from(self), &Vector3f::from(v))
     }
 }
 
@@ -255,84 +305,72 @@ pub struct Normal3f {
 
 impl Normal3f {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0.0);
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1.0);
+    pub const ONE: Self = Self {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+    };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1.0);
+    pub const NEG_ONE: Self = Self {
+        x: -1.0,
+        y: -1.0,
+        z: -1.0,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1.0, 0.0, 0.0);
+    pub const X: Self = Self {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0.0, 1.0, 0.0);
+    pub const Y: Self = Self {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self::new(0.0, 0.0, 1.0);
+    pub const Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1.0, 0.0, 0.0);
+    pub const NEG_X: Self = Self {
+        x: -1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0.0, -1.0, 0.0);
+    pub const NEG_Y: Self = Self {
+        x: 0.0,
+        y: -1.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: Float) -> Self {
-        Self { x: v, y: v, z: v }
-    }
-
-    /// Compute the dot product of two normals.
-    pub fn dot(&self, n: &Self) -> Float {
-        dot3(self, n)
-    }
-
-    /// Compute the dot with a vector.
-    pub fn dot_vector(&self, v: &Vector3f) -> Float {
-        dot3(self, v)
-    }
-
-    /// Compute the dot product of two normals and take the absolute value.
-    pub fn abs_dot(&self, n: &Self) -> Float {
-        abs_dot3(self, n)
-    }
-
-    /// Compute the dot with a vector and take the absolute value.
-    pub fn abs_dot_vector(&self, v: &Vector3f) -> Float {
-        abs_dot3(self, v)
-    }
-
-    /// Takes the cross of this normal with a vector.
-    /// Note that you cannot take the cross product of two normals.
-    /// Uses an EFT method for calculating the value with minimal error without
-    /// casting to f64. See PBRTv4 3.3.2.
-    pub fn cross(&self, v: &Vector3f) -> Vector3f {
-        cross::<Normal3f, Vector3f, Vector3f>(self, v)
-    }
-
-    /// Get the angle between this and another normal.
-    /// Both must be normalized.
-    pub fn angle_between(&self, n: &Normal3f) -> Float {
-        angle_between::<Normal3f, Normal3f, Normal3f>(self, n)
-    }
-
-    /// Get the angle between this normal and a vector.
-    pub fn angle_between_vector(&self, v: &Vector3f) -> Float {
-        angle_between::<Normal3f, Vector3f, Vector3f>(self, v)
-    }
+    pub const NEG_Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: -1.0,
+    };
 }
 
 impl Tuple3<Float> for Normal3f {
     fn new(x: Float, y: Float, z: Float) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> Float {
@@ -349,6 +387,50 @@ impl Tuple3<Float> for Normal3f {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
+    }
+}
+
+impl Normal3 for Normal3f {
+    type ElementType = Float;
+    type AssociatedVectorType = Vector3f;
+
+    /// Compute the dot product of two normals.
+    fn dot(&self, n: &Self) -> Float {
+        dot3(self, n)
+    }
+
+    /// Compute the dot with a vector.
+    fn dot_vector(&self, v: &Vector3f) -> Float {
+        dot3(self, v)
+    }
+
+    /// Compute the dot product of two normals and take the absolute value.
+    fn abs_dot(&self, n: &Self) -> Float {
+        abs_dot3(self, n)
+    }
+
+    /// Compute the dot with a vector and take the absolute value.
+    fn abs_dot_vector(&self, v: &Vector3f) -> Float {
+        abs_dot3(self, v)
+    }
+
+    /// Takes the cross of this normal with a vector.
+    /// Note that you cannot take the cross product of two normals.
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64. See PBRTv4 3.3.2.
+    fn cross(&self, v: &Vector3f) -> Vector3f {
+        cross::<Normal3f, Vector3f, Vector3f>(self, v)
+    }
+
+    /// Get the angle between this and another normal.
+    /// Both must be normalized.
+    fn angle_between(&self, n: &Normal3f) -> Float {
+        angle_between::<Normal3f, Normal3f, Normal3f>(self, n)
+    }
+
+    /// Get the angle between this normal and a vector.
+    fn angle_between_vector(&self, v: &Vector3f) -> Float {
+        angle_between::<Normal3f, Vector3f, Vector3f>(self, v)
     }
 }
 
@@ -376,9 +458,7 @@ impl Default for Normal3f {
     }
 }
 
-// Normals can be negated
 impl_op_ex!(-|n: &Normal3f| -> Normal3f { Normal3f::new(-n.x, -n.y, -n.z) });
-// Normals can add and subtract with other normals
 impl_op_ex!(+ |n1: &Normal3f, n2: &Normal3f| -> Normal3f { Normal3f::new(n1.x + n2.x, n1.y + n2.y, n1.z + n2.z)});
 impl_op_ex!(-|n1: &Normal3f, n2: &Normal3f| -> Normal3f {
     Normal3f::new(n1.x - n2.x, n1.y - n2.y, n1.z - n2.z)
@@ -393,8 +473,6 @@ impl_op_ex!(-= |n1: &mut Normal3f, n2: &Normal3f| {
     n1.y -= n2.y;
     n1.z -= n2.z;
 });
-
-// Normals can be scaled
 impl_op_ex_commutative!(*|n: &Normal3f, s: Float| -> Normal3f {
     Normal3f::new(n.x * s, n.y * s, n.z * s)
 });
@@ -409,12 +487,9 @@ impl_op_ex!(/= |n1: &mut Normal3f, s: Float| {
     n1.y /= s;
     n1.z /= s;
 });
-
-// Normals can add and subtract with vectors to create a new vector
 impl_op_ex!(-|n: &Normal3f, v: &Vector3f| -> Vector3f {
     Vector3f::new(n.x - v.x, n.y - v.y, n.z - v.z)
 });
-
 impl_op_ex!(-|v: &Vector3f, n: &Normal3f| -> Vector3f {
     Vector3f::new(v.x - n.x, v.y - n.y, v.z - n.z)
 });
@@ -452,11 +527,31 @@ impl From<Normal3f> for (Float, Float, Float) {
     }
 }
 
+impl From<Normal3i> for Normal3f {
+    fn from(value: Normal3i) -> Self {
+        Normal3f {
+            x: value.x as Float,
+            y: value.y as Float,
+            z: value.z as Float,
+        }
+    }
+}
+
+impl From<&Normal3i> for Normal3f {
+    fn from(value: &Normal3i) -> Self {
+        Normal3f {
+            x: value.x as Float,
+            y: value.y as Float,
+            z: value.z as Float,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
         float::Float,
-        geometry::vecmath::{HasNan, Length, Normalize},
+        geometry::vecmath::{normal::Normal3, HasNan, Length, Normalize, Tuple3},
     };
 
     use super::{Normal3f, Normal3i, Vector3f, Vector3i};

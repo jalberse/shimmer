@@ -27,6 +27,17 @@
 //! in the type system as well: because normals are defined in terms of
 //! their relationship to a particular surface, they behave differently
 //! than vectors in some situations, particularly when applying transformations.
+//!
+//! Further, note that common behaviors are shared via traits in this module;
+//! we rely on monomorphization on generic functions in order to do static dispatch.
+//! It's not intended to use these traits as trait objects by e.g. creating a
+//! Vec<dyn Tuple3<Float>> for runtime polymorphism across Normals and Vectors;
+//! this would result in dynamic dispatch, which is not efficient.
+//! It's unlikely one would need such runtime polymorphism on these particular types,
+//! however, because of the discussion above, so we're okay with this.
+//! If we ever *did* want runtime polymorphism on these tyeps, we should
+//! use the enum_dispatch crate to generate an enum of implementing types and thus
+//! use static dispatch.
 
 pub mod has_nan;
 pub mod length;
@@ -50,3 +61,18 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 // TODO Face forward functions.
 // TODO ensure we debug_assert() with has_nan() where appropriate.
 // TODO Improve testing coverage.
+// TODO Consider some NormalizedVector, NormalizedNormal type or some other
+// mechanism for enforcing that a vector must be normalized for an operation like angle_between.
+// It's certainly possible with a type system but that's a lot of code to write.
+// You would need the normalize() functions to return the Normalized* type,
+// and then define operations on the Normalized* type as appropriate (where scaling
+// would for example make it not-normalized).
+// TODO We could share gram_schmidt() implementations for Vector types if we had
+//  dot as a separate trait which both Vector2 and Vector3 become supertraits of.
+//  This way we can place the trait constraints Dot + Mul + Sub onto a helper function
+//  which all the various structs may call in their implementation.
+// TODO we likely need a FMA function for Tuple, but let's hold off implementing it until we do need it
+//   for something else. I've sent too long on vector math and not enough time on rendering.
+// TODO Consider splitting e.g. Vector2 and Vector3 (and associated types imlementing them) into separate files.
+// TODO There's still chunks of code that are repeated, mainly in impl_op_ex()'s.
+//   I'd like to share them where possible, but that's not worth the effort at the time of writing.

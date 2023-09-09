@@ -12,6 +12,12 @@ impl Sqrt for Float {
     }
 }
 
+impl Sqrt for i32 {
+    fn sqrt(self) -> Self {
+        (self as f32).sqrt() as i32
+    }
+}
+
 pub trait Abs {
     fn abs(self) -> Self;
 }
@@ -91,6 +97,22 @@ impl Max for i32 {
     fn max(self, a: Self) -> Self {
         <i32 as Ord>::max(self, a)
     }
+}
+
+/// Provides the maximum and minimum possible representable number
+pub trait NumericLimit {
+    const MIN: Self;
+    const MAX: Self;
+}
+
+impl NumericLimit for i32 {
+    const MIN: i32 = i32::MIN;
+    const MAX: i32 = i32::MAX;
+}
+
+impl NumericLimit for Float {
+    const MIN: Float = Float::MIN;
+    const MAX: Float = Float::MAX;
 }
 
 /// Provides the equivalent of f32::mul_add for the specified type.

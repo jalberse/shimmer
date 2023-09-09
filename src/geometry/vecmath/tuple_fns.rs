@@ -5,19 +5,16 @@ use std::ops::{Add, Sub};
 
 use crate::{
     float::PI_F,
-    is_nan::IsNan,
-    math::{
-        difference_of_products, safe_asin, sum_of_products, Abs, Ceil, Floor, Max, Min, MulAdd,
-    },
+    math::{difference_of_products, safe_asin, sum_of_products, MulAdd},
     Float,
 };
 
-use super::{HasNan, Length, Tuple2, Tuple3};
+use super::{tuple::TupleElement, Length, Tuple2, Tuple3};
 
 pub fn has_nan3<V, T>(v: &V) -> bool
 where
     V: Tuple3<T>,
-    T: IsNan + Abs + Ceil + Floor + Min + Max + PartialOrd,
+    T: TupleElement,
 {
     v.x().is_nan() || v.y().is_nan() || v.z().is_nan()
 }
@@ -25,7 +22,7 @@ where
 pub fn has_nan2<V, T>(v: &V) -> bool
 where
     V: Tuple2<T>,
-    T: IsNan + Abs + Ceil + Floor + Min + Max + PartialOrd,
+    T: TupleElement,
 {
     v.x().is_nan() || v.y().is_nan()
 }
@@ -69,8 +66,8 @@ where
 /// Take the dot product of two vectors.
 pub fn dot3<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple3<Float> + HasNan,
-    V2: Tuple3<Float> + HasNan,
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -81,8 +78,8 @@ where
 /// Take the dot product of two vectors.
 pub fn dot3i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple3<i32> + HasNan,
-    V2: Tuple3<i32> + HasNan,
+    V1: Tuple3<i32>,
+    V2: Tuple3<i32>,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -93,8 +90,8 @@ where
 /// Take the dot product of two vectors then take the absolute value.
 pub fn abs_dot3<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple3<Float> + HasNan,
-    V2: Tuple3<Float> + HasNan,
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
 {
     Float::abs(dot3(v, w))
 }
@@ -102,8 +99,8 @@ where
 /// Take the dot product of two vectors then take the absolute value.
 pub fn abs_dot3i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple3<i32> + HasNan,
-    V2: Tuple3<i32> + HasNan,
+    V1: Tuple3<i32>,
+    V2: Tuple3<i32>,
 {
     i32::abs(dot3i(v, w))
 }
@@ -111,8 +108,8 @@ where
 /// Take the dot product of two vectors.
 pub fn dot2<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple2<Float> + HasNan,
-    V2: Tuple2<Float> + HasNan,
+    V1: Tuple2<Float>,
+    V2: Tuple2<Float>,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -122,8 +119,8 @@ where
 /// Take the dot product of two vectors.
 pub fn dot2i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple2<i32> + HasNan,
-    V2: Tuple2<i32> + HasNan,
+    V1: Tuple2<i32>,
+    V2: Tuple2<i32>,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -133,8 +130,8 @@ where
 /// Take the dot product of two vectors then take the absolute value.
 pub fn abs_dot2<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple2<Float> + HasNan,
-    V2: Tuple2<Float> + HasNan,
+    V1: Tuple2<Float>,
+    V2: Tuple2<Float>,
 {
     Float::abs(dot2(v, w))
 }
@@ -142,18 +139,11 @@ where
 /// Take the dot product of two vectors then take the absolute value.
 pub fn abs_dot2i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple2<i32> + HasNan,
-    V2: Tuple2<i32> + HasNan,
+    V1: Tuple2<i32>,
+    V2: Tuple2<i32>,
 {
     i32::abs(dot2i(v, w))
 }
-
-// TODO Consider some NormalizedVector, NormalizedNormal type or some other
-// mechanism for enforcing that a vector must be normalized for an operation like angle_between.
-// It's certainly possible with a type system but that's a lot of code to write.
-// You would need the normalize() functions to return the Normalized* type,
-// and then define operations on the Normalized* type as appropriate (where scaling
-// would for example make it not-normalized).
 
 /// Computes the angle between two vectors in radians. Generic because we want to be able
 /// to use this for Vector and Normal types alike, and combinations of them.
@@ -168,8 +158,8 @@ where
 ///   We just use the third type to be able to specify that that is the case.
 pub fn angle_between<'a, V1, V2, V3>(v1: &'a V1, v2: &'a V2) -> Float
 where
-    V1: Tuple3<Float> + HasNan,
-    V2: Tuple3<Float> + HasNan,
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
     V3: Tuple3<Float> + Length<Float>,
     &'a V1: Add<&'a V2, Output = V3>,
     &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,
@@ -177,6 +167,23 @@ where
     debug_assert!(!v1.has_nan());
     debug_assert!(!v2.has_nan());
     if dot3(v1, v2) < 0.0 {
+        PI_F - 2.0 * safe_asin((v1 + v2).length() / 2.0)
+    } else {
+        2.0 * safe_asin((v2 - v1).length() / 2.0)
+    }
+}
+
+pub fn angle_between2<'a, V1, V2, V3>(v1: &'a V1, v2: &'a V2) -> Float
+where
+    V1: Tuple2<Float>,
+    V2: Tuple2<Float>,
+    V3: Tuple2<Float> + Length<Float>,
+    &'a V1: Add<&'a V2, Output = V3>,
+    &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,
+{
+    debug_assert!(!v1.has_nan());
+    debug_assert!(!v2.has_nan());
+    if dot2(v1, v2) < 0.0 {
         PI_F - 2.0 * safe_asin((v1 + v2).length() / 2.0)
     } else {
         2.0 * safe_asin((v2 - v1).length() / 2.0)

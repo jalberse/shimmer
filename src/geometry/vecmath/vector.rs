@@ -1,16 +1,108 @@
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
 use super::has_nan::HasNan;
 use super::length::Length;
 use super::length_fns::{length2, length3, length_squared2, length_squared3};
+use super::normal::Normal3;
 use super::normalize::Normalize;
-use super::tuple::{Tuple2, Tuple3};
+use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{
-    abs_dot2, abs_dot2i, abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot2, dot2i, dot3,
-    dot3i, has_nan2, has_nan3,
+    abs_dot2, abs_dot2i, abs_dot3, abs_dot3i, angle_between, angle_between2, cross, cross_i32,
+    dot2, dot2i, dot3, dot3i, has_nan2, has_nan3,
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
 use crate::math::lerp;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
+
+pub trait Vector2:
+    Tuple2<Self::ElementType>
+    + Neg
+    + Add<Self, Output = Self>
+    + AddAssign<Self::ElementType>
+    + Sub<Self, Output = Self>
+    + SubAssign<Self>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType>
+    + DivAssign<Self::ElementType>
+    + Mul<Self, Output = Self>
+    + MulAssign<Self>
+    + Div<Self, Output = Self>
+    + DivAssign<Self>
+{
+    type ElementType: TupleElement;
+
+    /// Compute the dot product.
+    fn dot(&self, v: &Self) -> Self::ElementType;
+
+    /// Compute the dot product and take the absolute value.
+    fn abs_dot(&self, v: &Self) -> Self::ElementType;
+
+    /// Find the andle between this vector and another vector.
+    /// Both vectors must be normalized.
+    fn angle_between(&self, v: &Self) -> Float;
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    fn gram_schmidt(&self, w: &Self) -> Self;
+}
+
+pub trait Vector3:
+    Tuple3<Self::ElementType>
+    + Neg
+    + Add<Self, Output = Self>
+    + AddAssign<Self::ElementType>
+    + Sub<Self, Output = Self>
+    + SubAssign<Self>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType>
+    + DivAssign<Self::ElementType>
+    + Mul<Self, Output = Self>
+    + MulAssign<Self>
+    + Div<Self, Output = Self>
+    + DivAssign<Self>
+{
+    type ElementType: TupleElement;
+    type AssociatedNormalType: Normal3;
+
+    /// Compute the dot product.
+    fn dot(&self, v: &Self) -> Self::ElementType;
+
+    /// Dot this vector with a normal.
+    fn dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType;
+
+    /// Compute the dot product and take the absolute value.
+    fn abs_dot(&self, v: &Self) -> Self::ElementType;
+
+    /// Dot this vector with a normal and take its absolute value.
+    fn abs_dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType;
+
+    /// Take the cross product of this and a vector v.
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64. See PBRTv4 3.3.2.
+    fn cross(&self, v: &Self) -> Self;
+
+    /// Take the cross product of this and a normal n.
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64. See PBRTv4 3.3.2.
+    fn cross_normal(&self, n: &Self::AssociatedNormalType) -> Self;
+
+    /// Find the andle between this vector and another vector.
+    /// Both vectors must be normalized.
+    fn angle_between(&self, v: &Self) -> Float;
+
+    /// Find the angle between this vector and a normal
+    /// Both vectors must be normalized.
+    fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float;
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    fn gram_schmidt(&self, w: &Self) -> Self;
+}
 
 // ---------------------------------------------------------------------------
 //        Vector2i
@@ -24,59 +116,30 @@ pub struct Vector2i {
 
 impl Vector2i {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0);
+    pub const ZERO: Self = Self { x: 0, y: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1);
+    pub const ONE: Self = Self { x: 1, y: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1);
+    pub const NEG_ONE: Self = Self { x: -1, y: -1 };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1, 0);
+    pub const X: Self = Self { x: 1, y: 0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0, 1);
+    pub const Y: Self = Self { x: 0, y: 1 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1, 0);
+    pub const NEG_X: Self = Self { x: -1, y: 0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0, -1);
-
-    pub const fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: i32) -> Self {
-        Self::new(v, v)
-    }
-
-    /// Compute the dot product.
-    pub fn dot(&self, v: &Self) -> i32 {
-        dot2i(self, v)
-    }
-
-    /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(&self, v: &Self) -> i32 {
-        abs_dot2i(self, v)
-    }
-
-    /// Create a new vector orthogonal to w.
-    /// w must be normalized.
-    /// See PBRTv4 3.2
-    pub fn gram_schmidt(&self, w: &Self) -> Self {
-        // TODO We should share this implementation; possibly by making dot() into
-        //   a Trait we can use as a bound for some GramSchmidt trait that our Vector types
-        //   implement (a default implementation would suffice). I'm just rushing right now.
-        self - self.dot(w) * w
-    }
+    pub const NEG_Y: Self = Self { x: 0, y: -1 };
 }
 
 impl Tuple2<i32> for Vector2i {
     fn new(x: i32, y: i32) -> Self {
-        Self::new(x, y)
+        Self { x, y }
     }
 
     fn x(&self) -> i32 {
@@ -92,9 +155,44 @@ impl Tuple2<i32> for Vector2i {
     }
 }
 
+impl Vector2 for Vector2i {
+    type ElementType = i32;
+
+    /// Compute the dot product.
+    fn dot(&self, v: &Self) -> i32 {
+        dot2i(self, v)
+    }
+
+    /// Compute the dot product and take the absolute value.
+    fn abs_dot(&self, v: &Self) -> i32 {
+        abs_dot2i(self, v)
+    }
+
+    fn angle_between(&self, v: &Self) -> Float {
+        angle_between2(&Vector2f::from(self), &Vector2f::from(v))
+    }
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    fn gram_schmidt(&self, w: &Self) -> Self {
+        self - self.dot(w) * w
+    }
+}
+
 impl HasNan for Vector2i {
     fn has_nan(&self) -> bool {
         false
+    }
+}
+
+impl Length<i32> for Vector2i {
+    fn length_squared(&self) -> i32 {
+        length_squared2(self)
+    }
+
+    fn length(&self) -> i32 {
+        length2(self)
     }
 }
 
@@ -142,6 +240,12 @@ impl_op_ex!(/|v: &Vector2i, s: i32| -> Vector2i
     Vector2i { x: v.x / s, y: v.y / s }
 });
 
+impl_op_ex!(+=|v1: &mut Vector2i, v: &i32|
+{
+    v1.x += v;
+    v1.y += v;
+});
+
 impl_op_ex!(+=|v1: &mut Vector2i, v2: &Vector2i|
 {
     v1.x += v2.x;
@@ -160,10 +264,25 @@ impl_op_ex!(*=|v1: &mut Vector2i, v2: &Vector2i|
     v1.y *= v2.y;
 });
 
+impl_op_ex!(/|v1: &Vector2i, v2: &Vector2i| -> Vector2i
+{
+    Vector2i{
+        x: v1.x / v2.x,
+        y: v1.y / v2.y,
+    }
+});
+
 impl_op_ex!(/=|v1: &mut Vector2i, v2: &Vector2i|
 {
     v1.x /= v2.x;
     v1.y /= v2.y;
+});
+
+impl_op_ex!(*|v1: &Vector2i, v2: &Vector2i| -> Vector2i {
+    Vector2i {
+        x: v1.x * v2.x,
+        y: v1.y * v2.y,
+    }
 });
 
 impl_op_ex!(*=|v1: &mut Vector2i, s: i32|
@@ -230,86 +349,40 @@ pub struct Vector3i {
 
 impl Vector3i {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0);
+    pub const ZERO: Self = Self { x: 0, y: 0, z: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1);
+    pub const ONE: Self = Self { x: 1, y: 1, z: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1);
+    pub const NEG_ONE: Self = Self {
+        x: -1,
+        y: -1,
+        z: -1,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1, 0, 0);
+    pub const X: Self = Self { x: 1, y: 0, z: 0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0, 1, 0);
+    pub const Y: Self = Self { x: 0, y: 1, z: 0 };
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self::new(0, 0, 1);
+    pub const Z: Self = Self { x: 0, y: 0, z: 1 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1, 0, 0);
+    pub const NEG_X: Self = Self { x: -1, y: 0, z: 0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0, -1, 0);
+    pub const NEG_Y: Self = Self { x: 0, y: -1, z: 0 };
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self::new(0, 0, -1);
-
-    pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: i32) -> Self {
-        Self::new(v, v, v)
-    }
-
-    /// Compute the dot product
-    pub fn dot(&self, v: &Self) -> i32 {
-        dot3i(self, v)
-    }
-
-    /// Dot this vector with a normal.
-    pub fn dot_normal(&self, n: &Normal3i) -> i32 {
-        dot3i(self, n)
-    }
-
-    /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(&self, v: &Self) -> i32 {
-        abs_dot3i(self, v)
-    }
-
-    /// Dot this vector with a normal and take the absolute value.
-    pub fn abs_dot_normal(&self, n: &Normal3i) -> i32 {
-        abs_dot3i(self, n)
-    }
-
-    /// Take the cross product of this and a vector v
-    pub fn cross(&self, v: &Self) -> Self {
-        // Integer vectors do not need to use EFT methods for accuracy.
-        cross_i32(self, v)
-    }
-
-    /// Take the cross product of this and a normal n
-    pub fn cross_normal(&self, n: &Normal3i) -> Self {
-        cross_i32(self, n)
-    }
-
-    /// Create a new vector orthogonal to w.
-    /// w must be normalized.
-    /// See PBRTv4 3.2
-    pub fn gram_schmidt(&self, w: &Self) -> Self {
-        // TODO We should share this implementation; possibly by making dot() into
-        //   a Trait we can use as a bound for some GramSchmidt trait that our Vector types
-        //   implement (a default implementation would suffice). I'm just rushing right now.
-        self - self.dot(w) * w
-    }
+    pub const NEG_Z: Self = Self { x: 0, y: 0, z: -1 };
 }
 
 impl Tuple3<i32> for Vector3i {
     fn new(x: i32, y: i32, z: i32) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> i32 {
@@ -329,9 +402,70 @@ impl Tuple3<i32> for Vector3i {
     }
 }
 
+impl Vector3 for Vector3i {
+    type ElementType = i32;
+    type AssociatedNormalType = Normal3i;
+
+    /// Compute the dot product
+    fn dot(&self, v: &Self) -> i32 {
+        dot3i(self, v)
+    }
+
+    /// Dot this vector with a normal.
+    fn dot_normal(&self, n: &Normal3i) -> i32 {
+        dot3i(self, n)
+    }
+
+    /// Compute the dot product and take the absolute value.
+    fn abs_dot(&self, v: &Self) -> i32 {
+        abs_dot3i(self, v)
+    }
+
+    /// Dot this vector with a normal and take the absolute value.
+    fn abs_dot_normal(&self, n: &Normal3i) -> i32 {
+        abs_dot3i(self, n)
+    }
+
+    /// Take the cross product of this and a vector v
+    fn cross(&self, v: &Self) -> Self {
+        // Integer vectors do not need to use EFT methods for accuracy.
+        cross_i32(self, v)
+    }
+
+    /// Take the cross product of this and a normal n
+    fn cross_normal(&self, n: &Normal3i) -> Self {
+        cross_i32(self, n)
+    }
+
+    fn angle_between(&self, v: &Self) -> Float {
+        angle_between(&Vector3f::from(self), &Vector3f::from(v))
+    }
+
+    fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float {
+        angle_between::<Vector3f, Normal3f, Vector3f>(&Vector3f::from(self), &Normal3f::from(n))
+    }
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    fn gram_schmidt(&self, w: &Self) -> Self {
+        self - self.dot(w) * w
+    }
+}
+
 impl HasNan for Vector3i {
     fn has_nan(&self) -> bool {
         false
+    }
+}
+
+impl Length<i32> for Vector3i {
+    fn length_squared(&self) -> i32 {
+        length_squared3(self)
+    }
+
+    fn length(&self) -> i32 {
+        length3(self)
     }
 }
 
@@ -387,6 +521,13 @@ impl_op_ex!(/|v: &Vector3i, s: i32| -> Vector3i
     Vector3i { x: v.x / s, y: v.y / s, z: v.z / s }
 });
 
+impl_op_ex!(+=|v1: &mut Vector3i, v: &i32|
+{
+    v1.x += v;
+    v1.y += v;
+    v1.z += v;
+});
+
 impl_op_ex!(+=|v1: &mut Vector3i, v2: &Vector3i|
 {
     v1.x += v2.x;
@@ -427,6 +568,14 @@ impl_op_ex!(/=|v1: &mut Vector3i, s: i32|
     v1.x /= s;
     v1.y /= s;
     v1.z /= s;
+});
+
+impl_op_ex!(/|v1: &Vector3i, v2: &Vector3i| -> Vector3i
+{
+    Vector3i::new(v1.x / v2.x, v1.y / v2.y, v1.z / v2.z)
+});
+impl_op_ex!(*|v1: &Vector3i, v2: &Vector3i| -> Vector3i {
+    Vector3i::new(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z)
 });
 
 impl From<Point3i> for Vector3i {
@@ -493,59 +642,30 @@ pub struct Vector2f {
 
 impl Vector2f {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0.0);
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1.0);
+    pub const ONE: Self = Self { x: 1.0, y: 1.0 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1.0);
+    pub const NEG_ONE: Self = Self { x: -1.0, y: -1.0 };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1.0, 0.0);
+    pub const X: Self = Self { x: 1.0, y: 0.0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0.0, 1.0);
+    pub const Y: Self = Self { x: 0.0, y: 1.0 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1.0, 0.0);
+    pub const NEG_X: Self = Self { x: -1.0, y: 0.0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float) -> Self {
-        Self { x, y }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: Float) -> Self {
-        Self { x: v, y: v }
-    }
-
-    /// Compute the dot product.
-    pub fn dot(&self, v: &Self) -> Float {
-        dot2(self, v)
-    }
-
-    /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(&self, v: &Self) -> Float {
-        abs_dot2(self, v)
-    }
-
-    /// Create a new vector orthogonal to w.
-    /// w must be normalized.
-    /// See PBRTv4 3.2
-    pub fn gram_schmidt(&self, w: &Self) -> Self {
-        // TODO We should share this implementation; possibly by making dot() into
-        //   a Trait we can use as a bound for some GramSchmidt trait that our Vector types
-        //   implement (a default implementation would suffice). I'm just rushing right now.
-        self - self.dot(w) * w
-    }
+    pub const NEG_Y: Self = Self { x: 0.0, y: -1.0 };
 }
 
 impl Tuple2<Float> for Vector2f {
     fn new(x: Float, y: Float) -> Self {
-        Self::new(x, y)
+        Self { x, y }
     }
 
     fn x(&self) -> Float {
@@ -558,6 +678,31 @@ impl Tuple2<Float> for Vector2f {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
+    }
+}
+
+impl Vector2 for Vector2f {
+    type ElementType = Float;
+
+    /// Compute the dot product.
+    fn dot(&self, v: &Self) -> Float {
+        dot2(self, v)
+    }
+
+    /// Compute the dot product and take the absolute value.
+    fn abs_dot(&self, v: &Self) -> Float {
+        abs_dot2(self, v)
+    }
+
+    fn angle_between(&self, v: &Self) -> Float {
+        angle_between2(self, v)
+    }
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    fn gram_schmidt(&self, w: &Self) -> Self {
+        self - self.dot(w) * w
     }
 }
 
@@ -585,9 +730,7 @@ impl Default for Vector2f {
     }
 }
 
-// Vectors can be negated
 impl_op_ex!(-|v: &Vector2f| -> Vector2f { Vector2f::new(-v.x, -v.y) });
-// Vectors can add and subtract with other vectors
 impl_op_ex!(+ |v1: &Vector2f, v2: &Vector2f| -> Vector2f {
     Vector2f::new(v1.x + v2.x, v1.y + v2.y)});
 impl_op_ex!(-|v1: &Vector2f, v2: &Vector2f| -> Vector2f {
@@ -601,8 +744,6 @@ impl_op_ex!(-= |n1: &mut Vector2f, n2: &Vector2f| {
     n1.x -= n2.x;
     n1.y -= n2.y;
 });
-
-// Vectors can be scaled
 impl_op_ex_commutative!(*|v: &Vector2f, s: Float| -> Vector2f { Vector2f::new(v.x * s, v.y * s) });
 impl_op_ex!(/ |v: &Vector2f, s: Float| -> Vector2f {
     Vector2f::new(v.x / s, v.y / s) });
@@ -613,6 +754,30 @@ impl_op_ex!(*= |v1: &mut Vector2f, s: Float| {
 impl_op_ex!(/= |v1: &mut Vector2f, s: Float| {
     v1.x /= s;
     v1.y /= s;
+});
+impl_op_ex!(/= |v1: &mut Vector2f, v2: &Vector2f|
+{
+    v1.x /= v2.x;
+    v1.y /= v2.y;
+});
+impl_op_ex!(/ |v1: &Vector2f, v2: &Vector2f| -> Vector2f
+{
+    Vector2f::new(
+    v1.x / v2.x,
+    v1.y / v2.y)
+});
+impl_op_ex!(*= |v1: &mut Vector2f, v2: &Vector2f|
+{
+    v1.x *= v2.x;
+    v1.y *= v2.y;
+});
+impl_op_ex!(*|v1: &Vector2f, v2: &Vector2f| -> Vector2f {
+    Vector2f::new(v1.x * v2.x, v1.y * v2.y)
+});
+impl_op_ex!(+= |v1: &mut Vector2f, v: &Float|
+{
+    v1.x += v;
+    v1.y += v;
 });
 
 impl From<Point2f> for Vector2f {
@@ -645,6 +810,15 @@ impl From<Vector2f> for (Float, Float) {
     }
 }
 
+impl From<&Vector2i> for Vector2f {
+    fn from(value: &Vector2i) -> Self {
+        Vector2f {
+            x: value.x as Float,
+            y: value.y as Float,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 //        Vector3f
 // ---------------------------------------------------------------------------
@@ -658,101 +832,72 @@ pub struct Vector3f {
 
 impl Vector3f {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0.0);
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1.0);
+    pub const ONE: Self = Self {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+    };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1.0);
+    pub const NEG_ONE: Self = Self {
+        x: -1.0,
+        y: -1.0,
+        z: -1.0,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1.0, 0.0, 0.0);
+    pub const X: Self = Self {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0.0, 1.0, 0.0);
+    pub const Y: Self = Self {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self::new(0.0, 0.0, 1.0);
+    pub const Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1.0, 0.0, 0.0);
+    pub const NEG_X: Self = Self {
+        x: -1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0.0, -1.0, 0.0);
+    pub const NEG_Y: Self = Self {
+        x: 0.0,
+        y: -1.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: Float) -> Self {
-        Self::new(v, v, v)
-    }
-
-    /// Compute the dot product.
-    pub fn dot(&self, v: &Self) -> Float {
-        dot3(self, v)
-    }
-
-    /// Dot this vector with a normal.
-    pub fn dot_normal(&self, n: &Normal3f) -> Float {
-        dot3(self, n)
-    }
-
-    /// Compute the dot product and take the absolute value.
-    pub fn abs_dot(&self, v: &Self) -> Float {
-        abs_dot3(self, v)
-    }
-
-    /// Dot this vector with a normal and take its absolute value.
-    pub fn abs_dot_normal(&self, n: &Normal3f) -> Float {
-        abs_dot3(self, n)
-    }
-
-    /// Take the cross product of this and a vector v.
-    /// Uses an EFT method for calculating the value with minimal error without
-    /// casting to f64. See PBRTv4 3.3.2.
-    pub fn cross(&self, v: &Self) -> Self {
-        cross::<Vector3f, Vector3f, Vector3f>(self, v)
-    }
-
-    /// Take the cross product of this and a normal n.
-    /// Uses an EFT method for calculating the value with minimal error without
-    /// casting to f64. See PBRTv4 3.3.2.
-    pub fn cross_normal(&self, n: &Normal3f) -> Self {
-        cross::<Vector3f, Normal3f, Vector3f>(self, n)
-    }
-
-    /// Find the andle between this vector and another vector.
-    /// Both vectors must be normalized.
-    pub fn angle_between(&self, v: &Self) -> Float {
-        angle_between(self, v)
-    }
-
-    /// Find the angle between this vector and a normal
-    /// Both vectors must be normalized.
-    pub fn angle_between_normal(&self, n: &Normal3f) -> Float {
-        angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
-    }
-
-    /// Create a new vector orthogonal to w.
-    /// w must be normalized.
-    /// See PBRTv4 3.2
-    pub fn gram_schmidt(&self, w: &Self) -> Self {
-        // TODO We should share this implementation; possibly by making dot() into
-        //   a Trait we can use as a bound for some GramSchmidt trait that our Vector types
-        //   implement (a default implementation would suffice). I'm just rushing right now.
-        self - self.dot(w) * w
-    }
+    pub const NEG_Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: -1.0,
+    };
 }
 
 impl Tuple3<Float> for Vector3f {
     fn new(x: Float, y: Float, z: Float) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> Float {
@@ -769,6 +914,64 @@ impl Tuple3<Float> for Vector3f {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
+    }
+}
+
+impl Vector3 for Vector3f {
+    type ElementType = Float;
+    type AssociatedNormalType = Normal3f;
+
+    /// Compute the dot product.
+    fn dot(&self, v: &Self) -> Float {
+        dot3(self, v)
+    }
+
+    /// Dot this vector with a normal.
+    fn dot_normal(&self, n: &Normal3f) -> Float {
+        dot3(self, n)
+    }
+
+    /// Compute the dot product and take the absolute value.
+    fn abs_dot(&self, v: &Self) -> Float {
+        abs_dot3(self, v)
+    }
+
+    /// Dot this vector with a normal and take its absolute value.
+    fn abs_dot_normal(&self, n: &Normal3f) -> Float {
+        abs_dot3(self, n)
+    }
+
+    /// Take the cross product of this and a vector v.
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64. See PBRTv4 3.3.2.
+    fn cross(&self, v: &Self) -> Self {
+        cross::<Vector3f, Vector3f, Vector3f>(self, v)
+    }
+
+    /// Take the cross product of this and a normal n.
+    /// Uses an EFT method for calculating the value with minimal error without
+    /// casting to f64. See PBRTv4 3.3.2.
+    fn cross_normal(&self, n: &Normal3f) -> Self {
+        cross::<Vector3f, Normal3f, Vector3f>(self, n)
+    }
+
+    /// Find the andle between this vector and another vector.
+    /// Both vectors must be normalized.
+    fn angle_between(&self, v: &Self) -> Float {
+        angle_between(self, v)
+    }
+
+    /// Find the angle between this vector and a normal
+    /// Both vectors must be normalized.
+    fn angle_between_normal(&self, n: &Normal3f) -> Float {
+        angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
+    }
+
+    /// Create a new vector orthogonal to w.
+    /// w must be normalized.
+    /// See PBRTv4 3.2
+    fn gram_schmidt(&self, w: &Self) -> Self {
+        self - self.dot(w) * w
     }
 }
 
@@ -820,6 +1023,11 @@ impl_op_ex_commutative!(*|v: &Vector3f, s: Float| -> Vector3f {
     Vector3f::new(v.x * s, v.y * s, v.z * s)
 });
 impl_op_ex!(/ |v: &Vector3f, s: Float| -> Vector3f { Vector3f::new(v.x / s, v.y / s, v.z / s) });
+impl_op_ex!(+= |v1: &mut Vector3f, s: Float| {
+    v1.x += s;
+    v1.y += s;
+    v1.z += s;
+});
 impl_op_ex!(*= |v1: &mut Vector3f, s: Float| {
     v1.x *= s;
     v1.y *= s;
@@ -829,6 +1037,25 @@ impl_op_ex!(/= |v1: &mut Vector3f, s: Float| {
     v1.x /= s;
     v1.y /= s;
     v1.z /= s;
+});
+impl_op_ex!(*= |v1: &mut Vector3f, v2: &Vector3f| {
+    v1.x *= v2.x;
+    v1.y *= v2.y;
+    v1.z *= v2.z;
+});
+impl_op_ex!(/= |v1: &mut Vector3f, v2: &Vector3f| {
+    v1.x /= v2.x;
+    v1.y /= v2.y;
+    v1.z /= v2.z;
+});
+impl_op_ex!(/ |v1: &Vector3f, v2: &Vector3f| -> Vector3f{
+    Vector3f::new(
+        v1.x / v2.x,
+        v1.y / v2.y,
+        v1.z / v2.z)
+});
+impl_op_ex!(*|v1: &Vector3f, v2: &Vector3f| -> Vector3f {
+    Vector3f::new(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z)
 });
 
 impl From<Point3f> for Vector3f {
@@ -867,10 +1094,19 @@ impl From<Vector3f> for (Float, Float, Float) {
     }
 }
 
+impl From<&Vector3i> for Vector3f {
+    fn from(value: &Vector3i) -> Self {
+        Self::new(value.x as Float, value.y as Float, value.z as Float)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        geometry::vecmath::{HasNan, Length, Normalize, Tuple2, Tuple3},
+        geometry::vecmath::{
+            vector::{Vector2, Vector3},
+            HasNan, Length, Normalize, Tuple2, Tuple3,
+        },
         Float,
     };
 

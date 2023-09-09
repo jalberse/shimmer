@@ -1,11 +1,58 @@
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
 use super::has_nan::HasNan;
-use super::tuple::{Tuple2, Tuple3};
+use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{has_nan2, has_nan3};
+use super::vector::{Vector2, Vector3};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
 use crate::geometry::vecmath::Length;
 use crate::math::{self, lerp};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
+
+pub trait Point2:
+    Tuple2<Self::ElementType>
+    + Sub<Self, Output = Self::AssociatedVectorType>
+    + Sub<Self::AssociatedVectorType, Output = Self>
+    + SubAssign<Self::AssociatedVectorType>
+    + Add<Self::AssociatedVectorType, Output = Self>
+    + AddAssign<Self::AssociatedVectorType>
+    + Mul<Self::ElementType, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Mul<Float, Output = Self>
+    + Div<Self::ElementType>
+    + DivAssign<Self::ElementType>
+    + Neg
+{
+    type ElementType: TupleElement;
+    type AssociatedVectorType: Vector2 + From<Self>;
+
+    fn distance(&self, p: &Self) -> Float;
+
+    fn distance_squared(&self, p: &Self) -> Float;
+}
+
+pub trait Point3:
+    Tuple3<Self::ElementType>
+    + Sub<Self, Output = Self::AssociatedVectorType>
+    + Sub<Self::AssociatedVectorType, Output = Self>
+    + SubAssign<Self::AssociatedVectorType>
+    + Add<Self::AssociatedVectorType, Output = Self>
+    + AddAssign<Self::AssociatedVectorType>
+    + Mul<Self::ElementType, Output = Self>
+    + Mul<Float, Output = Self>
+    + MulAssign<Self::ElementType>
+    + Div<Self::ElementType, Output = Self>
+    + DivAssign<Self::ElementType>
+    + Neg
+{
+    type ElementType: TupleElement;
+    type AssociatedVectorType: Vector3 + From<Self>;
+
+    fn distance(&self, p: &Self) -> Self::ElementType;
+
+    fn distance_squared(&self, p: &Self) -> Self::ElementType;
+}
 
 // ---------------------------------------------------------------------------
 //        Point2i
@@ -18,33 +65,66 @@ pub struct Point2i {
 
 impl Point2i {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0);
+    pub const ZERO: Self = Point2i { x: 0, y: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1);
+    pub const ONE: Self = Point2i { x: 1, y: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1);
+    pub const NEG_ONE: Self = Point2i { x: -1, y: -1 };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1, 0);
+    pub const X: Self = Self { x: 1, y: 0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0, 1);
+    pub const Y: Self = Self { x: 0, y: 1 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1, 0);
+    pub const NEG_X: Self = Self { x: -1, y: 0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0, -1);
+    pub const NEG_Y: Self = Self { x: 0, y: -1 };
+}
 
-    pub const fn new(x: i32, y: i32) -> Self {
+impl Tuple2<i32> for Point2i {
+    fn new(x: i32, y: i32) -> Self {
         Self { x, y }
     }
 
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: i32) -> Self {
-        Self::new(v, v)
+    fn x(&self) -> i32 {
+        self.x
+    }
+
+    fn y(&self) -> i32 {
+        self.y
+    }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        Point2i {
+            x: math::lerp(t, &(a.x as Float), &(b.x as Float)) as i32,
+            y: math::lerp(t, &(a.y as Float), &(b.y as Float)) as i32,
+        }
+    }
+}
+
+impl Point2 for Point2i {
+    type ElementType = i32;
+    type AssociatedVectorType = Vector2i;
+
+    fn distance(&self, p: &Self) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length() as Float
+    }
+
+    fn distance_squared(&self, p: &Self) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length_squared() as Float
+    }
+}
+
+impl HasNan for Point2i {
+    fn has_nan(&self) -> bool {
+        false
     }
 }
 
@@ -54,21 +134,28 @@ impl Default for Point2i {
     }
 }
 
-impl_op_ex!(-|p: Point2i| -> Point2i {
+impl_op_ex!(-|p: &Point2i| -> Point2i {
     Point2i {
         x: p.x.neg(),
         y: p.y.neg(),
     }
 });
 
-impl_op_ex_commutative!(*|v: Point2i, s: i32| -> Point2i {
+impl_op_ex_commutative!(*|v: &Point2i, s: i32| -> Point2i {
     Point2i {
         x: v.x * s,
         y: v.y * s,
     }
 });
 
-impl_op_ex!(/|v: Point2i, s: i32| -> Point2i
+impl_op_ex_commutative!(*|v: &Point2i, s: Float| -> Point2i {
+    Point2i {
+        x: (v.x as Float * s) as i32,
+        y: (v.y as Float * s) as i32,
+    }
+});
+
+impl_op_ex!(/|v: &Point2i, s: i32| -> Point2i
 {
     Point2i { x: v.x / s, y: v.y / s }
 });
@@ -110,7 +197,7 @@ impl_op_ex!(+=|p: &mut Point2i, v: Vector2i|
 });
 
 // Point - Vector -> Point
-impl_op_ex_commutative!(-|p: Point2i, v: Vector2i| -> Point2i {
+impl_op_ex!(-|p: Point2i, v: Vector2i| -> Point2i {
     Point2i {
         x: p.x - v.x,
         y: p.y - v.y,
@@ -124,7 +211,7 @@ impl_op_ex!(-=|p: &mut Point2i, v: Vector2i|
 });
 
 // Point - Point -> Vector
-impl_op_ex!(-|p1: Point2i, p2: Point2i| -> Vector2i {
+impl_op_ex!(-|p1: &Point2i, p2: &Point2i| -> Vector2i {
     Vector2i {
         x: p1.x - p2.x,
         y: p1.y - p2.y,
@@ -183,45 +270,40 @@ pub struct Point3i {
 
 impl Point3i {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0);
+    pub const ZERO: Self = Point3i { x: 0, y: 0, z: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1);
+    pub const ONE: Self = Point3i { x: 1, y: 1, z: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1);
+    pub const NEG_ONE: Self = Point3i {
+        x: -1,
+        y: -1,
+        z: -1,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1, 0, 0);
+    pub const X: Self = Self { x: 1, y: 0, z: 0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0, 1, 0);
+    pub const Y: Self = Self { x: 0, y: 1, z: 0 };
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self::new(0, 0, 1);
+    pub const Z: Self = Self { x: 0, y: 0, z: 1 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1, 0, 0);
+    pub const NEG_X: Self = Self { x: -1, y: 0, z: 0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0, -1, 0);
+    pub const NEG_Y: Self = Self { x: 0, y: -1, z: 0 };
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self::new(0, 0, -1);
-
-    pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: i32) -> Self {
-        Self::new(v, v, v)
-    }
+    pub const NEG_Z: Self = Self { x: 0, y: 0, z: -1 };
 }
 
 impl Tuple3<i32> for Point3i {
     fn new(x: i32, y: i32, z: i32) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> i32 {
@@ -245,9 +327,28 @@ impl Tuple3<i32> for Point3i {
     }
 }
 
+impl Point3 for Point3i {
+    type ElementType = i32;
+    type AssociatedVectorType = Vector3i;
+
+    fn distance(&self, p: &Self) -> i32 {
+        (self - p).length()
+    }
+
+    fn distance_squared(&self, p: &Self) -> i32 {
+        (self - p).length_squared()
+    }
+}
+
 impl Default for Point3i {
     fn default() -> Self {
         Self::ZERO
+    }
+}
+
+impl HasNan for Point3i {
+    fn has_nan(&self) -> bool {
+        false
     }
 }
 
@@ -387,50 +488,30 @@ pub struct Point2f {
 
 impl Point2f {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0.0);
+    pub const ZERO: Self = Point2f { x: 0.0, y: 0.0 };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1.0);
+    pub const ONE: Self = Point2f { x: 1.0, y: 1.0 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1.0);
+    pub const NEG_ONE: Self = Point2f { x: -1.0, y: -1.0 };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1.0, 0.0);
+    pub const X: Self = Self { x: 1.0, y: 0.0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0.0, 1.0);
+    pub const Y: Self = Self { x: 0.0, y: 1.0 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1.0, 0.0);
+    pub const NEG_X: Self = Self { x: -1.0, y: 0.0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float) -> Self {
-        Self { x, y }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: Float) -> Self {
-        Self { x: v, y: v }
-    }
-
-    // TODO we can make a Distance trait that Points can implement.
-    pub fn distance(self, p: Point2f) -> Float {
-        debug_assert!(!self.has_nan());
-        (self - p).length()
-    }
-
-    pub fn distance_squared(self, p: Point2f) -> Float {
-        debug_assert!(!self.has_nan());
-        (self - p).length_squared()
-    }
+    pub const NEG_Y: Self = Self { x: 0.0, y: -1.0 };
 }
 
 impl Tuple2<Float> for Point2f {
     fn new(x: Float, y: Float) -> Self {
-        Self::new(x, y)
+        Self { x, y }
     }
 
     fn x(&self) -> Float {
@@ -446,6 +527,21 @@ impl Tuple2<Float> for Point2f {
             x: lerp(t, &a.x, &b.x),
             y: lerp(t, &a.y, &b.y),
         }
+    }
+}
+
+impl Point2 for Point2f {
+    type ElementType = Float;
+    type AssociatedVectorType = Vector2f;
+
+    fn distance(&self, p: &Point2f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length()
+    }
+
+    fn distance_squared(&self, p: &Point2f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length_squared()
     }
 }
 
@@ -539,55 +635,72 @@ pub struct Point3f {
 
 impl Point3f {
     /// All zeroes.
-    pub const ZERO: Self = Self::splat(0.0);
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// All ones.
-    pub const ONE: Self = Self::splat(1.0);
+    pub const ONE: Self = Self {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+    };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::splat(-1.0);
+    pub const NEG_ONE: Self = Self {
+        x: -1.0,
+        y: -1.0,
+        z: -1.0,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1.0, 0.0, 0.0);
+    pub const X: Self = Self {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0.0, 1.0, 0.0);
+    pub const Y: Self = Self {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self::new(0.0, 0.0, 1.0);
+    pub const Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1.0, 0.0, 0.0);
+    pub const NEG_X: Self = Self {
+        x: -1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0.0, -1.0, 0.0);
+    pub const NEG_Y: Self = Self {
+        x: 0.0,
+        y: -1.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self { x, y, z }
-    }
-
-    /// Creates a vector with all elements set to `v`.
-    pub const fn splat(v: Float) -> Self {
-        Self::new(v, v, v)
-    }
-
-    pub fn distance(self, p: Point3f) -> Float {
-        debug_assert!(!self.has_nan());
-        (self - p).length()
-    }
-
-    pub fn distance_squared(self, p: Point3f) -> Float {
-        debug_assert!(!self.has_nan());
-        (self - p).length_squared()
-    }
+    pub const NEG_Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: -1.0,
+    };
 }
 
 impl Tuple3<Float> for Point3f {
     fn new(x: Float, y: Float, z: Float) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> Float {
@@ -611,6 +724,21 @@ impl Tuple3<Float> for Point3f {
     }
 }
 
+impl Point3 for Point3f {
+    type ElementType = Float;
+    type AssociatedVectorType = Vector3f;
+
+    fn distance(&self, p: &Point3f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length()
+    }
+
+    fn distance_squared(&self, p: &Point3f) -> Float {
+        debug_assert!(!self.has_nan());
+        (self - p).length_squared()
+    }
+}
+
 impl HasNan for Point3f {
     fn has_nan(&self) -> bool {
         has_nan3(self)
@@ -623,13 +751,13 @@ impl Default for Point3f {
     }
 }
 
-impl_op_ex!(-|v: Point3f| -> Point3f { Point3f::new(-v.x, -v.y, -v.z) });
+impl_op_ex!(-|v: &Point3f| -> Point3f { Point3f::new(-v.x, -v.y, -v.z) });
 
 // Points can be scaled elementwise
-impl_op_ex_commutative!(*|p: Point3f, s: Float| -> Point3f {
+impl_op_ex_commutative!(*|p: &Point3f, s: Float| -> Point3f {
     Point3f::new(p.x * s, p.y * s, p.z * s)
 });
-impl_op_ex!(/ |p: Point3f, s: Float| -> Point3f {
+impl_op_ex!(/ |p: &Point3f, s: Float| -> Point3f {
     Point3f::new(p.x / s, p.y / s, p.z / s) });
 impl_op_ex!(*= |p: &mut Point3f, s: Float| {
     p.x *= s;
@@ -655,17 +783,17 @@ impl_op_ex!(+=|p: &mut Point3f, v: Vector3f| {
 });
 
 // Point - Vector -> Point
-impl_op_ex!(-|p: Point3f, v: Vector3f| -> Point3f {
+impl_op_ex!(-|p: &Point3f, v: &Vector3f| -> Point3f {
     Point3f::new(p.x - v.x, p.y - v.y, p.z - v.z)
 });
-impl_op_ex!(-=|p: &mut Point3f, v: Vector3f| {
+impl_op_ex!(-=|p: &mut Point3f, v: &Vector3f| {
     p.x -= v.x;
     p.y -= v.y;
     p.z -= v.z;
 });
 
 // Point - Point -> Vector
-impl_op_ex!(-|p1: Point3f, p2: Point3f| -> Vector3f {
+impl_op_ex!(-|p1: &Point3f, p2: &Point3f| -> Vector3f {
     Vector3f::new(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z)
 });
 
@@ -701,7 +829,10 @@ impl From<Point3f> for (Float, Float, Float) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{geometry::vecmath::HasNan, Float};
+    use crate::{
+        geometry::vecmath::{point::Point2, HasNan, Tuple2, Tuple3},
+        Float,
+    };
 
     use super::{Point2f, Point2i, Point3f, Point3i, Vector2f, Vector2i, Vector3f, Vector3i};
 
@@ -726,14 +857,14 @@ mod tests {
     fn point_point_distance() {
         let p1 = Point2f::new(0.0, 0.0);
         let p2 = Point2f::new(3.0, 4.0);
-        assert_eq!(5.0, p1.distance(p2));
+        assert_eq!(5.0, p1.distance(&p2));
     }
 
     #[test]
     fn point_point_distance_squared() {
         let p1 = Point2f::new(0.0, 0.0);
         let p2 = Point2f::new(3.0, 4.0);
-        assert_eq!(25.0, p1.distance_squared(p2));
+        assert_eq!(25.0, p1.distance_squared(&p2));
     }
 
     #[test]
