@@ -203,6 +203,14 @@ where
         };
         V::new(out_x, out_y)
     }
+
+    fn is_empty(&self) -> bool {
+        self.min.x() >= self.max.x() || self.min.y() >= self.max.y()
+    }
+
+    fn is_degenerate(&self) -> bool {
+        self.min.x() > self.max.x() || self.min.y() > self.max.y()
+    }
 }
 
 impl<P: Point2, V: Vector2> Default for Bounds2<P, V> {
@@ -458,6 +466,14 @@ where
         };
         Sphere::new(center, radius)
     }
+
+    fn is_empty(&self) -> bool {
+        self.min.x() >= self.max.x() || self.min.y() >= self.max.y() || self.min.z() >= self.max.z()
+    }
+
+    fn is_degenerate(&self) -> bool {
+        self.min.x() > self.max.x() || self.min.y() > self.max.y() || self.min.z() > self.max.z()
+    }
 }
 
 impl<P: Point3, V: Vector3> Default for Bounds3<P, V> {
@@ -486,6 +502,8 @@ impl<P, V> Index<usize> for Bounds3<P, V> {
 }
 
 mod tests {
+    use std::marker::PhantomData;
+
     use crate::{
         geometry::{
             bounding_box::{Bounds2f, Bounds3f, Bounds3i},
@@ -952,5 +970,47 @@ mod tests {
         let bounding_sphere = bounds.bounding_sphere();
         assert_eq!(Point3f::new(0.0, 0.0, 0.0), bounding_sphere.center);
         assert_eq!(11.489125, bounding_sphere.radius);
+    }
+
+    #[test]
+    fn bounds2_is_empty() {
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(0.0, 0.0);
+        let bounds = Bounds2f::new(min, max);
+        assert!(bounds.is_empty());
+    }
+
+    #[test]
+    fn bounds3_is_empty() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(0.0, 0.0, 0.0);
+        let bounds = Bounds3f::new(min, max);
+        assert!(bounds.is_empty());
+    }
+
+    #[test]
+    fn bounds2_is_degen() {
+        let min = Point2f::new(1.0, 0.0);
+        let max = Point2f::new(0.0, 0.0);
+        // Don't use the ctor, which fixes degeneracy
+        let bounds = Bounds2f {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        };
+        assert!(bounds.is_degenerate());
+    }
+
+    #[test]
+    fn bounds3_is_degen() {
+        let min = Point3f::new(1.0, 0.0, 0.0);
+        let max = Point3f::new(0.0, 0.0, 0.0);
+        // Don't use the ctor, which fixes degeneracy
+        let bounds = Bounds3f {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        };
+        assert!(bounds.is_degenerate());
     }
 }
