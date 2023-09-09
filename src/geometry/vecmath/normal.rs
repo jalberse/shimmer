@@ -12,23 +12,21 @@ use crate::float::Float;
 use crate::math::lerp;
 use auto_ops::*;
 
-pub trait Normal3<T>: Tuple3<T>
-where
-    T: TupleElement,
-{
-    type AssociatedVectorType: Vector3<T>;
+pub trait Normal3: Tuple3<Self::ElementType> {
+    type ElementType: TupleElement;
+    type AssociatedVectorType: Vector3;
 
     /// Compute the dot product of two normals.
-    fn dot(&self, n: &Self) -> T;
+    fn dot(&self, n: &Self) -> Self::ElementType;
 
     /// Compute the dot product with a vector.
-    fn dot_vector(&self, v: &Self::AssociatedVectorType) -> T;
+    fn dot_vector(&self, v: &Self::AssociatedVectorType) -> Self::ElementType;
 
     /// Compute the dot product of two normals and take the absolute value.
-    fn abs_dot(&self, n: &Self) -> T;
+    fn abs_dot(&self, n: &Self) -> Self::ElementType;
 
     /// Compute the dot product with a vector and take the absolute value.
-    fn abs_dot_vector(&self, v: &Self::AssociatedVectorType) -> T;
+    fn abs_dot_vector(&self, v: &Self::AssociatedVectorType) -> Self::ElementType;
 
     /// Cross this normal with a vector.
     /// Note that you cannot take the cross product of two normals.
@@ -111,7 +109,8 @@ impl Tuple3<i32> for Normal3i {
     }
 }
 
-impl Normal3<i32> for Normal3i {
+impl Normal3 for Normal3i {
+    type ElementType = i32;
     type AssociatedVectorType = Vector3i;
 
     /// Compute the dot product of two normals.
@@ -346,7 +345,8 @@ impl Tuple3<Float> for Normal3f {
     }
 }
 
-impl Normal3<Float> for Normal3f {
+impl Normal3 for Normal3f {
+    type ElementType = Float;
     type AssociatedVectorType = Vector3f;
 
     /// Compute the dot product of two normals.

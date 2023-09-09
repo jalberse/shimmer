@@ -1,39 +1,33 @@
-use std::{marker::PhantomData, ops::Index};
+use std::ops::Index;
 
-use crate::{math::NumericLimit, Float};
+use crate::math::{Max, NumericLimit, Sqrt};
 
 use super::vecmath::{
     point::{Point2, Point3},
     tuple::TupleElement,
+    vector::Vector2,
     Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3,
 };
 
-pub type Bounds2i = Bounds2<Point2i, i32>;
-pub type Bounds2f = Bounds2<Point2f, Float>;
-pub type Bounds3i = Bounds3<Point3i, i32>;
-pub type Bounds3f = Bounds3<Point3f, Float>;
+pub type Bounds2i = Bounds2<Point2i>;
+pub type Bounds2f = Bounds2<Point2f>;
+pub type Bounds3i = Bounds3<Point3i>;
+pub type Bounds3f = Bounds3<Point3f>;
 
 #[derive(Debug, PartialEq)]
-struct Bounds2<P, T>
-where
-    P: Point2<T>,
-    T: TupleElement,
-{
+struct Bounds2<P> {
     pub min: P,
     pub max: P,
-    point_element_type: PhantomData<T>,
 }
 
-impl<P, T> Bounds2<P, T>
+impl<P> Bounds2<P>
 where
-    P: Point2<T>,
-    T: TupleElement,
+    P: Point2,
 {
     fn new(p1: P, p2: P) -> Self {
         Self {
             min: Tuple2::min(&p1, &p2),
             max: Tuple2::max(&p1, &p2),
-            point_element_type: Default::default(),
         }
     }
 
@@ -41,7 +35,6 @@ where
         Self {
             min: point,
             max: point,
-            point_element_type: Default::default(),
         }
     }
 
@@ -56,11 +49,7 @@ where
         let max = Tuple2::max(&self.max, &p);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
-        Self {
-            min,
-            max,
-            point_element_type: Default::default(),
-        }
+        Self { min, max }
     }
 
     fn union(&self, other: &Self) -> Self {
@@ -68,11 +57,7 @@ where
         let max = Tuple2::max(&self.max, &other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
-        Self {
-            min,
-            max,
-            point_element_type: Default::default(),
-        }
+        Self { min, max }
     }
 
     /// None if the bounds do not intersect.
@@ -85,11 +70,7 @@ where
             return None;
         }
 
-        Some(Self {
-            min,
-            max,
-            point_element_type: Default::default(),
-        })
+        Some(Self { min, max })
     }
 
     fn overlaps(&self, other: &Self) -> bool {
@@ -116,46 +97,37 @@ where
 
     /// Zero if the point is inside the bounds, else the squared distance from
     /// the point to the bounding box.
-    fn distance_squared(&self, p: &P) -> T {
-        let dx = T::max(
-            T::max(T::zero(), self.min.x() - p.x()),
+    fn distance_squared(&self, p: &P) -> P::ElementType {
+        let dx = P::ElementType::max(
+            P::ElementType::max(P::ElementType::zero(), self.min.x() - p.x()),
             p.x() - self.max.x(),
         );
-        let dy = T::max(
-            T::max(T::zero(), self.min.y() - p.y()),
+        let dy = P::ElementType::max(
+            P::ElementType::max(P::ElementType::zero(), self.min.y() - p.y()),
             p.y() - self.max.y(),
         );
 
         dx * dx + dy * dy
     }
 
-    fn distance(&self, p: &P) -> T {
+    fn distance(&self, p: &P) -> P::ElementType {
         // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
-        T::sqrt(self.distance_squared(p))
+        P::ElementType::sqrt(self.distance_squared(p))
     }
 }
 
-impl<P, T> Default for Bounds2<P, T>
-where
-    P: Point2<T>,
-    T: TupleElement,
-{
+impl<P: Point2> Default for Bounds2<P> {
     fn default() -> Self {
         let min_num = NumericLimit::MIN;
         let max_num = NumericLimit::MAX;
         Self {
             min: P::new(min_num, min_num),
             max: P::new(max_num, max_num),
-            point_element_type: Default::default(),
         }
     }
 }
 
-impl<P, T> Index<usize> for Bounds2<P, T>
-where
-    P: Point2<T>,
-    T: TupleElement,
-{
+impl<P: Point2> Index<usize> for Bounds2<P> {
     type Output = P;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -169,26 +141,19 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-struct Bounds3<P, T>
+struct Bounds3<P>
 where
-    P: Point3<T>,
-    T: TupleElement,
+    P: Point3,
 {
     pub min: P,
     pub max: P,
-    point_element_type: PhantomData<T>,
 }
 
-impl<P, T> Bounds3<P, T>
-where
-    P: Point3<T>,
-    T: TupleElement,
-{
+impl<P: Point3> Bounds3<P> {
     fn new(p1: P, p2: P) -> Self {
         Self {
             min: Tuple3::min(&p1, &p2),
             max: Tuple3::max(&p1, &p2),
-            point_element_type: Default::default(),
         }
     }
 
@@ -196,7 +161,6 @@ where
         Self {
             min: point,
             max: point,
-            point_element_type: Default::default(),
         }
     }
 
@@ -215,11 +179,7 @@ where
         let max = Tuple3::max(&self.max, &p);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
-        Self {
-            min,
-            max,
-            point_element_type: Default::default(),
-        }
+        Self { min, max }
     }
 
     fn union(&self, other: &Self) -> Self {
@@ -227,11 +187,7 @@ where
         let max = Tuple3::max(&self.max, &other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
-        Self {
-            min,
-            max,
-            point_element_type: Default::default(),
-        }
+        Self { min, max }
     }
 
     /// None if the bounds do not intersect.
@@ -247,11 +203,7 @@ where
             return None;
         }
 
-        Some(Self {
-            min,
-            max,
-            point_element_type: Default::default(),
-        })
+        Some(Self { min, max })
     }
 
     fn overlaps(&self, other: &Self) -> bool {
@@ -283,46 +235,41 @@ where
 
     /// Zero if the point is inside the bounds, else the squared distance from
     /// the point to the bounding box.
-    fn distance_squared(&self, p: &P) -> T {
-        let dx = T::max(
-            T::max(T::zero(), self.min.x() - p.x()),
+    fn distance_squared(&self, p: &P) -> P::ElementType {
+        let dx = P::ElementType::max(
+            P::ElementType::max(P::ElementType::zero(), self.min.x() - p.x()),
             p.x() - self.max.x(),
         );
-        let dy = T::max(
-            T::max(T::zero(), self.min.y() - p.y()),
+        let dy = P::ElementType::max(
+            P::ElementType::max(P::ElementType::zero(), self.min.y() - p.y()),
             p.y() - self.max.y(),
         );
-        let dz = T::max(
-            T::max(T::zero(), self.min.z() - p.z()),
+        let dz = P::ElementType::max(
+            P::ElementType::max(P::ElementType::zero(), self.min.z() - p.z()),
             p.z() - self.max.z(),
         );
 
         dx * dx + dy * dy + dz * dz
     }
 
-    fn distance(&self, p: &P) -> T {
+    fn distance(&self, p: &P) -> P::ElementType {
         // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
-        T::sqrt(self.distance_squared(p))
+        P::ElementType::sqrt(self.distance_squared(p))
     }
 }
 
-impl<P, T> Default for Bounds3<P, T>
-where
-    P: Point3<T>,
-    T: TupleElement,
-{
+impl<P: Point3> Default for Bounds3<P> {
     fn default() -> Self {
         let min_num = NumericLimit::MIN;
         let max_num = NumericLimit::MAX;
         Self {
             min: P::new(min_num, min_num, min_num),
             max: P::new(max_num, max_num, max_num),
-            point_element_type: Default::default(),
         }
     }
 }
 
-impl<P: Point3<T>, T: TupleElement> Index<usize> for Bounds3<P, T> {
+impl<P: Point3> Index<usize> for Bounds3<P> {
     type Output = P;
 
     fn index(&self, index: usize) -> &Self::Output {

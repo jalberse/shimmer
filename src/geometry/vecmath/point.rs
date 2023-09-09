@@ -1,28 +1,31 @@
+use std::ops::Sub;
+
 use super::has_nan::HasNan;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{has_nan2, has_nan3};
+use super::vector::{Vector2, Vector3};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
 use crate::geometry::vecmath::Length;
 use crate::math::{self, lerp};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-pub trait Point2<T>: Tuple2<T>
-where
-    T: TupleElement,
-{
+pub trait Point2: Tuple2<Self::ElementType> {
+    type ElementType: TupleElement;
+    type AssociatedVectorType: Vector2;
+
     fn distance(&self, p: &Self) -> Float;
 
     fn distance_squared(&self, p: &Self) -> Float;
 }
 
-pub trait Point3<T>: Tuple3<T>
-where
-    T: TupleElement,
-{
-    fn distance(&self, p: &Self) -> T;
+pub trait Point3: Tuple3<Self::ElementType> {
+    type ElementType: TupleElement;
+    type AssociatedVectorType: Vector3;
 
-    fn distance_squared(&self, p: &Self) -> T;
+    fn distance(&self, p: &Self) -> Self::ElementType;
+
+    fn distance_squared(&self, p: &Self) -> Self::ElementType;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +85,10 @@ impl Tuple2<i32> for Point2i {
     }
 }
 
-impl Point2<i32> for Point2i {
+impl Point2 for Point2i {
+    type ElementType = i32;
+    type AssociatedVectorType = Vector2i;
+
     fn distance(&self, p: &Self) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length() as Float
@@ -296,7 +302,10 @@ impl Tuple3<i32> for Point3i {
     }
 }
 
-impl Point3<i32> for Point3i {
+impl Point3 for Point3i {
+    type ElementType = i32;
+    type AssociatedVectorType = Vector3i;
+
     fn distance(&self, p: &Self) -> i32 {
         (self - p).length()
     }
@@ -309,6 +318,12 @@ impl Point3<i32> for Point3i {
 impl Default for Point3i {
     fn default() -> Self {
         Self::ZERO
+    }
+}
+
+impl HasNan for Point3i {
+    fn has_nan(&self) -> bool {
+        false
     }
 }
 
@@ -494,7 +509,10 @@ impl Tuple2<Float> for Point2f {
     }
 }
 
-impl Point2<Float> for Point2f {
+impl Point2 for Point2f {
+    type ElementType = Float;
+    type AssociatedVectorType = Vector2f;
+
     fn distance(&self, p: &Point2f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length()
@@ -653,7 +671,10 @@ impl Tuple3<Float> for Point3f {
     }
 }
 
-impl Point3<Float> for Point3f {
+impl Point3 for Point3f {
+    type ElementType = Float;
+    type AssociatedVectorType = Vector3f;
+
     fn distance(&self, p: &Point3f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length()

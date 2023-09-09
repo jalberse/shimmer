@@ -9,7 +9,7 @@ use crate::{
     Float,
 };
 
-use super::{tuple::TupleElement, HasNan, Length, Tuple2, Tuple3};
+use super::{tuple::TupleElement, Length, Tuple2, Tuple3};
 
 pub fn has_nan3<V, T>(v: &V) -> bool
 where
@@ -66,8 +66,8 @@ where
 /// Take the dot product of two vectors.
 pub fn dot3<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple3<Float> + HasNan,
-    V2: Tuple3<Float> + HasNan,
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -78,8 +78,8 @@ where
 /// Take the dot product of two vectors.
 pub fn dot3i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple3<i32> + HasNan,
-    V2: Tuple3<i32> + HasNan,
+    V1: Tuple3<i32>,
+    V2: Tuple3<i32>,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -90,8 +90,8 @@ where
 /// Take the dot product of two vectors then take the absolute value.
 pub fn abs_dot3<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple3<Float> + HasNan,
-    V2: Tuple3<Float> + HasNan,
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
 {
     Float::abs(dot3(v, w))
 }
@@ -99,8 +99,8 @@ where
 /// Take the dot product of two vectors then take the absolute value.
 pub fn abs_dot3i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple3<i32> + HasNan,
-    V2: Tuple3<i32> + HasNan,
+    V1: Tuple3<i32>,
+    V2: Tuple3<i32>,
 {
     i32::abs(dot3i(v, w))
 }
@@ -108,8 +108,8 @@ where
 /// Take the dot product of two vectors.
 pub fn dot2<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple2<Float> + HasNan,
-    V2: Tuple2<Float> + HasNan,
+    V1: Tuple2<Float>,
+    V2: Tuple2<Float>,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -119,8 +119,8 @@ where
 /// Take the dot product of two vectors.
 pub fn dot2i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple2<i32> + HasNan,
-    V2: Tuple2<i32> + HasNan,
+    V1: Tuple2<i32>,
+    V2: Tuple2<i32>,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
@@ -130,8 +130,8 @@ where
 /// Take the dot product of two vectors then take the absolute value.
 pub fn abs_dot2<V1, V2>(v: &V1, w: &V2) -> Float
 where
-    V1: Tuple2<Float> + HasNan,
-    V2: Tuple2<Float> + HasNan,
+    V1: Tuple2<Float>,
+    V2: Tuple2<Float>,
 {
     Float::abs(dot2(v, w))
 }
@@ -139,8 +139,8 @@ where
 /// Take the dot product of two vectors then take the absolute value.
 pub fn abs_dot2i<V1, V2>(v: &V1, w: &V2) -> i32
 where
-    V1: Tuple2<i32> + HasNan,
-    V2: Tuple2<i32> + HasNan,
+    V1: Tuple2<i32>,
+    V2: Tuple2<i32>,
 {
     i32::abs(dot2i(v, w))
 }
@@ -158,8 +158,8 @@ where
 ///   We just use the third type to be able to specify that that is the case.
 pub fn angle_between<'a, V1, V2, V3>(v1: &'a V1, v2: &'a V2) -> Float
 where
-    V1: Tuple3<Float> + HasNan,
-    V2: Tuple3<Float> + HasNan,
+    V1: Tuple3<Float>,
+    V2: Tuple3<Float>,
     V3: Tuple3<Float> + Length<Float>,
     &'a V1: Add<&'a V2, Output = V3>,
     &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,
@@ -175,8 +175,8 @@ where
 
 pub fn angle_between2<'a, V1, V2, V3>(v1: &'a V1, v2: &'a V2) -> Float
 where
-    V1: Tuple2<Float> + HasNan,
-    V2: Tuple2<Float> + HasNan,
+    V1: Tuple2<Float>,
+    V2: Tuple2<Float>,
     V3: Tuple2<Float> + Length<Float>,
     &'a V1: Add<&'a V2, Output = V3>,
     &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,

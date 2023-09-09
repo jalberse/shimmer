@@ -5,7 +5,7 @@ use super::{tuple::TupleElement, HasNan, Tuple2, Tuple3};
 
 pub fn length_squared3<V, T>(v: &V) -> T
 where
-    V: Tuple3<T> + HasNan,
+    V: Tuple3<T>,
     T: TupleElement,
 {
     debug_assert!(!v.has_nan());
@@ -14,7 +14,7 @@ where
 
 pub fn length3<V, T>(v: &V) -> T
 where
-    V: Tuple3<T> + HasNan,
+    V: Tuple3<T>,
     T: TupleElement,
 {
     // PAPERDOC - PBRTv4 has a discussion on page 88 about an odd usage of std::sqrt().

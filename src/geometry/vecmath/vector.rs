@@ -13,12 +13,16 @@ use crate::float::Float;
 use crate::math::lerp;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-pub trait Vector2<T> {
+pub trait Vector2: Tuple2<Self::ElementType> {
+    type ElementType: TupleElement;
+
+    fn new(x: Self::ElementType, y: Self::ElementType) -> Self;
+
     /// Compute the dot product.
-    fn dot(&self, v: &Self) -> T;
+    fn dot(&self, v: &Self) -> Self::ElementType;
 
     /// Compute the dot product and take the absolute value.
-    fn abs_dot(&self, v: &Self) -> T;
+    fn abs_dot(&self, v: &Self) -> Self::ElementType;
 
     /// Find the andle between this vector and another vector.
     /// Both vectors must be normalized.
@@ -30,23 +34,23 @@ pub trait Vector2<T> {
     fn gram_schmidt(&self, w: &Self) -> Self;
 }
 
-pub trait Vector3<T>: Tuple3<T>
-where
-    T: TupleElement,
-{
-    type AssociatedNormalType: Normal3<T>;
+pub trait Vector3: Tuple3<Self::ElementType> {
+    type ElementType: TupleElement;
+    type AssociatedNormalType: Normal3;
+
+    fn new(x: Self::ElementType, y: Self::ElementType, z: Self::ElementType) -> Self;
 
     /// Compute the dot product.
-    fn dot(&self, v: &Self) -> T;
+    fn dot(&self, v: &Self) -> Self::ElementType;
 
     /// Dot this vector with a normal.
-    fn dot_normal(&self, n: &Self::AssociatedNormalType) -> T;
+    fn dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType;
 
     /// Compute the dot product and take the absolute value.
-    fn abs_dot(&self, v: &Self) -> T;
+    fn abs_dot(&self, v: &Self) -> Self::ElementType;
 
     /// Dot this vector with a normal and take its absolute value.
-    fn abs_dot_normal(&self, n: &Self::AssociatedNormalType) -> T;
+    fn abs_dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType;
 
     /// Take the cross product of this and a vector v.
     /// Uses an EFT method for calculating the value with minimal error without
@@ -127,7 +131,13 @@ impl Tuple2<i32> for Vector2i {
     }
 }
 
-impl Vector2<i32> for Vector2i {
+impl Vector2 for Vector2i {
+    type ElementType = i32;
+
+    fn new(x: i32, y: i32) -> Self {
+        Self::new(x, y)
+    }
+
     /// Compute the dot product.
     fn dot(&self, v: &Self) -> i32 {
         dot2i(self, v)
@@ -351,8 +361,13 @@ impl Tuple3<i32> for Vector3i {
     }
 }
 
-impl Vector3<i32> for Vector3i {
+impl Vector3 for Vector3i {
+    type ElementType = i32;
     type AssociatedNormalType = Normal3i;
+
+    fn new(x: i32, y: i32, z: i32) -> Self {
+        Self::new(x, y, z)
+    }
 
     /// Compute the dot product
     fn dot(&self, v: &Self) -> i32 {
@@ -618,7 +633,13 @@ impl Tuple2<Float> for Vector2f {
     }
 }
 
-impl Vector2<Float> for Vector2f {
+impl Vector2 for Vector2f {
+    type ElementType = Float;
+
+    fn new(x: Float, y: Float) -> Self {
+        Self::new(x, y)
+    }
+
     /// Compute the dot product.
     fn dot(&self, v: &Self) -> Float {
         dot2(self, v)
@@ -800,8 +821,13 @@ impl Tuple3<Float> for Vector3f {
     }
 }
 
-impl Vector3<Float> for Vector3f {
+impl Vector3 for Vector3f {
+    type ElementType = Float;
     type AssociatedNormalType = Normal3f;
+
+    fn new(x: Float, y: Float, z: Float) -> Self {
+        Self::new(x, y, z)
+    }
 
     /// Compute the dot product.
     fn dot(&self, v: &Self) -> Float {
