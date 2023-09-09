@@ -332,9 +332,7 @@ where
 
     fn surface_area(&self) -> P::ElementType {
         let d = self.diagonal();
-        // TODO how to allow multiplication on a generic ElementType?
-        //  Do we need like a generic Element<T> struct and impl From<T> for it?
-        2 * (d.x() * d.y() + d.x() * d.z() + d.y() * d.z())
+        P::ElementType::from_i32(2) * (d.x() * d.y() + d.x() * d.z() + d.y() * d.z())
     }
 }
 
@@ -724,5 +722,13 @@ mod tests {
         let bounds = Bounds3f::new(min, max);
         let diag = bounds.diagonal();
         assert_eq!(Vector3f::new(4.0, 4.0, 4.0), diag);
+    }
+
+    #[test]
+    fn bounds3_surface_area() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(4.0, 4.0, 4.0);
+        let bounds = Bounds3f::new(min, max);
+        assert_eq!(96.0, bounds.surface_area());
     }
 }

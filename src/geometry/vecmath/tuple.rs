@@ -25,16 +25,25 @@ pub trait TupleElement:
     + Add<Self, Output = Self>
     + IsNan
 {
+    fn from_i32(val: i32) -> Self;
     fn zero() -> Self;
 }
 
 impl TupleElement for Float {
+    fn from_i32(val: i32) -> Self {
+        val as Self
+    }
+
     fn zero() -> Self {
         0.0
     }
 }
 
 impl TupleElement for i32 {
+    fn from_i32(val: i32) -> Self {
+        val as Self
+    }
+
     fn zero() -> Self {
         0
     }
