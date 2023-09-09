@@ -334,6 +334,11 @@ where
         let d = self.diagonal();
         P::ElementType::from_i32(2) * (d.x() * d.y() + d.x() * d.z() + d.y() * d.z())
     }
+
+    fn volume(&self) -> P::ElementType {
+        let d = self.diagonal();
+        d.x() * d.y() * d.z()
+    }
 }
 
 impl<P: Point3, V: Vector3> Default for Bounds3<P, V> {
@@ -730,5 +735,13 @@ mod tests {
         let max = Point3f::new(4.0, 4.0, 4.0);
         let bounds = Bounds3f::new(min, max);
         assert_eq!(96.0, bounds.surface_area());
+    }
+
+    #[test]
+    fn bounds3_volume() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(4.0, 4.0, 4.0);
+        let bounds = Bounds3f::new(min, max);
+        assert_eq!(64.0, bounds.volume());
     }
 }
