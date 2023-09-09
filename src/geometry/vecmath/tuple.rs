@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Div, Mul, Sub};
 
 use crate::{
     float::Float,
@@ -21,6 +21,7 @@ pub trait TupleElement:
     + NumericLimit
     + Sqrt
     + Mul<Self, Output = Self>
+    + Div<Self, Output = Self>
     + Sub<Self, Output = Self>
     + Add<Self, Output = Self>
     + IsNan

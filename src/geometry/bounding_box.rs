@@ -183,6 +183,23 @@ where
             )),
         )
     }
+
+    /// Effectively the inverse of lerp(); given a point, returns the continuous position
+    /// of that point within the bounding box where the minimum is at 0 and the maximum is at 1.
+    fn offset(&self, p: P) -> V {
+        let out_init = p - self.min;
+        let out_x = if self.max.x() > self.min.x() {
+            out_init.x() / (self.max.x() - self.min.x())
+        } else {
+            out_init.x()
+        };
+        let out_y = if self.max.y() > self.min.y() {
+            out_init.y() / (self.max.y() - self.min.y())
+        } else {
+            out_init.y()
+        };
+        V::new(out_x, out_y)
+    }
 }
 
 impl<P: Point2, V: Vector2> Default for Bounds2<P, V> {
@@ -405,6 +422,28 @@ where
                 &self.max.z().into_float(),
             )),
         )
+    }
+
+    /// Effectively the inverse of lerp(); given a point, returns the continuous position
+    /// of that point within the bounding box where the minimum is at 0 and the maximum is at 1.
+    fn offset(&self, p: P) -> V {
+        let out_init = p - self.min;
+        let out_x = if self.max.x() > self.min.x() {
+            out_init.x() / (self.max.x() - self.min.x())
+        } else {
+            out_init.x()
+        };
+        let out_y = if self.max.y() > self.min.y() {
+            out_init.y() / (self.max.y() - self.min.y())
+        } else {
+            out_init.y()
+        };
+        let out_z = if self.max.z() > self.min.z() {
+            out_init.z() / (self.max.z() - self.min.z())
+        } else {
+            out_init.z()
+        };
+        V::new(out_x, out_y, out_z)
     }
 }
 
@@ -867,6 +906,28 @@ mod tests {
         assert_eq!(
             Point3f::new(2.0, 3.0, 1.0),
             bounds.lerp(Point3f::new(0.5, 0.75, 0.1))
+        );
+    }
+
+    #[test]
+    fn bounds2_offset() {
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(4.0, 4.0);
+        let bounds = Bounds2f::new(min, max);
+        assert_eq!(
+            Vector2f::new(0.5, 0.75),
+            bounds.offset(Point2f::new(2.0, 3.0))
+        );
+    }
+
+    #[test]
+    fn bounds3_offset() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(4.0, 4.0, 10.0);
+        let bounds = Bounds3f::new(min, max);
+        assert_eq!(
+            Vector3f::new(0.5, 0.75, 0.1),
+            bounds.offset(Point3f::new(2.0, 3.0, 1.0)),
         );
     }
 }
