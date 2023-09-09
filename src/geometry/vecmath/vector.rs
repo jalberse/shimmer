@@ -84,25 +84,25 @@ pub struct Vector2i {
 
 impl Vector2i {
     /// All zeroes.
-    pub const ZERO: Self = Vector2i::new(0, 0);
+    pub const ZERO: Self = Self { x: 0, y: 0 };
 
     /// All ones.
-    pub const ONE: Self = Vector2i::new(1, 1);
+    pub const ONE: Self = Self { x: 1, y: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Vector2i::new(-1, -1);
+    pub const NEG_ONE: Self = Self { x: -1, y: -1 };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1, 0);
+    pub const X: Self = Self { x: 1, y: 0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0, 1);
+    pub const Y: Self = Self { x: 0, y: 1 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1, 0);
+    pub const NEG_X: Self = Self { x: -1, y: 0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0, -1);
+    pub const NEG_Y: Self = Self { x: 0, y: -1 };
 }
 
 impl Tuple2<i32> for Vector2i {
@@ -296,31 +296,35 @@ pub struct Vector3i {
 
 impl Vector3i {
     /// All zeroes.
-    pub const ZERO: Self = Self::new(0, 0, 0);
+    pub const ZERO: Self = Self { x: 0, y: 0, z: 0 };
 
     /// All ones.
-    pub const ONE: Self = Self::new(1, 1, 1);
+    pub const ONE: Self = Self { x: 1, y: 1, z: 1 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::new(-1, -1, -1);
+    pub const NEG_ONE: Self = Self {
+        x: -1,
+        y: -1,
+        z: -1,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1, 0, 0);
+    pub const X: Self = Self { x: 1, y: 0, z: 0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0, 1, 0);
+    pub const Y: Self = Self { x: 0, y: 1, z: 0 };
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self::new(0, 0, 1);
+    pub const Z: Self = Self { x: 0, y: 0, z: 1 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1, 0, 0);
+    pub const NEG_X: Self = Self { x: -1, y: 0, z: 0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0, -1, 0);
+    pub const NEG_Y: Self = Self { x: 0, y: -1, z: 0 };
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self::new(0, 0, -1);
+    pub const NEG_Z: Self = Self { x: 0, y: 0, z: -1 };
 }
 
 impl Tuple3<i32> for Vector3i {
@@ -570,25 +574,25 @@ pub struct Vector2f {
 
 impl Vector2f {
     /// All zeroes.
-    pub const ZERO: Self = Self::new(0.0, 0.0);
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
 
     /// All ones.
-    pub const ONE: Self = Self::new(1.0, 1.0);
+    pub const ONE: Self = Self { x: 1.0, y: 1.0 };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::new(-1.0, -1.0);
+    pub const NEG_ONE: Self = Self { x: -1.0, y: -1.0 };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1.0, 0.0);
+    pub const X: Self = Self { x: 1.0, y: 0.0 };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0.0, 1.0);
+    pub const Y: Self = Self { x: 0.0, y: 1.0 };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1.0, 0.0);
+    pub const NEG_X: Self = Self { x: -1.0, y: 0.0 };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0.0, -1.0);
+    pub const NEG_Y: Self = Self { x: 0.0, y: -1.0 };
 }
 
 impl Tuple2<Float> for Vector2f {
@@ -740,31 +744,67 @@ pub struct Vector3f {
 
 impl Vector3f {
     /// All zeroes.
-    pub const ZERO: Self = Self::new(0.0, 0.0, 0.0);
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// All ones.
-    pub const ONE: Self = Self::new(1.0, 1.0, 1.0);
+    pub const ONE: Self = Self {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+    };
 
     /// All negative ones.
-    pub const NEG_ONE: Self = Self::new(-1.0, -1.0, -1.0);
+    pub const NEG_ONE: Self = Self {
+        x: -1.0,
+        y: -1.0,
+        z: -1.0,
+    };
 
     /// A unit-length vector pointing along the positive X axis.
-    pub const X: Self = Self::new(1.0, 0.0, 0.0);
+    pub const X: Self = Self {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the positive Y axis.
-    pub const Y: Self = Self::new(0.0, 1.0, 0.0);
+    pub const Y: Self = Self {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the positive Z axis.
-    pub const Z: Self = Self::new(0.0, 0.0, 1.0);
+    pub const Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    };
 
     /// A unit-length vector pointing along the negative X axis.
-    pub const NEG_X: Self = Self::new(-1.0, 0.0, 0.0);
+    pub const NEG_X: Self = Self {
+        x: -1.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the negative Y axis.
-    pub const NEG_Y: Self = Self::new(0.0, -1.0, 0.0);
+    pub const NEG_Y: Self = Self {
+        x: 0.0,
+        y: -1.0,
+        z: 0.0,
+    };
 
     /// A unit-length vector pointing along the negative Z axis.
-    pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
+    pub const NEG_Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: -1.0,
+    };
 }
 
 impl Tuple3<Float> for Vector3f {

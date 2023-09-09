@@ -1,33 +1,39 @@
-use std::ops::Index;
+use std::{
+    marker::PhantomData,
+    ops::{Add, Index, Sub},
+};
 
 use crate::math::{Max, NumericLimit, Sqrt};
 
 use super::vecmath::{
     point::{Point2, Point3},
     tuple::TupleElement,
-    vector::Vector2,
-    Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3,
+    vector::{Vector2, Vector3},
+    Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3, Vector2f, Vector2i, Vector3f, Vector3i,
 };
 
-pub type Bounds2i = Bounds2<Point2i>;
-pub type Bounds2f = Bounds2<Point2f>;
-pub type Bounds3i = Bounds3<Point3i>;
-pub type Bounds3f = Bounds3<Point3f>;
+pub type Bounds2i = Bounds2<Point2i, Vector2i>;
+pub type Bounds2f = Bounds2<Point2f, Vector2f>;
+pub type Bounds3i = Bounds3<Point3i, Vector3i>;
+pub type Bounds3f = Bounds3<Point3f, Vector3f>;
 
 #[derive(Debug, PartialEq)]
-struct Bounds2<P> {
+struct Bounds2<P, V> {
     pub min: P,
     pub max: P,
+    phantom_vector: PhantomData<V>,
 }
 
-impl<P> Bounds2<P>
+impl<P, V> Bounds2<P, V>
 where
-    P: Point2,
+    P: Point2 + Sub<V, Output = P> + Add<V, Output = P>,
+    V: Vector2<ElementType = P::ElementType>,
 {
     fn new(p1: P, p2: P) -> Self {
         Self {
             min: Tuple2::min(&p1, &p2),
             max: Tuple2::max(&p1, &p2),
+            phantom_vector: PhantomData,
         }
     }
 
@@ -35,6 +41,7 @@ where
         Self {
             min: point,
             max: point,
+            phantom_vector: PhantomData,
         }
     }
 
@@ -49,7 +56,11 @@ where
         let max = Tuple2::max(&self.max, &p);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
-        Self { min, max }
+        Self {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        }
     }
 
     fn union(&self, other: &Self) -> Self {
@@ -57,7 +68,11 @@ where
         let max = Tuple2::max(&self.max, &other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
-        Self { min, max }
+        Self {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        }
     }
 
     /// None if the bounds do not intersect.
@@ -70,7 +85,11 @@ where
             return None;
         }
 
-        Some(Self { min, max })
+        Some(Self {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        })
     }
 
     fn overlaps(&self, other: &Self) -> bool {
@@ -115,31 +134,35 @@ where
         P::ElementType::sqrt(self.distance_squared(p))
     }
 
-    fn expand<V>(self, delta: P::ElementType) -> Self
-    where
-        V: Vector2<ElementType = P::ElementType>,
-    {
+    fn expand(self, delta: P::ElementType) -> Self {
         // PAPERDOC this is an example of a better model than pass-by-mut-reference that PBRTv4 uses (page 97)
         let vec = V::new(delta, delta);
 
-        // TODO Okay I think I've got the associated types thing sorted. But now we need to impl Sub and Add
-        //  for the associated types.
         let min = self.min - vec;
+        let max = self.max + vec;
+
+        // Avoid calling new() to maintain degeneracy of bounds.
+        Self {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        }
     }
 }
 
-impl<P: Point2> Default for Bounds2<P> {
+impl<P: Point2, V: Vector2> Default for Bounds2<P, V> {
     fn default() -> Self {
         let min_num = NumericLimit::MIN;
         let max_num = NumericLimit::MAX;
         Self {
             min: P::new(min_num, min_num),
             max: P::new(max_num, max_num),
+            phantom_vector: PhantomData,
         }
     }
 }
 
-impl<P: Point2> Index<usize> for Bounds2<P> {
+impl<P: Point2, V: Vector2> Index<usize> for Bounds2<P, V> {
     type Output = P;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -153,19 +176,22 @@ impl<P: Point2> Index<usize> for Bounds2<P> {
 }
 
 #[derive(Debug, PartialEq)]
-struct Bounds3<P>
-where
-    P: Point3,
-{
+struct Bounds3<P, V> {
     pub min: P,
     pub max: P,
+    phantom_vector: PhantomData<V>,
 }
 
-impl<P: Point3> Bounds3<P> {
+impl<P, V> Bounds3<P, V>
+where
+    P: Point3 + Sub<V, Output = P> + Add<V, Output = P>,
+    V: Vector3<ElementType = P::ElementType>,
+{
     fn new(p1: P, p2: P) -> Self {
         Self {
             min: Tuple3::min(&p1, &p2),
             max: Tuple3::max(&p1, &p2),
+            phantom_vector: PhantomData,
         }
     }
 
@@ -173,6 +199,7 @@ impl<P: Point3> Bounds3<P> {
         Self {
             min: point,
             max: point,
+            phantom_vector: PhantomData,
         }
     }
 
@@ -191,7 +218,11 @@ impl<P: Point3> Bounds3<P> {
         let max = Tuple3::max(&self.max, &p);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
-        Self { min, max }
+        Self {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        }
     }
 
     fn union(&self, other: &Self) -> Self {
@@ -199,7 +230,11 @@ impl<P: Point3> Bounds3<P> {
         let max = Tuple3::max(&self.max, &other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
-        Self { min, max }
+        Self {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        }
     }
 
     /// None if the bounds do not intersect.
@@ -215,7 +250,11 @@ impl<P: Point3> Bounds3<P> {
             return None;
         }
 
-        Some(Self { min, max })
+        Some(Self {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        })
     }
 
     fn overlaps(&self, other: &Self) -> bool {
@@ -268,20 +307,36 @@ impl<P: Point3> Bounds3<P> {
         // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
         P::ElementType::sqrt(self.distance_squared(p))
     }
+
+    fn expand(self, delta: P::ElementType) -> Self {
+        // PAPERDOC this is an example of a better model than pass-by-mut-reference that PBRTv4 uses (page 97)
+        let vec = V::new(delta, delta, delta);
+
+        let min = self.min - vec;
+        let max = self.max + vec;
+
+        // Avoid calling new() to maintain degeneracy of bounds.
+        Self {
+            min,
+            max,
+            phantom_vector: PhantomData,
+        }
+    }
 }
 
-impl<P: Point3> Default for Bounds3<P> {
+impl<P: Point3, V: Vector3> Default for Bounds3<P, V> {
     fn default() -> Self {
         let min_num = NumericLimit::MIN;
         let max_num = NumericLimit::MAX;
         Self {
             min: P::new(min_num, min_num, min_num),
             max: P::new(max_num, max_num, max_num),
+            phantom_vector: PhantomData,
         }
     }
 }
 
-impl<P: Point3> Index<usize> for Bounds3<P> {
+impl<P, V> Index<usize> for Bounds3<P, V> {
     type Output = P;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -617,5 +672,25 @@ mod tests {
         assert_eq!(0.0, bounds.distance_squared(&inside_point));
         assert_eq!(4.0, bounds.distance_squared(&outside_point));
         assert_eq!(2.0, bounds.distance(&outside_point));
+    }
+
+    #[test]
+    fn bounds2_expand() {
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(4.0, 4.0);
+        let bounds = Bounds2f::new(min, max);
+        let expanded = bounds.expand(1.0);
+        assert_eq!(Point2f::new(-1.0, -1.0), expanded.min);
+        assert_eq!(Point2f::new(5.0, 5.0), expanded.max);
+    }
+
+    #[test]
+    fn bounds3_expand() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(4.0, 4.0, 4.0);
+        let bounds = Bounds3f::new(min, max);
+        let expanded = bounds.expand(1.0);
+        assert_eq!(Point3f::new(-1.0, -1.0, -1.0), expanded.min);
+        assert_eq!(Point3f::new(5.0, 5.0, 5.0), expanded.max);
     }
 }
