@@ -114,6 +114,18 @@ where
         // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
         P::ElementType::sqrt(self.distance_squared(p))
     }
+
+    fn expand<V>(self, delta: P::ElementType) -> Self
+    where
+        V: Vector2<ElementType = P::ElementType>,
+    {
+        // PAPERDOC this is an example of a better model than pass-by-mut-reference that PBRTv4 uses (page 97)
+        let vec = V::new(delta, delta);
+
+        // TODO Okay I think I've got the associated types thing sorted. But now we need to impl Sub and Add
+        //  for the associated types.
+        let min = self.min - vec;
+    }
 }
 
 impl<P: Point2> Default for Bounds2<P> {
@@ -286,7 +298,7 @@ mod tests {
     use crate::{
         geometry::{
             bounding_box::{Bounds2f, Bounds3f, Bounds3i},
-            vecmath::{Point2f, Point2i, Point3f, Point3i},
+            vecmath::{Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3},
         },
         Float,
     };

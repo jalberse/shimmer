@@ -58,15 +58,11 @@ impl Point2i {
 
     /// A unit-length vector pointing along the negative Y axis.
     pub const NEG_Y: Self = Self::new(0, -1);
-
-    pub const fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
 }
 
 impl Tuple2<i32> for Point2i {
     fn new(x: i32, y: i32) -> Self {
-        Self::new(x, y)
+        Self { x, y }
     }
 
     fn x(&self) -> i32 {
@@ -168,12 +164,14 @@ impl_op_ex!(+=|p: &mut Point2i, v: Vector2i|
 });
 
 // Point - Vector -> Point
-impl_op_ex_commutative!(-|p: Point2i, v: Vector2i| -> Point2i {
-    Point2i {
-        x: p.x - v.x,
-        y: p.y - v.y,
+impl_op_ex_commutative!(
+    -|p: Point2i, v: <Point2i as Point2>::AssociatedVectorType| -> Point2i {
+        Point2i {
+            x: p.x - v.x,
+            y: p.y - v.y,
+        }
     }
-});
+);
 
 impl_op_ex!(-=|p: &mut Point2i, v: Vector2i|
 {
@@ -270,15 +268,11 @@ impl Point3i {
 
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self::new(0, 0, -1);
-
-    pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
 }
 
 impl Tuple3<i32> for Point3i {
     fn new(x: i32, y: i32, z: i32) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> i32 {
@@ -482,15 +476,11 @@ impl Point2f {
 
     /// A unit-length vector pointing along the negative Y axis.
     pub const NEG_Y: Self = Self::new(0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float) -> Self {
-        Self { x, y }
-    }
 }
 
 impl Tuple2<Float> for Point2f {
     fn new(x: Float, y: Float) -> Self {
-        Self::new(x, y)
+        Self { x, y }
     }
 
     fn x(&self) -> Float {
@@ -639,15 +629,11 @@ impl Point3f {
 
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self { x, y, z }
-    }
 }
 
 impl Tuple3<Float> for Point3f {
     fn new(x: Float, y: Float, z: Float) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> Float {
@@ -777,7 +763,7 @@ impl From<Point3f> for (Float, Float, Float) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        geometry::vecmath::{point::Point2, HasNan},
+        geometry::vecmath::{point::Point2, HasNan, Tuple2, Tuple3},
         Float,
     };
 

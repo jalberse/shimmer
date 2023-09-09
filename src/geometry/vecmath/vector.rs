@@ -16,8 +16,6 @@ use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 pub trait Vector2: Tuple2<Self::ElementType> {
     type ElementType: TupleElement;
 
-    fn new(x: Self::ElementType, y: Self::ElementType) -> Self;
-
     /// Compute the dot product.
     fn dot(&self, v: &Self) -> Self::ElementType;
 
@@ -37,8 +35,6 @@ pub trait Vector2: Tuple2<Self::ElementType> {
 pub trait Vector3: Tuple3<Self::ElementType> {
     type ElementType: TupleElement;
     type AssociatedNormalType: Normal3;
-
-    fn new(x: Self::ElementType, y: Self::ElementType, z: Self::ElementType) -> Self;
 
     /// Compute the dot product.
     fn dot(&self, v: &Self) -> Self::ElementType;
@@ -107,15 +103,11 @@ impl Vector2i {
 
     /// A unit-length vector pointing along the negative Y axis.
     pub const NEG_Y: Self = Self::new(0, -1);
-
-    pub const fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
 }
 
 impl Tuple2<i32> for Vector2i {
     fn new(x: i32, y: i32) -> Self {
-        Self::new(x, y)
+        Self { x, y }
     }
 
     fn x(&self) -> i32 {
@@ -133,10 +125,6 @@ impl Tuple2<i32> for Vector2i {
 
 impl Vector2 for Vector2i {
     type ElementType = i32;
-
-    fn new(x: i32, y: i32) -> Self {
-        Self::new(x, y)
-    }
 
     /// Compute the dot product.
     fn dot(&self, v: &Self) -> i32 {
@@ -333,15 +321,11 @@ impl Vector3i {
 
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self::new(0, 0, -1);
-
-    pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
 }
 
 impl Tuple3<i32> for Vector3i {
     fn new(x: i32, y: i32, z: i32) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> i32 {
@@ -364,10 +348,6 @@ impl Tuple3<i32> for Vector3i {
 impl Vector3 for Vector3i {
     type ElementType = i32;
     type AssociatedNormalType = Normal3i;
-
-    fn new(x: i32, y: i32, z: i32) -> Self {
-        Self::new(x, y, z)
-    }
 
     /// Compute the dot product
     fn dot(&self, v: &Self) -> i32 {
@@ -609,15 +589,11 @@ impl Vector2f {
 
     /// A unit-length vector pointing along the negative Y axis.
     pub const NEG_Y: Self = Self::new(0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float) -> Self {
-        Self { x, y }
-    }
 }
 
 impl Tuple2<Float> for Vector2f {
     fn new(x: Float, y: Float) -> Self {
-        Self::new(x, y)
+        Self { x, y }
     }
 
     fn x(&self) -> Float {
@@ -635,10 +611,6 @@ impl Tuple2<Float> for Vector2f {
 
 impl Vector2 for Vector2f {
     type ElementType = Float;
-
-    fn new(x: Float, y: Float) -> Self {
-        Self::new(x, y)
-    }
 
     /// Compute the dot product.
     fn dot(&self, v: &Self) -> Float {
@@ -793,15 +765,11 @@ impl Vector3f {
 
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self { x, y, z }
-    }
 }
 
 impl Tuple3<Float> for Vector3f {
     fn new(x: Float, y: Float, z: Float) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> Float {
@@ -824,10 +792,6 @@ impl Tuple3<Float> for Vector3f {
 impl Vector3 for Vector3f {
     type ElementType = Float;
     type AssociatedNormalType = Normal3f;
-
-    fn new(x: Float, y: Float, z: Float) -> Self {
-        Self::new(x, y, z)
-    }
 
     /// Compute the dot product.
     fn dot(&self, v: &Self) -> Float {

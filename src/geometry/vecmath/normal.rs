@@ -81,15 +81,11 @@ impl Normal3i {
 
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self::new(0, 0, -1);
-
-    pub const fn new(x: i32, y: i32, z: i32) -> Self {
-        Self { x, y, z }
-    }
 }
 
 impl Tuple3<i32> for Normal3i {
     fn new(x: i32, y: i32, z: i32) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> i32 {
@@ -317,15 +313,11 @@ impl Normal3f {
 
     /// A unit-length vector pointing along the negative Z axis.
     pub const NEG_Z: Self = Self::new(0.0, 0.0, -1.0);
-
-    pub const fn new(x: Float, y: Float, z: Float) -> Self {
-        Self { x, y, z }
-    }
 }
 
 impl Tuple3<Float> for Normal3f {
     fn new(x: Float, y: Float, z: Float) -> Self {
-        Self::new(x, y, z)
+        Self { x, y, z }
     }
 
     fn x(&self) -> Float {
@@ -513,7 +505,7 @@ impl From<&Normal3i> for Normal3f {
 mod tests {
     use crate::{
         float::Float,
-        geometry::vecmath::{normal::Normal3, HasNan, Length, Normalize},
+        geometry::vecmath::{normal::Normal3, HasNan, Length, Normalize, Tuple3},
     };
 
     use super::{Normal3f, Normal3i, Vector3f, Vector3i};
