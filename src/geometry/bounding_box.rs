@@ -1,6 +1,9 @@
 use std::{marker::PhantomData, ops::Index};
 
-use crate::math::{Max, NumericLimit, Sqrt};
+use crate::{
+    math::{lerp, Max, NumericLimit, Sqrt},
+    Float,
+};
 
 use super::vecmath::{
     point::{Point2, Point3},
@@ -163,6 +166,22 @@ where
         } else {
             1
         }
+    }
+
+    /// Returns a point within the bounding box given the specified amount in each direction via t.
+    fn lerp(&self, t: P) -> P {
+        P::new(
+            P::ElementType::from_float(lerp(
+                t.x().into_float(),
+                &self.min.x().into_float(),
+                &self.max.x().into_float(),
+            )),
+            P::ElementType::from_float(lerp(
+                t.y().into_float(),
+                &self.min.y().into_float(),
+                &self.max.y().into_float(),
+            )),
+        )
     }
 }
 
@@ -365,6 +384,27 @@ where
                 2
             }
         }
+    }
+
+    /// Returns a point within the bounding box given the specified amount in each direction via t.
+    fn lerp(&self, t: P) -> P {
+        P::new(
+            P::ElementType::from_float(lerp(
+                t.x().into_float(),
+                &self.min.x().into_float(),
+                &self.max.x().into_float(),
+            )),
+            P::ElementType::from_float(lerp(
+                t.y().into_float(),
+                &self.min.y().into_float(),
+                &self.max.y().into_float(),
+            )),
+            P::ElementType::from_float(lerp(
+                t.z().into_float(),
+                &self.min.z().into_float(),
+                &self.max.z().into_float(),
+            )),
+        )
     }
 }
 
@@ -809,5 +849,24 @@ mod tests {
         let max = Point3f::new(5.0, 4.0, 10.0);
         let bounds = Bounds3f::new(min, max);
         assert_eq!(2, bounds.max_dimension());
+    }
+
+    #[test]
+    fn bounds2_lerp() {
+        let min = Point2f::new(0.0, 0.0);
+        let max = Point2f::new(4.0, 4.0);
+        let bounds = Bounds2f::new(min, max);
+        assert_eq!(Point2f::new(2.0, 3.0), bounds.lerp(Point2f::new(0.5, 0.75)));
+    }
+
+    #[test]
+    fn bounds3_lerp() {
+        let min = Point3f::new(0.0, 0.0, 0.0);
+        let max = Point3f::new(4.0, 4.0, 10.0);
+        let bounds = Bounds3f::new(min, max);
+        assert_eq!(
+            Point3f::new(2.0, 3.0, 1.0),
+            bounds.lerp(Point3f::new(0.5, 0.75, 0.1))
+        );
     }
 }

@@ -19,6 +19,7 @@ pub trait Point2:
     + AddAssign<Self::AssociatedVectorType>
     + Mul<Self::ElementType, Output = Self>
     + MulAssign<Self::ElementType>
+    + Mul<Float, Output = Self>
     + Div<Self::ElementType>
     + DivAssign<Self::ElementType>
     + Neg
@@ -39,6 +40,7 @@ pub trait Point3:
     + Add<Self::AssociatedVectorType, Output = Self>
     + AddAssign<Self::AssociatedVectorType>
     + Mul<Self::ElementType, Output = Self>
+    + Mul<Float, Output = Self>
     + MulAssign<Self::ElementType>
     + Div<Self::ElementType>
     + DivAssign<Self::ElementType>
@@ -132,21 +134,28 @@ impl Default for Point2i {
     }
 }
 
-impl_op_ex!(-|p: Point2i| -> Point2i {
+impl_op_ex!(-|p: &Point2i| -> Point2i {
     Point2i {
         x: p.x.neg(),
         y: p.y.neg(),
     }
 });
 
-impl_op_ex_commutative!(*|v: Point2i, s: i32| -> Point2i {
+impl_op_ex_commutative!(*|v: &Point2i, s: i32| -> Point2i {
     Point2i {
         x: v.x * s,
         y: v.y * s,
     }
 });
 
-impl_op_ex!(/|v: Point2i, s: i32| -> Point2i
+impl_op_ex_commutative!(*|v: &Point2i, s: Float| -> Point2i {
+    Point2i {
+        x: (v.x as Float * s) as i32,
+        y: (v.y as Float * s) as i32,
+    }
+});
+
+impl_op_ex!(/|v: &Point2i, s: i32| -> Point2i
 {
     Point2i { x: v.x / s, y: v.y / s }
 });
