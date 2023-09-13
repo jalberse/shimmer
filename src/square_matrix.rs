@@ -1,8 +1,8 @@
-use std::ops::{Add, Div, Index, Mul};
+use std::ops::{Add, Div, DivAssign, Index, Mul, MulAssign};
 
 use auto_ops::impl_op_ex;
 
-use crate::float::Float;
+use crate::{float::Float, math::MulAdd};
 
 // PAPERDOC - PBRTv4 must implement ==, <, !=.
 //   In Rust, you can often derive a trait like so instead. Easier.
@@ -77,6 +77,14 @@ impl<const N: usize> SquareMatrix<N> {
         m
     }
 
+    fn mul_assign_float(&mut self, v: Float) {
+        for i in 0..N {
+            for j in 0..N {
+                self.m[i][j] *= v;
+            }
+        }
+    }
+
     fn div_float(&self, v: Float) -> SquareMatrix<N> {
         let mut m = SquareMatrix::zero();
         for i in 0..N {
@@ -85,6 +93,14 @@ impl<const N: usize> SquareMatrix<N> {
             }
         }
         m
+    }
+
+    fn div_assign_float(&mut self, v: Float) {
+        for i in 0..N {
+            for j in 0..N {
+                self.m[i][j] /= v;
+            }
+        }
     }
 }
 
@@ -164,9 +180,17 @@ impl<const N: usize> Div<Float> for SquareMatrix<N> {
     }
 }
 
-// TODO mulasign, divassin
+impl<const N: usize> MulAssign<Float> for SquareMatrix<N> {
+    fn mul_assign(&mut self, rhs: Float) {
+        self.mul_assign_float(rhs);
+    }
+}
 
-// TODO divide matrix by scalar (for convenience)
+impl<const N: usize> DivAssign<Float> for SquareMatrix<N> {
+    fn div_assign(&mut self, rhs: Float) {
+        self.div_assign_float(rhs);
+    }
+}
 
 // TODO transpose
 
@@ -254,5 +278,19 @@ mod tests {
         let m = SquareMatrix::<4>::diag([2.0, 4.0, 6.0, 8.0]);
         let scaled = m / 2.0;
         assert_eq!(SquareMatrix::<4>::diag([1.0, 2.0, 3.0, 4.0]), scaled);
+    }
+
+    #[test]
+    fn mat_mul_assign_float() {
+        let mut m = SquareMatrix::<4>::diag([1.0, 2.0, 3.0, 4.0]);
+        m *= 2.0;
+        assert_eq!(SquareMatrix::<4>::diag([2.0, 4.0, 6.0, 8.0]), m);
+    }
+
+    #[test]
+    fn mat_div_assign_float() {
+        let mut m = SquareMatrix::<4>::diag([4.0, 8.0, 12.0, 16.0]);
+        m /= 2.0;
+        assert_eq!(SquareMatrix::<4>::diag([2.0, 4.0, 6.0, 8.0]), m);
     }
 }
