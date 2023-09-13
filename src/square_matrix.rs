@@ -216,6 +216,7 @@ mod tests {
         let m = SquareMatrix::<4>::diag([1.0, 2.0, 3.0, 4.0]);
         let scaled = m * 2.0;
         assert_eq!(SquareMatrix::<4>::diag([2.0, 4.0, 6.0, 8.0]), scaled);
+        let m = SquareMatrix::<4>::diag([1.0, 2.0, 3.0, 4.0]);
         let scaled = 2.0 * m;
         assert_eq!(SquareMatrix::<4>::diag([2.0, 4.0, 6.0, 8.0]), scaled);
     }
