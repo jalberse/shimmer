@@ -1,4 +1,4 @@
-use std::ops::{Add, Index};
+use std::ops::{Add, Index, Mul};
 
 use auto_ops::impl_op_ex;
 
@@ -66,6 +66,16 @@ impl<const N: usize> SquareMatrix<N> {
         }
         m
     }
+
+    fn mul_float(&self, v: Float) -> SquareMatrix<N> {
+        let mut m = SquareMatrix::zero();
+        for i in 0..N {
+            for j in 0..N {
+                m.m[i][j] = self[i][j] * v;
+            }
+        }
+        m
+    }
 }
 
 impl<const N: usize> Default for SquareMatrix<N> {
@@ -104,7 +114,29 @@ impl<const N: usize> Add for SquareMatrix<N> {
     }
 }
 
-// TODO scale matrix by scalar
+impl<const N: usize> Mul<Float> for &SquareMatrix<N> {
+    type Output = SquareMatrix<N>;
+
+    fn mul(self, rhs: Float) -> Self::Output {
+        self.mul_float(rhs)
+    }
+}
+
+impl<const N: usize> Mul<Float> for SquareMatrix<N> {
+    type Output = SquareMatrix<N>;
+
+    fn mul(self, rhs: Float) -> Self::Output {
+        self.mul_float(rhs)
+    }
+}
+
+impl<const N: usize> Mul<SquareMatrix<N>> for Float {
+    type Output = SquareMatrix<N>;
+
+    fn mul(self, rhs: SquareMatrix<N>) -> Self::Output {
+        rhs.mul_float(self)
+    }
+}
 
 // TODO divide matrix by scalar (for convenience)
 
@@ -177,5 +209,14 @@ mod tests {
         let m2 = SquareMatrix::<4>::diag([11.0, 12.0, 13.0, 14.0]);
         let sum = m1 + m2;
         assert_eq!(SquareMatrix::<4>::diag([12.0, 14.0, 16.0, 18.0]), sum);
+    }
+
+    #[test]
+    fn mat_mul_float() {
+        let m = SquareMatrix::<4>::diag([1.0, 2.0, 3.0, 4.0]);
+        let scaled = m * 2.0;
+        assert_eq!(SquareMatrix::<4>::diag([2.0, 4.0, 6.0, 8.0]), scaled);
+        let scaled = 2.0 * m;
+        assert_eq!(SquareMatrix::<4>::diag([2.0, 4.0, 6.0, 8.0]), scaled);
     }
 }
