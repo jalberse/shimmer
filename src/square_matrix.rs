@@ -38,7 +38,20 @@ impl<const N: usize> SquareMatrix<N> {
         N
     }
 
-    // TODO IsIdentity
+    pub fn is_identity(&self) -> bool {
+        for i in 0..N {
+            for j in 0..N {
+                if i == j {
+                    if self.m[i][j] != 1.0 {
+                        return false;
+                    }
+                } else if self.m[i][j] != 0.0 {
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }
 
 impl<const N: usize> Default for SquareMatrix<N> {
@@ -101,7 +114,19 @@ mod tests {
         let m = SquareMatrix::<4>::diag([0.0, 1.0, 2.0, 3.0]);
         let row1 = m[1];
         assert_eq!([0.0, 1.0, 0.0, 0.0], row1);
-        let bottomCorner = m[3][3];
-        assert_eq!(3.0, bottomCorner);
+        let bottom_corner = m[3][3];
+        assert_eq!(3.0, bottom_corner);
+    }
+
+    #[test]
+    fn is_identity() {
+        let m = SquareMatrix::<4>::default();
+        assert!(m.is_identity());
+
+        let m = SquareMatrix::<4>::diag([0.0, 1.0, 2.0, 3.0]);
+        assert!(!m.is_identity());
+
+        let m = SquareMatrix::<4>::zero();
+        assert!(!m.is_identity());
     }
 }
