@@ -56,6 +56,16 @@ impl<const N: usize> SquareMatrix<N> {
         }
         true
     }
+
+    fn add_mat(&self, other: &SquareMatrix<N>) -> SquareMatrix<N> {
+        let mut m = SquareMatrix::zero();
+        for i in 0..N {
+            for j in 0..N {
+                m.m[i][j] = self[i][j] + other[i][j];
+            }
+        }
+        m
+    }
 }
 
 impl<const N: usize> Default for SquareMatrix<N> {
@@ -78,25 +88,19 @@ impl<const N: usize> Index<usize> for SquareMatrix<N> {
     }
 }
 
-// TODO add two matrices. Let's look at glam's implementation.
-//   I'm curious about if we can re-use more memory.
-// eh, okay don't overthink it.
-//  they have an add_mat4() to share between Add and AddAssign.
-//  but they make a new object to return.
-//  oh lmao PBRTv4 also makes a copy, I was just dumb
-//   they implemented in a non-canonical way, which is what confused me.
-//   okay yeah don't worry about copy
 impl<const N: usize> Add for &SquareMatrix<N> {
     type Output = SquareMatrix<N>;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let mut m = SquareMatrix::zero();
-        for i in 0..N {
-            for j in 0..N {
-                m.m[i][j] = self[i][j] + rhs[i][j];
-            }
-        }
-        m
+        self.add_mat(rhs)
+    }
+}
+
+impl<const N: usize> Add for SquareMatrix<N> {
+    type Output = SquareMatrix<N>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.add_mat(&rhs)
     }
 }
 
@@ -165,5 +169,13 @@ mod tests {
 
         let m = SquareMatrix::<4>::zero();
         assert!(!m.is_identity());
+    }
+
+    #[test]
+    fn add_matrices() {
+        let m1 = SquareMatrix::<4>::diag([1.0, 2.0, 3.0, 4.0]);
+        let m2 = SquareMatrix::<4>::diag([11.0, 12.0, 13.0, 14.0]);
+        let sum = m1 + m2;
+        assert_eq!(SquareMatrix::<4>::diag([12.0, 14.0, 16.0, 18.0]), sum);
     }
 }
