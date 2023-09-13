@@ -1,7 +1,11 @@
-use std::ops::Index;
+use std::ops::{Add, Index};
+
+use auto_ops::impl_op_ex;
 
 use crate::float::Float;
 
+// PAPERDOC - PBRTv4 must implement ==, <, !=.
+//   In Rust, you can often derive a trait like so instead. Easier.
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct SquareMatrix<const N: usize> {
     pub m: [[Float; N]; N],
@@ -74,11 +78,44 @@ impl<const N: usize> Index<usize> for SquareMatrix<N> {
     }
 }
 
-// TODO add two matrices
+// TODO add two matrices. Let's look at glam's implementation.
+//   I'm curious about if we can re-use more memory.
+// eh, okay don't overthink it.
+//  they have an add_mat4() to share between Add and AddAssign.
+//  but they make a new object to return.
+//  oh lmao PBRTv4 also makes a copy, I was just dumb
+//   they implemented in a non-canonical way, which is what confused me.
+//   okay yeah don't worry about copy
+impl<const N: usize> Add for &SquareMatrix<N> {
+    type Output = SquareMatrix<N>;
 
-// TODO multiply two matrices
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut m = SquareMatrix::zero();
+        for i in 0..N {
+            for j in 0..N {
+                m.m[i][j] = self[i][j] + rhs[i][j];
+            }
+        }
+        m
+    }
+}
 
-// TODO divide two matrices
+// TODO scale matrix by scalar
+
+// TODO divide matrix by scalar (for convenience)
+
+// TODO transpose
+
+// TODO multiply two matrices - I think can't be generic over N?
+
+// TODO invert matrix (we don't need invertOrFail - caller can unwrap and panic if they want)
+//  I think can't be generic over N.
+
+// TODO Detemrinant of matrix. While I think this *can* be generic over N,
+//      we don't need N > 4, and specific implementations for N < 4 can be more efficient,
+//      so let's implement it for each type N = 1, 2, 3, 4.
+
+// TODO multiplication with a vector
 
 mod tests {
     use crate::Float;
