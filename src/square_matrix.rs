@@ -1,5 +1,8 @@
+use std::ops::Index;
+
 use crate::float::Float;
 
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct SquareMatrix<const N: usize> {
     pub m: [[Float; N]; N],
 }
@@ -34,6 +37,8 @@ impl<const N: usize> SquareMatrix<N> {
     pub fn dim(&self) -> usize {
         N
     }
+
+    // TODO IsIdentity
 }
 
 impl<const N: usize> Default for SquareMatrix<N> {
@@ -48,6 +53,20 @@ impl<const N: usize> Default for SquareMatrix<N> {
     }
 }
 
+impl<const N: usize> Index<usize> for SquareMatrix<N> {
+    type Output = [Float; N];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.m[index]
+    }
+}
+
+// TODO add two matrices
+
+// TODO multiply two matrices
+
+// TODO divide two matrices
+
 mod tests {
     use crate::Float;
 
@@ -58,7 +77,7 @@ mod tests {
         let m = SquareMatrix::<4>::zero();
         for i in 0..m.dim() {
             for j in 0..m.dim() {
-                assert_eq!(0.0, m.m[i][j]);
+                assert_eq!(0.0, m[i][j]);
             }
         }
     }
@@ -69,11 +88,20 @@ mod tests {
         for i in 0..m.dim() {
             for j in 0..m.dim() {
                 if i == j {
-                    assert_eq!(i as Float, m.m[i][j]);
+                    assert_eq!(i as Float, m[i][j]);
                 } else {
-                    assert_eq!(0.0, m.m[i][j])
+                    assert_eq!(0.0, m[i][j])
                 }
             }
         }
+    }
+
+    #[test]
+    fn index() {
+        let m = SquareMatrix::<4>::diag([0.0, 1.0, 2.0, 3.0]);
+        let row1 = m[1];
+        assert_eq!([0.0, 1.0, 0.0, 0.0], row1);
+        let bottomCorner = m[3][3];
+        assert_eq!(3.0, bottomCorner);
     }
 }
