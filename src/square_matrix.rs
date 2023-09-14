@@ -2,6 +2,10 @@ use std::ops::{Add, Div, DivAssign, Index, Mul, MulAssign};
 
 use crate::{float::Float, math::difference_of_products};
 
+pub trait Invertible: Sized {
+    fn inverse(&self) -> Option<Self>;
+}
+
 pub trait Determinant {
     fn determinant(&self) -> Float;
 }
@@ -206,9 +210,6 @@ impl<const N: usize> DivAssign<Float> for SquareMatrix<N> {
 
 // TODO multiply two matrices - I think can't be generic over N?
 
-// TODO invert matrix (we don't need invertOrFail - caller can unwrap and panic if they want)
-//  I think can't be generic over N.
-
 // PAPERDOC - In PBRTv4/C++, this would typically be done via function
 // overloading for the different values of N. That doesn't allow us to e.g.
 // constrain a generic on Determinant.
@@ -234,6 +235,72 @@ impl Determinant for SquareMatrix<3> {
             minor01,
             difference_of_products(self[0][0], minor12, self[0][1], minor02),
         )
+    }
+}
+
+impl Invertible for SquareMatrix<3> {
+    fn inverse(&self) -> Option<Self> {
+        let det = self.determinant();
+        if det == 0.0 {
+            return None;
+        }
+
+        let inv_det = 1.0 / det;
+
+        let mut out = SquareMatrix::<3>::zero();
+
+        out.m[0][0] =
+            inv_det * difference_of_products(self[1][1], self[2][2], self[1][2], self[2][1]);
+        out.m[1][0] =
+            inv_det * difference_of_products(self[1][2], self[2][0], self[1][0], self[2][2]);
+        out.m[2][0] =
+            inv_det * difference_of_products(self[1][0], self[2][1], self[1][1], self[2][0]);
+        out.m[0][1] =
+            inv_det * difference_of_products(self[0][2], self[2][1], self[0][1], self[2][2]);
+        out.m[1][1] =
+            inv_det * difference_of_products(self[0][0], self[2][2], self[0][2], self[2][0]);
+        out.m[2][1] =
+            inv_det * difference_of_products(self[0][1], self[2][0], self[0][0], self[2][1]);
+        out.m[0][2] =
+            inv_det * difference_of_products(self[0][1], self[1][2], self[0][2], self[1][1]);
+        out.m[1][2] =
+            inv_det * difference_of_products(self[0][2], self[1][0], self[0][0], self[1][2]);
+        out.m[2][2] =
+            inv_det * difference_of_products(self[0][0], self[1][1], self[0][1], self[1][0]);
+
+        Some(out)
+    }
+}
+
+impl Invertible for SquareMatrix<4> {
+    fn inverse(&self) -> Option<Self> {
+        // Via: https://github.com/google/ion/blob/master/ion/math/matrixutils.cc,
+        // (c) Google, Apache license.
+
+        // For 4x4 do not compute the adjugate as the transpose of the cofactor
+        // matrix, because this results in extra work. Several calculations can be
+        // shared across the sub-determinants.
+        //
+        // This approach is explained in David Eberly's Geometric Tools book,
+        // excerpted here:
+        //   http://www.geometrictools.com/Documentation/LaplaceExpansionTheorem.pdf
+
+        let s0 = difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
+        let s1 = difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
+        let s2 = difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
+        let s3 = difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
+        let s4 = difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
+        let s5 = difference_of_products(self[0][2], self[1][3], self[1][2], self[0][3]);
+        let c0 = difference_of_products(self[2][0], self[3][1], self[3][0], self[2][1]);
+        let c1 = difference_of_products(self[2][0], self[3][2], self[3][0], self[2][2]);
+        let c2 = difference_of_products(self[2][0], self[3][3], self[3][0], self[2][3]);
+        let c3 = difference_of_products(self[2][1], self[3][2], self[3][1], self[2][2]);
+        let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
+        let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
+
+        // TODO We need InnerProduct. Needs CompensatedFloat as well.
+
+        todo!()
     }
 }
 
