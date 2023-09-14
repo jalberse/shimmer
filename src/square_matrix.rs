@@ -57,6 +57,16 @@ impl<const N: usize> SquareMatrix<N> {
         true
     }
 
+    pub fn transpose(&self) -> Self {
+        let mut transposed = Self::zero();
+        for i in 0..N {
+            for j in 0..N {
+                transposed.m[i][j] = self[j][i];
+            }
+        }
+        transposed
+    }
+
     fn add_mat(&self, other: &SquareMatrix<N>) -> SquareMatrix<N> {
         let mut m = SquareMatrix::zero();
         for i in 0..N {
@@ -292,5 +302,25 @@ mod tests {
         let mut m = SquareMatrix::<4>::diag([4.0, 8.0, 12.0, 16.0]);
         m /= 2.0;
         assert_eq!(SquareMatrix::<4>::diag([2.0, 4.0, 6.0, 8.0]), m);
+    }
+
+    #[test]
+    fn mat_transpose() {
+        let m = SquareMatrix::<4>::new([
+            [1.0, 2.0, 3.0, 4.0],
+            [5.0, 6.0, 7.0, 8.0],
+            [9.0, 10.0, 11.0, 12.0],
+            [13.0, 14.0, 15.0, 16.0],
+        ]);
+        let transposed = m.transpose();
+        assert_eq!(
+            SquareMatrix::<4>::new([
+                [1.0, 5.0, 9.0, 13.0],
+                [2.0, 6.0, 10.0, 14.0],
+                [3.0, 7.0, 11.0, 15.0],
+                [4.0, 8.0, 12.0, 16.0],
+            ]),
+            transposed
+        );
     }
 }
