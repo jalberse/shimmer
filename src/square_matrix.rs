@@ -1,6 +1,10 @@
 use std::ops::{Add, Div, DivAssign, Index, Mul, MulAssign};
 
-use crate::float::Float;
+use crate::{float::Float, math::difference_of_products};
+
+pub trait Determinant {
+    fn determinant(&self) -> Float;
+}
 
 // PAPERDOC - PBRTv4 must implement ==, <, !=.
 //   In Rust, you can often derive a trait like so instead. Easier.
@@ -205,14 +209,62 @@ impl<const N: usize> DivAssign<Float> for SquareMatrix<N> {
 // TODO invert matrix (we don't need invertOrFail - caller can unwrap and panic if they want)
 //  I think can't be generic over N.
 
-// TODO Detemrinant of matrix. While I think this *can* be generic over N,
-//      we don't need N > 4, and specific implementations for N < 4 can be more efficient,
-//      so let's implement it for each type N = 1, 2, 3, 4.
+// PAPERDOC - In PBRTv4/C++, this would typically be done via function
+// overloading for the different values of N. That doesn't allow us to e.g.
+// constrain a generic on Determinant.
+impl Determinant for SquareMatrix<1> {
+    fn determinant(&self) -> Float {
+        self[0][0]
+    }
+}
+
+impl Determinant for SquareMatrix<2> {
+    fn determinant(&self) -> Float {
+        difference_of_products(self[0][0], self[1][1], self[0][1], self[1][0])
+    }
+}
+
+impl Determinant for SquareMatrix<3> {
+    fn determinant(&self) -> Float {
+        let minor12 = difference_of_products(self[1][1], self[2][2], self[1][2], self[2][1]);
+        let minor02 = difference_of_products(self[1][0], self[2][2], self[1][2], self[2][0]);
+        let minor01 = difference_of_products(self[1][0], self[2][1], self[1][1], self[2][0]);
+        Float::mul_add(
+            self[0][2],
+            minor01,
+            difference_of_products(self[0][0], minor12, self[0][1], minor02),
+        )
+    }
+}
+
+impl Determinant for SquareMatrix<4> {
+    fn determinant(&self) -> Float {
+        let s0 = difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
+        let s1 = difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
+        let s2 = difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
+
+        let s3 = difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
+        let s4 = difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
+        let s5 = difference_of_products(self[0][2], self[1][3], self[1][2], self[0][3]);
+
+        let c0 = difference_of_products(self[2][0], self[3][1], self[3][0], self[2][1]);
+        let c1 = difference_of_products(self[2][0], self[3][2], self[3][0], self[2][2]);
+        let c2 = difference_of_products(self[2][0], self[3][3], self[3][0], self[2][3]);
+
+        let c3 = difference_of_products(self[2][1], self[3][2], self[3][1], self[2][2]);
+        let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
+        let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
+
+        difference_of_products(s0, c5, s1, c4)
+            + difference_of_products(s2, c3, -s3, c2)
+            + difference_of_products(s5, c0, s4, c1)
+    }
+}
 
 // TODO multiplication with a vector
 
 mod tests {
-    use crate::Float;
+    use crate::{square_matrix::Determinant, Float};
 
     use super::SquareMatrix;
 
@@ -318,5 +370,34 @@ mod tests {
             ]),
             transposed
         );
+    }
+
+    #[test]
+    fn determinants() {
+        let m1 = SquareMatrix::<1>::new([[1.0]]);
+        assert_eq!(1.0, m1.determinant());
+        let m2 = SquareMatrix::<2>::new([[1.0, 2.0], [3.0, 4.0]]);
+        assert_eq!(-2.0, m2.determinant());
+        let m3 = SquareMatrix::<3>::new([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
+        assert_eq!(0.0, m3.determinant());
+        let m4 = SquareMatrix::<4>::new([
+            [1.0, 2.0, 3.0, 4.0],
+            [5.0, 6.0, 7.0, 8.0],
+            [9.0, 10.0, 11.0, 12.0],
+            [13.0, 14.0, 15.0, 16.0],
+        ]);
+        assert_eq!(0.0, m4.determinant());
+
+        // Test less-trivial examples.
+        let m5 = SquareMatrix::<4>::new([
+            [4.0, 3.0, 2.0, 2.0],
+            [0.0, 1.0, -3.0, 3.0],
+            [0.0, -1.0, 3.0, 3.0],
+            [0.0, 3.0, 1.0, 1.0],
+        ]);
+        assert_eq!(-240.0, m5.determinant());
+
+        let m6 = SquareMatrix::<3>::new([[2.0, -3.0, 1.0], [2.0, 0.0, -1.0], [1.0, 4.0, 5.0]]);
+        assert_eq!(49.0, m6.determinant());
     }
 }
