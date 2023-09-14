@@ -1,8 +1,6 @@
 use std::ops::{Add, Div, DivAssign, Index, Mul, MulAssign};
 
-use auto_ops::impl_op_ex;
-
-use crate::{float::Float, math::MulAdd};
+use crate::float::Float;
 
 // PAPERDOC - PBRTv4 must implement ==, <, !=.
 //   In Rust, you can often derive a trait like so instead. Easier.
