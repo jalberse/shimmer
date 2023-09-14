@@ -202,8 +202,6 @@ impl<const N: usize> DivAssign<Float> for SquareMatrix<N> {
     }
 }
 
-// TODO transpose
-
 // TODO multiply two matrices - I think can't be generic over N?
 
 // TODO invert matrix (we don't need invertOrFail - caller can unwrap and panic if they want)
