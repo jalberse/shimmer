@@ -1,3 +1,5 @@
+//! This module contains the related concepts of a Tuple/Vector/Point/Normal.
+//!
 //! Why are there distinct types for **Vector** and **Point** and
 //! **Normal**? Why not just use a unified vector class? Because they
 //! are not the same, so let's capture that with our ~type system~.
