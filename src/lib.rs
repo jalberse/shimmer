@@ -1,3 +1,4 @@
+mod compensated_float;
 mod float;
 mod geometry;
 mod is_nan;

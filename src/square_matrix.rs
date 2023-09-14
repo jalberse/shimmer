@@ -298,7 +298,7 @@ impl Invertible for SquareMatrix<4> {
         let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
         let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
 
-        // TODO We need InnerProduct. Needs CompensatedFloat as well.
+        // TODO We need InnerProduct. Have made a CompensatedFloat; need to use it for implementing InnerProduct.
 
         todo!()
     }
