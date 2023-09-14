@@ -505,10 +505,8 @@ mod tests {
     use std::marker::PhantomData;
 
     use crate::{
-        geometry::{
-            bounding_box::{Bounds2f, Bounds3f, Bounds3i},
-            vecmath::{Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3, Vector2f, Vector3f},
-        },
+        bounding_box::{Bounds2f, Bounds3f, Bounds3i},
+        vecmath::{Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3, Vector2f, Vector3f},
         Float,
     };
 

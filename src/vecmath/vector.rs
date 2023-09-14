@@ -1103,7 +1103,7 @@ impl From<&Vector3i> for Vector3f {
 #[cfg(test)]
 mod tests {
     use crate::{
-        geometry::vecmath::{
+        vecmath::{
             vector::{Vector2, Vector3},
             HasNan, Length, Normalize, Tuple2, Tuple3,
         },

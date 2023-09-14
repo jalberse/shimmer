@@ -1,10 +1,10 @@
 mod compensated_float;
 mod float;
-mod geometry;
 mod is_nan;
 mod math;
 mod sampling;
 mod square_matrix;
+mod vecmath;
 
 // For convenience, re-export.
 pub use float::Float;

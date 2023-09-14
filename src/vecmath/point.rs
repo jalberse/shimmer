@@ -6,8 +6,8 @@ use super::tuple_fns::{has_nan2, has_nan3};
 use super::vector::{Vector2, Vector3};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
-use crate::geometry::vecmath::Length;
 use crate::math::{self, lerp};
+use crate::vecmath::Length;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 pub trait Point2:
@@ -830,7 +830,7 @@ impl From<Point3f> for (Float, Float, Float) {
 #[cfg(test)]
 mod tests {
     use crate::{
-        geometry::vecmath::{point::Point2, HasNan, Tuple2, Tuple3},
+        vecmath::{point::Point2, HasNan, Tuple2, Tuple3},
         Float,
     };
 

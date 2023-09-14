@@ -551,7 +551,7 @@ impl From<&Normal3i> for Normal3f {
 mod tests {
     use crate::{
         float::Float,
-        geometry::vecmath::{normal::Normal3, HasNan, Length, Normalize, Tuple3},
+        vecmath::{normal::Normal3, HasNan, Length, Normalize, Tuple3},
     };
 
     use super::{Normal3f, Normal3i, Vector3f, Vector3i};
