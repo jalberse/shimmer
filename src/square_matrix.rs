@@ -1,5 +1,7 @@
 use std::ops::{Add, Div, DivAssign, Index, IndexMut, Mul, MulAssign};
 
+use auto_ops::impl_op_ex;
+
 use crate::{
     float::Float,
     math::{difference_of_products, InnerProduct},
@@ -15,7 +17,7 @@ pub trait Determinant {
 
 // PAPERDOC - PBRTv4 must implement ==, <, !=.
 //   In Rust, you can often derive a trait like so instead. Easier.
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
 pub struct SquareMatrix<const N: usize> {
     pub m: [[Float; N]; N],
 }
@@ -211,7 +213,35 @@ impl<const N: usize> DivAssign<Float> for SquareMatrix<N> {
     }
 }
 
-// TODO multiply two matrices - I think can't be generic over N?
+impl_op_ex!(
+    *|m1: &SquareMatrix<3>, m2: &SquareMatrix<3>| -> SquareMatrix<3> {
+        let mut out = SquareMatrix::<3>::zero();
+        for i in 0..3 {
+            for j in 0..3 {
+                out.m[i][j] = Float::from(InnerProduct(
+                    &[m1[i][0], m1[i][1], m1[i][2]],
+                    &[m2[0][j], m2[1][j], m2[2][j]],
+                ));
+            }
+        }
+        out
+    }
+);
+
+impl_op_ex!(
+    *|m1: &SquareMatrix<4>, m2: &SquareMatrix<4>| -> SquareMatrix<4> {
+        let mut out = SquareMatrix::<4>::zero();
+        for i in 0..4 {
+            for j in 0..4 {
+                out.m[i][j] = Float::from(InnerProduct(
+                    &[m1[i][0], m1[i][1], m1[i][2], m1[i][3]],
+                    &[m2[0][j], m2[1][j], m2[2][j], m2[3][j]],
+                ));
+            }
+        }
+        out
+    }
+);
 
 // PAPERDOC - In PBRTv4/C++, this would typically be done via function
 // overloading for the different values of N. That doesn't allow us to e.g.
@@ -661,5 +691,36 @@ mod tests {
         let v = Vector3f::new(2.0, 1.0, 3.0);
         let result = mul_mat_vec::<3, Vector3f, Vector3f>(&m, &v);
         assert_eq!(Vector3f::new(13.0, 31.0, 49.0), result);
+    }
+
+    #[test]
+    fn mat_mul() {
+        let m1 = SquareMatrix::<3>::new([[1.0, 2.0, -1.0], [3.0, 2.0, 0.0], [-4.0, 0.0, 2.0]]);
+        let m2 = SquareMatrix::<3>::new([[3.0, 4.0, 2.0], [0.0, 1.0, 0.0], [-2.0, 0.0, 1.0]]);
+        let result = m1 * m2;
+        let expected =
+            SquareMatrix::<3>::new([[5.0, 6.0, 1.0], [9.0, 14.0, 6.0], [-16.0, -16.0, -6.0]]);
+        assert_eq!(expected, result);
+
+        let m1 = SquareMatrix::<4>::new([
+            [5.0, 7.0, 9.0, 10.0],
+            [2.0, 3.0, 3.0, 8.0],
+            [8.0, 10.0, 2.0, 3.0],
+            [3.0, 3.0, 4.0, 8.0],
+        ]);
+        let m2 = SquareMatrix::<4>::new([
+            [3.0, 10.0, 12.0, 18.0],
+            [12.0, 1.0, 4.0, 9.0],
+            [9.0, 10.0, 12.0, 2.0],
+            [3.0, 12.0, 4.0, 10.0],
+        ]);
+        let result = m1 * m2;
+        let expected = SquareMatrix::<4>::new([
+            [210.0, 267.0, 236.0, 271.0],
+            [93.0, 149.0, 104.0, 149.0],
+            [171.0, 146.0, 172.0, 268.0],
+            [105.0, 169.0, 128.0, 169.0],
+        ]);
+        assert_eq!(expected, result);
     }
 }
