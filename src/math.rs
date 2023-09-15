@@ -171,6 +171,15 @@ pub fn safe_asin(x: Float) -> Float {
 pub fn safe_acos(x: Float) -> Float {
     Float::asin(Float::clamp(x, -1.0, 1.0))
 }
+
+/// Inner Products with error free transformations.
+/// Computes the inner product using f32 precision, with error
+/// equivalent to f64 precision.
+///
+///  The xs and ys slices provide the following values, in pairs:
+/// x0 * y0 + x1 * y1 + x2 * y2 + ...
+/// xs and ys must be of the same length.
+///
 /// Accurate dot products with FMA: Graillat et al.,
 /// https://www-pequan.lip6.fr/~graillat/papers/posterRNC7.pdf
 ///
