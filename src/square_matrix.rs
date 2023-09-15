@@ -328,9 +328,6 @@ impl Invertible for SquareMatrix<4> {
         let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
         let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
 
-        // TODO my test case is getting None when it should be invertible - I've double checked the above,
-        // so I think that InnerProduct is to blame? check.
-        //  Uh, difference_of_products keeps returning 0? wtf?
         let det: Float =
             InnerProduct(&[s0, -s1, s2, s3, s5, -s4], &[c5, c4, c3, c2, c0, c1]).into();
         if det == 0.0 {
