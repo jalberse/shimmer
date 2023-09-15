@@ -1,6 +1,9 @@
 use std::ops::{Add, Div, DivAssign, Index, Mul, MulAssign};
 
-use crate::{float::Float, math::difference_of_products};
+use crate::{
+    float::Float,
+    math::{difference_of_products, InnerProduct},
+};
 
 pub trait Invertible: Sized {
     fn inverse(&self) -> Option<Self>;
@@ -238,6 +241,30 @@ impl Determinant for SquareMatrix<3> {
     }
 }
 
+impl Determinant for SquareMatrix<4> {
+    fn determinant(&self) -> Float {
+        let s0 = difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
+        let s1 = difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
+        let s2 = difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
+
+        let s3 = difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
+        let s4 = difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
+        let s5 = difference_of_products(self[0][2], self[1][3], self[1][2], self[0][3]);
+
+        let c0 = difference_of_products(self[2][0], self[3][1], self[3][0], self[2][1]);
+        let c1 = difference_of_products(self[2][0], self[3][2], self[3][0], self[2][2]);
+        let c2 = difference_of_products(self[2][0], self[3][3], self[3][0], self[2][3]);
+
+        let c3 = difference_of_products(self[2][1], self[3][2], self[3][1], self[2][2]);
+        let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
+        let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
+
+        difference_of_products(s0, c5, s1, c4)
+            + difference_of_products(s2, c3, -s3, c2)
+            + difference_of_products(s5, c0, s4, c1)
+    }
+}
+
 impl Invertible for SquareMatrix<3> {
     fn inverse(&self) -> Option<Self> {
         let det = self.determinant();
@@ -288,27 +315,6 @@ impl Invertible for SquareMatrix<4> {
         let s0 = difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
         let s1 = difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
         let s2 = difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
-        let s3 = difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
-        let s4 = difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
-        let s5 = difference_of_products(self[0][2], self[1][3], self[1][2], self[0][3]);
-        let c0 = difference_of_products(self[2][0], self[3][1], self[3][0], self[2][1]);
-        let c1 = difference_of_products(self[2][0], self[3][2], self[3][0], self[2][2]);
-        let c2 = difference_of_products(self[2][0], self[3][3], self[3][0], self[2][3]);
-        let c3 = difference_of_products(self[2][1], self[3][2], self[3][1], self[2][2]);
-        let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
-        let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
-
-        // TODO We need InnerProduct. Have made a CompensatedFloat; need to use it for implementing InnerProduct.
-
-        todo!()
-    }
-}
-
-impl Determinant for SquareMatrix<4> {
-    fn determinant(&self) -> Float {
-        let s0 = difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
-        let s1 = difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
-        let s2 = difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
 
         let s3 = difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
         let s4 = difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
@@ -322,9 +328,93 @@ impl Determinant for SquareMatrix<4> {
         let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
         let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
 
-        difference_of_products(s0, c5, s1, c4)
-            + difference_of_products(s2, c3, -s3, c2)
-            + difference_of_products(s5, c0, s4, c1)
+        // TODO my test case is getting None when it should be invertible - I've double checked the above,
+        // so I think that InnerProduct is to blame? check.
+        //  Uh, difference_of_products keeps returning 0? wtf?
+        let det: Float =
+            InnerProduct(&[s0, -s1, s2, s3, s5, -s4], &[c5, c4, c3, c2, c0, c1]).into();
+        if det == 0.0 {
+            return None;
+        }
+
+        let s = 1.0 / det;
+
+        let inv: [[Float; 4]; 4] = [
+            [
+                s * Float::from(InnerProduct(
+                    &[self[1][1], self[1][3], -self[1][2]],
+                    &[c5, c3, c4],
+                )),
+                s * Float::from(InnerProduct(
+                    &[-self[0][1], self[0][2], -self[0][3]],
+                    &[c5, c4, c3],
+                )),
+                s * Float::from(InnerProduct(
+                    &[self[3][1], self[3][3], -self[3][2]],
+                    &[s5, s3, s4],
+                )),
+                s * Float::from(InnerProduct(
+                    &[-self[2][1], self[2][2], -self[2][3]],
+                    &[s5, s4, s3],
+                )),
+            ],
+            [
+                s * Float::from(InnerProduct(
+                    &[-self[1][0], self[1][2], -self[1][3]],
+                    &[c5, c2, c1],
+                )),
+                s * Float::from(InnerProduct(
+                    &[self[0][0], self[0][3], -self[0][2]],
+                    &[c5, c1, c2],
+                )),
+                s * Float::from(InnerProduct(
+                    &[-self[3][0], self[3][2], -self[3][3]],
+                    &[s5, s2, s1],
+                )),
+                s * Float::from(InnerProduct(
+                    &[self[2][0], self[2][3], -self[2][2]],
+                    &[s5, s1, s2],
+                )),
+            ],
+            [
+                s * Float::from(InnerProduct(
+                    &[self[1][0], self[1][3], -self[1][1]],
+                    &[c4, c0, c2],
+                )),
+                s * Float::from(InnerProduct(
+                    &[-self[0][0], self[0][1], -self[0][3]],
+                    &[c4, c2, c0],
+                )),
+                s * Float::from(InnerProduct(
+                    &[self[3][0], self[3][3], -self[3][1]],
+                    &[s4, s0, s2],
+                )),
+                s * Float::from(InnerProduct(
+                    &[-self[2][0], self[2][1], -self[2][3]],
+                    &[s4, s2, s0],
+                )),
+            ],
+            [
+                s * Float::from(InnerProduct(
+                    &[-self[1][0], self[1][1], -self[1][2]],
+                    &[c3, c1, c0],
+                )),
+                s * Float::from(InnerProduct(
+                    &[self[0][0], self[0][2], -self[0][1]],
+                    &[c3, c0, c1],
+                )),
+                s * Float::from(InnerProduct(
+                    &[-self[3][0], self[3][1], -self[3][2]],
+                    &[s3, s1, s0],
+                )),
+                s * Float::from(InnerProduct(
+                    &[self[2][0], self[2][2], -self[2][1]],
+                    &[s3, s0, s1],
+                )),
+            ],
+        ];
+
+        Some(SquareMatrix::<4>::new(inv))
     }
 }
 
@@ -333,7 +423,9 @@ impl Determinant for SquareMatrix<4> {
 mod tests {
     use crate::{square_matrix::Determinant, Float};
 
-    use super::SquareMatrix;
+    use super::{Invertible, SquareMatrix};
+
+    use float_cmp::approx_eq;
 
     #[test]
     fn zero() {
@@ -466,5 +558,79 @@ mod tests {
 
         let m6 = SquareMatrix::<3>::new([[2.0, -3.0, 1.0], [2.0, 0.0, -1.0], [1.0, 4.0, 5.0]]);
         assert_eq!(49.0, m6.determinant());
+    }
+
+    #[test]
+    fn inverse_3x3() {
+        let m = SquareMatrix::<3>::new([[1.0, 2.0, 3.0], [3.0, 2.0, 1.0], [2.0, 1.0, 3.0]]);
+        let inverse = m.inverse().unwrap();
+        let expected = SquareMatrix::<3>::new([
+            [-5.0 / 12.0, 1.0 / 4.0, 1.0 / 3.0],
+            [7.0 / 12.0, 1.0 / 4.0, -2.0 / 3.0],
+            [1.0 / 12.0, -1.0 / 4.0, 1.0 / 3.0],
+        ]);
+        assert!(approx_eq!(Float, expected[0][0], inverse[0][0]));
+        assert!(approx_eq!(Float, expected[0][1], inverse[0][1]));
+        assert!(approx_eq!(Float, expected[0][2], inverse[0][2]));
+
+        assert!(approx_eq!(Float, expected[1][0], inverse[1][0]));
+        assert!(approx_eq!(Float, expected[1][1], inverse[1][1]));
+        assert!(approx_eq!(Float, expected[1][2], inverse[1][2]));
+
+        assert!(approx_eq!(Float, expected[2][0], inverse[2][0]));
+        assert!(approx_eq!(Float, expected[2][1], inverse[2][1]));
+        assert!(approx_eq!(Float, expected[2][2], inverse[2][2]));
+
+        // Now, a non-invertible (singular) matrix...
+        let m = SquareMatrix::<3>::new([[1.0, 2.0, 2.0], [1.0, 2.0, 2.0], [3.0, 2.0, -1.0]]);
+        let inverse = m.inverse();
+        assert!(inverse.is_none());
+    }
+
+    #[test]
+    fn inverse_4x4() {
+        let m = SquareMatrix::<4>::new([
+            [1.0, 1.0, 1.0, 1.0],
+            [1.0, -1.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0],
+        ]);
+        let inverse = m.inverse().unwrap();
+        let expected = SquareMatrix::<4>::new([
+            [0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0, -1.0],
+            [0.0, 1.0, 1.0, -2.0],
+            [1.0, -1.0, -2.0, 2.0],
+        ]);
+
+        assert!(approx_eq!(Float, expected[0][0], inverse[0][0]));
+        assert!(approx_eq!(Float, expected[0][1], inverse[0][1]));
+        assert!(approx_eq!(Float, expected[0][2], inverse[0][2]));
+        assert!(approx_eq!(Float, expected[0][3], inverse[0][3]));
+
+        assert!(approx_eq!(Float, expected[1][0], inverse[1][0]));
+        assert!(approx_eq!(Float, expected[1][1], inverse[1][1]));
+        assert!(approx_eq!(Float, expected[1][2], inverse[1][2]));
+        assert!(approx_eq!(Float, expected[1][3], inverse[1][3]));
+
+        assert!(approx_eq!(Float, expected[2][0], inverse[2][0]));
+        assert!(approx_eq!(Float, expected[2][1], inverse[2][1]));
+        assert!(approx_eq!(Float, expected[2][2], inverse[2][2]));
+        assert!(approx_eq!(Float, expected[2][3], inverse[2][3]));
+
+        assert!(approx_eq!(Float, expected[3][0], inverse[3][0]));
+        assert!(approx_eq!(Float, expected[3][1], inverse[3][1]));
+        assert!(approx_eq!(Float, expected[3][2], inverse[3][2]));
+        assert!(approx_eq!(Float, expected[3][3], inverse[3][3]));
+
+        // Now, a singular matrix...
+        let m = SquareMatrix::<4>::new([
+            [1.0, 2.0, 3.0, 4.0],
+            [5.0, 6.0, 7.0, 8.0],
+            [0.0, 0.0, 0.0, 0.0], // All zeroes, det == 0, thus singular
+            [1.0, 2.0, 3.0, 4.0],
+        ]);
+        let inverse = m.inverse();
+        assert!(inverse.is_none());
     }
 }

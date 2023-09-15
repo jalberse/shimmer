@@ -1,6 +1,6 @@
 use crate::Float;
 
-struct CompensatedFloat {
+pub struct CompensatedFloat {
     pub v: Float,
     pub err: Float,
 }
