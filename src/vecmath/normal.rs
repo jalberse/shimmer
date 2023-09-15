@@ -1,4 +1,6 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{
+    Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign,
+};
 
 use super::has_nan::HasNan;
 use super::length::Length;
@@ -117,8 +119,32 @@ impl Tuple3<i32> for Normal3i {
         self.z
     }
 
+    fn x_mut(&mut self) -> &mut i32 {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut i32 {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut i32 {
+        &mut self.z
+    }
+
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
+    }
+
+    fn x_ref(&self) -> &i32 {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &i32 {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &i32 {
+        &self.z
     }
 }
 
@@ -159,6 +185,20 @@ impl Normal3 for Normal3i {
 
     fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float {
         angle_between::<Normal3f, Vector3f, Vector3f>(&Normal3f::from(self), &Vector3f::from(v))
+    }
+}
+
+impl Index<usize> for Normal3i {
+    type Output = i32;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Normal3i {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
@@ -388,6 +428,30 @@ impl Tuple3<Float> for Normal3f {
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
     }
+
+    fn x_mut(&mut self) -> &mut Float {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut Float {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut Float {
+        &mut self.z
+    }
+
+    fn x_ref(&self) -> &Float {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &Float {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &Float {
+        &self.z
+    }
 }
 
 impl Normal3 for Normal3f {
@@ -431,6 +495,20 @@ impl Normal3 for Normal3f {
     /// Get the angle between this normal and a vector.
     fn angle_between_vector(&self, v: &Vector3f) -> Float {
         angle_between::<Normal3f, Vector3f, Vector3f>(self, v)
+    }
+}
+
+impl Index<usize> for Normal3f {
+    type Output = Float;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Normal3f {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 

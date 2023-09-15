@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, DivAssign, Index, Mul, MulAssign};
+use std::ops::{Add, Div, DivAssign, Index, IndexMut, Mul, MulAssign};
 
 use crate::{
     float::Float,
@@ -415,12 +415,36 @@ impl Invertible for SquareMatrix<4> {
     }
 }
 
-// TODO multiplication with a vector
+/// Multiply a matrix with a vector and output another type.
+/// The output type U is distinct from V because this can be used to e.g.
+/// convert an RGB color representation into an XYZ color representation.
+/// Note that it might be best to impl Mul for various types (using
+/// this function as a helper function) rather than calling this directly,
+/// just for the sake of more readable code.
+pub fn mul_mat_vec<const N: usize, V, VResult>(m: &SquareMatrix<N>, v: &V) -> VResult
+where
+    V: Index<usize, Output = Float>,
+    VResult: IndexMut<usize, Output = Float> + Default,
+{
+    // TODO consider requiring V to have some const generic N as well,
+    // so that our type system can enforce N == N.
+
+    // PAPREDOC - trait bounds make this generic code much more clear (if more verbose) than PBRTv4 page 1050.
+    // It makes clear what the generic types must satisfy.
+    let mut out: VResult = Default::default();
+    for i in 0..N {
+        for j in 0..N {
+            out[i] += m[i][j] * v[j];
+        }
+    }
+    out
+}
 
 mod tests {
-    use crate::{square_matrix::Determinant, Float};
+    use crate::vecmath::tuple::Tuple3;
+    use crate::{square_matrix::Determinant, vecmath::Vector3f, Float};
 
-    use super::{Invertible, SquareMatrix};
+    use super::{mul_mat_vec, Invertible, SquareMatrix};
 
     use float_cmp::approx_eq;
 
@@ -629,5 +653,13 @@ mod tests {
         ]);
         let inverse = m.inverse();
         assert!(inverse.is_none());
+    }
+
+    #[test]
+    fn mat_vec_mul() {
+        let m = SquareMatrix::<3>::new([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
+        let v = Vector3f::new(2.0, 1.0, 3.0);
+        let result = mul_mat_vec::<3, Vector3f, Vector3f>(&m, &v);
+        assert_eq!(Vector3f::new(13.0, 31.0, 49.0), result);
     }
 }

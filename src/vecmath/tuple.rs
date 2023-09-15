@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Index, IndexMut, Mul, Sub};
 
 use crate::{
     float::Float,
@@ -73,7 +73,7 @@ impl TupleElement for i32 {
 /// Note that only those functions that are shared across all three types are
 /// within this trait; if there's something that only one or two of them have,
 /// then that can be represented in a separate trait which they can implement. Composition!
-pub trait Tuple3<T>: Sized + Copy + Clone + HasNan
+pub trait Tuple3<T>: Sized + Copy + Clone + HasNan + Index<usize> + IndexMut<usize>
 where
     T: TupleElement,
 {
@@ -86,6 +86,36 @@ where
     fn x(&self) -> T;
     fn y(&self) -> T;
     fn z(&self) -> T;
+
+    fn x_ref(&self) -> &T;
+    fn y_ref(&self) -> &T;
+    fn z_ref(&self) -> &T;
+
+    fn x_mut(&mut self) -> &mut T;
+    fn y_mut(&mut self) -> &mut T;
+    fn z_mut(&mut self) -> &mut T;
+
+    fn get(&self, index: usize) -> &T {
+        debug_assert!(index < 3);
+        if index == 0 {
+            self.x_ref()
+        } else if index == 1 {
+            self.y_ref()
+        } else {
+            self.z_ref()
+        }
+    }
+
+    fn get_mut(&mut self, index: usize) -> &mut T {
+        debug_assert!(index < 3);
+        if index == 0 {
+            self.x_mut()
+        } else if index == 1 {
+            self.y_mut()
+        } else {
+            self.z_mut()
+        }
+    }
 
     fn abs(&self) -> Self {
         Self::new(Abs::abs(self.x()), Abs::abs(self.y()), Abs::abs(self.z()))
@@ -205,7 +235,7 @@ where
 
 /// A tuple with 2 elements.
 /// Used for sharing logic across e.g. Vector2f and Normal2f and Point2f.
-pub trait Tuple2<T>: Sized + Copy + Clone + HasNan
+pub trait Tuple2<T>: Sized + Copy + Clone + HasNan + Index<usize> + IndexMut<usize>
 where
     T: TupleElement,
 {
@@ -217,6 +247,30 @@ where
 
     fn x(&self) -> T;
     fn y(&self) -> T;
+
+    fn x_ref(&self) -> &T;
+    fn y_ref(&self) -> &T;
+
+    fn x_mut(&mut self) -> &mut T;
+    fn y_mut(&mut self) -> &mut T;
+
+    fn get(&self, index: usize) -> &T {
+        debug_assert!(index < 2);
+        if index == 0 {
+            self.x_ref()
+        } else {
+            self.y_ref()
+        }
+    }
+
+    fn get_mut(&mut self, index: usize) -> &mut T {
+        debug_assert!(index < 2);
+        if index == 0 {
+            self.x_mut()
+        } else {
+            self.y_mut()
+        }
+    }
 
     fn abs(&self) -> Self {
         Self::new(Abs::abs(self.x()), Abs::abs(self.y()))

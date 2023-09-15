@@ -1,4 +1,6 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{
+    Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign,
+};
 
 use super::has_nan::HasNan;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
@@ -105,6 +107,22 @@ impl Tuple2<i32> for Point2i {
             y: math::lerp(t, &(a.y as Float), &(b.y as Float)) as i32,
         }
     }
+
+    fn x_mut(&mut self) -> &mut i32 {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut i32 {
+        &mut self.y
+    }
+
+    fn x_ref(&self) -> &i32 {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &i32 {
+        &self.y
+    }
 }
 
 impl Point2 for Point2i {
@@ -119,6 +137,20 @@ impl Point2 for Point2i {
     fn distance_squared(&self, p: &Self) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length_squared() as Float
+    }
+}
+
+impl Index<usize> for Point2i {
+    type Output = i32;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Point2i {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
@@ -325,6 +357,30 @@ impl Tuple3<i32> for Point3i {
             z: math::lerp(t, &(a.z as Float), &(b.z as Float)) as i32,
         }
     }
+
+    fn x_mut(&mut self) -> &mut i32 {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut i32 {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut i32 {
+        &mut self.z
+    }
+
+    fn x_ref(&self) -> &i32 {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &i32 {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &i32 {
+        &self.z
+    }
 }
 
 impl Point3 for Point3i {
@@ -337,6 +393,20 @@ impl Point3 for Point3i {
 
     fn distance_squared(&self, p: &Self) -> i32 {
         (self - p).length_squared()
+    }
+}
+
+impl Index<usize> for Point3i {
+    type Output = i32;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Point3i {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
@@ -528,6 +598,22 @@ impl Tuple2<Float> for Point2f {
             y: lerp(t, &a.y, &b.y),
         }
     }
+
+    fn x_mut(&mut self) -> &mut Float {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut Float {
+        &mut self.y
+    }
+
+    fn x_ref(&self) -> &Float {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &Float {
+        &self.y
+    }
 }
 
 impl Point2 for Point2f {
@@ -542,6 +628,20 @@ impl Point2 for Point2f {
     fn distance_squared(&self, p: &Point2f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length_squared()
+    }
+}
+
+impl Index<usize> for Point2f {
+    type Output = Float;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Point2f {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
@@ -722,6 +822,30 @@ impl Tuple3<Float> for Point3f {
             z: math::lerp(t, &a.z, &b.z),
         }
     }
+
+    fn x_mut(&mut self) -> &mut Float {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut Float {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut Float {
+        &mut self.z
+    }
+
+    fn x_ref(&self) -> &Float {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &Float {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &Float {
+        &self.z
+    }
 }
 
 impl Point3 for Point3f {
@@ -736,6 +860,20 @@ impl Point3 for Point3f {
     fn distance_squared(&self, p: &Point3f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length_squared()
+    }
+}
+
+impl Index<usize> for Point3f {
+    type Output = Float;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Point3f {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
