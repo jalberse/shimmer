@@ -43,7 +43,7 @@ impl Transform {
 
         // PAPERDOC - It might be idiomatic in Rust to store the inverse in Option here,
         // rather than populate with NaN as PBRTv4 does. This would ensure the programmer
-        // must check for NaN, rather than let it poison anything.
+        // must check for non-invertible, rather than let it poison anything.
         // However, then each transform would take an additional byte of memory to store
         // the discriminator. Maybe this is a case of premature optimization, but I'll elect
         // to also store NaN in the inverse if the matrix was non-invertible instead.
