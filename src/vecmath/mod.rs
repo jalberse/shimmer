@@ -59,6 +59,55 @@ pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use tuple::{Tuple2, Tuple3};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
+// TODO Consider specialization after Rust RFC 1210 is implemented, if ever.
+//
+// Consider: I think that the better way to represent e.g. Point2f vs Point2i,
+//   is not to have Point2 be a trait. We can lets Point2<T> be a generic class,
+//   with type aliases for 2f and 2i. Wherever we need different implementations for
+//   i32 vs float, we can have an impl<i32> Point2<i32> {} block and a impl<Float> Point2<Float> {}
+//   block, but shared implementations can remain in a generic impl<T> Point2<T> block.
+// I think this would make the code cleaner.
+// Something like this:
+//
+// struct TestType<T> {
+//     t: T,
+// }
+//
+// impl TestType<i32> {
+//     pub fn new(v: i32) -> TestType<i32> {
+//         TestType { t: v }
+//     }
+// }
+//
+// impl TestType<Float> {
+//     pub fn new(v: Float) -> TestType<Float> {
+//         TestType { t: v }
+//     }
+// }
+//
+// impl<T> TestType<T> {
+//     pub fn new_generic(t: T) -> TestType<T> {
+//         TestType { t }
+//     }
+// }
+//
+// Note that if the impl<T> block defined a new(), there would be a naming conflict since T is ALL T,
+// including i32 or Float, so a TestType<i32> type would have two new() functions (but the i32
+// and Float impls don't contradict, since an object can't be both a TestType<i32> and a TestType<Float>).
+//
+// BUT I'm not totally convinced of this approach. If we want to implement a function that takes a
+// generic Point<T> under such an approach, I think we wouldn't be able to reference e.g. cross()
+// which would be implemented for Point<i32> and Point<Float> but not all Point<T>, so the compiler
+// wouldn't let us use a Point<T>::cross(). And you can't just implement Point<T>::cross() and let
+// the compiler use the "more specific" i32 or Float definition under Stable rust.
+//  We would need that calling code to be specialized as well, I think, which doesn't suit our need for generics.
+// In which case, I think the Trait approach might actually be better. But it's something to consider.
+// It turns out, I've run up against the Specialization RFC, which seeks to solve this problem:
+// https://stackoverflow.com/questions/72913825/can-i-do-template-specialisation-with-concrete-types-in-rust
+// https://rust-lang.github.io/rfcs/1210-impl-specialization.html
+// https://github.com/rust-lang/rust/issues/31844
+// So, no, we can't do this. The current Trait approach is idiomatic Rust.
+
 // TODO Coordinate sys from vectors
 // TODO Face forward functions.
 // TODO ensure we debug_assert() with has_nan() where appropriate.

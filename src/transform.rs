@@ -1,5 +1,6 @@
 use crate::{
     square_matrix::{Invertible, SquareMatrix},
+    vecmath::{normal::Normal3, point::Point3, vector::Vector3, Length, Tuple3, Vector3f},
     Float,
 };
 
@@ -53,6 +54,104 @@ impl Transform {
         Self::new_calc_inverse(SquareMatrix::new(m))
     }
 
+    pub fn translate(delta: Vector3f) -> Transform {
+        let m = SquareMatrix::<4>::new([
+            [1.0, 0.0, 0.0, delta.x],
+            [0.0, 1.0, 0.0, delta.y],
+            [0.0, 0.0, 1.0, delta.z],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        let m_inv = SquareMatrix::<4>::new([
+            [1.0, 0.0, 0.0, -delta.x],
+            [0.0, 1.0, 0.0, -delta.y],
+            [0.0, 0.0, 1.0, -delta.z],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        Self::new(m, m_inv)
+    }
+
+    pub fn scale(x: Float, y: Float, z: Float) -> Transform {
+        let m = SquareMatrix::<4>::new([
+            [x, 0.0, 0.0, 0.0],
+            [0.0, y, 0.0, 0.0],
+            [0.0, 0.0, z, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        let m_inv = SquareMatrix::<4>::new([
+            [1.0 / x, 0.0, 0.0, 0.0],
+            [0.0, 1.0 / y, 0.0, 0.0],
+            [0.0, 0.0, 1.0 / z, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        Self::new(m, m_inv)
+    }
+
+    pub fn has_scale(&self) -> bool {
+        self.has_scale_tolerance(1e-3)
+    }
+
+    pub fn has_scale_tolerance(&self, tolerance: Float) -> bool {
+        let la2 = self.apply_v(&Vector3f::new(1.0, 0.0, 0.0)).length_squared();
+        let lb2 = self.apply_v(&Vector3f::new(0.0, 1.0, 0.0)).length_squared();
+        let lc2 = self.apply_v(&Vector3f::new(0.0, 0.0, 1.0)).length_squared();
+
+        la2.abs() - 1.0 > tolerance || lb2.abs() > tolerance || lc2.abs() > tolerance
+    }
+
+    /// theta: radians
+    pub fn rotate_x(theta: Float) -> Transform {
+        let sin_theta = Float::sin(theta);
+        let cos_theta = Float::cos(theta);
+
+        let m = SquareMatrix::<4>::new([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, cos_theta, -sin_theta, 0.0],
+            [0.0, sin_theta, cos_theta, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+
+        Transform {
+            m,
+            m_inv: m.transpose(),
+        }
+    }
+
+    /// theta: radians
+    pub fn rotate_y(theta: Float) -> Transform {
+        let sin_theta = Float::sin(theta);
+        let cos_theta = Float::cos(theta);
+
+        let m = SquareMatrix::<4>::new([
+            [cos_theta, 0.0, sin_theta, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [-sin_theta, 0.0, cos_theta, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+
+        Transform {
+            m,
+            m_inv: m.transpose(),
+        }
+    }
+
+    /// theta: radians
+    pub fn rotate_z(theta: Float) -> Transform {
+        let sin_theta = Float::sin(theta);
+        let cos_theta = Float::cos(theta);
+
+        let m = SquareMatrix::<4>::new([
+            [cos_theta, -sin_theta, 0.0, 0.0],
+            [sin_theta, cos_theta, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+
+        Transform {
+            m,
+            m_inv: m.transpose(),
+        }
+    }
+
     pub fn get_matrix(&self) -> &SquareMatrix<4> {
         &self.m
     }
@@ -77,6 +176,18 @@ impl Transform {
 
     pub fn is_identity(&self) -> bool {
         self.m.is_identity()
+    }
+
+    pub fn apply_p<P: Point3>(&self, p: &P) -> P {
+        todo!()
+    }
+
+    pub fn apply_v<V: Vector3>(&self, v: &V) -> V {
+        todo!()
+    }
+
+    pub fn apply_n<N: Normal3>(&self, n: &N) -> N {
+        todo!()
     }
 }
 
