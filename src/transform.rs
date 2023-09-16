@@ -154,7 +154,7 @@ impl Transform {
         }
     }
 
-    fn rotate_helper(sin_theta: Float, cos_theta: Float, axis: Vector3f) -> Transform {
+    fn rotate_helper(sin_theta: Float, cos_theta: Float, axis: &Vector3f) -> Transform {
         let a = axis.normalize();
         let mut m = SquareMatrix::<4>::zero();
         // Coompute the rotation of each basis vector in turn.
@@ -179,8 +179,43 @@ impl Transform {
         }
     }
 
-    pub fn rotation(theta: Float, axis: Vector3f) -> Transform {
+    pub fn rotation(theta: Float, axis: &Vector3f) -> Transform {
         Transform::rotate_helper(Float::sin(theta), Float::cos(theta), axis)
+    }
+
+    /// Gets the rotation matrix that would transform from to to.
+    /// both from and to should be normalized.
+    pub fn rotate_from_to(from: &Vector3f, to: &Vector3f) -> Transform {
+        // Compute intermediate vector for vector reflection
+        // PAPERDOC - Example of where Rust being expression-based
+        // allows for easy const correctness where PBRTv4 does not allow const.
+        // In C++, a common pattern to maintain const correctness here is to define and call a lambda inline,
+        // which is overcomplicated syntax.
+        let ref1: Vector3f = if from.x.abs() < 0.72 && to.x < 0.72 {
+            Vector3f::X
+        } else if from.y < 0.72 && to.y < 0.72 {
+            Vector3f::Y
+        } else {
+            Vector3f::Z
+        };
+
+        let u = ref1 - from;
+        let v = ref1 - to;
+
+        let mut r = SquareMatrix::<4>::zero();
+        for i in 0..3 {
+            for j in 0..3 {
+                let kronecker = if i == j { 1.0 } else { 0.0 };
+                r.m[i][j] =
+                    kronecker - 2.0 / u.dot(&u) * u[i] * u[j] - 2.0 / v.dot(&v) * v[i] * v[j]
+                        + 4.0 * u.dot(&v) / (u.dot(&u) * v.dot(&v)) * v[i] * u[j];
+            }
+        }
+
+        Transform {
+            m: r,
+            m_inv: r.transpose(),
+        }
     }
 
     pub fn get_matrix(&self) -> &SquareMatrix<4> {
@@ -230,3 +265,5 @@ impl Default for Transform {
         }
     }
 }
+
+// TODO test a bunch of transforms.
