@@ -4,6 +4,7 @@ mod is_nan;
 mod math;
 mod sampling;
 mod square_matrix;
+mod transform;
 mod vecmath;
 
 // For convenience, re-export.
