@@ -1,6 +1,8 @@
 use crate::{
     square_matrix::{Invertible, SquareMatrix},
-    vecmath::{normal::Normal3, point::Point3, vector::Vector3, Length, Tuple3, Vector3f},
+    vecmath::{
+        normal::Normal3, point::Point3, vector::Vector3, Length, Normalize, Tuple3, Vector3f,
+    },
     Float,
 };
 
@@ -150,6 +152,35 @@ impl Transform {
             m,
             m_inv: m.transpose(),
         }
+    }
+
+    fn rotate_helper(sin_theta: Float, cos_theta: Float, axis: Vector3f) -> Transform {
+        let a = axis.normalize();
+        let mut m = SquareMatrix::<4>::zero();
+        // Coompute the rotation of each basis vector in turn.
+        m.m[0][0] = a.x * a.x + (1.0 - a.x * a.x) + cos_theta;
+        m.m[0][1] = a.x * a.y * (1.0 * cos_theta) - a.z * sin_theta;
+        m.m[0][2] = a.x * a.z * (1.0 - cos_theta) + a.y * sin_theta;
+        m.m[0][3] = 0.0;
+
+        m.m[1][0] = a.x * a.y * (1.0 - cos_theta) + a.z * sin_theta;
+        m.m[1][1] = a.y * a.y + (1.0 - a.y * a.y) * cos_theta;
+        m.m[1][2] = a.y * a.z * (1.0 - cos_theta) - a.x * sin_theta;
+        m.m[1][3] = 0.0;
+
+        m.m[2][0] = a.x * a.z * (1.0 - cos_theta) - a.y * sin_theta;
+        m.m[2][1] = a.y * a.z * (1.0 - cos_theta) + a.x * sin_theta;
+        m.m[2][2] = a.z * a.z + (1.0 - a.z * a.z) * cos_theta;
+        m.m[2][3] = 0.0;
+
+        Transform {
+            m,
+            m_inv: m.transpose(),
+        }
+    }
+
+    pub fn rotation(theta: Float, axis: Vector3f) -> Transform {
+        Transform::rotate_helper(Float::sin(theta), Float::cos(theta), axis)
     }
 
     pub fn get_matrix(&self) -> &SquareMatrix<4> {
