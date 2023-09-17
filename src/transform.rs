@@ -1,7 +1,8 @@
 use crate::{
     square_matrix::{Invertible, SquareMatrix},
     vecmath::{
-        normal::Normal3, point::Point3, vector::Vector3, Length, Normalize, Tuple3, Vector3f,
+        normal::Normal3, point::Point3, vector::Vector3, Length, Normal3f, Normalize, Point3f,
+        Tuple3, Vector3f,
     },
     Float,
 };
@@ -244,17 +245,72 @@ impl Transform {
         self.m.is_identity()
     }
 
-    pub fn apply_p<P: Point3>(&self, p: &P) -> P {
-        todo!()
+    fn apply_p_helper(m: &SquareMatrix<4>, p: &Point3f) -> Point3f {
+        // TODO We may need this to be generic on P: Point3. Until then, let's
+        // stick with Point3f as concrete.
+        //  Else we need TupleElement: Mul<Float>.
+        // In this case, we might switch out i32 in e.g. Point3i for a NewType so that we can impl
+        //  Mul<Float> on it legally. ITupleElem could be the struct name or something.
+        let xp = m[0][0] * p.x() + m[0][1] * p.y() + m[0][2] * p.z() + m[0][3];
+        let yp = m[1][0] * p.x() + m[1][1] * p.y() + m[1][2] * p.z() + m[1][3];
+        let zp = m[2][0] * p.x() + m[2][1] * p.y() + m[2][2] * p.z() + m[2][3];
+        let wp = m[3][0] * p.x() + m[3][1] * p.y() + m[3][2] * p.z() + m[3][3];
+        if wp == 1.0 {
+            Point3f::new(xp, yp, zp)
+        } else {
+            debug_assert!(wp != 0.0);
+            Point3f::new(xp, yp, zp) / wp
+        }
     }
 
-    pub fn apply_v<V: Vector3>(&self, v: &V) -> V {
-        todo!()
+    pub fn apply_p(&self, p: &Point3f) -> Point3f {
+        Self::apply_p_helper(&self.m, p)
     }
 
-    pub fn apply_n<N: Normal3>(&self, n: &N) -> N {
-        todo!()
+    pub fn apply_p_inv(&self, p: &Point3f) -> Point3f {
+        Self::apply_p_helper(&self.m_inv, p)
     }
+
+    fn apply_v_helper(m: &SquareMatrix<4>, v: &Vector3f) -> Vector3f {
+        Vector3f::new(
+            m[0][0] * v.x() + m[0][1] * v.y() + m[0][2] * v.z(),
+            m[1][0] * v.x() + m[1][1] * v.y() + m[1][2] * v.z(),
+            m[2][0] * v.x() + m[2][1] * v.y() + m[2][2] * v.z(),
+        )
+    }
+
+    pub fn apply_v(&self, v: &Vector3f) -> Vector3f {
+        Self::apply_v_helper(&self.m, v)
+    }
+
+    pub fn apply_v_inv(&self, v: &Vector3f) -> Vector3f {
+        Self::apply_v_helper(&self.m_inv, v)
+    }
+
+    fn apply_n_helper(m: &SquareMatrix<4>, n: &Normal3f) -> Normal3f {
+        // Notice indices are different to get transpose (compare to Vector transform)
+        Normal3f::new(
+            m[0][0] * n.x() + m[1][0] * n.y() + m[2][0] * n.z(),
+            m[0][1] * n.x() + m[1][1] * n.y() + m[2][1] * n.z(),
+            m[0][2] * n.x() + m[1][2] * n.y() + m[2][2] * n.z(),
+        )
+    }
+
+    pub fn apply_n(&self, n: &Normal3f) -> Normal3f {
+        // See PBRTv4 page 131 - we haven't passed the wrong matrix!
+        // Normals must be transformed by the inverse transform of the transformation matrix.
+        Self::apply_n_helper(&self.m_inv, n)
+    }
+
+    pub fn apply_n_inv(&self, n: &Normal3f) -> Normal3f {
+        // See PBRTv4 page 131 - we haven't passed the wrong matrix!
+        // Normals must be transformed by the inverse transform of the transformation matrix.
+        Self::apply_n_helper(&self.m, n)
+    }
+
+    // TODO ray transforms
+
+    // TODO bounding box transforms.
 }
 
 impl Default for Transform {
