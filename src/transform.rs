@@ -366,6 +366,7 @@ mod tests {
     fn translate_normal() {
         let v = Normal3f::new(1.0, 2.0, 3.0);
         let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
+        // Note this is applying the inverse transpose still! But...
         let new = translate.apply_n(&v);
         // Translation does not effect vectors or normals!
         assert_eq!(Normal3f::new(1.0, 2.0, 3.0), new);
@@ -380,9 +381,45 @@ mod tests {
         assert_eq!(Normal3f::new(1.0, 2.0, 3.0), new);
     }
 
-    // TODO test scaling
+    #[test]
+    fn scale_point() {
+        let p = Point3f::new(1.0, 2.0, 3.0);
+        let scale = Transform::scale(2.0, 3.0, 4.0);
+        let scaled = scale.apply_p(&p);
+        assert_eq!(Point3f::new(2.0, 6.0, 12.0), scaled);
+        let back_again = scale.apply_p_inv(&scaled);
+        assert_eq!(p, back_again);
+    }
 
-    // TODO test scaling inverse
+    #[test]
+    fn scale_vector() {
+        let p = Vector3f::new(1.0, 2.0, 3.0);
+        let scale = Transform::scale(2.0, 3.0, 4.0);
+        let scaled = scale.apply_v(&p);
+        assert_eq!(Vector3f::new(2.0, 6.0, 12.0), scaled);
+        let back_again = scale.apply_v_inv(&scaled);
+        assert_eq!(p, back_again);
+    }
+
+    #[test]
+    fn scale_normal() {
+        let p = Normal3f::new(1.0, 2.0, 3.0);
+        let scale = Transform::scale(2.0, 3.0, 4.0);
+        let scaled = scale.apply_n(&p);
+        // Note how this differs from vectors - we must transform by the inverse transpose!
+        assert_eq!(Normal3f::new(0.5, 0.6666667, 0.75), scaled);
+        let back_again = scale.apply_n_inv(&scaled);
+        assert_eq!(p, back_again);
+
+        // Again, a bit more simply
+        let p = Normal3f::new(1.0, 2.0, 3.0);
+        let scale = Transform::scale(2.0, 2.0, 2.0);
+        let scaled = scale.apply_n(&p);
+        // Note how this differs from vectors - we must transform by the inverse transpose!
+        assert_eq!(Normal3f::new(0.5, 1.0, 1.5), scaled);
+        let back_again = scale.apply_n_inv(&scaled);
+        assert_eq!(p, back_again);
+    }
 
     // TODO test rotations
 
