@@ -386,8 +386,6 @@ impl_op_ex!(*|t1: &Transform, t2: &Transform| -> Transform {
     }
 });
 
-// TODO test a bunch of transforms.
-
 mod tests {
     use crate::{
         bounding_box::Bounds3f,
@@ -510,7 +508,26 @@ mod tests {
         assert_eq!(p, reverted);
     }
 
-    // TODO test rotations
+    #[test]
+    fn rotate_from_to() {
+        let from = Vector3f::Z;
+        let to = Vector3f::Z;
+        let r = Transform::rotate_from_to(&from, &to);
+        let to_new = r.apply_v(&from);
+        assert_eq!(to, to_new);
+
+        let from = Vector3f::Z;
+        let to = Vector3f::X;
+        let r = Transform::rotate_from_to(&from, &to);
+        let to_new = r.apply_v(&from);
+        assert_eq!(to, to_new);
+
+        let from = Vector3f::Z;
+        let to = Vector3f::Y;
+        let r = Transform::rotate_from_to(&from, &to);
+        let to_new = r.apply_v(&from);
+        assert_eq!(to, to_new);
+    }
 
     // TODO test rotations inverse
 }
