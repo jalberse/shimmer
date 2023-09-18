@@ -1,5 +1,3 @@
-use std::ops::Mul;
-
 use auto_ops::impl_op_ex;
 
 use crate::{
