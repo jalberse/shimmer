@@ -1,3 +1,7 @@
+use std::ops::Mul;
+
+use auto_ops::impl_op_ex;
+
 use crate::{
     bounding_box::Bounds3f,
     square_matrix::{Invertible, SquareMatrix},
@@ -364,6 +368,14 @@ impl Default for Transform {
     }
 }
 
+// Allow composition of transformations!
+impl_op_ex!(*|t1: &Transform, t2: &Transform| -> Transform {
+    Transform {
+        m: t1.m * t2.m,
+        m_inv: t2.m_inv * t1.m_inv,
+    }
+});
+
 // TODO test a bunch of transforms.
 
 mod tests {
@@ -473,6 +485,19 @@ mod tests {
         let translate = Transform::translate(Vector3f::ONE);
         let translated = translate.apply_bb(&bounds);
         assert_eq!(Bounds3f::new(Point3f::ONE, Point3f::ONE * 2.0), translated);
+    }
+
+    #[test]
+    fn transform_composition() {
+        let t1 = Transform::translate(Vector3f::ONE);
+        let t2 = Transform::scale(1.0, 2.0, 3.0);
+        // This will scale then translate
+        let composed = t1 * t2;
+        let p = Point3f::ONE;
+        let new = composed.apply_p(&p);
+        assert_eq!(Point3f::new(2.0, 3.0, 4.0), new);
+        let reverted = composed.apply_p_inv(&new);
+        assert_eq!(p, reverted);
     }
 
     // TODO test rotations
