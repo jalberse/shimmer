@@ -1,7 +1,5 @@
-use std::ops::Bound;
-
 use crate::{
-    bounding_box::{Bounds3, Bounds3f},
+    bounding_box::Bounds3f,
     square_matrix::{Invertible, SquareMatrix},
     vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f},
     Float,
@@ -231,6 +229,41 @@ impl Transform {
         Transform {
             m: self.m,
             m_inv: self.m_inv,
+        }
+    }
+
+    pub fn look_at(pos: &Point3f, look_at: &Point3f, up: &Vector3f) -> Transform {
+        let mut world_from_camera = SquareMatrix::<4>::zero();
+
+        world_from_camera.m[0][3] = pos.x;
+        world_from_camera.m[1][3] = pos.y;
+        world_from_camera.m[2][3] = pos.z;
+        world_from_camera.m[3][3] = 1.0;
+
+        let dir = (look_at - pos).normalize();
+        let right = up.normalize().cross(&dir).normalize();
+        let new_up = dir.cross(&right);
+
+        world_from_camera.m[0][0] = right.x;
+        world_from_camera.m[1][0] = right.y;
+        world_from_camera.m[2][0] = right.z;
+        world_from_camera.m[3][0] = 0.0;
+
+        world_from_camera.m[0][1] = new_up.x;
+        world_from_camera.m[1][1] = new_up.y;
+        world_from_camera.m[2][1] = new_up.z;
+        world_from_camera.m[3][1] = 0.0;
+
+        world_from_camera.m[0][2] = dir.x;
+        world_from_camera.m[1][2] = dir.y;
+        world_from_camera.m[2][2] = dir.z;
+        world_from_camera.m[3][2] = 0.0;
+
+        let camera_from_world = world_from_camera.inverse().expect("Uninvertible look_at!");
+
+        Transform {
+            m: camera_from_world,
+            m_inv: world_from_camera,
         }
     }
 
