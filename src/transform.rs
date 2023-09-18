@@ -1,4 +1,7 @@
+use std::ops::Bound;
+
 use crate::{
+    bounding_box::{Bounds3, Bounds3f},
     square_matrix::{Invertible, SquareMatrix},
     vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f},
     Float,
@@ -307,9 +310,16 @@ impl Transform {
 
     // TODO ray transforms
 
-    // TODO bounding box transforms.
+    pub fn apply_bb(&self, bb: &Bounds3f) -> Bounds3f {
+        // TODO this could be made more efficient.
+        let mut out = Bounds3f::new(self.apply_p(&bb.corner(0)), self.apply_p(&bb.corner(1)));
 
-    // TODO look-at transformation
+        for i in 2..8 {
+            out = out.union_point(&self.apply_p(&bb.corner(i)));
+        }
+
+        out
+    }
 }
 
 impl Default for Transform {
@@ -324,7 +334,10 @@ impl Default for Transform {
 // TODO test a bunch of transforms.
 
 mod tests {
-    use crate::vecmath::{Normal3f, Point3f, Tuple3, Vector3f};
+    use crate::{
+        bounding_box::Bounds3f,
+        vecmath::{Normal3f, Point3f, Tuple3, Vector3f},
+    };
 
     use super::Transform;
 
@@ -419,6 +432,14 @@ mod tests {
         assert_eq!(Normal3f::new(0.5, 1.0, 1.5), scaled);
         let back_again = scale.apply_n_inv(&scaled);
         assert_eq!(p, back_again);
+    }
+
+    #[test]
+    fn apply_bb_transform() {
+        let bounds = Bounds3f::new(Point3f::ZERO, Point3f::ONE);
+        let translate = Transform::translate(Vector3f::ONE);
+        let translated = translate.apply_bb(&bounds);
+        assert_eq!(Bounds3f::new(Point3f::ONE, Point3f::ONE * 2.0), translated);
     }
 
     // TODO test rotations

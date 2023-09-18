@@ -2,17 +2,14 @@ use std::{marker::PhantomData, ops::Index};
 
 use crate::{
     math::{lerp, Max, NumericLimit, Sqrt},
-    Float,
+    sphere::Sphere,
 };
 
-use super::{
-    sphere::Sphere,
-    vecmath::{
-        point::{Point2, Point3},
-        tuple::TupleElement,
-        vector::{Vector2, Vector3},
-        Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3, Vector2f, Vector2i, Vector3f, Vector3i,
-    },
+use super::vecmath::{
+    point::{Point2, Point3},
+    tuple::TupleElement,
+    vector::{Vector2, Vector3},
+    Point2f, Point2i, Point3f, Point3i, Tuple2, Tuple3, Vector2f, Vector2i, Vector3f, Vector3i,
 };
 
 pub type Bounds2i = Bounds2<Point2i, Vector2i>;
@@ -21,7 +18,7 @@ pub type Bounds3i = Bounds3<Point3i, Vector3i>;
 pub type Bounds3f = Bounds3<Point3f, Vector3f>;
 
 #[derive(Debug, PartialEq)]
-struct Bounds2<P, V> {
+pub struct Bounds2<P, V> {
     pub min: P,
     pub max: P,
     phantom_vector: PhantomData<V>,
@@ -32,7 +29,7 @@ where
     P: Point2<AssociatedVectorType = V>,
     V: Vector2<ElementType = P::ElementType>,
 {
-    fn new(p1: P, p2: P) -> Self {
+    pub fn new(p1: P, p2: P) -> Self {
         Self {
             min: Tuple2::min(&p1, &p2),
             max: Tuple2::max(&p1, &p2),
@@ -40,7 +37,7 @@ where
         }
     }
 
-    fn from_point(point: P) -> Self {
+    pub fn from_point(point: P) -> Self {
         Self {
             min: point,
             max: point,
@@ -49,12 +46,12 @@ where
     }
 
     /// Returns a corner of the bounding box specified by `corner`.
-    fn corner(&self, corner: usize) -> P {
+    pub fn corner(&self, corner: usize) -> P {
         debug_assert!(corner < 4);
         P::new(self[corner & 1].x(), self[(corner & 2 != 0) as usize].y())
     }
 
-    fn union_point(&self, p: &P) -> Self {
+    pub fn union_point(&self, p: &P) -> Self {
         let min = Tuple2::min(&self.min, &p);
         let max = Tuple2::max(&self.max, &p);
         // Set values directly to maintain degeneracy and avoid infinite extents.
@@ -66,7 +63,7 @@ where
         }
     }
 
-    fn union(&self, other: &Self) -> Self {
+    pub fn union(&self, other: &Self) -> Self {
         let min = Tuple2::min(&self.min, &other.min);
         let max = Tuple2::max(&self.max, &other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
@@ -80,7 +77,7 @@ where
 
     /// None if the bounds do not intersect.
     /// Else, the intersection of the two bounds.
-    fn intersect(&self, other: &Self) -> Option<Self> {
+    pub fn intersect(&self, other: &Self) -> Option<Self> {
         let min = Tuple2::max(&self.min, &other.min);
         let max = Tuple2::min(&self.max, &other.max);
 
@@ -95,14 +92,14 @@ where
         })
     }
 
-    fn overlaps(&self, other: &Self) -> bool {
+    pub fn overlaps(&self, other: &Self) -> bool {
         let x_overlap = self.max.x() >= other.min.x() && self.min.x() <= other.max.x();
         let y_overlap = self.max.y() >= other.min.y() && self.min.y() <= other.max.y();
         x_overlap && y_overlap
     }
 
     /// Checks if the point is inside the bounds (inclusive)
-    fn inside(&self, p: &P) -> bool {
+    pub fn inside(&self, p: &P) -> bool {
         p.x() >= self.min.x()
             && p.x() <= self.max.x()
             && p.y() >= self.min.y()
@@ -110,7 +107,7 @@ where
     }
 
     /// Checks if the point is inside the bounds, with exclusive upper bounds.
-    fn inside_exclusive(&self, p: &P) -> bool {
+    pub fn inside_exclusive(&self, p: &P) -> bool {
         p.x() >= self.min.x()
             && p.x() < self.max.x()
             && p.y() >= self.min.y()
@@ -119,7 +116,7 @@ where
 
     /// Zero if the point is inside the bounds, else the squared distance from
     /// the point to the bounding box.
-    fn distance_squared(&self, p: &P) -> P::ElementType {
+    pub fn distance_squared(&self, p: &P) -> P::ElementType {
         let dx = P::ElementType::max(
             P::ElementType::max(P::ElementType::zero(), self.min.x() - p.x()),
             p.x() - self.max.x(),
@@ -132,12 +129,12 @@ where
         dx * dx + dy * dy
     }
 
-    fn distance(&self, p: &P) -> P::ElementType {
+    pub fn distance(&self, p: &P) -> P::ElementType {
         // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
         P::ElementType::sqrt(self.distance_squared(p))
     }
 
-    fn expand(self, delta: P::ElementType) -> Self {
+    pub fn expand(self, delta: P::ElementType) -> Self {
         // PAPERDOC this is an example of a better model than pass-by-mut-reference that PBRTv4 uses (page 97)
         let vec = V::new(delta, delta);
 
@@ -153,16 +150,16 @@ where
     }
 
     /// Vector along the box diagonal from the minimum to the maximum point.
-    fn diagonal(&self) -> V {
+    pub fn diagonal(&self) -> V {
         self.max - self.min
     }
 
-    fn area(&self) -> P::ElementType {
+    pub fn area(&self) -> P::ElementType {
         let d = self.diagonal();
         d.x() * d.y()
     }
 
-    fn max_dimension(&self) -> usize {
+    pub fn max_dimension(&self) -> usize {
         let d = self.diagonal();
         if d.x() > d.y() {
             0
@@ -172,7 +169,7 @@ where
     }
 
     /// Returns a point within the bounding box given the specified amount in each direction via t.
-    fn lerp(&self, t: P) -> P {
+    pub fn lerp(&self, t: P) -> P {
         P::new(
             P::ElementType::from_float(lerp(
                 t.x().into_float(),
@@ -189,7 +186,7 @@ where
 
     /// Effectively the inverse of lerp(); given a point, returns the continuous position
     /// of that point within the bounding box where the minimum is at 0 and the maximum is at 1.
-    fn offset(&self, p: P) -> V {
+    pub fn offset(&self, p: P) -> V {
         let out_init = p - self.min;
         let out_x = if self.max.x() > self.min.x() {
             out_init.x() / (self.max.x() - self.min.x())
@@ -204,11 +201,11 @@ where
         V::new(out_x, out_y)
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.min.x() >= self.max.x() || self.min.y() >= self.max.y()
     }
 
-    fn is_degenerate(&self) -> bool {
+    pub fn is_degenerate(&self) -> bool {
         self.min.x() > self.max.x() || self.min.y() > self.max.y()
     }
 }
@@ -239,7 +236,7 @@ impl<P: Point2, V: Vector2> Index<usize> for Bounds2<P, V> {
 }
 
 #[derive(Debug, PartialEq)]
-struct Bounds3<P, V> {
+pub struct Bounds3<P, V> {
     pub min: P,
     pub max: P,
     phantom_vector: PhantomData<V>,
@@ -250,7 +247,7 @@ where
     P: Point3<AssociatedVectorType = V>,
     V: Vector3<ElementType = P::ElementType> + From<P>,
 {
-    fn new(p1: P, p2: P) -> Self {
+    pub fn new(p1: P, p2: P) -> Self {
         Self {
             min: Tuple3::min(&p1, &p2),
             max: Tuple3::max(&p1, &p2),
@@ -258,7 +255,7 @@ where
         }
     }
 
-    fn from_point(point: P) -> Self {
+    pub fn from_point(point: P) -> Self {
         Self {
             min: point,
             max: point,
@@ -267,7 +264,7 @@ where
     }
 
     /// Returns a corner of the bounding box specified by `corner`.
-    fn corner(&self, corner: usize) -> P {
+    pub fn corner(&self, corner: usize) -> P {
         debug_assert!(corner < 8);
         P::new(
             self[corner & 1].x(),
@@ -276,7 +273,7 @@ where
         )
     }
 
-    fn union_point(&self, p: &P) -> Self {
+    pub fn union_point(&self, p: &P) -> Self {
         let min = Tuple3::min(&self.min, &p);
         let max = Tuple3::max(&self.max, &p);
         // Set values directly to maintain degeneracy and avoid infinite extents.
@@ -288,7 +285,7 @@ where
         }
     }
 
-    fn union(&self, other: &Self) -> Self {
+    pub fn union(&self, other: &Self) -> Self {
         let min = Tuple3::min(&self.min, &other.min);
         let max = Tuple3::max(&self.max, &other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
@@ -302,7 +299,7 @@ where
 
     /// None if the bounds do not intersect.
     /// Else, the intersection of the two bounds.
-    fn intersect(&self, other: &Self) -> Option<Self> {
+    pub fn intersect(&self, other: &Self) -> Option<Self> {
         let min = Tuple3::max(&self.min, &other.min);
         let max = Tuple3::min(&self.max, &other.max);
 
@@ -320,7 +317,7 @@ where
         })
     }
 
-    fn overlaps(&self, other: &Self) -> bool {
+    pub fn overlaps(&self, other: &Self) -> bool {
         let x_overlap = self.max.x() >= other.min.x() && self.min.x() <= other.max.x();
         let y_overlap = self.max.y() >= other.min.y() && self.min.y() <= other.max.y();
         let z_overlap = self.max.z() >= other.min.z() && self.min.z() <= other.max.z();
@@ -328,7 +325,7 @@ where
     }
 
     /// Checks if the point is inside the bounds (inclusive)
-    fn inside(&self, p: &P) -> bool {
+    pub fn inside(&self, p: &P) -> bool {
         p.x() >= self.min.x()
             && p.x() <= self.max.x()
             && p.y() >= self.min.y()
@@ -338,7 +335,7 @@ where
     }
 
     /// Checks if the point is inside the bounds, with exclusive upper bounds.
-    fn inside_exclusive(&self, p: &P) -> bool {
+    pub fn inside_exclusive(&self, p: &P) -> bool {
         p.x() >= self.min.x()
             && p.x() < self.max.x()
             && p.y() >= self.min.y()
@@ -349,7 +346,7 @@ where
 
     /// Zero if the point is inside the bounds, else the squared distance from
     /// the point to the bounding box.
-    fn distance_squared(&self, p: &P) -> P::ElementType {
+    pub fn distance_squared(&self, p: &P) -> P::ElementType {
         let dx = P::ElementType::max(
             P::ElementType::max(P::ElementType::zero(), self.min.x() - p.x()),
             p.x() - self.max.x(),
@@ -366,12 +363,12 @@ where
         dx * dx + dy * dy + dz * dz
     }
 
-    fn distance(&self, p: &P) -> P::ElementType {
+    pub fn distance(&self, p: &P) -> P::ElementType {
         // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
         P::ElementType::sqrt(self.distance_squared(p))
     }
 
-    fn expand(self, delta: P::ElementType) -> Self {
+    pub fn expand(self, delta: P::ElementType) -> Self {
         // PAPERDOC this is an example of a better model than pass-by-mut-reference that PBRTv4 uses (page 97)
         let vec = V::new(delta, delta, delta);
 
@@ -387,21 +384,21 @@ where
     }
 
     /// Returns a vector across the diagonal of the box from the min point to the max point.
-    fn diagonal(&self) -> V {
+    pub fn diagonal(&self) -> V {
         self.max - self.min
     }
 
-    fn surface_area(&self) -> P::ElementType {
+    pub fn surface_area(&self) -> P::ElementType {
         let d = self.diagonal();
         P::ElementType::from_i32(2) * (d.x() * d.y() + d.x() * d.z() + d.y() * d.z())
     }
 
-    fn volume(&self) -> P::ElementType {
+    pub fn volume(&self) -> P::ElementType {
         let d = self.diagonal();
         d.x() * d.y() * d.z()
     }
 
-    fn max_dimension(&self) -> usize {
+    pub fn max_dimension(&self) -> usize {
         let d = self.diagonal();
         if d.x() > d.y() && d.x() > d.z() {
             0
@@ -415,7 +412,7 @@ where
     }
 
     /// Returns a point within the bounding box given the specified amount in each direction via t.
-    fn lerp(&self, t: P) -> P {
+    pub fn lerp(&self, t: P) -> P {
         P::new(
             P::ElementType::from_float(lerp(
                 t.x().into_float(),
@@ -437,7 +434,7 @@ where
 
     /// Effectively the inverse of lerp(); given a point, returns the continuous position
     /// of that point within the bounding box where the minimum is at 0 and the maximum is at 1.
-    fn offset(&self, p: P) -> V {
+    pub fn offset(&self, p: P) -> V {
         let out_init = p - self.min;
         let out_x = if self.max.x() > self.min.x() {
             out_init.x() / (self.max.x() - self.min.x())
@@ -457,7 +454,7 @@ where
         V::new(out_x, out_y, out_z)
     }
 
-    fn bounding_sphere(&self) -> Sphere<P, P::ElementType> {
+    pub fn bounding_sphere(&self) -> Sphere<P, P::ElementType> {
         let center: P = (self.min + V::from(self.max)) / P::ElementType::from_i32(2);
         let radius: P::ElementType = if self.inside(&center) {
             center.distance(&self.max)
@@ -467,11 +464,11 @@ where
         Sphere::new(center, radius)
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.min.x() >= self.max.x() || self.min.y() >= self.max.y() || self.min.z() >= self.max.z()
     }
 
-    fn is_degenerate(&self) -> bool {
+    pub fn is_degenerate(&self) -> bool {
         self.min.x() > self.max.x() || self.min.y() > self.max.y() || self.min.z() > self.max.z()
     }
 }
