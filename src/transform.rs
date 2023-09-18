@@ -4,7 +4,7 @@ use auto_ops::impl_op_ex;
 
 use crate::{
     bounding_box::Bounds3f,
-    square_matrix::{Invertible, SquareMatrix},
+    square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f},
     Float,
 };
@@ -280,6 +280,16 @@ impl Transform {
 
     pub fn is_identity(&self) -> bool {
         self.m.is_identity()
+    }
+
+    pub fn swaps_handedness(&self) -> bool {
+        // Create a 3x3 for cheaper determinant calculation
+        let s = SquareMatrix::<3>::new([
+            [self.m[0][0], self.m[0][1], self.m[0][2]],
+            [self.m[1][0], self.m[1][1], self.m[1][2]],
+            [self.m[2][0], self.m[2][1], self.m[2][2]],
+        ]);
+        s.determinant() < 0.0
     }
 
     fn apply_p_helper(m: &SquareMatrix<4>, p: &Point3f) -> Point3f {
