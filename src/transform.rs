@@ -2,6 +2,7 @@ use auto_ops::impl_op_ex;
 
 use crate::{
     bounding_box::Bounds3f,
+    frame::Frame,
     square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f},
     Float,
@@ -55,6 +56,16 @@ impl Transform {
 
     pub fn from_2d(m: [[Float; 4]; 4]) -> Transform {
         Self::new_calc_inverse(SquareMatrix::new(m))
+    }
+
+    pub fn from_frame(frame: &Frame) -> Transform {
+        let m = SquareMatrix::<4>::new([
+            [frame.x.x, frame.x.y, frame.x.z, 0.0],
+            [frame.y.x, frame.y.y, frame.y.z, 0.0],
+            [frame.z.x, frame.z.y, frame.z.z, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        Transform::new_calc_inverse(m)
     }
 
     pub fn translate(delta: Vector3f) -> Transform {

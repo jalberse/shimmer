@@ -108,7 +108,6 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 // https://github.com/rust-lang/rust/issues/31844
 // So, no, we can't do this. The current Trait approach is idiomatic Rust.
 
-// TODO Coordinate sys from vectors
 // TODO Face forward functions.
 // TODO ensure we debug_assert() with has_nan() where appropriate.
 // TODO Improve testing coverage.

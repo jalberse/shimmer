@@ -1,6 +1,7 @@
 mod bounding_box;
 mod compensated_float;
 mod float;
+mod frame;
 mod is_nan;
 mod math;
 mod sampling;
