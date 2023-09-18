@@ -1,9 +1,6 @@
 use crate::{
     square_matrix::{Invertible, SquareMatrix},
-    vecmath::{
-        normal::Normal3, point::Point3, vector::Vector3, Length, Normal3f, Normalize, Point3f,
-        Tuple3, Vector3f,
-    },
+    vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f},
     Float,
 };
 
@@ -311,6 +308,8 @@ impl Transform {
     // TODO ray transforms
 
     // TODO bounding box transforms.
+
+    // TODO look-at transformation
 }
 
 impl Default for Transform {
@@ -323,3 +322,69 @@ impl Default for Transform {
 }
 
 // TODO test a bunch of transforms.
+
+mod tests {
+    use crate::vecmath::{Normal3f, Point3f, Tuple3, Vector3f};
+
+    use super::Transform;
+
+    #[test]
+    fn translate_point() {
+        let p = Point3f::new(1.0, 2.0, 3.0);
+        let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
+        let new = translate.apply_p(&p);
+        assert_eq!(Point3f::new(11.0, 22.0, 43.0), new);
+    }
+
+    #[test]
+    fn translate_inverse_point() {
+        let p = Point3f::new(1.0, 2.0, 3.0);
+        let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
+        let new = translate.apply_p_inv(&p);
+        assert_eq!(Point3f::new(-9.0, -18.0, -37.0), new);
+    }
+
+    #[test]
+    fn translate_vector() {
+        let v = Vector3f::new(1.0, 2.0, 3.0);
+        let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
+        let new = translate.apply_v(&v);
+        // Translation does not effect vectors or normals!
+        assert_eq!(Vector3f::new(1.0, 2.0, 3.0), new);
+    }
+
+    #[test]
+    fn translate_vector_inv() {
+        let v = Vector3f::new(1.0, 2.0, 3.0);
+        let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
+        let new = translate.apply_v_inv(&v);
+        // Translation does not effect vectors or normals!
+        assert_eq!(Vector3f::new(1.0, 2.0, 3.0), new);
+    }
+
+    #[test]
+    fn translate_normal() {
+        let v = Normal3f::new(1.0, 2.0, 3.0);
+        let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
+        let new = translate.apply_n(&v);
+        // Translation does not effect vectors or normals!
+        assert_eq!(Normal3f::new(1.0, 2.0, 3.0), new);
+    }
+
+    #[test]
+    fn translate_normal_inv() {
+        let v = Normal3f::new(1.0, 2.0, 3.0);
+        let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
+        let new = translate.apply_n_inv(&v);
+        // Translation does not effect vectors or normals!
+        assert_eq!(Normal3f::new(1.0, 2.0, 3.0), new);
+    }
+
+    // TODO test scaling
+
+    // TODO test scaling inverse
+
+    // TODO test rotations
+
+    // TODO test rotations inverse
+}
