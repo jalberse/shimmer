@@ -1,6 +1,9 @@
-use std::ops::{Add, Mul};
+use std::{
+    ops::{Add, Mul},
+    path::Component,
+};
 
-use crate::float::Float;
+use crate::{compensated_float::CompensatedFloat, float::Float};
 
 pub trait Sqrt {
     fn sqrt(self) -> Self;
@@ -167,6 +170,46 @@ pub fn safe_asin(x: Float) -> Float {
 /// See PBRTv4 8.2.3
 pub fn safe_acos(x: Float) -> Float {
     Float::asin(Float::clamp(x, -1.0, 1.0))
+}
+
+/// Inner Products with error free transformations.
+/// Computes the inner product using f32 precision, with error
+/// equivalent to f64 precision.
+///
+///  The xs and ys slices provide the following values, in pairs:
+/// x0 * y0 + x1 * y1 + x2 * y2 + ...
+/// xs and ys must be of the same length.
+///
+/// Accurate dot products with FMA: Graillat et al.,
+/// https://www-pequan.lip6.fr/~graillat/papers/posterRNC7.pdf
+///
+/// Accurate summation, dot product and polynomial evaluation in complex
+/// floating point arithmetic, Graillat and Menissier-Morain.
+pub fn InnerProduct(xs: &[Float], ys: &[Float]) -> CompensatedFloat {
+    // PAPERDOC this is arguable a more elegant solution with slices than variadic parameters.
+    debug_assert!(xs.len() == ys.len());
+    if xs.len() == 1 {
+        // Base case
+        return TwoProd(xs[0], ys[0]);
+    } else {
+        let ab = TwoProd(xs[0], ys[0]);
+        let tp = InnerProduct(&xs[1..xs.len()], &ys[1..ys.len()]);
+        let sum = TwoSum(ab.v, tp.v);
+        return CompensatedFloat::new(sum.v, ab.err + tp.err + sum.err);
+    }
+}
+
+fn TwoProd(a: Float, b: Float) -> CompensatedFloat {
+    let ab = a * b;
+    let err = Float::mul_add(a, b, -ab);
+    CompensatedFloat::new(ab, err)
+}
+
+fn TwoSum(a: Float, b: Float) -> CompensatedFloat {
+    let s = a + b;
+    let delta = s - a;
+    let err = (a - (s - delta)) + (b - delta);
+    CompensatedFloat::new(s, err)
 }
 
 mod tests {

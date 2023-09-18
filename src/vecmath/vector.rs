@@ -1,4 +1,6 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{
+    Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign,
+};
 
 use super::has_nan::HasNan;
 use super::length::Length;
@@ -153,6 +155,22 @@ impl Tuple2<i32> for Vector2i {
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
     }
+
+    fn x_mut(&mut self) -> &mut i32 {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut i32 {
+        &mut self.y
+    }
+
+    fn x_ref(&self) -> &i32 {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &i32 {
+        &self.y
+    }
 }
 
 impl Vector2 for Vector2i {
@@ -177,6 +195,20 @@ impl Vector2 for Vector2i {
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self {
         self - self.dot(w) * w
+    }
+}
+
+impl Index<usize> for Vector2i {
+    type Output = i32;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Vector2i {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
@@ -400,6 +432,30 @@ impl Tuple3<i32> for Vector3i {
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
     }
+
+    fn x_mut(&mut self) -> &mut i32 {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut i32 {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut i32 {
+        &mut self.z
+    }
+
+    fn x_ref(&self) -> &i32 {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &i32 {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &i32 {
+        &self.z
+    }
 }
 
 impl Vector3 for Vector3i {
@@ -450,6 +506,20 @@ impl Vector3 for Vector3i {
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self {
         self - self.dot(w) * w
+    }
+}
+
+impl Index<usize> for Vector3i {
+    type Output = i32;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Vector3i {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
@@ -679,6 +749,22 @@ impl Tuple2<Float> for Vector2f {
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
     }
+
+    fn x_mut(&mut self) -> &mut Float {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut Float {
+        &mut self.y
+    }
+
+    fn x_ref(&self) -> &Float {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &Float {
+        &self.y
+    }
 }
 
 impl Vector2 for Vector2f {
@@ -703,6 +789,20 @@ impl Vector2 for Vector2f {
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self {
         self - self.dot(w) * w
+    }
+}
+
+impl Index<usize> for Vector2f {
+    type Output = Float;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Vector2f {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
@@ -893,6 +993,16 @@ impl Vector3f {
         y: 0.0,
         z: -1.0,
     };
+
+    pub fn coordinate_system(&self) -> (Vector3f, Vector3f) {
+        let sign = Float::copysign(1.0, self.z);
+
+        let a = -1.0 / (sign + self.z);
+        let b = self.x * self.y * a;
+        let v2 = Vector3f::new(1.0 + sign * self.x * self.x * a, sign * b, -sign * self.x);
+        let v3 = Vector3f::new(b, sign + self.y * self.y * a, -self.y);
+        (v2, v3)
+    }
 }
 
 impl Tuple3<Float> for Vector3f {
@@ -914,6 +1024,30 @@ impl Tuple3<Float> for Vector3f {
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
         lerp(t, a, b)
+    }
+
+    fn x_mut(&mut self) -> &mut Float {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut Float {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut Float {
+        &mut self.z
+    }
+
+    fn x_ref(&self) -> &Float {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &Float {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &Float {
+        &self.z
     }
 }
 
@@ -972,6 +1106,20 @@ impl Vector3 for Vector3f {
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self {
         self - self.dot(w) * w
+    }
+}
+
+impl Index<usize> for Vector3f {
+    type Output = Float;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.get(index)
+    }
+}
+
+impl IndexMut<usize> for Vector3f {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.get_mut(index)
     }
 }
 
@@ -1103,7 +1251,7 @@ impl From<&Vector3i> for Vector3f {
 #[cfg(test)]
 mod tests {
     use crate::{
-        geometry::vecmath::{
+        vecmath::{
             vector::{Vector2, Vector3},
             HasNan, Length, Normalize, Tuple2, Tuple3,
         },
