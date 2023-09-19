@@ -5,6 +5,7 @@ mod frame;
 mod is_nan;
 mod math;
 mod sampling;
+mod spectrum;
 mod sphere;
 mod square_matrix;
 mod transform;
