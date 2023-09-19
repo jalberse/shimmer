@@ -7,6 +7,20 @@ const LAMBDA_MAX: Float = 830.0;
 
 // TODO blackbody function
 
+/// The emitted radiance for blackbody at wavelength lambda (nanometers) at temperature (kelvin).
+pub fn blackbody(lambda: Float, temperature: Float) -> Float {
+    if temperature < 0.0 {
+        return 0.0;
+    }
+    let c: Float = 299792458.0;
+    let h: Float = 6.62606957e-34;
+    let kb: Float = 1.3806488e-23;
+    // Convert to meters
+    let l = lambda * 1e-9;
+    // TODO finish this up
+    todo!()
+}
+
 enum Spectrum {
     Constant {
         c: Float,
