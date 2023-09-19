@@ -27,9 +27,9 @@ pub fn blackbody(lambda: Float, temperature: Float) -> Float {
     // Are these kinds of micro-optimizations worth it in Rust? In C++?
     // My money is on "neither, until you have the data to show it, and even then be skeptical of your data"
     // TODO consider Exponentiation by squaring for powi call, and fastexp for exp().
-    let Le = (2.0 * h * c * c) / l.powi(5) * (Float::exp((h * c) / (l * kb * temperature)) - 1.0);
-    debug_assert!(!Le.is_nan());
-    Le
+    let le = (2.0 * h * c * c) / l.powi(5) * (Float::exp((h * c) / (l * kb * temperature)) - 1.0);
+    debug_assert!(!le.is_nan());
+    le
 }
 
 enum Spectrum {
