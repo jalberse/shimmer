@@ -41,6 +41,7 @@ impl<const N: usize> SquareMatrix<N> {
     pub fn diag(vals: [Float; N]) -> Self {
         // PAPERDOC - Rust const generics allow this nice method of passing values in,
         // where PBRTv4 uses variable length parameter lists.
+        // I think this is also possible in C++, though.
         let mut m: [[Float; N]; N] = [[0.0; N]; N];
         for i in 0..N {
             m[i][i] = vals[i];

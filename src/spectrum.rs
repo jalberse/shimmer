@@ -25,11 +25,11 @@ pub fn blackbody(lambda: Float, temperature: Float) -> Float {
     // of the power being known at compile-time, perhaps allowing LLVM to do some magic.
     // This might be something I'd want to write 2 quick demos to test and compare the speeds.
     // Are these kinds of micro-optimizations worth it in Rust? In C++?
-    // My money is on "neither, until you have the data to show it, and even then be skeptical of your data" 
+    // My money is on "neither, until you have the data to show it, and even then be skeptical of your data"
     // TODO consider Exponentiation by squaring for powi call, and fastexp for exp().
-    let Le = (2.0 * h * c * c) / l.powi(5) * (Float::exp((h * c) / (l * kb * temperature)) - 1.0)
+    let Le = (2.0 * h * c * c) / l.powi(5) * (Float::exp((h * c) / (l * kb * temperature)) - 1.0);
     debug_assert!(!Le.is_nan());
-    Le   
+    Le
 }
 
 enum Spectrum {
@@ -101,11 +101,15 @@ impl Spectrum {
                 // and use f32::min() which itself handles the NaN case. This is a bit more verbose,
                 // but that's a worthwhile trade-off to ensure NaNs are handled correctly at compile-time,
                 // rather tracking down propagated NaNs at runtime.
-                let min = values.iter().fold(Float::INFINITY, |a, &b| a.min(b));
-                if min == Float::INFINITY {
+
+                // TODO actually fix, maybe need neg_infinity, was using min() before.
+                // Though a list of neg_infinity would technically have its max there...
+                // Maybe we need an option instead.
+                let max = values.iter().fold(Float::NEG_INFINITY, |a, &b| a.max(b));
+                if max == Float::NEG_INFINITY {
                     panic!("Empty or NaN-filled Densely Sampled Spectrum!")
                 }
-                min
+                max
             }
         }
     }
