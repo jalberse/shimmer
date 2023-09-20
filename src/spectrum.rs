@@ -161,7 +161,11 @@ impl SpectrumI for PiecewiseLinear {
     }
 
     fn max_value(&self) -> Float {
-        todo!()
+        let max = self.values.iter().fold(Float::NAN, |a, &b| a.max(b));
+        if max.is_nan() {
+            panic!("Empty or NaN-filled Spectrum!")
+        }
+        max
     }
 }
 
