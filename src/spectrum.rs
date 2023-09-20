@@ -127,6 +127,8 @@ impl PiecewiseLinear {
     pub fn new<const N: usize>(lambdas: &[Float; N], values: &[Float; N]) -> PiecewiseLinear {
         // PAPERDOC I think this is a good way to ensure lambdas.len() == values.len() at compile-time,
         // rather than a runtime check as in PBRTv4. I'll need to see how it fairs in practice.
+        // Note that we're taking a slice, which is read-only, so we perform a copy here.
+        // This follows PBRT, which also makes a copy; could it be beneficial to take ownership instead?
         let mut l = vec![0.0; lambdas.len()];
         l.copy_from_slice(lambdas);
         let mut v = vec![0.0; values.len()];
@@ -141,7 +143,6 @@ impl PiecewiseLinear {
     }
 }
 
-// TODO impl SpectrumI for PiecewiseLinear, and add to enum
 impl SpectrumI for PiecewiseLinear {
     fn get(&self, lambda: Float) -> Float {
         if self.lambdas.is_empty()
