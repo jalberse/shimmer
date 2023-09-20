@@ -18,6 +18,7 @@ pub trait SpectrumI {
 pub enum Spectrum {
     Constant(Constant),
     DenselySampled(DenselySampled),
+    PiecewiseLinear(PiecewiseLinear),
     Blackbody(Blackbody),
 }
 
@@ -31,6 +32,7 @@ impl SpectrumI for Spectrum {
         match self {
             Spectrum::Constant(c) => c.get(lambda),
             Spectrum::DenselySampled(s) => s.get(lambda),
+            Spectrum::PiecewiseLinear(s) => s.get(lambda),
             Spectrum::Blackbody(s) => s.get(lambda),
         }
     }
@@ -42,6 +44,7 @@ impl SpectrumI for Spectrum {
         match self {
             Spectrum::Constant(c) => c.max_value(),
             Spectrum::DenselySampled(s) => s.max_value(),
+            Spectrum::PiecewiseLinear(s) => s.max_value(),
             Spectrum::Blackbody(s) => s.max_value(),
         }
     }
