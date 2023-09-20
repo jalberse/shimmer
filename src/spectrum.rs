@@ -111,6 +111,26 @@ impl SpectrumI for DenselySampled {
     }
 }
 
+pub struct PiecewiseLinear {
+    lambdas: Vec<Float>,
+    values: Vec<Float>,
+}
+
+impl PiecewiseLinear {
+    pub fn new(lambdas: &[Float], values: &[Float]) -> PiecewiseLinear {
+        let mut l = vec![0.0; lambdas.len()];
+        l.clone_from_slice(lambdas);
+        let mut v = vec![0.0; values.len()];
+        v.clone_from_slice(values);
+        PiecewiseLinear {
+            lambdas: l,
+            values: v,
+        }
+    }
+}
+
+// TODO impl SpectrumI for PiecewiseLinear, and add to enum
+
 /// Normalized blackbody spectrum where the maximum value at any wavelength is 1.
 pub struct Blackbody {
     /// Temperature K
