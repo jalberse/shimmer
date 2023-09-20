@@ -23,10 +23,14 @@ pub fn blackbody(lambda: Float, temperature: Float) -> Float {
     le
 }
 
+trait SpectrumI {
+    fn get(&self, lambda: Float) -> Float;
+
+    fn max_value(&self) -> Float;
+}
+
 enum Spectrum {
-    Constant {
-        c: Float,
-    },
+    Constant(Constant),
     DenselySampled {
         lambda_min: i32,
         lambda_max: i32,
@@ -41,10 +45,6 @@ enum Spectrum {
 }
 
 impl Spectrum {
-    pub fn constant(c: Float) -> Spectrum {
-        Spectrum::Constant { c }
-    }
-
     /// Samples from the provided spectrum to create a DenselySampled spectrum
     pub fn densley_sampled(spectrum: &Spectrum, lambda_min: i32, lambda_max: i32) -> Spectrum {
         // PAPERDOC This is a fun area where idiomatic rust code (map -> collect) is arguably cleaner
@@ -73,7 +73,7 @@ impl Spectrum {
         // PAPERDOC - this will be a great example against PBRTv4's call with TaggedPointer
         //  to achieve static dispatch.
         match self {
-            Spectrum::Constant { c } => *c,
+            Spectrum::Constant(c) => c.get(lambda),
             Spectrum::DenselySampled {
                 lambda_min,
                 lambda_max: _,
@@ -97,7 +97,7 @@ impl Spectrum {
     /// lights can be sampled according to their expected contriibution to illumination in the scene.
     pub fn max_value(&self) -> Float {
         match self {
-            Spectrum::Constant { c } => *c,
+            Spectrum::Constant(c) => c.max_value(),
             Spectrum::DenselySampled {
                 lambda_min: _,
                 lambda_max: _,
@@ -129,12 +129,36 @@ impl Spectrum {
     }
 }
 
+struct Constant {
+    c: Float,
+}
+
+impl Constant {
+    pub fn new(c: Float) -> Self {
+        Self { c }
+    }
+}
+
+impl SpectrumI for Constant {
+    fn get(&self, _lambda: Float) -> Float {
+        self.c
+    }
+
+    fn max_value(&self) -> Float {
+        self.c
+    }
+}
+
 mod tests {
+    use crate::spectrum::{Constant, SpectrumI};
+
     use super::Spectrum;
 
     #[test]
     fn get_constant() {
-        let c = Spectrum::constant(5.0);
-        assert_eq!(5.0, c.get(999.0))
+        let c = Constant::new(5.0);
+        assert_eq!(5.0, c.get(999.0));
+        let spectrum = Spectrum::Constant(c);
+        assert_eq!(5.0, spectrum.get(999.0))
     }
 }
