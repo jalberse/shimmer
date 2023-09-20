@@ -5,7 +5,7 @@ const LAMBDA_MIN: Float = 360.0;
 /// Nanometers. Maximum of visible range of light.
 const LAMBDA_MAX: Float = 830.0;
 
-// TODO blackbody function
+// TODO Embedded spectral data 4.5.3.
 
 /// The emitted radiance for blackbody at wavelength lambda (nanometers) at temperature (kelvin).
 pub fn blackbody(lambda: Float, temperature: Float) -> Float {
@@ -32,6 +32,12 @@ enum Spectrum {
         lambda_max: i32,
         values: Vec<Float>,
     },
+    /// Normalized blackbody spectrum where the maximum value at any wavelength is 1.
+    Blackbody {
+        /// Temperature K
+        t: Float,
+        normalization_factor: Float,
+    },
 }
 
 impl Spectrum {
@@ -53,6 +59,15 @@ impl Spectrum {
         }
     }
 
+    pub fn blackbody(t: Float) -> Spectrum {
+        let lambda_max = 2.8977721e-3 / t; // Wien's displacement law
+        let normalization_factor = 1.0 / blackbody(lambda_max * 1e9, t);
+        Spectrum::Blackbody {
+            t,
+            normalization_factor,
+        }
+    }
+
     /// Gets the value of the spectral distribution at wavelength lambda
     pub fn get(&self, lambda: Float) -> Float {
         // PAPERDOC - this will be a great example against PBRTv4's call with TaggedPointer
@@ -70,6 +85,10 @@ impl Spectrum {
                 }
                 values[offset as usize]
             }
+            Spectrum::Blackbody {
+                t,
+                normalization_factor,
+            } => blackbody(lambda, *t) * normalization_factor,
         }
     }
 
@@ -102,6 +121,10 @@ impl Spectrum {
                 }
                 max
             }
+            Spectrum::Blackbody {
+                t: _,
+                normalization_factor: _,
+            } => 1.0,
         }
     }
 }
