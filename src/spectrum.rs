@@ -17,15 +17,6 @@ pub fn blackbody(lambda: Float, temperature: Float) -> Float {
     let kb: Float = 1.3806488e-23;
     // Convert to meters
     let l = lambda * 1e-9;
-    // PAPERDOC - Note that I'm using the Rust intrinsic functions for powi and exp here.
-    // That differs from PBRT, which uses exponentiation by squaring and a fastexp() algorithm
-    // (pages 1034, 1036).
-    // Intrinsics in Rust leave the development to LLVM, and thus hardware optimization.
-    // I typically wouldn't be against that - but exponentiation by squaring does take advantage
-    // of the power being known at compile-time, perhaps allowing LLVM to do some magic.
-    // This might be something I'd want to write 2 quick demos to test and compare the speeds.
-    // Are these kinds of micro-optimizations worth it in Rust? In C++?
-    // My money is on "neither, until you have the data to show it, and even then be skeptical of your data"
     // TODO consider Exponentiation by squaring for powi call, and fastexp for exp().
     let le = (2.0 * h * c * c) / l.powi(5) * (Float::exp((h * c) / (l * kb * temperature)) - 1.0);
     debug_assert!(!le.is_nan());
