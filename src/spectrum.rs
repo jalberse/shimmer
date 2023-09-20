@@ -1,4 +1,6 @@
-use crate::Float;
+use crate::{math::lerp, Float};
+
+use itertools::Itertools;
 
 /// Nanometers. Minimum of visible range of light.
 const LAMBDA_MIN: Float = 360.0;
@@ -117,11 +119,18 @@ pub struct PiecewiseLinear {
 }
 
 impl PiecewiseLinear {
-    pub fn new(lambdas: &[Float], values: &[Float]) -> PiecewiseLinear {
+    /// Creates a piecewise linear spectrum from associated lambdas and values;
+    /// these slices must be sorted.
+    pub fn new<const N: usize>(lambdas: &[Float; N], values: &[Float; N]) -> PiecewiseLinear {
+        // PAPERDOC I think this is a good way to ensure lambdas.len() == values.len() at compile-time,
+        // rather than a runtime check as in PBRTv4. I'll need to see how it fairs in practice.
         let mut l = vec![0.0; lambdas.len()];
-        l.clone_from_slice(lambdas);
+        l.copy_from_slice(lambdas);
         let mut v = vec![0.0; values.len()];
-        v.clone_from_slice(values);
+        v.copy_from_slice(values);
+        // Check that they are sorted
+        assert!(l.windows(2).all(|p| p[0] <= p[1]));
+        assert!(v.windows(2).all(|p| p[0] <= p[1]));
         PiecewiseLinear {
             lambdas: l,
             values: v,
@@ -130,6 +139,31 @@ impl PiecewiseLinear {
 }
 
 // TODO impl SpectrumI for PiecewiseLinear, and add to enum
+impl SpectrumI for PiecewiseLinear {
+    fn get(&self, lambda: Float) -> Float {
+        if self.lambdas.is_empty()
+            || lambda < *self.lambdas.first().unwrap()
+            || lambda > *self.lambdas.last().unwrap()
+        {
+            return 0.0;
+        }
+
+        // PAPERDOC I would contend that this is a much cleaner and simpler approach
+        // than PBRTv4's FindInterval() approach.
+        let interval: Option<(usize, usize)> = (0..self.lambdas.len())
+            .tuples()
+            .find(|(a, b)| -> bool { self.lambdas[*a] <= lambda && lambda < self.lambdas[*b] });
+        let interval = interval.expect("Interval not found; edge cases should be handled above.");
+
+        let t = (lambda - self.lambdas[interval.0])
+            / (self.lambdas[interval.1] - self.lambdas[interval.0]);
+        lerp(t, &self.values[interval.0], &self.values[interval.1])
+    }
+
+    fn max_value(&self) -> Float {
+        todo!()
+    }
+}
 
 /// Normalized blackbody spectrum where the maximum value at any wavelength is 1.
 pub struct Blackbody {
@@ -189,4 +223,6 @@ mod tests {
         let spectrum = Spectrum::Constant(c);
         assert_eq!(5.0, spectrum.get(999.0))
     }
+
+    // TODO test piecewiselinear ctor and get(). It's a bit invovled so we should test it.
 }

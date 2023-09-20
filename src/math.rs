@@ -212,6 +212,12 @@ fn TwoSum(a: Float, b: Float) -> CompensatedFloat {
     CompensatedFloat::new(s, err)
 }
 
+pub fn find_interval<T>(size: usize, pred: T)
+where
+    T: Fn(&[Float], usize) -> usize,
+{
+}
+
 mod tests {
     #[test]
     fn lerp() {
