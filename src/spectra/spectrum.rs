@@ -218,7 +218,7 @@ impl SpectrumI for Blackbody {
 }
 
 mod tests {
-    use crate::spectra::{Constant, Spectrum};
+    use crate::spectra::{spectrum::SpectrumI, Constant, Spectrum};
 
     #[test]
     fn get_constant() {

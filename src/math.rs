@@ -185,27 +185,27 @@ pub fn safe_acos(x: Float) -> Float {
 ///
 /// Accurate summation, dot product and polynomial evaluation in complex
 /// floating point arithmetic, Graillat and Menissier-Morain.
-pub fn InnerProduct(xs: &[Float], ys: &[Float]) -> CompensatedFloat {
+pub fn inner_product(xs: &[Float], ys: &[Float]) -> CompensatedFloat {
     // PAPERDOC this is arguable a more elegant solution with slices than variadic parameters.
     debug_assert!(xs.len() == ys.len());
     if xs.len() == 1 {
         // Base case
-        return TwoProd(xs[0], ys[0]);
+        return two_prod(xs[0], ys[0]);
     } else {
-        let ab = TwoProd(xs[0], ys[0]);
-        let tp = InnerProduct(&xs[1..xs.len()], &ys[1..ys.len()]);
-        let sum = TwoSum(ab.v, tp.v);
+        let ab = two_prod(xs[0], ys[0]);
+        let tp = inner_product(&xs[1..xs.len()], &ys[1..ys.len()]);
+        let sum = two_sum(ab.v, tp.v);
         return CompensatedFloat::new(sum.v, ab.err + tp.err + sum.err);
     }
 }
 
-fn TwoProd(a: Float, b: Float) -> CompensatedFloat {
+fn two_prod(a: Float, b: Float) -> CompensatedFloat {
     let ab = a * b;
     let err = Float::mul_add(a, b, -ab);
     CompensatedFloat::new(ab, err)
 }
 
-fn TwoSum(a: Float, b: Float) -> CompensatedFloat {
+fn two_sum(a: Float, b: Float) -> CompensatedFloat {
     let s = a + b;
     let delta = s - a;
     let err = (a - (s - delta)) + (b - delta);
