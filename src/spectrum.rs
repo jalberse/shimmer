@@ -1,13 +1,12 @@
 use crate::{math::lerp, Float};
 
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 
 /// Nanometers. Minimum of visible range of light.
 const LAMBDA_MIN: Float = 360.0;
 /// Nanometers. Maximum of visible range of light.
 const LAMBDA_MAX: Float = 830.0;
-
-// TODO Embedded spectral data 4.5.3.
 
 pub trait SpectrumI {
     fn get(&self, lambda: Float) -> Float;
@@ -218,6 +217,34 @@ impl SpectrumI for Blackbody {
         1.0
     }
 }
+
+// TODO Embedded spectral data 4.5.3.
+// I think we will have const spectra as we see in Init(), but rather than
+// having an Init() function, we'll define those objects as static constants
+// (hopefully at compile time?).
+// And instead of a map on string keys (which requires evaluating the hash),
+// we'll have an Enum with the names and match on it and return ref to static-lifetimed
+// spectra. Ensure we have ONE of each that are read-only.
+
+enum NamedSpectrum {
+    GLASS_BK7,
+    GLASS_BAF10,
+}
+
+fn get_named_spectrum(spectrum: NamedSpectrum) -> &'static Spectrum {
+    match spectrum {
+        NamedSpectrum::GLASS_BK7 => Lazy::force(&GLASS_BK7_ETA),
+        NamedSpectrum::GLASS_BAF10 => Lazy::force(&GLASS_BAF10_ETA),
+    }
+}
+
+// TODO Need to use once_cell I think.
+// TODO and use actual data lol.
+static GLASS_BK7_ETA: Lazy<Spectrum> =
+    Lazy::new(|| Spectrum::PiecewiseLinear(PiecewiseLinear::new(&[0.0, 1.0], &[1.0, 2.0])));
+
+static GLASS_BAF10_ETA: Lazy<Spectrum> =
+    Lazy::new(|| Spectrum::PiecewiseLinear(PiecewiseLinear::new(&[2.0, 3.0], &[5.0, 6.0])));
 
 mod tests {
     use crate::spectrum::{Constant, SpectrumI};
