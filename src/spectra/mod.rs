@@ -1,3 +1,4 @@
+mod cie;
 pub mod named_spectrum;
 pub mod spectrum;
 
