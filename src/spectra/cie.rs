@@ -1,8 +1,61 @@
+use once_cell::sync::Lazy;
+
 /// CIE embedded data.
 /// Separated to keep other modules readable.
-use crate::Float;
+use crate::{
+    spectra::spectrum::{LAMBDA_MAX, LAMBDA_MIN},
+    Float,
+};
 
-const NUM_CIE_SAMPLES: usize = 471;
+use super::{DenselySampled, PiecewiseLinear, Spectrum};
+
+pub const NUM_CIE_SAMPLES: usize = 471;
+
+pub const CIE_Y_INTEGRAL: Float = 106.856895;
+
+pub enum CIE {
+    X,
+    Y,
+    Z,
+}
+
+pub fn get_cie(cie: CIE) -> &'static Spectrum {
+    match cie {
+        CIE::X => Lazy::force(&X),
+        CIE::Y => Lazy::force(&Y),
+        CIE::Z => Lazy::force(&Z),
+    }
+}
+
+static X: Lazy<Spectrum> = Lazy::new(|| {
+    let xpls =
+        Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_X));
+    Spectrum::DenselySampled(DenselySampled::new(
+        &xpls,
+        LAMBDA_MIN as i32,
+        LAMBDA_MAX as i32,
+    ))
+});
+
+static Y: Lazy<Spectrum> = Lazy::new(|| {
+    let ypls =
+        Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_Y));
+    Spectrum::DenselySampled(DenselySampled::new(
+        &ypls,
+        LAMBDA_MIN as i32,
+        LAMBDA_MAX as i32,
+    ))
+});
+
+static Z: Lazy<Spectrum> = Lazy::new(|| {
+    let zpls =
+        Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_Z));
+    Spectrum::DenselySampled(DenselySampled::new(
+        &zpls,
+        LAMBDA_MIN as i32,
+        LAMBDA_MAX as i32,
+    ))
+});
 
 const CIE_LAMBDA: [Float; NUM_CIE_SAMPLES] = [
     360.0, 361.0, 362.0, 363.0, 364.0, 365.0, 366.0, 367.0, 368.0, 369.0, 370.0, 371.0, 372.0,

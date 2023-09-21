@@ -1,11 +1,15 @@
-use crate::{math::lerp, Float};
+use crate::{
+    math::{inner_product, lerp},
+    spectra::cie::CIE_Y_INTEGRAL,
+    Float,
+};
 
 use itertools::Itertools;
 
 /// Nanometers. Minimum of visible range of light.
-const LAMBDA_MIN: Float = 360.0;
+pub const LAMBDA_MIN: Float = 360.0;
 /// Nanometers. Maximum of visible range of light.
-const LAMBDA_MAX: Float = 830.0;
+pub const LAMBDA_MAX: Float = 830.0;
 
 pub trait SpectrumI {
     fn get(&self, lambda: Float) -> Float;
@@ -137,6 +141,57 @@ impl PiecewiseLinear {
         PiecewiseLinear {
             lambdas: l,
             values: v,
+        }
+    }
+
+    pub fn from_interleaved<const N: usize>(
+        samples: &[Float; N],
+        normalize: bool,
+    ) -> PiecewiseLinear {
+        assert_eq!(0, samples.len() % 2);
+        let n = samples.len() / 2;
+        let mut lambda: Vec<Float> = Vec::new();
+        let mut v: Vec<Float> = Vec::new();
+
+        // Extend samples to cover range of visible wavelengths if needed.
+        // Note since we're making a piecewise spectrum, we only need one more entry.
+        if samples[0] > LAMBDA_MIN {
+            lambda.push(LAMBDA_MIN - 1.0);
+            v.push(samples[1]);
+        }
+        for i in 0..n {
+            lambda.push(samples[2 * i]);
+            v.push(samples[2 * i + 1]);
+            if i > 0 {
+                // Check ordering
+                assert!(*lambda.last().unwrap() > lambda[lambda.len() - 2]);
+            }
+        }
+        // Extend to cover maximum wavelength if necessary.
+        if *lambda.last().unwrap() < LAMBDA_MAX {
+            lambda.push(LAMBDA_MAX + 1.0);
+            v.push(*v.last().unwrap());
+        }
+
+        // PAPERDOC Interesting callsite as we enforce the slices must have the same length N.
+        // Note that N must propagate up through this function, then; but that should be okay for our case.
+        let mut spectrum = PiecewiseLinear::new::<N>(
+            lambda.as_slice().try_into().expect("Invalid length"),
+            v.as_slice().try_into().expect("Invalid length"),
+        );
+
+        if normalize {
+            // TODO Need inner_product of two spectra
+            // TODO need Spectrum::Y(). Can use our new get_cie() lazy eval.
+            // TODO I think get_cie() and get_named_spectrum() should be in impl Spectrum. Clearest place to look.
+        }
+
+        todo!()
+    }
+
+    pub fn scale(&mut self, s: Float) {
+        for v in &mut self.values {
+            *v *= s;
         }
     }
 }
