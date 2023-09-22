@@ -1,6 +1,6 @@
 use crate::{
-    math::{inner_product, lerp},
-    spectra::cie::CIE_Y_INTEGRAL,
+    math::lerp,
+    spectra::cie::{get_cie, CIE, CIE_Y_INTEGRAL},
     Float,
 };
 
@@ -10,6 +10,14 @@ use itertools::Itertools;
 pub const LAMBDA_MIN: Float = 360.0;
 /// Nanometers. Maximum of visible range of light.
 pub const LAMBDA_MAX: Float = 830.0;
+
+fn inner_product<T: SpectrumI, G: SpectrumI>(a: &T, b: &G) -> Float {
+    let mut integral = 0.0;
+    for lambda in (LAMBDA_MIN as i32)..(LAMBDA_MAX as i32) {
+        integral += a.get(lambda as Float) * b.get(lambda as Float);
+    }
+    integral
+}
 
 pub trait SpectrumI {
     fn get(&self, lambda: Float) -> Float;
@@ -181,12 +189,14 @@ impl PiecewiseLinear {
         );
 
         if normalize {
-            // TODO Need inner_product of two spectra
-            // TODO need Spectrum::Y(). Can use our new get_cie() lazy eval.
             // TODO I think get_cie() and get_named_spectrum() should be in impl Spectrum. Clearest place to look.
+            spectrum.scale(
+                CIE_Y_INTEGRAL
+                    / inner_product::<PiecewiseLinear, Spectrum>(&spectrum, &get_cie(CIE::Y)),
+            );
         }
 
-        todo!()
+        spectrum
     }
 
     pub fn scale(&mut self, s: Float) {
