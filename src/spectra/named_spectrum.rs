@@ -8,6 +8,9 @@ use crate::Float;
 
 use super::{PiecewiseLinear, Spectrum};
 
+// TODO add other named spectra. I'm happy to just have the system in place for
+// now though, we can add them as we need them or when I have time to go through
+// and copy/generate all the data.
 pub enum NamedSpectrum {
     GlassBk7,
     GlassBaf10,
@@ -22,9 +25,14 @@ pub static GLASS_BK7_ETA: Lazy<Spectrum> = Lazy::new(|| {
     ))
 });
 
-pub static GLASS_BAF10_ETA: Lazy<Spectrum> =
-    Lazy::new(|| Spectrum::PiecewiseLinear(PiecewiseLinear::new(&[2.0, 3.0], &[5.0, 6.0])));
+pub static GLASS_BAF10_ETA: Lazy<Spectrum> = Lazy::new(|| {
+    Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<54, 27>(
+        &GLASS_BAF10_ETA_SAMPLES,
+        false,
+    ))
+});
 
+const NUM_GLASS_BK7_ETA_SAMPLES: usize = 58;
 const GLASS_BK7_ETA_SAMPLES: [Float; 58] = [
     300.0,
     1.5527702635739,
@@ -84,4 +92,61 @@ const GLASS_BK7_ETA_SAMPLES: [Float; 58] = [
     1.5090939781792,
     916.0,
     1.5087426727363,
+];
+
+const GLASS_BAF10_ETA_SAMPLES: [Float; 54] = [
+    350.0,
+    1.7126880848268,
+    371.0,
+    1.7044510025682,
+    393.0,
+    1.6978539633931,
+    414.0,
+    1.6924597573902,
+    436.0,
+    1.6879747521657,
+    457.0,
+    1.6841935148947,
+    479.0,
+    1.6809676313681,
+    500.0,
+    1.6781870617363,
+    522.0,
+    1.6757684467878,
+    543.0,
+    1.6736474831891,
+    565.0,
+    1.6717737892968,
+    586.0,
+    1.6701073530462,
+    608.0,
+    1.6686160168249,
+    629.0,
+    1.6672736605352,
+    651.0,
+    1.6660588657981,
+    672.0,
+    1.6649539185393,
+    694.0,
+    1.6639440538738,
+    715.0,
+    1.6630168772865,
+    737.0,
+    1.6621619159417,
+    758.0,
+    1.6613702672977,
+    780.0,
+    1.6606343213443,
+    801.0,
+    1.6599475391478,
+    823.0,
+    1.6593042748862,
+    844.0,
+    1.6586996317841,
+    866.0,
+    1.6581293446924,
+    887.0,
+    1.6575896837763,
+    909.0,
+    1.6570773750475,
 ];
