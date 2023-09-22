@@ -180,10 +180,16 @@ impl PiecewiseLinear {
         }
     }
 
-    pub fn from_interleaved<const N: usize>(
+    /// Gets a PiecewiseLinear spectrum from an interleaved samples array;
+    /// i.e. the wavelength and value for each sample i are at (i * 2) and (i * 2) + 1.
+    ///
+    /// * N: The length of the interleaved samples array. 2 * S.
+    /// * S: The number of samples; 1/2 of N.
+    pub fn from_interleaved<const N: usize, const S: usize>(
         samples: &[Float; N],
         normalize: bool,
     ) -> PiecewiseLinear {
+        assert_eq!(N, S / 2);
         assert_eq!(0, samples.len() % 2);
         let n = samples.len() / 2;
         let mut lambda: Vec<Float> = Vec::new();
@@ -211,7 +217,13 @@ impl PiecewiseLinear {
 
         // PAPERDOC Interesting callsite as we enforce the slices must have the same length N.
         // Note that N must propagate up through this function, then; but that should be okay for our case.
-        let mut spectrum = PiecewiseLinear::new::<N>(
+        // This is enabled by const generics, which were added recently (in 2022?) to Rust.
+        // Note that the N, S arrangement is a bit awkward - but that could be avoided
+        // by not interleaving the data, which would honestly be better. But for convenience,
+        // let's do this for now.
+        // TODO switch off of interleaved data structures so we can just use one value N.
+        // This means changing the named spectra to have separate lambda and value arrays.
+        let mut spectrum = PiecewiseLinear::new::<S>(
             lambda.as_slice().try_into().expect("Invalid length"),
             v.as_slice().try_into().expect("Invalid length"),
         );
