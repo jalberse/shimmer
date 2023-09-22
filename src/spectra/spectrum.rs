@@ -1,10 +1,13 @@
 use crate::{
     math::lerp,
-    spectra::cie::{get_cie, CIE, CIE_Y_INTEGRAL},
+    spectra::cie::{CIE, CIE_Y_INTEGRAL},
     Float,
 };
 
 use itertools::Itertools;
+use once_cell::sync::Lazy;
+
+use super::NamedSpectrum;
 
 /// Nanometers. Minimum of visible range of light.
 pub const LAMBDA_MIN: Float = 360.0;
@@ -56,6 +59,31 @@ impl SpectrumI for Spectrum {
             Spectrum::DenselySampled(s) => s.max_value(),
             Spectrum::PiecewiseLinear(s) => s.max_value(),
             Spectrum::Blackbody(s) => s.max_value(),
+        }
+    }
+}
+
+impl Spectrum {
+    /// Gets a lazily-evaluated named spectrum.
+    fn get_named_spectrum(spectrum: NamedSpectrum) -> &'static Spectrum {
+        // PAPERDOC Embedded spectral data 4.5.3.
+        // Instead of a map on string keys (which requires evaluating the hash),
+        // we use an Enum with the names and match on it and return ref to static-lifetimed
+        // spectra. These are thread-safe read-only single-instance objects.
+        // We can just use const CIE_LAMBDA: [Float] = [...]; and that should work.
+        //   or maybe we need it static?
+        match spectrum {
+            NamedSpectrum::GlassBk7 => Lazy::force(&super::named_spectrum::GLASS_BK7_ETA),
+            NamedSpectrum::GlassBaf10 => Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA),
+        }
+    }
+
+    /// Gets a CIE spectrum
+    fn get_cie(cie: CIE) -> &'static Spectrum {
+        match cie {
+            CIE::X => Lazy::force(&super::cie::X),
+            CIE::Y => Lazy::force(&super::cie::Y),
+            CIE::Z => Lazy::force(&super::cie::Z),
         }
     }
 }
@@ -189,10 +217,12 @@ impl PiecewiseLinear {
         );
 
         if normalize {
-            // TODO I think get_cie() and get_named_spectrum() should be in impl Spectrum. Clearest place to look.
             spectrum.scale(
                 CIE_Y_INTEGRAL
-                    / inner_product::<PiecewiseLinear, Spectrum>(&spectrum, &get_cie(CIE::Y)),
+                    / inner_product::<PiecewiseLinear, Spectrum>(
+                        &spectrum,
+                        Spectrum::get_cie(CIE::Y),
+                    ),
             );
         }
 

@@ -2,7 +2,6 @@ mod cie;
 pub mod named_spectrum;
 pub mod spectrum;
 
-pub use named_spectrum::get_named_spectrum;
 pub use named_spectrum::NamedSpectrum;
 pub use spectrum::Blackbody;
 pub use spectrum::Constant;

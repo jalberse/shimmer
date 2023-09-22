@@ -19,15 +19,7 @@ pub enum CIE {
     Z,
 }
 
-pub fn get_cie(cie: CIE) -> &'static Spectrum {
-    match cie {
-        CIE::X => Lazy::force(&X),
-        CIE::Y => Lazy::force(&Y),
-        CIE::Z => Lazy::force(&Z),
-    }
-}
-
-static X: Lazy<Spectrum> = Lazy::new(|| {
+pub static X: Lazy<Spectrum> = Lazy::new(|| {
     let xpls =
         Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_X));
     Spectrum::DenselySampled(DenselySampled::new(
@@ -37,7 +29,7 @@ static X: Lazy<Spectrum> = Lazy::new(|| {
     ))
 });
 
-static Y: Lazy<Spectrum> = Lazy::new(|| {
+pub static Y: Lazy<Spectrum> = Lazy::new(|| {
     let ypls =
         Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_Y));
     Spectrum::DenselySampled(DenselySampled::new(
@@ -47,7 +39,7 @@ static Y: Lazy<Spectrum> = Lazy::new(|| {
     ))
 });
 
-static Z: Lazy<Spectrum> = Lazy::new(|| {
+pub static Z: Lazy<Spectrum> = Lazy::new(|| {
     let zpls =
         Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_Z));
     Spectrum::DenselySampled(DenselySampled::new(
