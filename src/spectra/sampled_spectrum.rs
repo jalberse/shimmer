@@ -92,6 +92,10 @@ impl SampledSpectrum {
     pub fn lerp(&self, other: &SampledSpectrum, t: Float) -> SampledSpectrum {
         (1.0 - t) * self + t * other
     }
+
+    pub fn average(&self) -> Float {
+        self.values.iter().sum::<Float>() / self.values.len() as Float
+    }
 }
 
 impl Index<usize> for SampledSpectrum {
