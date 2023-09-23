@@ -2,7 +2,7 @@ use auto_ops::impl_op_ex;
 
 use crate::{
     spectra::{inner_product, spectrum::SpectrumI, Spectrum, CIE_Y_INTEGRAL},
-    vecmath::HasNan,
+    vecmath::{HasNan, Point2f, Tuple2},
     Float,
 };
 
@@ -23,6 +23,20 @@ impl XYZ {
             inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::Y), s),
             inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::Z), s)
                 / CIE_Y_INTEGRAL,
+        )
+    }
+
+    pub fn from_xy_y(xy: &Point2f, y: Float) -> XYZ {
+        if xy.y == 0.0 {
+            return XYZ::new(0.0, 0.0, 0.0);
+        }
+        XYZ::new(xy.x * y / xy.y, y, (1.0 - xy.x - xy.y) * y / xy.y)
+    }
+
+    pub fn xy(&self) -> Point2f {
+        Point2f::new(
+            self.x / (self.x + self.y + self.z),
+            self.y / (self.x + self.y + self.z),
         )
     }
 }
