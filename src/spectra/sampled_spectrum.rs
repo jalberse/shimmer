@@ -1,6 +1,6 @@
 use std::ops::{Deref, Index, IndexMut};
 
-use auto_ops::impl_op_ex;
+use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 use crate::{
     math::{Min, Sqrt},
@@ -88,6 +88,10 @@ impl SampledSpectrum {
         debug_assert!(!result.has_nan());
         SampledSpectrum::new(result)
     }
+
+    pub fn lerp(&self, other: &SampledSpectrum, t: Float) -> SampledSpectrum {
+        (1.0 - t) * self + t * other
+    }
 }
 
 impl Index<usize> for SampledSpectrum {
@@ -145,6 +149,15 @@ impl_op_ex!(
         SampledSpectrum::new(result)
     }
 );
+
+impl_op_ex_commutative!(*|s1: &SampledSpectrum, v: &Float| -> SampledSpectrum {
+    let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+    for i in 0..NUM_SPECTRUM_SAMPLES {
+        result[i] = s1[i] * v;
+    }
+    debug_assert!(!result.has_nan());
+    SampledSpectrum::new(result)
+});
 
 impl_op_ex!(/|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum
 {
