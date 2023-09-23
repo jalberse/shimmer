@@ -124,6 +124,8 @@ impl SampledSpectrum {
         )
     }
 
+    /// Similar to to_xyz(), but only computes the y value for when only
+    /// luminance is needed, thereby saving computations.
     pub fn y(&self, lambda: &SampledWavelengths) -> Float {
         let ys = Spectrum::get_cie(super::CIE::Y).sample(lambda);
         let pdf = lambda.pdf();
