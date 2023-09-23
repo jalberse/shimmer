@@ -96,6 +96,20 @@ impl SampledSpectrum {
     pub fn average(&self) -> Float {
         self.values.iter().sum::<Float>() / self.values.len() as Float
     }
+
+    pub fn min_component_value(&self) -> Float {
+        debug_assert!(!self.values.has_nan());
+        let min = self.values.iter().fold(Float::NAN, |a, &b| a.min(b));
+        debug_assert!(!min.is_nan());
+        min
+    }
+
+    pub fn max_component_value(&self) -> Float {
+        debug_assert!(!self.values.has_nan());
+        let max = self.values.iter().fold(Float::NAN, |a, &b| a.max(b));
+        debug_assert!(!max.is_nan());
+        max
+    }
 }
 
 impl Index<usize> for SampledSpectrum {
