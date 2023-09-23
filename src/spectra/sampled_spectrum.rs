@@ -2,7 +2,11 @@ use std::ops::{Deref, Index, IndexMut};
 
 use auto_ops::impl_op_ex;
 
-use crate::{math::Sqrt, Float};
+use crate::{
+    math::{Min, Sqrt},
+    vecmath::HasNan,
+    Float,
+};
 
 const NUM_SPECTRUM_SAMPLES: usize = 4;
 
@@ -35,6 +39,16 @@ impl SampledSpectrum {
                 self[i] / other[i]
             }
         }
+        debug_assert!(!result.has_nan());
+        SampledSpectrum::new(result)
+    }
+
+    pub fn clamp(&self, min: Float, max: Float) -> SampledSpectrum {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            result[i] = self.values[i].clamp(min, max);
+        }
+        debug_assert!(!result.has_nan());
         SampledSpectrum::new(result)
     }
 }
@@ -69,6 +83,7 @@ impl_op_ex!(+|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum
     {
         result[i] = s1[i] + s2[i];
     }
+    debug_assert!(!result.has_nan());
     SampledSpectrum::new(result)
 });
 
@@ -78,6 +93,7 @@ impl_op_ex!(
         for i in 0..NUM_SPECTRUM_SAMPLES {
             result[i] = s1[i] - s2[i];
         }
+        debug_assert!(!result.has_nan());
         SampledSpectrum::new(result)
     }
 );
@@ -88,6 +104,7 @@ impl_op_ex!(
         for i in 0..NUM_SPECTRUM_SAMPLES {
             result[i] = s1[i] * s2[i];
         }
+        debug_assert!(!result.has_nan());
         SampledSpectrum::new(result)
     }
 );
@@ -99,6 +116,7 @@ impl_op_ex!(/|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum
     {
         result[i] = s1[i] / s2[i];
     }
+    debug_assert!(!result.has_nan());
     SampledSpectrum::new(result)
 });
 
@@ -134,12 +152,25 @@ impl_op_ex!(/=|s1: &mut SampledSpectrum, s2: &SampledSpectrum|
     }
 });
 
+impl HasNan for SampledSpectrum {
+    fn has_nan(&self) -> bool {
+        self.values.iter().any(|x| x.is_nan())
+    }
+}
+
+impl HasNan for [Float; NUM_SPECTRUM_SAMPLES] {
+    fn has_nan(&self) -> bool {
+        self.iter().any(|x| x.is_nan())
+    }
+}
+
 impl Sqrt for SampledSpectrum {
     fn sqrt(self) -> Self {
         let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
         for i in 0..NUM_SPECTRUM_SAMPLES {
             result[i] = self[i].sqrt();
         }
+        debug_assert!(!result.has_nan());
         SampledSpectrum::new(result)
     }
 }
