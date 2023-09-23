@@ -7,7 +7,10 @@ use crate::{
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 
-use super::NamedSpectrum;
+use super::{
+    sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths, NamedSpectrum,
+    NUM_SPECTRUM_SAMPLES,
+};
 
 /// Nanometers. Minimum of visible range of light.
 pub const LAMBDA_MIN: Float = 360.0;
@@ -26,6 +29,8 @@ pub trait SpectrumI {
     fn get(&self, lambda: Float) -> Float;
 
     fn max_value(&self) -> Float;
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
 
 pub enum Spectrum {
@@ -59,6 +64,15 @@ impl SpectrumI for Spectrum {
             Spectrum::DenselySampled(s) => s.max_value(),
             Spectrum::PiecewiseLinear(s) => s.max_value(),
             Spectrum::Blackbody(s) => s.max_value(),
+        }
+    }
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        match self {
+            Spectrum::Constant(c) => c.sample(lambda),
+            Spectrum::DenselySampled(s) => s.sample(lambda),
+            Spectrum::PiecewiseLinear(s) => s.sample(lambda),
+            Spectrum::Blackbody(s) => s.sample(lambda),
         }
     }
 }
@@ -106,6 +120,10 @@ impl SpectrumI for Constant {
     fn max_value(&self) -> Float {
         self.c
     }
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        SampledSpectrum::from_const(self.c)
+    }
 }
 
 pub struct DenselySampled {
@@ -151,6 +169,19 @@ impl SpectrumI for DenselySampled {
             panic!("Empty or NaN-filled Densely Sampled Spectrum!")
         }
         max
+    }
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let mut s = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            let offset: i32 = lambda[i].round() as i32 - self.lambda_min;
+            s[i] = if offset < 0 || offset >= self.values.len() as i32 {
+                0.0
+            } else {
+                self.values[offset as usize]
+            }
+        }
+        SampledSpectrum::new(s)
     }
 }
 
@@ -276,6 +307,14 @@ impl SpectrumI for PiecewiseLinear {
         }
         max
     }
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let mut s = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            s[i] = self.get(lambda[i]);
+        }
+        SampledSpectrum::new(s)
+    }
 }
 
 /// Normalized blackbody spectrum where the maximum value at any wavelength is 1.
@@ -321,6 +360,14 @@ impl SpectrumI for Blackbody {
 
     fn max_value(&self) -> Float {
         1.0
+    }
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let mut s = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            s[i] = Blackbody::blackbody(lambda[i], self.t) * self.normalization_factor;
+        }
+        SampledSpectrum::new(s)
     }
 }
 
