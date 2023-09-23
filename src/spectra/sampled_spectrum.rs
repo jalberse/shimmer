@@ -2,13 +2,9 @@ use std::ops::{Deref, Index, IndexMut};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-use crate::{
-    math::{Min, Sqrt},
-    vecmath::HasNan,
-    Float,
-};
+use crate::{math::Sqrt, vecmath::HasNan, Float};
 
-const NUM_SPECTRUM_SAMPLES: usize = 4;
+use super::NUM_SPECTRUM_SAMPLES;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct SampledSpectrum {
