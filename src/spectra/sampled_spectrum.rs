@@ -2,9 +2,11 @@ use std::ops::{Deref, Index, IndexMut};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-use crate::{math::Sqrt, vecmath::HasNan, Float};
+use crate::{color::XYZ, math::Sqrt, spectra::spectrum::SpectrumI, vecmath::HasNan, Float};
 
-use super::NUM_SPECTRUM_SAMPLES;
+use super::{
+    sampled_wavelengths::SampledWavelengths, Spectrum, CIE_Y_INTEGRAL, NUM_SPECTRUM_SAMPLES,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct SampledSpectrum {
@@ -105,6 +107,21 @@ impl SampledSpectrum {
         let max = self.values.iter().fold(Float::NAN, |a, &b| a.max(b));
         debug_assert!(!max.is_nan());
         max
+    }
+
+    pub fn to_xyz(&self, lambda: &SampledWavelengths) -> XYZ {
+        // Sample the X, Y, and Z matching curves at lambda
+        let x = Spectrum::get_cie(super::CIE::X).sample(lambda);
+        let y = Spectrum::get_cie(super::CIE::Y).sample(lambda);
+        let z = Spectrum::get_cie(super::CIE::Z).sample(lambda);
+
+        // Evaluate estimator to compute (x, y, z) coefficients.
+        let pdf = lambda.pdf();
+        XYZ::new(
+            (x * self).safe_div(&pdf).average(),
+            (y * self).safe_div(&pdf).average(),
+            (z * self).safe_div(&pdf).average() / CIE_Y_INTEGRAL,
+        )
     }
 }
 
