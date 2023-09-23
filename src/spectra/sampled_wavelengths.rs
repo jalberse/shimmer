@@ -12,8 +12,6 @@ pub struct SampledWavelengths {
 }
 
 impl SampledWavelengths {
-    // TODO make a sample_uniform with defaults
-
     pub fn sample_uniform(u: Float) -> SampledWavelengths {
         Self::sample_uniform_range(u, LAMBDA_MIN, LAMBDA_MAX)
     }
@@ -29,7 +27,7 @@ impl SampledWavelengths {
         lambda[0] = lerp(u, &lambda_min, &lambda_max);
 
         // Initialzie lambda for remaining wavelengths
-        let delta = (lambda_max - lambda_min) / NUM_SPECTRUM_SAMPLES;
+        let delta = (lambda_max - lambda_min) / NUM_SPECTRUM_SAMPLES as Float;
         for i in 1..NUM_SPECTRUM_SAMPLES {
             lambda[i] = lambda[i - 1] + delta;
             if lambda[i] > lambda_max {
