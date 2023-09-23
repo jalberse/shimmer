@@ -51,6 +51,15 @@ impl SampledSpectrum {
         debug_assert!(!result.has_nan());
         SampledSpectrum::new(result)
     }
+
+    pub fn clamp_zero(&self) -> SampledSpectrum {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            result[i] = Float::max(0.0, self.values[i])
+        }
+        debug_assert!(!result.has_nan());
+        SampledSpectrum::new(result)
+    }
 }
 
 impl Index<usize> for SampledSpectrum {
