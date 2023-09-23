@@ -7,7 +7,7 @@ use crate::Float;
 const NUM_SPECTRUM_SAMPLES: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-struct SampledSpectrum {
+pub struct SampledSpectrum {
     values: [Float; NUM_SPECTRUM_SAMPLES],
 }
 
@@ -24,6 +24,18 @@ impl SampledSpectrum {
 
     pub fn is_zero(&self) -> bool {
         self.values.iter().all(|x: &Float| x == &0.0)
+    }
+
+    pub fn safe_div(&self, other: &SampledSpectrum) -> SampledSpectrum {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            result[i] = if other[i] == 0.0 {
+                0.0
+            } else {
+                self[i] / other[i]
+            }
+        }
+        SampledSpectrum::new(result)
     }
 }
 
