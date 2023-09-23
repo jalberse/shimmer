@@ -60,6 +60,24 @@ impl SampledSpectrum {
         debug_assert!(!result.has_nan());
         SampledSpectrum::new(result)
     }
+
+    pub fn powf(&self, e: Float) -> SampledSpectrum {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            result[i] = self.values[i].powf(e);
+        }
+        debug_assert!(!result.has_nan());
+        SampledSpectrum::new(result)
+    }
+
+    pub fn powi(&self, e: i32) -> SampledSpectrum {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            result[i] = self.values[i].powi(e);
+        }
+        debug_assert!(!result.has_nan());
+        SampledSpectrum::new(result)
+    }
 }
 
 impl Index<usize> for SampledSpectrum {
