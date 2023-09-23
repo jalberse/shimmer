@@ -112,3 +112,89 @@ impl_op_ex!(/|a: &XYZ, b: &Float| -> XYZ {
         z: a.z / b,
     }
 });
+
+pub struct RGB {
+    pub r: Float,
+    pub g: Float,
+    pub b: Float,
+}
+
+impl RGB {
+    pub fn new(r: Float, g: Float, b: Float) -> RGB {
+        RGB { r, g, b }
+    }
+}
+
+impl_op_ex!(+|a: &RGB, b: &RGB| -> RGB {
+    RGB::new(a.r + b.r, a.g + b.g, a.b + b.b)
+});
+
+impl_op_ex!(-|a: &RGB, b: &RGB| -> RGB { RGB::new(a.r - b.r, a.g - b.g, a.b - b.b) });
+
+impl_op_ex!(*|a: &RGB, b: &RGB| -> RGB { RGB::new(a.r * b.r, a.g * b.g, a.b * b.b) });
+
+impl_op_ex!(/|a: &RGB, b: &RGB| -> RGB { RGB::new(a.r / b.r, a.g / b.g, a.b / b.b) });
+
+impl_op_ex!(+|a: &RGB, b: &Float| -> RGB {
+    RGB::new(a.r + b, a.g + b, a.b + b)
+});
+
+impl_op_ex!(-|a: &RGB, b: &Float| -> RGB { RGB::new(a.r - b, a.g - b, a.b - b) });
+
+impl_op_ex!(*|a: &RGB, b: &Float| -> RGB { RGB::new(a.r * b, a.g * b, a.b * b) });
+
+impl_op_ex!(/|a: &RGB, b: &Float| -> RGB { RGB::new(a.r / b, a.g / b, a.b / b) });
+
+impl_op_ex!(+=|a: &mut RGB, b: &RGB| {
+    a.r += b.r;
+    a.g += b.g;
+    a.b += b.b;
+});
+
+impl_op_ex!(-=|a: &mut RGB, b: &RGB| {
+    a.r -= b.r;
+    a.g -= b.g;
+    a.b -= b.b;
+});
+
+impl_op_ex!(*=|a: &mut RGB, b: &RGB| {
+    a.r *= b.r;
+    a.g *= b.g;
+    a.b *= b.b;
+});
+
+impl_op_ex!(/=|a: &mut RGB, b: &RGB| {
+    a.r /= b.r;
+    a.g /= b.g;
+    a.b /= b.b;
+});
+
+impl_op_ex!(+=|a: &mut RGB, b: &Float| {
+    a.r += b;
+    a.g += b;
+    a.b += b;
+});
+
+impl_op_ex!(-=|a: &mut RGB, b: &Float| {
+    a.r -= b;
+    a.g -= b;
+    a.b -= b;
+});
+
+impl_op_ex!(*=|a: &mut RGB, b: &Float| {
+    a.r *= b;
+    a.g *= b;
+    a.b *= b;
+});
+
+impl_op_ex!(/=|a: &mut RGB, b: &Float| {
+    a.r /= b;
+    a.g /= b;
+    a.b /= b;
+});
+
+impl HasNan for RGB {
+    fn has_nan(&self) -> bool {
+        self.r.is_nan() || self.g.is_nan() || self.b.is_nan()
+    }
+}
