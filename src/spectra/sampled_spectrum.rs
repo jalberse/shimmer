@@ -123,6 +123,12 @@ impl SampledSpectrum {
             (z * self).safe_div(&pdf).average() / CIE_Y_INTEGRAL,
         )
     }
+
+    pub fn y(&self, lambda: &SampledWavelengths) -> Float {
+        let ys = Spectrum::get_cie(super::CIE::Y).sample(lambda);
+        let pdf = lambda.pdf();
+        (ys * self).safe_div(&pdf).average() / CIE_Y_INTEGRAL
+    }
 }
 
 impl Index<usize> for SampledSpectrum {
