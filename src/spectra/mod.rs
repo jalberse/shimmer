@@ -1,5 +1,6 @@
 mod cie;
 pub mod named_spectrum;
+mod sampled_spectrum;
 pub mod spectrum;
 
 pub use named_spectrum::NamedSpectrum;

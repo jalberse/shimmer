@@ -1,7 +1,12 @@
-use std::ops::{Index, IndexMut};
+use std::ops::{Deref, Index, IndexMut};
+
+use auto_ops::impl_op_ex;
+
+use crate::Float;
 
 const NUM_SPECTRUM_SAMPLES: usize = 4;
 
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 struct SampledSpectrum {
     values: [Float; NUM_SPECTRUM_SAMPLES],
 }
@@ -18,12 +23,12 @@ impl SampledSpectrum {
     }
 
     pub fn is_zero(&self) -> bool {
-        self.values.iter().all(|x: Float| x == 0.0)
+        self.values.iter().all(|x: &Float| x == &0.0)
     }
 }
 
 impl Index<usize> for SampledSpectrum {
-    type Output = &Float;
+    type Output = Float;
 
     fn index(&self, index: usize) -> &Self::Output {
         self.values.index(index)
@@ -35,3 +40,84 @@ impl IndexMut<usize> for SampledSpectrum {
         self.values.index_mut(index)
     }
 }
+
+// We implement Deref so that we can use the array's iter().
+impl Deref for SampledSpectrum {
+    type Target = [Float; NUM_SPECTRUM_SAMPLES];
+
+    fn deref(&self) -> &Self::Target {
+        &self.values
+    }
+}
+
+impl_op_ex!(+|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum
+{
+    let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+    for i in 0..NUM_SPECTRUM_SAMPLES
+    {
+        result[i] = s1[i] + s2[i];
+    }
+    SampledSpectrum::new(result)
+});
+
+impl_op_ex!(
+    -|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            result[i] = s1[i] - s2[i];
+        }
+        SampledSpectrum::new(result)
+    }
+);
+
+impl_op_ex!(
+    *|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            result[i] = s1[i] * s2[i];
+        }
+        SampledSpectrum::new(result)
+    }
+);
+
+impl_op_ex!(/|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum
+{
+    let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+    for i in 0..NUM_SPECTRUM_SAMPLES
+    {
+        result[i] = s1[i] / s2[i];
+    }
+    SampledSpectrum::new(result)
+});
+
+impl_op_ex!(+=|s1: &mut SampledSpectrum, s2: &SampledSpectrum|
+{
+    for i in 0..NUM_SPECTRUM_SAMPLES
+    {
+        s1[i] += s2[i];
+    }
+});
+
+impl_op_ex!(-=|s1: &mut SampledSpectrum, s2: &SampledSpectrum|
+{
+    for i in 0..NUM_SPECTRUM_SAMPLES
+    {
+        s1[i] -= s2[i];
+    }
+});
+
+impl_op_ex!(*=|s1: &mut SampledSpectrum, s2: &SampledSpectrum|
+{
+    for i in 0..NUM_SPECTRUM_SAMPLES
+    {
+        s1[i] *= s2[i];
+    }
+});
+
+impl_op_ex!(/=|s1: &mut SampledSpectrum, s2: &SampledSpectrum|
+{
+    for i in 0..NUM_SPECTRUM_SAMPLES
+    {
+        s1[i] /= s2[i];
+    }
+});
