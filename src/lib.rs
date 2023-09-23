@@ -1,4 +1,5 @@
 mod bounding_box;
+mod color;
 mod compensated_float;
 mod float;
 mod frame;
