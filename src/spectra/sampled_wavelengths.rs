@@ -50,8 +50,27 @@ impl SampledWavelengths {
 
     /// PDf values are returned in the form of a SampledSpectrum to make it easy to
     /// ocmpute the value of associated Monte Carlo estimators
-    fn pdf(&self) -> SampledSpectrum {
+    pub fn pdf(&self) -> SampledSpectrum {
         SampledSpectrum::new(self.pdf)
+    }
+
+    pub fn terminate_secondary(&mut self) {
+        if self.secondary_terminated() {
+            return;
+        }
+        for i in 1..NUM_SPECTRUM_SAMPLES {
+            self.pdf[i] = 0.0;
+        }
+        self.pdf[0] /= NUM_SPECTRUM_SAMPLES as Float;
+    }
+
+    pub fn secondary_terminated(&self) -> bool {
+        for i in 1..NUM_SPECTRUM_SAMPLES {
+            if self.pdf[i] != 0.0 {
+                return false;
+            }
+        }
+        true
     }
 }
 
