@@ -4,7 +4,10 @@ pub mod sampled_spectrum;
 pub mod sampled_wavelengths;
 pub mod spectrum;
 
+pub use cie::CIE;
+pub use cie::CIE_Y_INTEGRAL;
 pub use named_spectrum::NamedSpectrum;
+pub use spectrum::inner_product;
 pub use spectrum::Blackbody;
 pub use spectrum::Constant;
 pub use spectrum::DenselySampled;

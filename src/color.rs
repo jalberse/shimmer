@@ -1,6 +1,10 @@
 use auto_ops::impl_op_ex;
 
-use crate::{vecmath::HasNan, Float};
+use crate::{
+    spectra::{inner_product, spectrum::SpectrumI, Spectrum, CIE_Y_INTEGRAL},
+    vecmath::HasNan,
+    Float,
+};
 
 pub struct XYZ {
     pub x: Float,
@@ -11,6 +15,15 @@ pub struct XYZ {
 impl XYZ {
     pub fn new(x: Float, y: Float, z: Float) -> XYZ {
         XYZ { x, y, z }
+    }
+
+    pub fn from_spectrum<T: SpectrumI>(s: &T) -> XYZ {
+        XYZ::new(
+            inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::X), s),
+            inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::Y), s),
+            inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::Z), s)
+                / CIE_Y_INTEGRAL,
+        )
     }
 }
 
