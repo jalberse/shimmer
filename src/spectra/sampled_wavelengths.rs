@@ -1,4 +1,7 @@
+use std::ops::{Index, IndexMut};
+
 use super::{
+    sampled_spectrum::SampledSpectrum,
     spectrum::{LAMBDA_MAX, LAMBDA_MIN},
     NUM_SPECTRUM_SAMPLES,
 };
@@ -43,5 +46,25 @@ impl SampledWavelengths {
         }
 
         SampledWavelengths { lambda, pdf }
+    }
+
+    /// PDf values are returned in the form of a SampledSpectrum to make it easy to
+    /// ocmpute the value of associated Monte Carlo estimators
+    fn pdf(&self) -> SampledSpectrum {
+        SampledSpectrum::new(self.pdf)
+    }
+}
+
+impl Index<usize> for SampledWavelengths {
+    type Output = Float;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        self.lambda.index(index)
+    }
+}
+
+impl IndexMut<usize> for SampledWavelengths {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.lambda.index_mut(index)
     }
 }
