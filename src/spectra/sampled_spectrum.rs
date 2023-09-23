@@ -2,7 +2,7 @@ use std::ops::{Deref, Index, IndexMut};
 
 use auto_ops::impl_op_ex;
 
-use crate::Float;
+use crate::{math::Sqrt, Float};
 
 const NUM_SPECTRUM_SAMPLES: usize = 4;
 
@@ -133,3 +133,13 @@ impl_op_ex!(/=|s1: &mut SampledSpectrum, s2: &SampledSpectrum|
         s1[i] /= s2[i];
     }
 });
+
+impl Sqrt for SampledSpectrum {
+    fn sqrt(self) -> Self {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            result[i] = self[i].sqrt();
+        }
+        SampledSpectrum::new(result)
+    }
+}
