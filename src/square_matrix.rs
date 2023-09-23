@@ -4,7 +4,7 @@ use auto_ops::impl_op_ex;
 
 use crate::{
     float::Float,
-    math::{difference_of_products, InnerProduct},
+    math::{difference_of_products, inner_product},
 };
 
 pub trait Invertible: Sized {
@@ -41,6 +41,7 @@ impl<const N: usize> SquareMatrix<N> {
     pub fn diag(vals: [Float; N]) -> Self {
         // PAPERDOC - Rust const generics allow this nice method of passing values in,
         // where PBRTv4 uses variable length parameter lists.
+        // I think this is also possible in C++, though.
         let mut m: [[Float; N]; N] = [[0.0; N]; N];
         for i in 0..N {
             m[i][i] = vals[i];
@@ -218,7 +219,7 @@ impl_op_ex!(
         let mut out = SquareMatrix::<3>::zero();
         for i in 0..3 {
             for j in 0..3 {
-                out.m[i][j] = Float::from(InnerProduct(
+                out.m[i][j] = Float::from(inner_product(
                     &[m1[i][0], m1[i][1], m1[i][2]],
                     &[m2[0][j], m2[1][j], m2[2][j]],
                 ));
@@ -233,7 +234,7 @@ impl_op_ex!(
         let mut out = SquareMatrix::<4>::zero();
         for i in 0..4 {
             for j in 0..4 {
-                out.m[i][j] = Float::from(InnerProduct(
+                out.m[i][j] = Float::from(inner_product(
                     &[m1[i][0], m1[i][1], m1[i][2], m1[i][3]],
                     &[m2[0][j], m2[1][j], m2[2][j], m2[3][j]],
                 ));
@@ -359,7 +360,7 @@ impl Invertible for SquareMatrix<4> {
         let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
 
         let det: Float =
-            InnerProduct(&[s0, -s1, s2, s3, s5, -s4], &[c5, c4, c3, c2, c0, c1]).into();
+            inner_product(&[s0, -s1, s2, s3, s5, -s4], &[c5, c4, c3, c2, c0, c1]).into();
         if det == 0.0 {
             return None;
         }
@@ -368,73 +369,73 @@ impl Invertible for SquareMatrix<4> {
 
         let inv: [[Float; 4]; 4] = [
             [
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[self[1][1], self[1][3], -self[1][2]],
                     &[c5, c3, c4],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[-self[0][1], self[0][2], -self[0][3]],
                     &[c5, c4, c3],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[self[3][1], self[3][3], -self[3][2]],
                     &[s5, s3, s4],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[-self[2][1], self[2][2], -self[2][3]],
                     &[s5, s4, s3],
                 )),
             ],
             [
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[-self[1][0], self[1][2], -self[1][3]],
                     &[c5, c2, c1],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[self[0][0], self[0][3], -self[0][2]],
                     &[c5, c1, c2],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[-self[3][0], self[3][2], -self[3][3]],
                     &[s5, s2, s1],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[self[2][0], self[2][3], -self[2][2]],
                     &[s5, s1, s2],
                 )),
             ],
             [
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[self[1][0], self[1][3], -self[1][1]],
                     &[c4, c0, c2],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[-self[0][0], self[0][1], -self[0][3]],
                     &[c4, c2, c0],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[self[3][0], self[3][3], -self[3][1]],
                     &[s4, s0, s2],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[-self[2][0], self[2][1], -self[2][3]],
                     &[s4, s2, s0],
                 )),
             ],
             [
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[-self[1][0], self[1][1], -self[1][2]],
                     &[c3, c1, c0],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[self[0][0], self[0][2], -self[0][1]],
                     &[c3, c0, c1],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[-self[3][0], self[3][1], -self[3][2]],
                     &[s3, s1, s0],
                 )),
-                s * Float::from(InnerProduct(
+                s * Float::from(inner_product(
                     &[self[2][0], self[2][2], -self[2][1]],
                     &[s3, s0, s1],
                 )),
