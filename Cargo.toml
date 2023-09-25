@@ -17,6 +17,7 @@ float-cmp = "0.9.0"
 itertools = "0.11.0"
 once_cell = "1.18.0"
 rand = "0.8.5"
+rgb2spec = "0.1.1"
 
 [dev-dependencies]
 float_next_after = "1.0.0"

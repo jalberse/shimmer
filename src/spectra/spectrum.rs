@@ -1,4 +1,6 @@
 use crate::{
+    color::{RgbSigmoidPolynomial, RGB},
+    colorspace::RgbColorSpace,
     math::lerp,
     spectra::cie::{CIE, CIE_Y_INTEGRAL},
     Float,
@@ -33,11 +35,14 @@ pub trait SpectrumI {
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Spectrum {
     Constant(Constant),
     DenselySampled(DenselySampled),
     PiecewiseLinear(PiecewiseLinear),
     Blackbody(Blackbody),
+    RgbAlbedoSpectrum(RgbAlbedoSpectrum),
+    RgbUnboundedSpectrum(RgbUnboundedSpectrum),
 }
 
 impl SpectrumI for Spectrum {
@@ -52,6 +57,8 @@ impl SpectrumI for Spectrum {
             Spectrum::DenselySampled(s) => s.get(lambda),
             Spectrum::PiecewiseLinear(s) => s.get(lambda),
             Spectrum::Blackbody(s) => s.get(lambda),
+            Spectrum::RgbAlbedoSpectrum(s) => s.get(lambda),
+            Spectrum::RgbUnboundedSpectrum(s) => s.get(lambda),
         }
     }
 
@@ -64,6 +71,8 @@ impl SpectrumI for Spectrum {
             Spectrum::DenselySampled(s) => s.max_value(),
             Spectrum::PiecewiseLinear(s) => s.max_value(),
             Spectrum::Blackbody(s) => s.max_value(),
+            Spectrum::RgbAlbedoSpectrum(s) => s.max_value(),
+            Spectrum::RgbUnboundedSpectrum(s) => s.max_value(),
         }
     }
 
@@ -73,6 +82,8 @@ impl SpectrumI for Spectrum {
             Spectrum::DenselySampled(s) => s.sample(lambda),
             Spectrum::PiecewiseLinear(s) => s.sample(lambda),
             Spectrum::Blackbody(s) => s.sample(lambda),
+            Spectrum::RgbAlbedoSpectrum(s) => s.sample(lambda),
+            Spectrum::RgbUnboundedSpectrum(s) => s.sample(lambda),
         }
     }
 }
@@ -80,12 +91,17 @@ impl SpectrumI for Spectrum {
 impl Spectrum {
     /// Gets a lazily-evaluated named spectrum.
     pub fn get_named_spectrum(spectrum: NamedSpectrum) -> &'static Spectrum {
+        // TODO Maybe for this, rather than using once_cell, could we use static RwLock?
+        // https://www.cs.brandeis.edu/~cs146a/rust/doc-02-21-2015/std/sync/struct.StaticRwLock.html
+        // Since RwLock and Mutex are now const functions, we can define them as static during compile time,
+        // as long as the code involved can also be const.
+        // This way we don't need lazy evaluation, we can do it at compile time.
+        // Plus, I think it might be more efficient than the match, but that's not so important.
+
         // PAPERDOC Embedded spectral data 4.5.3.
         // Instead of a map on string keys (which requires evaluating the hash),
         // we use an Enum with the names and match on it and return ref to static-lifetimed
         // spectra. These are thread-safe read-only single-instance objects.
-        // We can just use const CIE_LAMBDA: [Float] = [...]; and that should work.
-        //   or maybe we need it static?
         match spectrum {
             NamedSpectrum::GlassBk7 => Lazy::force(&super::named_spectrum::GLASS_BK7_ETA),
             NamedSpectrum::GlassBaf10 => Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA),
@@ -102,6 +118,7 @@ impl Spectrum {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Constant {
     c: Float,
 }
@@ -126,6 +143,7 @@ impl SpectrumI for Constant {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct DenselySampled {
     lambda_min: i32,
     lambda_max: i32,
@@ -185,6 +203,7 @@ impl SpectrumI for DenselySampled {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct PiecewiseLinear {
     lambdas: Vec<Float>,
     values: Vec<Float>,
@@ -318,6 +337,7 @@ impl SpectrumI for PiecewiseLinear {
 }
 
 /// Normalized blackbody spectrum where the maximum value at any wavelength is 1.
+#[derive(Debug, PartialEq)]
 pub struct Blackbody {
     /// Temperature K
     t: Float,
@@ -368,6 +388,121 @@ impl SpectrumI for Blackbody {
             s[i] = Blackbody::blackbody(lambda[i], self.t) * self.normalization_factor;
         }
         SampledSpectrum::new(s)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct RgbAlbedoSpectrum {
+    rsp: RgbSigmoidPolynomial,
+}
+
+impl RgbAlbedoSpectrum {
+    pub fn new(cs: &RgbColorSpace, rgb: &RGB) -> RgbAlbedoSpectrum {
+        debug_assert!(Float::max(Float::max(rgb.r, rgb.g), rgb.b) <= 1.0);
+        debug_assert!(Float::max(Float::min(rgb.r, rgb.g), rgb.b) >= 0.0);
+        RgbAlbedoSpectrum {
+            rsp: cs.to_rgb_coeffs(rgb),
+        }
+    }
+}
+
+impl SpectrumI for RgbAlbedoSpectrum {
+    fn get(&self, lambda: Float) -> Float {
+        self.rsp.get(lambda)
+    }
+
+    fn max_value(&self) -> Float {
+        self.rsp.max_value()
+    }
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let mut s = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            s[i] = self.rsp.get(lambda[i]);
+        }
+        SampledSpectrum::new(s)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct RgbUnboundedSpectrum {
+    scale: Float,
+    rsp: RgbSigmoidPolynomial,
+}
+
+impl RgbUnboundedSpectrum {
+    pub fn new(cs: &RgbColorSpace, rgb: &RGB) -> RgbUnboundedSpectrum {
+        let m = Float::max(Float::max(rgb.r, rgb.g), rgb.b);
+        let scale = 2.0 * m;
+        let rsp = if scale != 0.0 {
+            cs.to_rgb_coeffs(&(rgb / scale))
+        } else {
+            cs.to_rgb_coeffs(&RGB::new(0.0, 0.0, 0.0))
+        };
+        RgbUnboundedSpectrum { scale, rsp }
+    }
+}
+
+impl SpectrumI for RgbUnboundedSpectrum {
+    fn get(&self, lambda: Float) -> Float {
+        self.scale * self.rsp.get(lambda)
+    }
+
+    fn max_value(&self) -> Float {
+        self.scale * self.rsp.max_value()
+    }
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let mut s = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            s[i] = self.scale * self.rsp.get(lambda[i]);
+        }
+        SampledSpectrum::new(s)
+    }
+}
+
+// TODO RGBIlluminantSpectrum
+
+pub struct RgbIlluminantSpectrum {
+    scale: Float,
+    rsp: RgbSigmoidPolynomial,
+    // TODO consider making into a DenselySampled
+    // TODO and, this should be a pointer. Should we use Arc?
+    //  It would be very expensive to copy this from the RGBColorSpace.
+    //  The RgbColorSpace illuminant should change likewise.
+    illuminant: Spectrum,
+}
+
+impl RgbIlluminantSpectrum {
+    pub fn new(cs: &RgbColorSpace, rgb: &RGB) -> RgbIlluminantSpectrum {
+        let m = Float::max(Float::max(rgb.r, rgb.g), rgb.b);
+        let scale = 2.0 * m;
+        let rsp = if scale != 0.0 {
+            cs.to_rgb_coeffs(&(rgb / scale))
+        } else {
+            cs.to_rgb_coeffs(&RGB::new(0.0, 0.0, 0.0))
+        };
+        // TODO yeah, I think change the illuminan to an Rc for now.
+        //   We can change to Arc when we change to multi-threading as needed.
+        RgbIlluminantSpectrum {
+            scale,
+            rsp,
+            illuminant: cs.illuminant,
+        }
+    }
+}
+
+impl SpectrumI for RgbIlluminantSpectrum {
+    fn get(&self, lambda: Float) -> Float {
+        todo!()
+    }
+
+    fn max_value(&self) -> Float {
+        todo!()
+    }
+
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        todo!()
     }
 }
 

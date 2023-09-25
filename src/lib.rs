@@ -1,10 +1,12 @@
 mod bounding_box;
 mod color;
+mod colorspace;
 mod compensated_float;
 mod float;
 mod frame;
 mod is_nan;
 mod math;
+mod rgb_to_spectra;
 mod sampling;
 mod spectra;
 mod sphere;

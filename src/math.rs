@@ -212,10 +212,13 @@ fn two_sum(a: Float, b: Float) -> CompensatedFloat {
     CompensatedFloat::new(s, err)
 }
 
-pub fn find_interval<T>(size: usize, pred: T)
-where
-    T: Fn(&[Float], usize) -> usize,
-{
+pub fn evaluate_polynomial(t: Float, c: &[Float]) -> Float {
+    let (c, c_remaining) = c.split_first().expect("Missed base case of c.len() == 1!");
+    if c_remaining.is_empty() {
+        *c
+    } else {
+        Float::mul_add(t, evaluate_polynomial(t, &c_remaining), *c)
+    }
 }
 
 mod tests {

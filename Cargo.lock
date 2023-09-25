@@ -119,6 +119,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rgb2spec"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58affc6e805f329514b459c98c1ed36062f57e4dbfcbe128b26847c51055aaf0"
+
+[[package]]
 name = "shimmer"
 version = "0.1.0"
 dependencies = [
@@ -128,6 +134,7 @@ dependencies = [
  "itertools",
  "once_cell",
  "rand",
+ "rgb2spec",
 ]
 
 [[package]]

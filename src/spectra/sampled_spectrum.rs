@@ -2,7 +2,14 @@ use std::ops::{Deref, Index, IndexMut};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-use crate::{color::XYZ, math::Sqrt, spectra::spectrum::SpectrumI, vecmath::HasNan, Float};
+use crate::{
+    color::{RGB, XYZ},
+    colorspace::RgbColorSpace,
+    math::Sqrt,
+    spectra::spectrum::SpectrumI,
+    vecmath::HasNan,
+    Float,
+};
 
 use super::{
     sampled_wavelengths::SampledWavelengths, Spectrum, CIE_Y_INTEGRAL, NUM_SPECTRUM_SAMPLES,
@@ -130,6 +137,11 @@ impl SampledSpectrum {
         let ys = Spectrum::get_cie(super::CIE::Y).sample(lambda);
         let pdf = lambda.pdf();
         (ys * self).safe_div(&pdf).average() / CIE_Y_INTEGRAL
+    }
+
+    pub fn to_rgb(&self, lambda: &SampledWavelengths, cs: &RgbColorSpace) -> RGB {
+        let xyz = self.to_xyz(lambda);
+        cs.to_rgb(&xyz)
     }
 }
 
