@@ -1,7 +1,9 @@
+use std::rc::Rc;
+
 use crate::{
     color::{RgbSigmoidPolynomial, RGB, XYZ},
     rgb_to_spectra::{self, Gamut},
-    spectra::Spectrum,
+    spectra::{DenselySampled, Spectrum},
     square_matrix::{mul_mat_vec, Invertible, SquareMatrix},
     vecmath::Point2f,
 };
@@ -15,8 +17,7 @@ pub struct RgbColorSpace {
     /// Blue primary
     pub b: Point2f,
     pub whitepoint: Point2f,
-    // TODO consider making into a DenselySampled if necessary.
-    pub illuminant: Spectrum,
+    pub illuminant: Rc<DenselySampled>,
     pub xyz_from_rgb: SquareMatrix<3>,
     pub rgb_from_xyz: SquareMatrix<3>,
     /// This is analogous to the RGBToSpectrumTable pointer used by PBRT;
@@ -34,7 +35,7 @@ impl RgbColorSpace {
         r: Point2f,
         g: Point2f,
         b: Point2f,
-        illuminant: Spectrum,
+        illuminant: DenselySampled,
         gamut: Gamut,
     ) -> RgbColorSpace {
         // Compute the whitepoint primaries and XYZ coordinates.
@@ -59,7 +60,7 @@ impl RgbColorSpace {
             g,
             b,
             whitepoint,
-            illuminant,
+            illuminant: Rc::new(illuminant),
             xyz_from_rgb,
             rgb_from_xyz,
             gamut,

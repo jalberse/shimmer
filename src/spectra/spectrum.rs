@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     color::{RgbSigmoidPolynomial, RGB},
     colorspace::RgbColorSpace,
@@ -466,11 +468,7 @@ impl SpectrumI for RgbUnboundedSpectrum {
 pub struct RgbIlluminantSpectrum {
     scale: Float,
     rsp: RgbSigmoidPolynomial,
-    // TODO consider making into a DenselySampled
-    // TODO and, this should be a pointer. Should we use Arc?
-    //  It would be very expensive to copy this from the RGBColorSpace.
-    //  The RgbColorSpace illuminant should change likewise.
-    illuminant: Spectrum,
+    illuminant: Rc<DenselySampled>,
 }
 
 impl RgbIlluminantSpectrum {
@@ -482,12 +480,10 @@ impl RgbIlluminantSpectrum {
         } else {
             cs.to_rgb_coeffs(&RGB::new(0.0, 0.0, 0.0))
         };
-        // TODO yeah, I think change the illuminan to an Rc for now.
-        //   We can change to Arc when we change to multi-threading as needed.
         RgbIlluminantSpectrum {
             scale,
             rsp,
-            illuminant: cs.illuminant,
+            illuminant: cs.illuminant.clone(),
         }
     }
 }
