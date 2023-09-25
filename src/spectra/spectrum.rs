@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use crate::{
     color::{RgbSigmoidPolynomial, RGB},
@@ -45,6 +45,7 @@ pub enum Spectrum {
     Blackbody(Blackbody),
     RgbAlbedoSpectrum(RgbAlbedoSpectrum),
     RgbUnboundedSpectrum(RgbUnboundedSpectrum),
+    RgbIlluminantSpectrum(RgbIlluminantSpectrum),
 }
 
 impl SpectrumI for Spectrum {
@@ -61,6 +62,7 @@ impl SpectrumI for Spectrum {
             Spectrum::Blackbody(s) => s.get(lambda),
             Spectrum::RgbAlbedoSpectrum(s) => s.get(lambda),
             Spectrum::RgbUnboundedSpectrum(s) => s.get(lambda),
+            Spectrum::RgbIlluminantSpectrum(s) => s.get(lambda),
         }
     }
 
@@ -75,6 +77,7 @@ impl SpectrumI for Spectrum {
             Spectrum::Blackbody(s) => s.max_value(),
             Spectrum::RgbAlbedoSpectrum(s) => s.max_value(),
             Spectrum::RgbUnboundedSpectrum(s) => s.max_value(),
+            Spectrum::RgbIlluminantSpectrum(s) => s.max_value(),
         }
     }
 
@@ -86,6 +89,7 @@ impl SpectrumI for Spectrum {
             Spectrum::Blackbody(s) => s.sample(lambda),
             Spectrum::RgbAlbedoSpectrum(s) => s.sample(lambda),
             Spectrum::RgbUnboundedSpectrum(s) => s.sample(lambda),
+            Spectrum::RgbIlluminantSpectrum(s) => s.sample(lambda),
         }
     }
 }
@@ -463,12 +467,11 @@ impl SpectrumI for RgbUnboundedSpectrum {
     }
 }
 
-// TODO RGBIlluminantSpectrum
-
+#[derive(Debug, PartialEq)]
 pub struct RgbIlluminantSpectrum {
     scale: Float,
     rsp: RgbSigmoidPolynomial,
-    illuminant: Rc<DenselySampled>,
+    illuminant: Arc<DenselySampled>,
 }
 
 impl RgbIlluminantSpectrum {
@@ -490,15 +493,19 @@ impl RgbIlluminantSpectrum {
 
 impl SpectrumI for RgbIlluminantSpectrum {
     fn get(&self, lambda: Float) -> Float {
-        todo!()
+        self.scale * self.rsp.get(lambda) * self.illuminant.get(lambda)
     }
 
     fn max_value(&self) -> Float {
-        todo!()
+        self.scale * self.rsp.max_value() * self.illuminant.max_value()
     }
 
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
-        todo!()
+        let mut s = [0.0; NUM_SPECTRUM_SAMPLES];
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            s[i] = self.scale * self.rsp.get(lambda[i]);
+        }
+        SampledSpectrum::new(s) * self.illuminant.sample(lambda)
     }
 }
 

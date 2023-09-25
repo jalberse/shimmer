@@ -1,9 +1,9 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use crate::{
     color::{RgbSigmoidPolynomial, RGB, XYZ},
     rgb_to_spectra::{self, Gamut},
-    spectra::{DenselySampled, Spectrum},
+    spectra::DenselySampled,
     square_matrix::{mul_mat_vec, Invertible, SquareMatrix},
     vecmath::Point2f,
 };
@@ -17,7 +17,7 @@ pub struct RgbColorSpace {
     /// Blue primary
     pub b: Point2f,
     pub whitepoint: Point2f,
-    pub illuminant: Rc<DenselySampled>,
+    pub illuminant: Arc<DenselySampled>,
     pub xyz_from_rgb: SquareMatrix<3>,
     pub rgb_from_xyz: SquareMatrix<3>,
     /// This is analogous to the RGBToSpectrumTable pointer used by PBRT;
@@ -29,7 +29,7 @@ pub struct RgbColorSpace {
 }
 
 // TODO equality, inequality operators should compare everything but illuminant; the
-// illuminant is actuaklly to expensive to compare (at least, it's not ocmpared in PBRT)
+// illuminant is actually too expensive to compare (at least, it's not ocmpared in PBRT)
 impl RgbColorSpace {
     pub fn new(
         r: Point2f,
@@ -60,7 +60,7 @@ impl RgbColorSpace {
             g,
             b,
             whitepoint,
-            illuminant: Rc::new(illuminant),
+            illuminant: Arc::new(illuminant),
             xyz_from_rgb,
             rgb_from_xyz,
             gamut,
