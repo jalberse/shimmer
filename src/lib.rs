@@ -6,6 +6,8 @@ mod float;
 mod frame;
 mod is_nan;
 mod math;
+mod medium;
+mod ray;
 mod rgb_to_spectra;
 mod sampling;
 mod spectra;
