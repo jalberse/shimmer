@@ -63,9 +63,31 @@ impl Default for Ray {
     }
 }
 
+impl HasNan for Ray {
+    fn has_nan(&self) -> bool {
+        self.o.has_nan() || self.d.has_nan() || self.time.is_nan()
+    }
+}
+
 pub struct RayDifferential {
     pub ray: Ray,
     pub auxiliary: Option<AuxiliaryRays>,
+}
+
+impl RayDifferential {
+    pub fn new(ray: Ray, auxiliary: Option<AuxiliaryRays>) -> RayDifferential {
+        RayDifferential { ray, auxiliary }
+    }
+
+    pub fn scale_differentials(&mut self, s: Float) {
+        if let Some(aux) = &mut self.auxiliary {
+            aux.rx_origin = self.ray.o + (aux.rx_origin - self.ray.o) * s;
+            aux.ry_origin = self.ray.o + (aux.ry_origin - self.ray.o) * s;
+
+            aux.rx_direction = self.ray.d + (aux.rx_direction - self.ray.d) * s;
+            aux.ry_direction = self.ray.d + (aux.ry_direction - self.ray.d) * s;
+        }
+    }
 }
 
 impl RayI for RayDifferential {
@@ -85,7 +107,12 @@ impl Default for RayDifferential {
 
 impl HasNan for RayDifferential {
     fn has_nan(&self) -> bool {
-        self.ray.has_nan() || self.auxiliary.has_nan()
+        self.ray.has_nan()
+            || (if let Some(aux) = &self.auxiliary {
+                aux.has_nan()
+            } else {
+                false
+            })
     }
 }
 
