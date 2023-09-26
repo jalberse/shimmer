@@ -24,13 +24,6 @@ pub fn get_rgb_to_spec(gamut: &Gamut, rgb: &RGB) -> [f32; 3] {
     }
 }
 
-// TODO So the main purpose of the RGBToSpectrumTable is getting the RGBSignmoidPolynomial corresponding to
-//   the given RGb color.
-// In our case, the RGB2SPEC gets the coeffcients via fetch().
-//  That's most of what RGBtoSpectrumTable::operator() does, it then just makes the RGBSigmoidPolynomial in the final line.
-// The RGBToSpectrumTable class doesn't do anything else for us; we might want to just use these lazily-evaluated rgbtospec
-//  things to implement a from_rgb() for RGBSigmoidPolynomial, that takes an rgb and an enum to say which of these to use.
-
 // Note that files in rgbtospec/ were generated with a resolution of 64; this matches the cmake
 // command used by PBRT for generating their tables.
 pub static SRGB_RGB2SPEC: Lazy<RGB2Spec> =
