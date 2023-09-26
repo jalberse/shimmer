@@ -21,14 +21,6 @@ pub const LAMBDA_MIN: Float = 360.0;
 /// Nanometers. Maximum of visible range of light.
 pub const LAMBDA_MAX: Float = 830.0;
 
-pub fn inner_product<T: SpectrumI, G: SpectrumI>(a: &T, b: &G) -> Float {
-    let mut integral = 0.0;
-    for lambda in (LAMBDA_MIN as i32)..(LAMBDA_MAX as i32) {
-        integral += a.get(lambda as Float) * b.get(lambda as Float);
-    }
-    integral
-}
-
 pub trait SpectrumI {
     fn get(&self, lambda: Float) -> Float;
 
@@ -507,6 +499,14 @@ impl SpectrumI for RgbIlluminantSpectrum {
         }
         SampledSpectrum::new(s) * self.illuminant.sample(lambda)
     }
+}
+
+pub fn inner_product<T: SpectrumI, G: SpectrumI>(a: &T, b: &G) -> Float {
+    let mut integral = 0.0;
+    for lambda in (LAMBDA_MIN as i32)..(LAMBDA_MAX as i32) {
+        integral += a.get(lambda as Float) * b.get(lambda as Float);
+    }
+    integral
 }
 
 mod tests {
