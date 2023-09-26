@@ -153,7 +153,7 @@ impl DenselySampled {
     /// Samples from the provided spectrum to create a DenselySampled spectrum
     pub fn new(spectrum: &Spectrum, lambda_min: i32, lambda_max: i32) -> DenselySampled {
         // PAPERDOC This is a fun area where idiomatic rust code (map -> collect) is arguably cleaner
-        // than similar C++ code (allowing e.g. const correctness).
+        // than similar C++ code (allowing e.g. const correctness). Of course, C++ can accomplish similar.
         let values: Vec<Float> = (lambda_min..lambda_max)
             .map(|lambda: i32| spectrum.get(lambda as Float))
             .collect();
@@ -214,8 +214,10 @@ impl PiecewiseLinear {
     pub fn new<const N: usize>(lambdas: &[Float; N], values: &[Float; N]) -> PiecewiseLinear {
         // PAPERDOC I think this is a good way to ensure lambdas.len() == values.len() at compile-time,
         // rather than a runtime check as in PBRTv4. I'll need to see how it fairs in practice.
+        // I think you can do this in C++ too though.
+
+        // TODO This follows PBRT, which also makes a copy; could it be beneficial to take ownership instead?
         // Note that we're taking a slice, which is read-only, so we perform a copy here.
-        // This follows PBRT, which also makes a copy; could it be beneficial to take ownership instead?
         let mut l = vec![0.0; lambdas.len()];
         l.copy_from_slice(lambdas);
         let mut v = vec![0.0; values.len()];
