@@ -24,6 +24,9 @@ pub const LAMBDA_MAX: Float = 830.0;
 pub trait SpectrumI {
     fn get(&self, lambda: Float) -> Float;
 
+    /// Returns a bound on the maximum value of the spectral distribution over its wavelength range.
+    /// The primary utility here is computing bounds on the power emitted by light sources so that
+    /// lights can be sampled according to their expected contriibution to illumination in the scene.
     fn max_value(&self) -> Float;
 
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
@@ -41,12 +44,13 @@ pub enum Spectrum {
 }
 
 impl SpectrumI for Spectrum {
+    // PAPERDOC - this will be a great example against PBRTv4's call with TaggedPointer
+    // to achieve static dispatch. If this is too verbose for someone's taste, then
+    // there are crates like enum_dispatch which could generate this automatically from
+    // the SpectrumI trait.
+
     /// Gets the value of the spectral distribution at wavelength lambda
     fn get(&self, lambda: Float) -> Float {
-        // PAPERDOC - this will be a great example against PBRTv4's call with TaggedPointer
-        // to achieve static dispatch. If this is too verbose for someone's taste, then
-        // there are crates like enum_dispatch which could generate this automatically from
-        // the SpectrumI trait.
         match self {
             Spectrum::Constant(c) => c.get(lambda),
             Spectrum::DenselySampled(s) => s.get(lambda),
@@ -58,9 +62,6 @@ impl SpectrumI for Spectrum {
         }
     }
 
-    /// Returns a bound on the maximum value of the psectral distribution over its wavelength range.
-    /// The primary utility here is computing bounds on the power emitted by light sources so that
-    /// lights can be sampled according to their expected contriibution to illumination in the scene.
     fn max_value(&self) -> Float {
         match self {
             Spectrum::Constant(c) => c.max_value(),
