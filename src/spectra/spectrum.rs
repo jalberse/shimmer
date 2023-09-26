@@ -136,7 +136,7 @@ impl SpectrumI for Constant {
         self.c
     }
 
-    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+    fn sample(&self, _lambda: &SampledWavelengths) -> SampledSpectrum {
         SampledSpectrum::from_const(self.c)
     }
 }
