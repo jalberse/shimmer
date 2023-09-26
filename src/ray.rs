@@ -1,8 +1,12 @@
 use crate::{
     medium::Medium,
-    vecmath::{Point3f, Vector3f},
+    vecmath::{HasNan, Point3f, Vector3f},
     Float,
 };
+
+trait RayI {
+    fn get(&self, t: Float) -> Point3f;
+}
 
 pub struct Ray {
     /// Origin of the ray
@@ -40,8 +44,10 @@ impl Ray {
             medium: medium,
         }
     }
+}
 
-    pub fn get(&self, t: Float) -> Point3f {
+impl RayI for Ray {
+    fn get(&self, t: Float) -> Point3f {
         self.o + self.d * t
     }
 }
@@ -54,5 +60,92 @@ impl Default for Ray {
             time: 0.0,
             medium: None,
         }
+    }
+}
+
+pub struct RayDifferential {
+    pub ray: Ray,
+    pub auxiliary: Option<AuxiliaryRays>,
+}
+
+impl RayI for RayDifferential {
+    fn get(&self, t: Float) -> Point3f {
+        self.ray.get(t)
+    }
+}
+
+impl Default for RayDifferential {
+    fn default() -> Self {
+        Self {
+            ray: Default::default(),
+            auxiliary: Default::default(),
+        }
+    }
+}
+
+impl HasNan for RayDifferential {
+    fn has_nan(&self) -> bool {
+        self.ray.has_nan() || self.auxiliary.has_nan()
+    }
+}
+
+// PAPERDOC PBRTv4 uses a flag which we must remember to check (hasDifferentials).
+// The inclusion of the Option type is just as efficient (we store a flag anyways)
+// but is easier for the programmer.
+
+/// We wrap the differential information in a single struct so that
+/// we can guarantee all or none are present in RayDifferential via a single Option member.
+pub struct AuxiliaryRays {
+    pub rx_origin: Point3f,
+    pub rx_direction: Vector3f,
+    pub ry_origin: Point3f,
+    pub ry_direction: Vector3f,
+}
+
+impl AuxiliaryRays {
+    pub fn new(
+        rx_origin: Point3f,
+        rx_direction: Vector3f,
+        ry_origin: Point3f,
+        ry_direction: Vector3f,
+    ) -> AuxiliaryRays {
+        AuxiliaryRays {
+            rx_origin,
+            rx_direction,
+            ry_origin,
+            ry_direction,
+        }
+    }
+}
+
+impl Default for AuxiliaryRays {
+    fn default() -> Self {
+        Self {
+            rx_origin: Default::default(),
+            rx_direction: Default::default(),
+            ry_origin: Default::default(),
+            ry_direction: Default::default(),
+        }
+    }
+}
+
+impl HasNan for AuxiliaryRays {
+    fn has_nan(&self) -> bool {
+        self.rx_origin.has_nan()
+            || self.rx_direction.has_nan()
+            || self.ry_origin.has_nan()
+            || self.ry_direction.has_nan()
+    }
+}
+
+mod tests {
+    use crate::vecmath::{Point3f, Tuple3, Vector3f};
+
+    use super::{Ray, RayI};
+
+    #[test]
+    fn get_pos_from_ray() {
+        let ray = Ray::new(Point3f::ZERO, Vector3f::ONE, None);
+        assert_eq!(Point3f::new(3.0, 3.0, 3.0), ray.get(3.0));
     }
 }
