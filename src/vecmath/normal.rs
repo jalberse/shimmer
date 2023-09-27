@@ -180,11 +180,17 @@ impl Normal3 for Normal3i {
     }
 
     fn angle_between(&self, n: &Normal3i) -> Float {
-        angle_between::<Normal3f, Normal3f, Normal3f>(&Normal3f::from(self), &Normal3f::from(n))
+        angle_between::<Normal3f, Normal3f, Normal3f>(
+            &Normal3f::from(self).normalize(),
+            &Normal3f::from(n).normalize(),
+        )
     }
 
     fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float {
-        angle_between::<Normal3f, Vector3f, Vector3f>(&Normal3f::from(self), &Vector3f::from(v))
+        angle_between::<Normal3f, Vector3f, Vector3f>(
+            &Normal3f::from(self).normalize(),
+            &Vector3f::from(v).normalize(),
+        )
     }
 }
 
@@ -280,6 +286,7 @@ impl_op_ex!(/|n: &Normal3i, s: i32| -> Normal3i {
         z: n.z / s,
     }
 });
+
 impl_op_ex!(/=|n1: &mut Normal3i, s: i32|
 {
     n1.x /= s;
@@ -537,40 +544,51 @@ impl Default for Normal3f {
 }
 
 impl_op_ex!(-|n: &Normal3f| -> Normal3f { Normal3f::new(-n.x, -n.y, -n.z) });
+
 impl_op_ex!(+ |n1: &Normal3f, n2: &Normal3f| -> Normal3f { Normal3f::new(n1.x + n2.x, n1.y + n2.y, n1.z + n2.z)});
+
 impl_op_ex!(-|n1: &Normal3f, n2: &Normal3f| -> Normal3f {
     Normal3f::new(n1.x - n2.x, n1.y - n2.y, n1.z - n2.z)
 });
+
 impl_op_ex!(+= |n1: &mut Normal3f, n2: &Normal3f| {
     n1.x += n2.x;
     n1.y += n2.y;
     n1.z += n2.z;
 });
+
 impl_op_ex!(-= |n1: &mut Normal3f, n2: &Normal3f| {
     n1.x -= n2.x;
     n1.y -= n2.y;
     n1.z -= n2.z;
 });
+
 impl_op_ex_commutative!(*|n: &Normal3f, s: Float| -> Normal3f {
     Normal3f::new(n.x * s, n.y * s, n.z * s)
 });
+
 impl_op_ex!(/ |n: &Normal3f, s: Float| -> Normal3f { Normal3f::new(n.x / s, n.y / s, n.z / s) });
+
 impl_op_ex!(*= |n1: &mut Normal3f, s: Float| {
     n1.x *= s;
     n1.y *= s;
     n1.z *= s;
 });
+
 impl_op_ex!(/= |n1: &mut Normal3f, s: Float| {
     n1.x /= s;
     n1.y /= s;
     n1.z /= s;
 });
+
 impl_op_ex!(-|n: &Normal3f, v: &Vector3f| -> Vector3f {
     Vector3f::new(n.x - v.x, n.y - v.y, n.z - v.z)
 });
+
 impl_op_ex!(-|v: &Vector3f, n: &Normal3f| -> Vector3f {
     Vector3f::new(v.x - n.x, v.y - n.y, v.z - n.z)
 });
+
 impl_op_ex_commutative!(+|n: &Normal3f, v: &Vector3f| -> Vector3f {
     Vector3f::new(n.x + v.x, n.y + v.y, n.z + v.z)
 });
@@ -725,6 +743,22 @@ mod tests {
     }
 
     #[test]
+    fn normal_normal_angle_between_i() {
+        let n1 = Normal3i::new(1, 2, 3);
+        let n2 = Normal3i::new(3, 4, 5);
+
+        assert_eq!(0.18623877, n1.angle_between(&n2));
+    }
+
+    #[test]
+    fn normal_vector_angle_between_i() {
+        let n1 = Normal3i::new(1, 2, 3);
+        let v2 = Vector3i::new(3, 4, 5);
+
+        assert_eq!(0.18623877, n1.angle_between_vector(&v2));
+    }
+
+    #[test]
     fn normal_normal_angle_between() {
         let n1 = Normal3f::new(1.0, 2.0, 3.0).normalize();
         let n2 = Normal3f::new(3.0, 4.0, 5.0).normalize();
@@ -841,6 +875,28 @@ mod tests {
         let n1 = Normal3i::new(1, 2, 3);
         let n2: Normal3f = n1.into();
         assert_eq!(Normal3f::new(1.0, 2.0, 3.0), n2);
+
+        let n3: Normal3f = (&n1).into();
+        assert_eq!(Normal3f::new(1.0, 2.0, 3.0), n3);
+    }
+
+    #[test]
+    fn normal3i_div_i32() {
+        let n = Normal3i::new(10, 100, 1000);
+        assert_eq!(Normal3i::new(5, 50, 500), n / 2);
+    }
+
+    #[test]
+    fn normal3i_mul_i32() {
+        let n = Normal3i::new(10, 100, 1000);
+        assert_eq!(Normal3i::new(20, 200, 2000), n * 2);
+    }
+
+    #[test]
+    fn normal3i_sub_normal3i() {
+        let n1 = Normal3i::new(1, 2, 3);
+        let n2 = Normal3i::new(11, 12, 13);
+        assert_eq!(Normal3i::new(-10, -10, -10), n1 - n2);
     }
 
     #[test]
@@ -870,5 +926,50 @@ mod tests {
         assert_eq!(5, n3[0]);
         assert_eq!(150, n3[1]);
         assert_eq!(1500, n3[2]);
+    }
+
+    #[test]
+    fn normal3i_default() {
+        let n = Normal3i::default();
+        assert_eq!(Normal3i::new(0, 0, 0), n);
+    }
+
+    #[test]
+    fn normal3f_lerp() {
+        let n1 = Normal3f::new(0.0, 100.0, 1000.0);
+        let n2 = Normal3f::new(10.0, 200.0, 2000.0);
+        let n3 = Normal3f::lerp(0.5, &n1, &n2);
+        assert_eq!(5.0, n3[0]);
+        assert_eq!(150.0, n3[1]);
+        assert_eq!(1500.0, n3[2]);
+    }
+
+    #[test]
+    fn normal3f_zero() {
+        let n = Normal3f::ZERO;
+        assert_eq!(Normal3f::new(0.0, 0.0, 0.0), n);
+    }
+
+    #[test]
+    fn normal3f_default() {
+        let n = Normal3f::default();
+        assert_eq!(Normal3f::new(0.0, 0.0, 0.0), n);
+    }
+
+    #[test]
+    fn normal3f_plus_vector3f() {
+        let n = Normal3f::ONE;
+        let v = Vector3f::NEG_ONE;
+        assert_eq!(Vector3f::ZERO, n + v);
+        assert_eq!(Vector3f::ZERO, v + n);
+    }
+
+    #[test]
+    fn normal3f_index_mut() {
+        let mut n = Normal3f::default();
+        n[0] = 1.0;
+        n[1] = 2.0;
+        n[2] = 3.0;
+        assert_eq!(Normal3f::new(1.0, 2.0, 3.0), n);
     }
 }
