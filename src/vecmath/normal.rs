@@ -225,7 +225,7 @@ impl_op_ex!(-|n: &Normal3i| -> Normal3i {
 // Normals can add and subtract with other normals
 impl_op_ex!(+|n1: &Normal3i, n2: &Normal3i| -> Normal3i
 {
-    Normal3i { x: n1.x + n2.y, y: n1.y + n2.y, z: n1.z + n2.z }
+    Normal3i { x: n1.x + n2.x, y: n1.y + n2.y, z: n1.z + n2.z }
 });
 
 impl_op_ex!(+=|n1: &mut Normal3i, n2: &Normal3i|
@@ -834,5 +834,41 @@ mod tests {
         let t1: [Float; 3] = v1.into();
         assert_eq!([1.0, 2.0, 3.0], t1);
         assert_eq!(v1, t1.into());
+    }
+
+    #[test]
+    fn normal3f_from_normal3i() {
+        let n1 = Normal3i::new(1, 2, 3);
+        let n2: Normal3f = n1.into();
+        assert_eq!(Normal3f::new(1.0, 2.0, 3.0), n2);
+    }
+
+    #[test]
+    fn normal3i_index() {
+        let n = Normal3i::new(1, 2, 3);
+        assert_eq!(1, n[0]);
+        assert_eq!(2, n[1]);
+        assert_eq!(3, n[2]);
+    }
+
+    #[test]
+    fn normal3i_mut_index() {
+        let mut n = Normal3i::new(1, 2, 3);
+        n[0] = 11;
+        n[1] = 12;
+        n[2] = 13;
+        assert_eq!(11, n[0]);
+        assert_eq!(12, n[1]);
+        assert_eq!(13, n[2]);
+    }
+
+    #[test]
+    fn normal3i_lerp() {
+        let n1 = Normal3i::new(0, 100, 1000);
+        let n2 = Normal3i::new(10, 200, 2000);
+        let n3 = Normal3i::lerp(0.5, &n1, &n2);
+        assert_eq!(5, n3[0]);
+        assert_eq!(150, n3[1]);
+        assert_eq!(1500, n3[2]);
     }
 }
