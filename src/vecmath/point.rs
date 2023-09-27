@@ -1207,4 +1207,93 @@ mod tests {
         assert_eq!([1.0, 2.0, 3.0], t1);
         assert_eq!(v1, t1.into());
     }
+
+    #[test]
+    fn point2i_default() {
+        let p = Point2i::default();
+        assert_eq!(Point2i::new(0, 0), p);
+    }
+
+    #[test]
+    fn point2i_lerp() {
+        let p1 = Point2i::new(0, 10);
+        let p2 = Point2i::new(10, 20);
+        assert_eq!(Point2i::new(5, 15), Point2i::lerp(0.5, &p1, &p2));
+    }
+
+    #[test]
+    fn point2i_scale() {
+        let p = Point2i::new(0, 100);
+        assert_eq!(Point2i::new(0, 50), p * 0.5);
+        assert_eq!(Point2i::new(0, 50), 0.5 * p);
+    }
+
+    #[test]
+    fn point2i_distance() {
+        let p1 = Point2i::ZERO;
+        let p2 = Point2i::new(3, 4);
+        assert_eq!(5.0, p1.distance(&p2));
+        assert_eq!(25.0, p1.distance_squared(&p2));
+    }
+
+    #[test]
+    fn point2i_index() {
+        let p = Point2i::new(1, 2);
+        assert_eq!(1, p[0]);
+        assert_eq!(2, p[1]);
+    }
+
+    #[test]
+    fn point2i_index_mut() {
+        let mut p = Point2i::ZERO;
+        p[0] = 1;
+        p[1] = 2;
+        assert_eq!(1, p[0]);
+        assert_eq!(2, p[1]);
+    }
+
+    #[test]
+    fn point2i_mulassign() {
+        let mut p1 = Point2i::new(1, 2);
+        let p2 = Point2i::new(3, 4);
+        p1 *= p2;
+        assert_eq!(Point2i::new(3, 8), p1);
+    }
+
+    #[test]
+    fn point2i_divassign() {
+        let mut p1 = Point2i::new(10, 20);
+        let p2 = Point2i::new(2, 5);
+        p1 /= p2;
+        assert_eq!(Point2i::new(5, 4), p1);
+    }
+
+    #[test]
+    fn point2f_default() {
+        let p = Point2f::default();
+        assert_eq!(Point2f::new(0.0, 0.0), p);
+    }
+
+    #[test]
+    fn point3f_lerp() {
+        let p1 = Point3f::new(0.0, 100.0, 1000.0);
+        let p2 = Point3f::new(10.0, 200.0, 2000.0);
+        let p3 = Point3f::lerp(0.5, &p1, &p2);
+        assert_eq!(5.0, p3[0]);
+        assert_eq!(150.0, p3[1]);
+        assert_eq!(1500.0, p3[2]);
+    }
+
+    #[test]
+    fn point3f_default() {
+        let p = Point3f::default();
+        assert_eq!(Point3f::new(0.0, 0.0, 0.0), p);
+    }
+
+    #[test]
+    fn point3f_neg() {
+        let p = Point3f::ONE;
+        let p_neg = -p;
+        assert_eq!(Point3f::NEG_ONE, p_neg);
+    }
 }
