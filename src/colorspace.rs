@@ -1,11 +1,13 @@
 use std::{rc::Rc, sync::Arc};
 
+use once_cell::sync::Lazy;
+
 use crate::{
     color::{RgbSigmoidPolynomial, RGB, XYZ},
     rgb_to_spectra::{self, Gamut},
-    spectra::DenselySampled,
+    spectra::{DenselySampled, Spectrum},
     square_matrix::{mul_mat_vec, Invertible, SquareMatrix},
-    vecmath::Point2f,
+    vecmath::{Point2f, Tuple2},
 };
 
 #[derive(Debug, PartialEq)]
@@ -35,11 +37,11 @@ impl RgbColorSpace {
         r: Point2f,
         g: Point2f,
         b: Point2f,
-        illuminant: DenselySampled,
+        illuminant: &Spectrum,
         gamut: Gamut,
     ) -> RgbColorSpace {
         // Compute the whitepoint primaries and XYZ coordinates.
-        let w: XYZ = XYZ::from_spectrum(&illuminant);
+        let w: XYZ = XYZ::from_spectrum(illuminant);
         let whitepoint = w.xy();
         let r_xyz = XYZ::from_xy_y_default(&r);
         let g_xyz = XYZ::from_xy_y_default(&g);
@@ -55,6 +57,9 @@ impl RgbColorSpace {
         let xyz_from_rgb = rgb * SquareMatrix::<3>::diag([c[0], c[1], c[2]]);
         let rgb_from_xyz = xyz_from_rgb.inverse().expect("Uninvertible!");
 
+        // Convert the spectrum given to a DenselySampled spectrum.
+        let illuminant = DenselySampled::new(illuminant);
+
         RgbColorSpace {
             r,
             g,
@@ -64,6 +69,14 @@ impl RgbColorSpace {
             xyz_from_rgb,
             rgb_from_xyz,
             gamut,
+        }
+    }
+
+    pub fn get_named(cs: NamedColorSpace) -> &'static RgbColorSpace {
+        match cs {
+            NamedColorSpace::SRGB => Lazy::force(&SRGB),
+            NamedColorSpace::REC2020 => Lazy::force(&REC_2020),
+            NamedColorSpace::ACES2065_1 => Lazy::force(&ACES2065_1),
         }
     }
 
@@ -87,6 +100,44 @@ impl RgbColorSpace {
     }
 }
 
-// TODO lazy-initialized RGBColorSpaces that are of each of the standard ones.
-//   stand-in for preinitialized pointers I suppose
-// TODO pg 186, get_named and lookup?
+// TODO We currently don't support DCI_P3, but PBRTv4 does. The reason is because
+// rgb2spec-rs, which we use for the rgb-to-spectra table generation, doesn't
+// support DCI_P3. We should add support for it sometime in the future.
+
+pub enum NamedColorSpace {
+    SRGB,
+    REC2020,
+    ACES2065_1,
+}
+
+pub static SRGB: Lazy<RgbColorSpace> = Lazy::new(|| {
+    RgbColorSpace::new(
+        Point2f::new(0.64, 0.33),
+        Point2f::new(0.3, 0.6),
+        Point2f::new(0.15, 0.06),
+        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::StdIllumD65),
+        Gamut::SRGB,
+    )
+});
+
+pub static REC_2020: Lazy<RgbColorSpace> = Lazy::new(|| {
+    RgbColorSpace::new(
+        Point2f::new(0.708, 0.292),
+        Point2f::new(0.170, 0.797),
+        Point2f::new(0.131, 0.046),
+        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::StdIllumD65),
+        Gamut::Rec2020,
+    )
+});
+
+pub static ACES2065_1: Lazy<RgbColorSpace> = Lazy::new(|| {
+    RgbColorSpace::new(
+        Point2f::new(0.7347, 0.2653),
+        Point2f::new(0.0, 1.0),
+        Point2f::new(0.0001, -0.077),
+        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::IllumAcesD60),
+        Gamut::Aces2065_1,
+    )
+});
+
+// TODO pg 186, lookup color space fn?

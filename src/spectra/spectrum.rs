@@ -102,6 +102,8 @@ impl Spectrum {
         // we use an Enum with the names and match on it and return ref to static-lifetimed
         // spectra. These are thread-safe read-only single-instance objects.
         match spectrum {
+            NamedSpectrum::StdIllumD65 => Lazy::force(&super::named_spectrum::STD_ILLUM_D65),
+            NamedSpectrum::IllumAcesD60 => Lazy::force(&super::named_spectrum::ILLUM_ACES_D60),
             NamedSpectrum::GlassBk7 => Lazy::force(&super::named_spectrum::GLASS_BK7_ETA),
             NamedSpectrum::GlassBaf10 => Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA),
         }
@@ -151,7 +153,12 @@ pub struct DenselySampled {
 
 impl DenselySampled {
     /// Samples from the provided spectrum to create a DenselySampled spectrum
-    pub fn new(spectrum: &Spectrum, lambda_min: i32, lambda_max: i32) -> DenselySampled {
+    pub fn new(spectrum: &Spectrum) -> DenselySampled {
+        Self::new_range(spectrum, LAMBDA_MIN as i32, LAMBDA_MAX as i32)
+    }
+
+    /// Samples from the provided spectrum to create a DenselySampled spectrum
+    pub fn new_range(spectrum: &Spectrum, lambda_min: i32, lambda_max: i32) -> DenselySampled {
         // PAPERDOC This is a fun area where idiomatic rust code (map -> collect) is arguably cleaner
         // than similar C++ code (allowing e.g. const correctness). Of course, C++ can accomplish similar.
         let values: Vec<Float> = (lambda_min..lambda_max)
