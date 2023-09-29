@@ -175,7 +175,7 @@ impl DenselySampled {
 impl SpectrumI for DenselySampled {
     fn get(&self, lambda: Float) -> Float {
         let offset = lambda as i32 - self.lambda_min;
-        if offset < 0 || offset > self.values.len() as i32 {
+        if offset < 0 || offset >= self.values.len() as i32 {
             return 0.0;
         }
         self.values[offset as usize]
@@ -371,7 +371,7 @@ impl Blackbody {
         let l = lambda * 1e-9;
         // TODO consider Exponentiation by squaring for powi call, and fastexp for exp().
         let le =
-            (2.0 * h * c * c) / l.powi(5) * (Float::exp((h * c) / (l * kb * temperature)) - 1.0);
+            (2.0 * h * c * c) / (l.powi(5) * (Float::exp((h * c) / (l * kb * temperature)) - 1.0));
         debug_assert!(!le.is_nan());
         le
     }
@@ -509,14 +509,19 @@ impl SpectrumI for RgbIlluminantSpectrum {
 
 pub fn inner_product<T: SpectrumI, G: SpectrumI>(a: &T, b: &G) -> Float {
     let mut integral = 0.0;
-    for lambda in (LAMBDA_MIN as i32)..(LAMBDA_MAX as i32) {
+    for lambda in (LAMBDA_MIN as i32)..=(LAMBDA_MAX as i32) {
         integral += a.get(lambda as Float) * b.get(lambda as Float);
     }
     integral
 }
 
 mod tests {
-    use crate::spectra::{spectrum::SpectrumI, Constant, Spectrum};
+    use float_cmp::assert_approx_eq;
+
+    use crate::{
+        spectra::{spectrum::SpectrumI, Blackbody, Constant, Spectrum},
+        Float,
+    };
 
     #[test]
     fn get_constant() {
@@ -526,5 +531,42 @@ mod tests {
         assert_eq!(5.0, spectrum.get(999.0))
     }
 
+    #[test]
+    fn blackbody() {
+        let err =
+            |val: Float, reference: Float| -> Float { Float::abs(val - reference) / reference };
+
+        // Planck's law.
+        // A few values via
+        // http://www.spectralcalc.com/blackbody_calculator/blackbody.php
+        // lambda, T, expected radiance
+        let v: [[Float; 3]; 4] = [
+            [483.0, 6000.0, 3.1849e13],
+            [600.0, 6000.0, 2.86772e13],
+            [500.0, 3700.0, 1.59845e12],
+            [600.0, 4500.0, 7.46497e12],
+        ];
+        for i in 0..4 {
+            let lambda = v[i][0];
+            let t = v[i][1];
+            let le_expected = v[i][2];
+            assert!(err(Blackbody::blackbody(lambda, t), le_expected) < 0.001);
+        }
+
+        // Use Wien's displacement law to compute maximum wavelength for a few
+        // temperatures, then confirm that the value returned by Blackbody() is
+        // consistent with this.
+        for t in [2700.0, 3000.0, 4500.0, 5600.0, 6000.0] {
+            let lambda_max = 2.8977721e-3 / t * 1e9;
+            let lambda: [Float; 3] = [0.99 * lambda_max, lambda_max, 1.01 * lambda_max];
+            let result0 = Blackbody::blackbody(lambda[0], t);
+            let result1 = Blackbody::blackbody(lambda[1], t);
+            let result2 = Blackbody::blackbody(lambda[2], t);
+            assert!(result0 < result1);
+            assert!(result1 > result2);
+        }
+    }
+
     // TODO test piecewiselinear ctor and get(). It's a bit invovled so we should test it.
+    // Something's wrong with either piecewiselienar or denselysampled because it messes up colorspace innerproduct calls I think.
 }
