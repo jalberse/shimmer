@@ -351,3 +351,31 @@ impl HasNan for RgbSigmoidPolynomial {
         self.c0.is_nan() || self.c1.is_nan() || self.c2.is_nan()
     }
 }
+
+mod tests {
+    use float_cmp::assert_approx_eq;
+
+    use crate::{
+        colorspace::{NamedColorSpace, RgbColorSpace},
+        rgb_to_spectra::Gamut,
+        Float,
+    };
+
+    use super::RGB;
+
+    #[test]
+    fn rgb_xyz() {
+        for cs in [
+            NamedColorSpace::ACES2065_1,
+            NamedColorSpace::REC2020,
+            NamedColorSpace::SRGB,
+        ] {
+            let cs = RgbColorSpace::get_named(cs);
+            let xyz = cs.to_xyz(&RGB::new(1.0, 1.0, 1.0));
+            let rgb = cs.to_rgb(&xyz);
+            assert_approx_eq!(Float, 1.0, rgb[0]);
+            assert_approx_eq!(Float, 1.0, rgb[1]);
+            assert_approx_eq!(Float, 1.0, rgb[2]);
+        }
+    }
+}

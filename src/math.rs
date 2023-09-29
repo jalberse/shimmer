@@ -221,6 +221,19 @@ pub fn evaluate_polynomial(t: Float, c: &[Float]) -> Float {
     }
 }
 
+pub fn find_interval(size: usize, pred: impl Fn(usize) -> bool) -> usize {
+    let mut first = 1;
+    let mut last = size as i32 - 2;
+    while last > 0 {
+        let half = last >> 1;
+        let middle = first + half;
+        let pred_result = pred(middle.try_into().unwrap());
+        first = if pred_result { middle + 1 } else { first };
+        last = if pred_result { last - (half + 1) } else { half };
+    }
+    i32::clamp(first - 1, 0, size as i32 - 2) as usize
+}
+
 mod tests {
     #[test]
     fn lerp() {

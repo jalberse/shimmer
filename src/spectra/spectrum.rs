@@ -3,7 +3,7 @@ use std::{rc::Rc, sync::Arc};
 use crate::{
     color::{RgbSigmoidPolynomial, RGB},
     colorspace::RgbColorSpace,
-    math::lerp,
+    math::{self, lerp},
     spectra::cie::{CIE, CIE_Y_INTEGRAL},
     Float,
 };
@@ -229,9 +229,8 @@ impl PiecewiseLinear {
         l.copy_from_slice(lambdas);
         let mut v = vec![0.0; values.len()];
         v.copy_from_slice(values);
-        // Check that they are sorted
+        // Check that lambdas are sorted
         assert!(l.windows(2).all(|p| p[0] <= p[1]));
-        assert!(v.windows(2).all(|p| p[0] <= p[1]));
         PiecewiseLinear {
             lambdas: l,
             values: v,
@@ -247,7 +246,7 @@ impl PiecewiseLinear {
         samples: &[Float; N],
         normalize: bool,
     ) -> PiecewiseLinear {
-        assert_eq!(N, S / 2);
+        assert_eq!(N / 2, S);
         assert_eq!(0, samples.len() % 2);
         let n = samples.len() / 2;
         let mut lambda: Vec<Float> = Vec::new();
@@ -315,16 +314,13 @@ impl SpectrumI for PiecewiseLinear {
             return 0.0;
         }
 
-        // PAPERDOC I would contend that this is a much cleaner and simpler approach
-        // than PBRTv4's FindInterval() approach.
-        let interval: Option<(usize, usize)> = (0..self.lambdas.len())
-            .tuples()
-            .find(|(a, b)| -> bool { self.lambdas[*a] <= lambda && lambda < self.lambdas[*b] });
-        let interval = interval.expect("Interval not found; edge cases should be handled above.");
+        let o = math::find_interval(self.lambdas.len(), |i| -> bool {
+            self.lambdas[i] <= lambda
+        });
+        debug_assert!(lambda >= self.lambdas[o] && lambda <= self.lambdas[o + 1]);
 
-        let t = (lambda - self.lambdas[interval.0])
-            / (self.lambdas[interval.1] - self.lambdas[interval.0]);
-        lerp(t, &self.values[interval.0], &self.values[interval.1])
+        let t = (lambda - self.lambdas[o]) / (self.lambdas[o + 1] - self.lambdas[o]);
+        lerp(t, &self.values[o], &self.values[o + 1])
     }
 
     fn max_value(&self) -> Float {

@@ -21,7 +21,7 @@ pub enum NamedSpectrum {
 // NOTE: These intentionally use static, not const.
 // const will compile, but will not work properly. See once_cell documentation.
 pub static STD_ILLUM_D65: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<214, 112>(
+    Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<214, 107>(
         &CIE_ILLUM_D6500,
         true,
     ))
