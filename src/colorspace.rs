@@ -43,7 +43,6 @@ impl RgbColorSpace {
         // Compute the whitepoint primaries and XYZ coordinates.
         let w: XYZ = XYZ::from_spectrum(illuminant);
 
-        // TODO whitepoint looked wrong; is it fixed now? Illuminant was fine
         let whitepoint = w.xy();
         let r_xyz = XYZ::from_xy_y_default(&r);
         let g_xyz = XYZ::from_xy_y_default(&g);
@@ -93,6 +92,7 @@ impl RgbColorSpace {
     }
 
     pub fn to_rgb_coeffs(&self, rgb: &RGB) -> RgbSigmoidPolynomial {
+        debug_assert!(rgb.r >= 0.0 && rgb.g >= 0.0 && rgb.b >= 0.0);
         RgbSigmoidPolynomial::from_array(rgb_to_spectra::get_rgb_to_spec(&self.gamut, rgb))
     }
 

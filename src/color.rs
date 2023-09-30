@@ -341,7 +341,7 @@ impl RgbSigmoidPolynomial {
             }
         }
 
-        0.5 + x / (2.0 * Float::sqrt(1.0 + Float::sqrt(x)))
+        0.5 + x / (2.0 * Float::sqrt(1.0 + x * x))
     }
 }
 
@@ -354,9 +354,13 @@ impl HasNan for RgbSigmoidPolynomial {
 #[cfg(test)]
 mod tests {
     use float_cmp::assert_approx_eq;
+    use rand::{distributions::Uniform, prelude::Distribution, rngs::StdRng, SeedableRng};
 
     use crate::{
         colorspace::{NamedColorSpace, RgbColorSpace},
+        spectra::spectrum::{
+            RgbAlbedoSpectrum, RgbUnboundedSpectrum, SpectrumI, LAMBDA_MAX, LAMBDA_MIN,
+        },
         Float,
     };
 
@@ -437,6 +441,66 @@ mod tests {
         assert!(rgb.g < 1.01);
         assert!(rgb.b > 0.99);
         assert!(rgb.b < 1.01);
+    }
+
+    #[test]
+    fn rgb_unbounded_spectrum_max_value() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let between = Uniform::from(0.0..1.0);
+        for cs in [
+            NamedColorSpace::SRGB,
+            NamedColorSpace::REC2020,
+            NamedColorSpace::ACES2065_1,
+        ] {
+            let cs = RgbColorSpace::get_named(cs);
+            for _ in 0..100 {
+                let rgb = RGB::new(
+                    between.sample(&mut rng),
+                    between.sample(&mut rng),
+                    between.sample(&mut rng),
+                ) * 10.0;
+                let rs = RgbUnboundedSpectrum::new(&cs, &rgb);
+
+                let m = rs.max_value();
+                let mut sm = 0.0;
+                let mut lambda = 360.0;
+                while lambda <= 830.0 {
+                    sm = Float::max(sm, rs.get(lambda));
+                    lambda += 1.0 / 16.0;
+                }
+                assert!(Float::abs(sm - m) / sm < 1e-4);
+            }
+        }
+    }
+
+    #[test]
+    fn rgb_albedo_spectrum_max_value() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let between = Uniform::from(0.0..1.0);
+        for cs in [
+            NamedColorSpace::SRGB,
+            NamedColorSpace::REC2020,
+            NamedColorSpace::ACES2065_1,
+        ] {
+            let cs = RgbColorSpace::get_named(cs);
+            for _ in 0..100 {
+                let rgb = RGB::new(
+                    between.sample(&mut rng),
+                    between.sample(&mut rng),
+                    between.sample(&mut rng),
+                );
+                let rs = RgbAlbedoSpectrum::new(&cs, &rgb);
+
+                let m = rs.max_value();
+                let mut sm = 0.0;
+                let mut lambda = 360.0;
+                while lambda <= 830.0 {
+                    sm = Float::max(sm, rs.get(lambda));
+                    lambda += 1.0 / 16.0;
+                }
+                assert!(Float::abs(sm - m) / sm < 1e-4);
+            }
+        }
     }
 
     // TODO do other color tests.

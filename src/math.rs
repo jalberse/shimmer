@@ -210,12 +210,8 @@ fn two_sum(a: Float, b: Float) -> CompensatedFloat {
 }
 
 pub fn evaluate_polynomial(t: Float, c: &[Float]) -> Float {
-    let (c, c_remaining) = c.split_first().expect("Missed base case of c.len() == 1!");
-    if c_remaining.is_empty() {
-        *c
-    } else {
-        Float::mul_add(t, evaluate_polynomial(t, &c_remaining), *c)
-    }
+    // TODO Consider using FMA as PBRT does. I previous did that but was getting the wrong answer; we'll go with KISS for now.
+    t * t * c[0] + t * c[1] + c[2]
 }
 
 pub fn find_interval(size: usize, pred: impl Fn(usize) -> bool) -> usize {

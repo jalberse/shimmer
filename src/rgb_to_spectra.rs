@@ -27,21 +27,19 @@ pub fn get_rgb_to_spec(gamut: &Gamut, rgb: &RGB) -> [f32; 3] {
 // Note that files in rgbtospec/ were generated with a resolution of 64; this matches the cmake
 // command used by PBRT for generating their tables.
 pub static SRGB_RGB2SPEC: Lazy<RGB2Spec> =
-    Lazy::new(|| RGB2Spec::load("../rgbtospec/srgb.spec").expect("Unable to read .spec file!"));
+    Lazy::new(|| RGB2Spec::load("rgbtospec/srgb.spec").unwrap());
 
 pub static XYZ_RGB2SPEC: Lazy<RGB2Spec> =
-    Lazy::new(|| RGB2Spec::load("../rgbtospec/xyz.spec").expect("Unable to read .spec file!"));
+    Lazy::new(|| RGB2Spec::load("rgbtospec/xyz.spec").unwrap());
 
 pub static ERGB_RGB2SPEC: Lazy<RGB2Spec> =
-    Lazy::new(|| RGB2Spec::load("../rgbtospec/ergb.spec").expect("Unable to read .spec file!"));
+    Lazy::new(|| RGB2Spec::load("rgbtospec/ergb.spec").unwrap());
 
-pub static ACES_2065_1_RGB2SPEC: Lazy<RGB2Spec> = Lazy::new(|| {
-    RGB2Spec::load("../rgbtospec/aces2065_1.spec").expect("Unable to read .spec file!")
-});
+pub static ACES_2065_1_RGB2SPEC: Lazy<RGB2Spec> =
+    Lazy::new(|| RGB2Spec::load("rgbtospec/aces2065_1.spec").unwrap());
 
-pub static PROPHOTORGB_RGB2SPEC: Lazy<RGB2Spec> = Lazy::new(|| {
-    RGB2Spec::load("../rgbtospec/prophotorgb.spec").expect("Unable to read .spec file!")
-});
+pub static PROPHOTORGB_RGB2SPEC: Lazy<RGB2Spec> =
+    Lazy::new(|| RGB2Spec::load("rgbtospec/prophotorgb.spec").unwrap());
 
 pub static REC2020_RGB2SPEC: Lazy<RGB2Spec> =
-    Lazy::new(|| RGB2Spec::load("../rgbtospec/rec2020.spec").expect("Unable to read .spec file!"));
+    Lazy::new(|| RGB2Spec::load("rgbtospec/rec2020.spec").unwrap());
