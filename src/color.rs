@@ -358,8 +358,11 @@ mod tests {
 
     use crate::{
         colorspace::{NamedColorSpace, RgbColorSpace},
-        spectra::spectrum::{
-            RgbAlbedoSpectrum, RgbUnboundedSpectrum, SpectrumI, LAMBDA_MAX, LAMBDA_MIN,
+        spectra::{
+            spectrum::{
+                RgbAlbedoSpectrum, RgbUnboundedSpectrum, SpectrumI, LAMBDA_MAX, LAMBDA_MIN,
+            },
+            DenselySampled,
         },
         Float,
     };
@@ -500,6 +503,38 @@ mod tests {
                 }
                 assert!(Float::abs(sm - m) / sm < 1e-4);
             }
+        }
+    }
+
+    #[test]
+    fn rgb_albedo_spectrum_round_trip() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let between = Uniform::from(0.0..1.0);
+        let cs = RgbColorSpace::get_named(NamedColorSpace::SRGB);
+
+        for _ in 0..100 {
+            let rgb = RGB::new(
+                between.sample(&mut rng),
+                between.sample(&mut rng),
+                between.sample(&mut rng),
+            );
+            let rs = RgbAlbedoSpectrum::new(cs, &rgb);
+
+            let rs_illum = DenselySampled::sample_function(
+                |lambda: Float| -> Float { rs.get(lambda) * cs.illuminant.get(lambda) },
+                LAMBDA_MIN as usize,
+                LAMBDA_MAX as usize,
+            );
+            let xyz = XYZ::from_spectrum(&rs_illum);
+            let rgb2 = cs.to_rgb(&xyz);
+
+            // Some error comes from the fact that piecewise linear (at 5nm)
+            // CIE curves were used for the optimization while we use piecewise
+            // linear at 1nm spacing converted to 1nm constant / densely
+            // sampled.
+            assert_approx_eq!(Float, rgb.r, rgb2.r, epsilon = 0.01);
+            assert_approx_eq!(Float, rgb.g, rgb2.g, epsilon = 0.01);
+            assert_approx_eq!(Float, rgb.b, rgb2.b, epsilon = 0.01);
         }
     }
 

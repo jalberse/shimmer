@@ -169,6 +169,22 @@ impl DenselySampled {
             values,
         }
     }
+
+    pub fn sample_function(
+        f: impl Fn(Float) -> Float,
+        lambda_min: usize,
+        lambda_max: usize,
+    ) -> DenselySampled {
+        let mut values = vec![0.0; lambda_max - lambda_min + 1];
+        for lambda in lambda_min..=lambda_max {
+            values[lambda - lambda_min] = f(lambda as Float);
+        }
+        DenselySampled {
+            values,
+            lambda_min: lambda_min as i32,
+            lambda_max: lambda_max as i32,
+        }
+    }
 }
 
 impl SpectrumI for DenselySampled {
