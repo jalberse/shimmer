@@ -234,6 +234,7 @@ pub fn find_interval(size: usize, pred: impl Fn(usize) -> bool) -> usize {
     i32::clamp(first - 1, 0, size as i32 - 2) as usize
 }
 
+#[cfg(test)]
 mod tests {
     #[test]
     fn lerp() {

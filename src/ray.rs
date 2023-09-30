@@ -165,6 +165,7 @@ impl HasNan for AuxiliaryRays {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use crate::vecmath::{Point3f, Tuple3, Vector3f};
 

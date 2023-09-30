@@ -395,6 +395,7 @@ impl_op_ex!(*|t1: &Transform, t2: &Transform| -> Transform {
     }
 });
 
+#[cfg(test)]
 mod tests {
     use crate::{
         bounding_box::Bounds3f,

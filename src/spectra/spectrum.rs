@@ -515,6 +515,7 @@ pub fn inner_product<T: SpectrumI, G: SpectrumI>(a: &T, b: &G) -> Float {
     integral
 }
 
+#[cfg(test)]
 mod tests {
     use float_cmp::assert_approx_eq;
     use rand::{distributions::Uniform, prelude::Distribution, rngs::StdRng, SeedableRng};

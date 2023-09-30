@@ -498,6 +498,7 @@ impl<P, V> Index<usize> for Bounds3<P, V> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use std::marker::PhantomData;
 

@@ -480,6 +480,7 @@ impl Mul<XYZ> for SquareMatrix<3> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use crate::vecmath::tuple::Tuple3;
     use crate::{square_matrix::Determinant, vecmath::Vector3f, Float};

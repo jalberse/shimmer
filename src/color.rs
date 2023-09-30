@@ -351,6 +351,7 @@ impl HasNan for RgbSigmoidPolynomial {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use float_cmp::assert_approx_eq;
 
