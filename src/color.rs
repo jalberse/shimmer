@@ -361,7 +361,8 @@ mod tests {
         colorspace::{NamedColorSpace, RgbColorSpace},
         spectra::{
             spectrum::{
-                RgbAlbedoSpectrum, RgbUnboundedSpectrum, SpectrumI, LAMBDA_MAX, LAMBDA_MIN,
+                RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, SpectrumI,
+                LAMBDA_MAX, LAMBDA_MIN,
             },
             DenselySampled,
         },
@@ -595,6 +596,103 @@ mod tests {
 
             let rs_illum = DenselySampled::sample_function(
                 |lambda: Float| -> Float { rs.get(lambda) * cs.illuminant.get(lambda) },
+                LAMBDA_MIN as usize,
+                LAMBDA_MAX as usize,
+            );
+            let xyz = XYZ::from_spectrum(&rs_illum);
+            let rgb2 = cs.to_rgb(&xyz);
+
+            // Some error comes from the fact that piecewise linear (at 5nm)
+            // CIE curves were used for the optimization while we use piecewise
+            // linear at 1nm spacing converted to 1nm constant / densely
+            // sampled.
+            assert_approx_eq!(Float, rgb.r, rgb2.r, epsilon = 0.01);
+            assert_approx_eq!(Float, rgb.g, rgb2.g, epsilon = 0.01);
+            assert_approx_eq!(Float, rgb.b, rgb2.b, epsilon = 0.01);
+        }
+    }
+
+    // TODO Okay the illum spectrums fail.
+    #[test]
+    fn rgb_illum_spectrum_round_trip_rgb() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let between = Uniform::from(0.0..1.0);
+        let cs = RgbColorSpace::get_named(NamedColorSpace::SRGB);
+
+        for _ in 0..100 {
+            let rgb = RGB::new(
+                between.sample(&mut rng),
+                between.sample(&mut rng),
+                between.sample(&mut rng),
+            );
+            let rs = RgbIlluminantSpectrum::new(cs, &rgb);
+
+            let rs_illum = DenselySampled::sample_function(
+                |lambda: Float| -> Float { rs.get(lambda) },
+                LAMBDA_MIN as usize,
+                LAMBDA_MAX as usize,
+            );
+            let xyz = XYZ::from_spectrum(&rs_illum);
+            let rgb2 = cs.to_rgb(&xyz);
+
+            // Some error comes from the fact that piecewise linear (at 5nm)
+            // CIE curves were used for the optimization while we use piecewise
+            // linear at 1nm spacing converted to 1nm constant / densely
+            // sampled.
+            assert_approx_eq!(Float, rgb.r, rgb2.r, epsilon = 0.01);
+            assert_approx_eq!(Float, rgb.g, rgb2.g, epsilon = 0.01);
+            assert_approx_eq!(Float, rgb.b, rgb2.b, epsilon = 0.01);
+        }
+    }
+
+    #[test]
+    fn rgb_illum_spectrum_round_trip_rec2020() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let between = Uniform::from(0.0..1.0);
+        let cs = RgbColorSpace::get_named(NamedColorSpace::REC2020);
+
+        for _ in 0..100 {
+            let rgb = RGB::new(
+                0.1 + 0.7 * between.sample(&mut rng),
+                0.1 + 0.7 * between.sample(&mut rng),
+                0.1 + 0.7 * between.sample(&mut rng),
+            );
+            let rs = RgbIlluminantSpectrum::new(cs, &rgb);
+
+            let rs_illum = DenselySampled::sample_function(
+                |lambda: Float| -> Float { rs.get(lambda) },
+                LAMBDA_MIN as usize,
+                LAMBDA_MAX as usize,
+            );
+            let xyz = XYZ::from_spectrum(&rs_illum);
+            let rgb2 = cs.to_rgb(&xyz);
+
+            // Some error comes from the fact that piecewise linear (at 5nm)
+            // CIE curves were used for the optimization while we use piecewise
+            // linear at 1nm spacing converted to 1nm constant / densely
+            // sampled.
+            assert_approx_eq!(Float, rgb.r, rgb2.r, epsilon = 0.01);
+            assert_approx_eq!(Float, rgb.g, rgb2.g, epsilon = 0.01);
+            assert_approx_eq!(Float, rgb.b, rgb2.b, epsilon = 0.01);
+        }
+    }
+
+    #[test]
+    fn rgb_illum_spectrum_round_trip_aces() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let between = Uniform::from(0.0..1.0);
+        let cs = RgbColorSpace::get_named(NamedColorSpace::ACES2065_1);
+
+        for _ in 0..100 {
+            let rgb = RGB::new(
+                0.3 + 0.4 * between.sample(&mut rng),
+                0.3 + 0.4 * between.sample(&mut rng),
+                0.3 + 0.4 * between.sample(&mut rng),
+            );
+            let rs = RgbIlluminantSpectrum::new(cs, &rgb);
+
+            let rs_illum = DenselySampled::sample_function(
+                |lambda: Float| -> Float { rs.get(lambda) },
                 LAMBDA_MIN as usize,
                 LAMBDA_MAX as usize,
             );
