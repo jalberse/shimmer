@@ -161,7 +161,7 @@ impl DenselySampled {
     pub fn new_range(spectrum: &Spectrum, lambda_min: i32, lambda_max: i32) -> DenselySampled {
         // PAPERDOC This is a fun area where idiomatic rust code (map -> collect) is arguably cleaner
         // than similar C++ code (allowing e.g. const correctness). Of course, C++ can accomplish similar.
-        let values: Vec<Float> = (lambda_min..lambda_max)
+        let values: Vec<Float> = (lambda_min..=lambda_max)
             .map(|lambda: i32| spectrum.get(lambda as Float))
             .collect();
         DenselySampled {
@@ -517,11 +517,17 @@ pub fn inner_product<T: SpectrumI, G: SpectrumI>(a: &T, b: &G) -> Float {
 
 mod tests {
     use float_cmp::assert_approx_eq;
+    use rand::{distributions::Uniform, prelude::Distribution, rngs::StdRng, SeedableRng};
 
     use crate::{
-        spectra::{spectrum::SpectrumI, Blackbody, Constant, Spectrum},
+        spectra::{
+            sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
+            spectrum::SpectrumI, Blackbody, Constant, Spectrum,
+        },
         Float,
     };
+
+    use super::{DenselySampled, PiecewiseLinear, LAMBDA_MAX, LAMBDA_MIN};
 
     #[test]
     fn get_constant() {
@@ -567,6 +573,94 @@ mod tests {
         }
     }
 
-    // TODO test piecewiselinear ctor and get(). It's a bit invovled so we should test it.
-    // Something's wrong with either piecewiselienar or denselysampled because it messes up colorspace innerproduct calls I think.
+    #[test]
+    fn xyz_integral() {
+        // Make sure the integral of all matching function sample values is
+        // basically one in x, y, and z.
+        let mut xx: Float = 0.0;
+        let mut yy: Float = 0.0;
+        let mut zz: Float = 0.0;
+
+        for lambda in (LAMBDA_MIN as i32)..=(LAMBDA_MAX as i32) {
+            xx += Spectrum::get_cie(crate::spectra::CIE::X).get(lambda as Float);
+            yy += Spectrum::get_cie(crate::spectra::CIE::Y).get(lambda as Float);
+            zz += Spectrum::get_cie(crate::spectra::CIE::Z).get(lambda as Float);
+        }
+        let cie_y_integral = 106.856895;
+        xx /= cie_y_integral;
+        yy /= cie_y_integral;
+        zz /= cie_y_integral;
+
+        assert_approx_eq!(Float, 1.0, xx, epsilon = 0.005);
+        assert_approx_eq!(Float, 1.0, yy, epsilon = 0.005);
+        assert_approx_eq!(Float, 1.0, zz, epsilon = 0.005);
+    }
+
+    #[test]
+    fn xyz_constant_spectrum() {
+        let mut xyz_sum: [Float; 3] = [0.0; 3];
+        let n = 100;
+        let between = Uniform::from(0.0..1.0);
+        let mut rng = StdRng::seed_from_u64(0);
+        for _ in 0..n {
+            let rand = between.sample(&mut rng);
+            let lambda = &&SampledWavelengths::sample_uniform(rand);
+            let xyz = SampledSpectrum::from_const(1.0).to_xyz(lambda);
+            for c in 0..3 {
+                xyz_sum[c] += xyz[c];
+            }
+        }
+        for c in 0..3 {
+            xyz_sum[c] /= n as Float;
+        }
+
+        // The epsilon is a bit high here because we're using a uniform sample
+        // rather than a stratified sample, with kind-of-low sample size.
+        // But this test DID catch a bug and I'm now reasonably certain this
+        // is correct.
+        assert_approx_eq!(Float, 1.0, xyz_sum[0], epsilon = 0.1);
+        assert_approx_eq!(Float, 1.0, xyz_sum[1], epsilon = 0.1);
+        assert_approx_eq!(Float, 1.0, xyz_sum[2], epsilon = 0.1);
+    }
+
+    #[test]
+    fn piecewise_linear_ctor() {
+        let lambdas = [0.0, 5.0, 10.0, 100.0];
+        let values = [0.0, 10.0, 20.0, 200.0];
+        let spectrum = PiecewiseLinear::new(&lambdas, &values);
+        assert_eq!(
+            [0.0, 5.0, 10.0, 100.0].as_slice(),
+            spectrum.lambdas.as_slice()
+        );
+        assert_eq!(
+            [0.0, 10.0, 20.0, 200.0].as_slice(),
+            spectrum.values.as_slice()
+        );
+    }
+
+    #[test]
+    fn piecewise_linear_get() {
+        let lambdas = [0.0, 5.0, 10.0, 100.0];
+        let values = [0.0, 10.0, 20.0, 200.0];
+        let spectrum = PiecewiseLinear::new(&lambdas, &values);
+        assert_eq!(5.0, spectrum.get(2.5));
+        assert_eq!(15.0, spectrum.get(7.5));
+        assert_eq!(110.0, spectrum.get(55.0));
+        assert_eq!(0.0, spectrum.get(99999.0));
+        assert_eq!(0.0, spectrum.get(0.0));
+    }
+
+    #[test]
+    fn densely_sampled_basic() {
+        let lambdas = [360.0, 820.0];
+        let values = [0.0, 100.0];
+        let spectrum = PiecewiseLinear::new(&lambdas, &values);
+        let spectrum = DenselySampled::new(&Spectrum::PiecewiseLinear(spectrum));
+
+        assert_approx_eq!(Float, 0.0, spectrum.get(360.0));
+        assert_approx_eq!(Float, 100.0, spectrum.get(820.0));
+        assert_approx_eq!(Float, 50.0, spectrum.get(590.0));
+    }
+
+    // TODO Do other spectra tests.
 }

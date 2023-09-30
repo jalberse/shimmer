@@ -24,13 +24,15 @@ impl SampledWavelengths {
         lambda_min: Float,
         lambda_max: Float,
     ) -> SampledWavelengths {
+        debug_assert!(u >= 0.0 && u <= 1.0);
+
         let mut lambda = [0.0; NUM_SPECTRUM_SAMPLES];
 
         // Sample first wavelength using u
         lambda[0] = lerp(u, &lambda_min, &lambda_max);
 
         // Initialzie lambda for remaining wavelengths
-        let delta = (lambda_max - lambda_min) / NUM_SPECTRUM_SAMPLES as Float;
+        let delta = (lambda_max - lambda_min) / (NUM_SPECTRUM_SAMPLES as Float);
         for i in 1..NUM_SPECTRUM_SAMPLES {
             lambda[i] = lambda[i - 1] + delta;
             if lambda[i] > lambda_max {

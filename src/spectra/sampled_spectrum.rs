@@ -38,10 +38,10 @@ impl SampledSpectrum {
     pub fn safe_div(&self, other: &SampledSpectrum) -> SampledSpectrum {
         let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
         for i in 0..NUM_SPECTRUM_SAMPLES {
-            result[i] = if other[i] == 0.0 {
-                0.0
-            } else {
+            result[i] = if other[i] != 0.0 {
                 self[i] / other[i]
+            } else {
+                0.0
             }
         }
         debug_assert!(!result.has_nan());
@@ -99,7 +99,7 @@ impl SampledSpectrum {
     }
 
     pub fn average(&self) -> Float {
-        self.values.iter().sum::<Float>() / self.values.len() as Float
+        self.values.iter().sum::<Float>() / (self.values.len() as Float)
     }
 
     pub fn min_component_value(&self) -> Float {
@@ -127,8 +127,8 @@ impl SampledSpectrum {
         XYZ::new(
             (x * self).safe_div(&pdf).average(),
             (y * self).safe_div(&pdf).average(),
-            (z * self).safe_div(&pdf).average() / CIE_Y_INTEGRAL,
-        )
+            (z * self).safe_div(&pdf).average(),
+        ) / CIE_Y_INTEGRAL
     }
 
     /// Similar to to_xyz(), but only computes the y value for when only

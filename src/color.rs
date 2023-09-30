@@ -28,9 +28,8 @@ impl XYZ {
         XYZ::new(
             inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::X), s),
             inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::Y), s),
-            inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::Z), s)
-                / CIE_Y_INTEGRAL,
-        )
+            inner_product::<Spectrum, T>(Spectrum::get_cie(crate::spectra::CIE::Z), s),
+        ) / CIE_Y_INTEGRAL
     }
 
     pub fn from_xy_y_default(xy: &Point2f) -> XYZ {
@@ -361,7 +360,7 @@ mod tests {
         Float,
     };
 
-    use super::RGB;
+    use super::{RGB, XYZ};
 
     #[test]
     fn rgb_xyz() {
@@ -378,4 +377,28 @@ mod tests {
             assert_approx_eq!(Float, 1.0, rgb[2]);
         }
     }
+
+    #[test]
+    fn srgb() {
+        // Make sure the matrix values are sensible by throwing the x, y, and z basis vectors
+        // at it to pull out columns.
+        let cs = RgbColorSpace::get_named(NamedColorSpace::SRGB);
+        let rgb = cs.to_rgb(&XYZ::new(1.0, 0.0, 0.0));
+
+        assert_approx_eq!(Float, 3.2406, rgb[0], epsilon = 0.001);
+        assert_approx_eq!(Float, -0.9689, rgb[1], epsilon = 0.001);
+        assert_approx_eq!(Float, 0.0557, rgb[2], epsilon = 0.001);
+
+        let rgb = cs.to_rgb(&XYZ::new(0.0, 1.0, 0.0));
+        assert_approx_eq!(Float, -1.5372, rgb[0], epsilon = 0.001);
+        assert_approx_eq!(Float, 1.8758, rgb[1], epsilon = 0.001);
+        assert_approx_eq!(Float, -0.2040, rgb[2], epsilon = 0.001);
+
+        let rgb = cs.to_rgb(&XYZ::new(0.0, 0.0, 1.0));
+        assert_approx_eq!(Float, -0.4986, rgb[0], epsilon = 0.001);
+        assert_approx_eq!(Float, 0.0415, rgb[1], epsilon = 0.001);
+        assert_approx_eq!(Float, 1.0570, rgb[2], epsilon = 0.001);
+    }
+
+    // TODO do other color tests.
 }
