@@ -356,7 +356,6 @@ mod tests {
 
     use crate::{
         colorspace::{NamedColorSpace, RgbColorSpace},
-        rgb_to_spectra::Gamut,
         Float,
     };
 
@@ -398,6 +397,45 @@ mod tests {
         assert_approx_eq!(Float, -0.4986, rgb[0], epsilon = 0.001);
         assert_approx_eq!(Float, 0.0415, rgb[1], epsilon = 0.001);
         assert_approx_eq!(Float, 1.0570, rgb[2], epsilon = 0.001);
+    }
+
+    #[test]
+    fn std_illum_whites_rgb() {
+        let srgb = RgbColorSpace::get_named(NamedColorSpace::SRGB);
+        let xyz = XYZ::from_spectrum(&*srgb.illuminant);
+        let rgb = srgb.to_rgb(&xyz);
+        assert!(rgb.r > 0.99);
+        assert!(rgb.r < 1.01);
+        assert!(rgb.g > 0.99);
+        assert!(rgb.g < 1.01);
+        assert!(rgb.b > 0.99);
+        assert!(rgb.b < 1.01);
+    }
+
+    #[test]
+    fn std_illum_whites_rec2020() {
+        let cs = RgbColorSpace::get_named(NamedColorSpace::REC2020);
+        let xyz = XYZ::from_spectrum(&*cs.illuminant);
+        let rgb = cs.to_rgb(&xyz);
+        assert!(rgb.r > 0.99);
+        assert!(rgb.r < 1.01);
+        assert!(rgb.g > 0.99);
+        assert!(rgb.g < 1.01);
+        assert!(rgb.b > 0.99);
+        assert!(rgb.b < 1.01);
+    }
+
+    #[test]
+    fn std_illum_whites_aces2065_1() {
+        let cs = RgbColorSpace::get_named(NamedColorSpace::ACES2065_1);
+        let xyz = XYZ::from_spectrum(&*cs.illuminant);
+        let rgb = cs.to_rgb(&xyz);
+        assert!(rgb.r > 0.99);
+        assert!(rgb.r < 1.01);
+        assert!(rgb.g > 0.99);
+        assert!(rgb.g < 1.01);
+        assert!(rgb.b > 0.99);
+        assert!(rgb.b < 1.01);
     }
 
     // TODO do other color tests.
