@@ -13,6 +13,7 @@ use crate::{
     Float,
 };
 
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct XYZ {
     pub x: Float,
     pub y: Float,
@@ -364,10 +365,18 @@ mod tests {
             },
             DenselySampled,
         },
+        vecmath::{Point2f, Tuple2},
         Float,
     };
 
     use super::{RGB, XYZ};
+
+    #[test]
+    fn from_xy_zero() {
+        let point = Point2f::new(1.0, 0.0);
+        let res = XYZ::from_xy_y(&point, 0.5);
+        assert_eq!(XYZ::new(0.0, 0.0, 0.0), res);
+    }
 
     #[test]
     fn rgb_xyz() {
