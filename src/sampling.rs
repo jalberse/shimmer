@@ -87,10 +87,30 @@ pub fn invert_linear_sample(x: Float, a: Float, b: Float) -> Float {
     x * (a * (2.0 - x) + b * x) / (a + b)
 }
 
+pub fn sample_visible_wavelengths(u: Float) -> Float {
+    538.0 - 138.888889 * Float::atanh(0.85691062 - 1.82750197 * u)
+}
+
+pub fn visible_wavelengths_pdf(lambda: Float) -> Float {
+    if lambda < 360.0 || lambda > 830.0 {
+        return 0.0;
+    }
+    let x = Float::cosh(0.0072 * (lambda - 538.0));
+    0.0039398042 / (x * x)
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::sampling::visible_wavelengths_pdf;
+
     use super::sample_discrete;
     use super::Float;
+
+    #[test]
+    fn visible_wavelength_pdf_outside_range() {
+        assert_eq!(0.0, visible_wavelengths_pdf(359.9));
+        assert_eq!(0.0, visible_wavelengths_pdf(830.1));
+    }
 
     #[test]
     fn sample_discrete_basics() {

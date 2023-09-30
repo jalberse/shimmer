@@ -536,9 +536,15 @@ mod tests {
     use rand::{distributions::Uniform, prelude::Distribution, rngs::StdRng, SeedableRng};
 
     use crate::{
+        color::RGB,
+        colorspace::{NamedColorSpace, RgbColorSpace},
+        math::lerp,
+        sampling::{sample_visible_wavelengths, visible_wavelengths_pdf},
         spectra::{
-            sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
-            spectrum::SpectrumI, Blackbody, Constant, Spectrum,
+            sampled_spectrum::SampledSpectrum,
+            sampled_wavelengths::SampledWavelengths,
+            spectrum::{RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, SpectrumI},
+            Blackbody, Constant, Spectrum, CIE, CIE_Y_INTEGRAL,
         },
         Float,
     };
@@ -679,4 +685,106 @@ mod tests {
     }
 
     // TODO Do other spectra tests.
+    #[test]
+    fn spectrum_max_value() {
+        assert_eq!(2.5, Constant::new(2.5).max_value());
+
+        assert_eq!(
+            10.1,
+            PiecewiseLinear::new(
+                &[300.0, 380.0, 510.0, 620.0, 700.0],
+                &[1.5, 2.6, 10.1, 5.3, 7.7]
+            )
+            .max_value()
+        );
+
+        assert_approx_eq!(
+            Float,
+            1.0,
+            Blackbody::new(5000.0).max_value(),
+            epsilon = 0.0001
+        );
+
+        let mut rng = StdRng::seed_from_u64(0);
+        let between = Uniform::from(0.0..1.0);
+        let cs = RgbColorSpace::get_named(NamedColorSpace::SRGB);
+        for _ in 0..20 {
+            let rgb = RGB::new(
+                between.sample(&mut rng),
+                between.sample(&mut rng),
+                between.sample(&mut rng),
+            );
+
+            let spectrum = RgbAlbedoSpectrum::new(cs, &rgb);
+            let max = spectrum.max_value() * 1.00001;
+            for lambda in 360..=820 {
+                assert!(spectrum.get(lambda as Float) < max)
+            }
+
+            let spectrum = RgbUnboundedSpectrum::new(cs, &(&rgb * 10.0));
+            let max = spectrum.max_value() * 1.00001;
+            for lambda in 360..=820 {
+                assert!(spectrum.get(lambda as Float) < max)
+            }
+
+            let spectrum = RgbIlluminantSpectrum::new(cs, &rgb);
+            let max = spectrum.max_value() * 1.00001;
+            for lambda in 360..=820 {
+                assert!(spectrum.get(lambda as Float) < max)
+            }
+        }
+    }
+
+    #[test]
+    fn sampling_pdf_y() {
+        let mut ysum = 0.0;
+        let mut rng = StdRng::seed_from_u64(1);
+        let between = Uniform::from(0.0..1.0);
+        let n = 10000;
+        for _ in 0..n {
+            let u = between.sample(&mut rng);
+            let lambda = sample_visible_wavelengths(u);
+            let pdf = visible_wavelengths_pdf(lambda);
+            if pdf > 0.0 {
+                ysum += Spectrum::get_cie(crate::spectra::CIE::Y).get(lambda) / pdf;
+            }
+        }
+        let y_integral = ysum / n as Float;
+        // Allow a sort-of-large epsilon since we're  not using stratified sampling
+        // and I don't want to sample 100,000 times.
+        assert_approx_eq!(Float, y_integral, CIE_Y_INTEGRAL, epsilon = 0.2);
+    }
+
+    #[test]
+    fn sampling_pdf_xyz() {
+        let mut impsum = 0.0;
+        let mut unifsum = 0.0;
+        let mut rng = StdRng::seed_from_u64(29378409);
+        let between = Uniform::from(0.0..1.0);
+        let n = 900000;
+        for _ in 0..n {
+            let u = between.sample(&mut rng);
+            let lambda = lerp::<Float>(u, &LAMBDA_MIN, &LAMBDA_MAX);
+            let pdf = 1.0 / (LAMBDA_MAX - LAMBDA_MIN);
+            unifsum += (Spectrum::get_cie(CIE::X).get(lambda)
+                + Spectrum::get_cie(CIE::Z).get(lambda)
+                + Spectrum::get_cie(CIE::Z).get(lambda))
+                / pdf;
+
+            let lambda = sample_visible_wavelengths(u);
+            let pdf = visible_wavelengths_pdf(lambda);
+            if pdf > 0.0 {
+                impsum += (Spectrum::get_cie(CIE::X).get(lambda)
+                    + Spectrum::get_cie(CIE::Z).get(lambda)
+                    + Spectrum::get_cie(CIE::Z).get(lambda))
+                    / pdf;
+            }
+        }
+        let imp_int = impsum / n as Float;
+        let unif_int = unifsum / n as Float;
+
+        // Allow a relatively large epsilong because we're not using stratified sampling
+        // and to get an exact value would require many samples.
+        assert_approx_eq!(Float, imp_int, unif_int, epsilon = 1.0);
+    }
 }
