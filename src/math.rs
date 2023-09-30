@@ -1,7 +1,4 @@
-use std::{
-    ops::{Add, Mul},
-    path::Component,
-};
+use std::ops::{Add, Mul};
 
 use crate::{compensated_float::CompensatedFloat, float::Float};
 

@@ -29,7 +29,7 @@ pub static STD_ILLUM_D65: Lazy<Spectrum> = Lazy::new(|| {
 
 pub static ILLUM_ACES_D60: Lazy<Spectrum> = Lazy::new(|| {
     Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<214, 107>(
-        &CIE_ILLUM_D6500,
+        &ACES_ILLUM_D60,
         true,
     ))
 });
@@ -78,7 +78,6 @@ const CIE_ILLUM_D6500: [Float; 214] = [
     820.000000, 57.440601, 825.000000, 58.876499, 830.000000, 60.312500,
 ];
 
-const NUM_GLASS_BK7_ETA_SAMPLES: usize = 58;
 const GLASS_BK7_ETA_SAMPLES: [Float; 58] = [
     300.0,
     1.5527702635739,
@@ -145,7 +144,7 @@ const GLASS_BK7_ETA_SAMPLES: [Float; 58] = [
 // <    cct = 6000
 // --
 // >    cct = 6000.
-const ACES_Illum_D60: [Float; 214] = [
+const ACES_ILLUM_D60: [Float; 214] = [
     300.0, 0.02928, 305.0, 1.28964, 310.0, 2.55, 315.0, 9.0338, 320.0, 15.5176, 325.0, 21.94705,
     330.0, 28.3765, 335.0, 29.93335, 340.0, 31.4902, 345.0, 33.75765, 350.0, 36.0251, 355.0,
     37.2032, 360.0, 38.3813, 365.0, 40.6445, 370.0, 42.9077, 375.0, 42.05735, 380.0, 41.207, 385.0,

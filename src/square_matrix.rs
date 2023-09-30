@@ -3,7 +3,7 @@ use std::ops::{Add, Div, DivAssign, Index, IndexMut, Mul, MulAssign};
 use auto_ops::impl_op_ex;
 
 use crate::{
-    color::{RGB, XYZ},
+    color::XYZ,
     float::Float,
     math::{difference_of_products, inner_product},
 };

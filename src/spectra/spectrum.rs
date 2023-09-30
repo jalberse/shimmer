@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     color::{RgbSigmoidPolynomial, RGB},
@@ -8,7 +8,6 @@ use crate::{
     Float,
 };
 
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 
 use super::{

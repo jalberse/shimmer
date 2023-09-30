@@ -1,13 +1,9 @@
-use once_cell::sync::Lazy;
-
 /// CIE embedded data.
 /// Separated to keep other modules readable.
-use crate::{
-    spectra::spectrum::{LAMBDA_MAX, LAMBDA_MIN},
-    Float,
-};
+use once_cell::sync::Lazy;
 
 use super::{DenselySampled, PiecewiseLinear, Spectrum};
+use crate::Float;
 
 pub const NUM_CIE_SAMPLES: usize = 471;
 
