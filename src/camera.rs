@@ -69,6 +69,32 @@ impl CameraBase {
         &self.film
     }
 
+    // TODO need transforms for rays and ray differentials when those are implemented.
+
+    pub fn render_from_camera_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
+        self.camera_transform.render_from_camera_v(v, _time)
+    }
+
+    pub fn render_from_camera_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
+        self.camera_transform.render_from_camera_n(n, _time)
+    }
+
+    pub fn render_from_camera_p(&self, p: &Point3f, _time: Float) -> Point3f {
+        self.camera_transform.render_from_camera_p(p, _time)
+    }
+
+    pub fn camera_from_render_p(&self, p: &Point3f, _time: Float) -> Point3f {
+        self.camera_transform.camera_from_render_p(p, _time)
+    }
+
+    pub fn camera_from_render_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
+        self.camera_transform.camera_from_render_v(v, _time)
+    }
+
+    pub fn camera_from_render_n(&self, n: Normal3f, _time: Float) -> Normal3f {
+        self.camera_transform.camera_from_render_n(&n, _time)
+    }
+
     /// u - the fraction between the shutter open and shutter close.
     pub fn sample_time(&self, u: Float) -> Float {
         lerp(u, &self.shutter_open, &self.shutter_close)
@@ -210,8 +236,16 @@ impl CameraTransform {
         self.render_from_camera.apply_v(v)
     }
 
+    pub fn camera_from_render_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
+        self.render_from_camera.apply_v_inv(v)
+    }
+
     pub fn render_from_camera_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
         self.render_from_camera.apply_n(n)
+    }
+
+    pub fn camera_from_render_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
+        self.render_from_camera.apply_n_inv(n)
     }
 
     // TODO Similar for ray and ray differentials. Requires implementing transforms on rays.
