@@ -24,7 +24,7 @@ pub trait CameraI {
     fn generate_ray_differential(
         &self,
         sample: &CameraSample,
-        lamda: &SampledWavelengths,
+        lambda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential>;
 
     fn film(&self) -> &Film;
@@ -450,9 +450,26 @@ impl CameraI for OrthographicCamera {
     fn generate_ray_differential(
         &self,
         sample: &CameraSample,
-        lamda: &SampledWavelengths,
+        lambda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential> {
-        todo!()
+        let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
+        let p_camera = self.projective_base.camera_from_raster.apply_p(&p_film);
+
+        let ray = Ray::new_with_time(
+            p_camera,
+            Vector3f::Z,
+            self.projective_base.camera_base.sample_time(sample.time),
+            self.projective_base.camera_base.medium,
+        );
+
+        // TODO Adjust for depth-of-field here (and in aux ray calculation)
+
+        let aux_rays =
+            AuxiliaryRays::new(ray.o + self.dx_camera, ray.d, ray.o + self.dy_camera, ray.d);
+
+        let rd = RayDifferential::new(ray, Some(aux_rays));
+
+        Some(CameraRayDifferential::new(rd))
     }
 
     fn film(&self) -> &Film {
