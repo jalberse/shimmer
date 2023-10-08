@@ -274,7 +274,7 @@ impl CameraTransform {
 }
 
 /// Serves to provide shared functionality across orthographic and perspective cameras
-pub struct ProjectiveCameraBase {
+struct ProjectiveCameraBase {
     camera_base: CameraBase,
     screen_from_camera: Transform,
     camera_from_raster: Transform,
@@ -328,6 +328,46 @@ impl ProjectiveCameraBase {
             screen_from_raster,
             lens_radius,
             focal_distance,
+        }
+    }
+}
+
+pub struct OrthographicCamera {
+    projective_base: ProjectiveCameraBase,
+    dx_camera: Vector3f,
+    dy_camera: Vector3f,
+}
+
+impl OrthographicCamera {
+    pub fn new(
+        camera_transform: CameraTransform,
+        shutter_open: Float,
+        shutter_close: Float,
+        film: Film,
+        medium: Medium,
+        lens_radius: Float,
+        focal_distance: Float,
+        screen_window: Bounds2f,
+    ) -> OrthographicCamera {
+        let screen_from_camera = Transform::orthographic(0.0, 1.0);
+        let projective_base = ProjectiveCameraBase::new(
+            camera_transform,
+            shutter_open,
+            shutter_close,
+            film,
+            medium,
+            lens_radius,
+            focal_distance,
+            screen_from_camera,
+            screen_window,
+        );
+        let dx_camera = projective_base.camera_from_raster.apply_v(&Vector3f::X);
+        let dy_camera = projective_base.camera_from_raster.apply_v(&Vector3f::Y);
+
+        OrthographicCamera {
+            projective_base,
+            dx_camera,
+            dy_camera,
         }
     }
 }

@@ -101,6 +101,11 @@ impl Transform {
         Self::new(m, m_inv)
     }
 
+    pub fn orthographic(z_near: Float, z_far: Float) -> Transform {
+        Transform::scale(1.0, 1.0, 1.0 / (z_far - z_near))
+            * Transform::translate(Vector3f::new(0.0, 0.0, -z_near))
+    }
+
     pub fn has_scale(&self) -> bool {
         self.has_scale_tolerance(1e-3)
     }
