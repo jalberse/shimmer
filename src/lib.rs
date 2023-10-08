@@ -1,12 +1,16 @@
 mod bounding_box;
+mod camera;
 mod color;
 mod colorspace;
 mod compensated_float;
+mod film;
 mod float;
 mod frame;
+mod image_metadata;
 mod is_nan;
 mod math;
 mod medium;
+mod options;
 mod ray;
 mod rgb_to_spectra;
 mod sampling;

@@ -3,6 +3,7 @@ use auto_ops::impl_op_ex;
 use crate::{
     bounding_box::Bounds3f,
     frame::Frame,
+    ray::Ray,
     square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f},
     Float,
@@ -364,7 +365,7 @@ impl Transform {
         Self::apply_n_helper(&self.m, n)
     }
 
-    // TODO ray transforms
+    // TODO ray transforms. Requires Interval, and Point<Interval>
 
     pub fn apply_bb(&self, bb: &Bounds3f) -> Bounds3f {
         // TODO this could be made more efficient.
