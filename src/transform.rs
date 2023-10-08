@@ -3,7 +3,7 @@ use auto_ops::impl_op_ex;
 use crate::{
     bounding_box::Bounds3f,
     frame::Frame,
-    ray::Ray,
+    ray::{Ray, RayDifferential},
     square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f},
     Float,
@@ -371,6 +371,21 @@ impl Transform {
     }
 
     // TODO ray transforms. Requires Interval, and Point<Interval>
+    pub fn apply_r(&self, r: &Ray) -> Ray {
+        todo!()
+    }
+
+    pub fn apply_r_inv(&self, r: &Ray) -> Ray {
+        todo!()
+    }
+
+    pub fn apply_rd(&self, r: &RayDifferential) -> RayDifferential {
+        todo!()
+    }
+
+    pub fn apply_rd_inv(&self, r: &RayDifferential) -> RayDifferential {
+        todo!()
+    }
 
     pub fn apply_bb(&self, bb: &Bounds3f) -> Bounds3f {
         // TODO this could be made more efficient.

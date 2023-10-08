@@ -46,7 +46,7 @@ struct CameraBase {
     shutter_close: Float,
     film: Film,
     /// The scattering medium that the camera lies in, if any.
-    medium: Medium,
+    medium: Option<Medium>,
 }
 
 impl CameraBase {
@@ -55,7 +55,7 @@ impl CameraBase {
         shutter_open: Float,
         shutter_close: Float,
         film: Film,
-        medium: Medium,
+        medium: Option<Medium>,
     ) -> CameraBase {
         CameraBase {
             camera_transform,
@@ -79,18 +79,24 @@ impl CameraBase {
         );
     }
 
-    // TODO need transforms for rays and ray differentials when those are implemented.
-
-    pub fn render_from_camera_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
-        self.camera_transform.render_from_camera_v(v, _time)
+    pub fn render_from_camera_v(&self, v: &Vector3f) -> Vector3f {
+        self.camera_transform.render_from_camera_v(v)
     }
 
-    pub fn render_from_camera_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
-        self.camera_transform.render_from_camera_n(n, _time)
+    pub fn render_from_camera_n(&self, n: &Normal3f) -> Normal3f {
+        self.camera_transform.render_from_camera_n(n)
     }
 
-    pub fn render_from_camera_p(&self, p: &Point3f, _time: Float) -> Point3f {
-        self.camera_transform.render_from_camera_p(p, _time)
+    pub fn render_from_camera_p(&self, p: &Point3f) -> Point3f {
+        self.camera_transform.render_from_camera_p(p)
+    }
+
+    pub fn render_from_camera_r(&self, r: &Ray) -> Ray {
+        self.camera_transform.render_from_camera_r(r)
+    }
+
+    pub fn render_from_camera_rd(&self, r: &RayDifferential) -> RayDifferential {
+        self.camera_transform.render_from_camera_rd(r)
     }
 
     pub fn camera_from_render_p(&self, p: &Point3f, _time: Float) -> Point3f {
@@ -103,6 +109,14 @@ impl CameraBase {
 
     pub fn camera_from_render_n(&self, n: Normal3f, _time: Float) -> Normal3f {
         self.camera_transform.camera_from_render_n(&n, _time)
+    }
+
+    pub fn camera_from_render_r(&self, r: &Ray, _time: Float) -> Ray {
+        self.camera_transform.camera_from_render_r(r, _time)
+    }
+
+    pub fn camera_from_render_rd(&self, r: &RayDifferential, _time: Float) -> RayDifferential {
+        self.camera_transform.camera_from_render_rd(r, _time)
     }
 
     /// u - the fraction between the shutter open and shutter close.
@@ -169,7 +183,7 @@ impl CameraBase {
         };
 
         let ray_differential = RayDifferential::new(base_camera_ray.ray, aux);
-        Some(CameraRayDifferential::new(
+        Some(CameraRayDifferential::new_with_weight(
             ray_differential,
             base_camera_ray.weight,
         ))
@@ -181,13 +195,29 @@ pub struct CameraRay {
     weight: SampledSpectrum,
 }
 
+impl CameraRay {
+    pub fn new(ray: Ray) -> CameraRay {
+        CameraRay {
+            ray,
+            weight: SampledSpectrum::from_const(1.0),
+        }
+    }
+}
+
 pub struct CameraRayDifferential {
     ray: RayDifferential,
     weight: SampledSpectrum,
 }
 
 impl CameraRayDifferential {
-    pub fn new(ray: RayDifferential, weight: SampledSpectrum) -> CameraRayDifferential {
+    pub fn new(ray: RayDifferential) -> CameraRayDifferential {
+        CameraRayDifferential {
+            ray,
+            weight: SampledSpectrum::from_const(1.0),
+        }
+    }
+
+    pub fn new_with_weight(ray: RayDifferential, weight: SampledSpectrum) -> CameraRayDifferential {
         CameraRayDifferential { ray, weight }
     }
 }
@@ -226,57 +256,58 @@ impl CameraTransform {
         }
     }
 
-    pub fn render_from_camera_p(&self, p: &Point3f, _time: Float) -> Point3f {
+    pub fn camera_from_render_has_scale(&self) -> bool {
+        self.render_from_camera.has_scale()
+    }
+
+    pub fn render_from_camera_p(&self, p: &Point3f) -> Point3f {
         self.render_from_camera.apply_p(p)
+    }
+    pub fn render_from_camera_v(&self, v: &Vector3f) -> Vector3f {
+        self.render_from_camera.apply_v(v)
+    }
+    pub fn render_from_camera_n(&self, n: &Normal3f) -> Normal3f {
+        self.render_from_camera.apply_n(n)
+    }
+    pub fn render_from_camera_r(&self, r: &Ray) -> Ray {
+        self.render_from_camera.apply_r(r)
+    }
+    pub fn render_from_camera_rd(&self, r: &RayDifferential) -> RayDifferential {
+        self.render_from_camera.apply_rd(r)
     }
 
     pub fn camera_from_render_p(&self, p: &Point3f, _time: Float) -> Point3f {
         self.render_from_camera.apply_p_inv(p)
+    }
+    pub fn camera_from_render_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
+        self.render_from_camera.apply_v_inv(v)
+    }
+    pub fn camera_from_render_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
+        self.render_from_camera.apply_n_inv(n)
+    }
+    pub fn camera_from_render_r(&self, r: &Ray, _time: Float) -> Ray {
+        self.render_from_camera.apply_r_inv(r)
+    }
+    pub fn camera_from_render_rd(&self, r: &RayDifferential, _time: Float) -> RayDifferential {
+        self.render_from_camera.apply_rd_inv(r)
     }
 
     pub fn render_from_world_p(&self, p: &Point3f) -> Point3f {
         self.world_from_render.apply_p_inv(p)
     }
 
-    pub fn camera_from_render_has_scale(&self) -> bool {
-        self.render_from_camera.has_scale()
-    }
-
-    pub fn render_from_camera_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
-        self.render_from_camera.apply_v(v)
-    }
-
-    pub fn camera_from_render_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
-        self.render_from_camera.apply_v_inv(v)
-    }
-
-    pub fn render_from_camera_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
-        self.render_from_camera.apply_n(n)
-    }
-
-    pub fn camera_from_render_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
-        self.render_from_camera.apply_n_inv(n)
-    }
-
-    // TODO Similar for ray and ray differentials. Requires implementing transforms on rays.
-    // That requires an Interval implementation, and a Point3<Interval> impl.
-
     pub fn render_from_world(&self) -> Transform {
         Transform::inverse(&self.world_from_render)
     }
-
     pub fn camera_from_render(&self, _time: Float) -> Transform {
         Transform::inverse(&self.render_from_camera)
     }
-
     pub fn camera_from_world(&self, _time: Float) -> Transform {
         Transform::inverse(&(self.world_from_render * self.render_from_camera))
     }
-
     pub fn render_from_camera(&self) -> &Transform {
         &self.render_from_camera
     }
-
     pub fn world_from_render(&self) -> &Transform {
         &self.world_from_render
     }
@@ -299,7 +330,7 @@ impl ProjectiveCameraBase {
         shutter_open: Float,
         shutter_close: Float,
         film: Film,
-        medium: Medium,
+        medium: Option<Medium>,
         lens_radius: Float,
         focal_distance: Float,
         screen_from_camera: Transform,
@@ -365,7 +396,7 @@ impl OrthographicCamera {
         shutter_open: Float,
         shutter_close: Float,
         film: Film,
-        medium: Medium,
+        medium: Option<Medium>,
         lens_radius: Float,
         focal_distance: Float,
         screen_window: Bounds2f,
@@ -399,7 +430,21 @@ impl CameraI for OrthographicCamera {
         sample: &CameraSample,
         lambda: &SampledWavelengths,
     ) -> Option<CameraRay> {
-        todo!()
+        let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
+        let p_camera = self.projective_base.camera_from_raster.apply_p(&p_film);
+
+        let ray = Ray::new_with_time(
+            p_camera,
+            Vector3f::Z,
+            self.projective_base.camera_base.sample_time(sample.time),
+            self.projective_base.camera_base.medium,
+        );
+
+        // TODO Adjust for depth-of-field here
+
+        Some(CameraRay::new(
+            self.projective_base.camera_base.render_from_camera_r(&ray),
+        ))
     }
 
     fn generate_ray_differential(

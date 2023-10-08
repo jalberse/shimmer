@@ -1,4 +1,4 @@
-use crate::{square_matrix::SquareMatrix, transform::Transform};
+use crate::square_matrix::SquareMatrix;
 
 pub struct ImageMetadata {
     pub camera_from_world: Option<SquareMatrix<4>>,
