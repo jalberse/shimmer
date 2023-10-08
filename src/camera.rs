@@ -1,24 +1,28 @@
 use crate::{
     film::Film,
     image_metadata::ImageMetadata,
+    math::lerp,
+    medium::Medium,
     options::{Options, RenderingCoordinateSystem},
-    ray::{Ray, RayDifferential},
+    ray::{AuxiliaryRays, Ray, RayDifferential},
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     transform::Transform,
-    vecmath::{normal::Normal3, Normal3f, Point2f, Point3f, Vector3f},
+    vecmath::{Normal3f, Point2f, Point3f, Vector3f},
     Float,
 };
 
+/// Interface that all different kinds of cameras must implement.
 pub trait CameraI {
     /// Computes the ray corresponding to a given image sample
-    fn generate_ray(&self, sample: CameraSample, lambda: &SampledWavelengths) -> Option<CameraRay>;
+    fn generate_ray(&self, sample: &CameraSample, lambda: &SampledWavelengths)
+        -> Option<CameraRay>;
 
     /// Like generate_ray(), but also computes the corresponding rays
     /// for pixels shifted one picel in the x and y directions on the film plane.
     /// This is useful for anti-aliasing.
     fn generate_ray_differential(
         &self,
-        sample: CameraSample,
+        sample: &CameraSample,
         lamda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential>;
 
@@ -32,6 +36,110 @@ pub trait CameraI {
     fn get_camera_transform(&self) -> &CameraTransform;
 }
 
+/// Shared implementation details for different kinds of cameras.
+struct CameraBase {
+    camera_transform: CameraTransform,
+    /// The time of the shutter opening
+    shutter_open: Float,
+    /// The time of the shutter closing
+    shutter_close: Float,
+    film: Film,
+    /// The scattering medium that the camera lies in, if any.
+    medium: Medium,
+}
+
+impl CameraBase {
+    pub fn new(
+        camera_transform: CameraTransform,
+        shutter_open: Float,
+        shutter_close: Float,
+        film: Film,
+        medium: Medium,
+    ) -> CameraBase {
+        CameraBase {
+            camera_transform,
+            shutter_open,
+            shutter_close,
+            film,
+            medium,
+        }
+    }
+
+    pub fn get_film(&self) -> &Film {
+        &self.film
+    }
+
+    /// u - the fraction between the shutter open and shutter close.
+    pub fn sample_time(&self, u: Float) -> Float {
+        lerp(u, &self.shutter_open, &self.shutter_close)
+    }
+
+    pub fn generate_ray_differential<T: CameraI>(
+        &self,
+        camera: &T,
+        sample: &CameraSample,
+        lambda: &SampledWavelengths,
+    ) -> Option<CameraRayDifferential> {
+        // Generate the base/central ray.
+        let base_camera_ray = camera.generate_ray(sample, lambda)?;
+
+        // Find a camera ray after shifting one pixel in the x direction; may need to
+        // try in the negative x direction as well. Just store the origin and direction
+        // since we don't need the time etc.
+        let rx = [0.05, -0.05]
+            .iter()
+            .map(|eps| -> (Float, CameraSample) {
+                // Shift the camera sample a bit, keep track of the epsilon.
+                let mut sshift = sample.clone();
+                sshift.p_film.x += eps;
+                (*eps, sshift)
+            })
+            .find_map(|(eps, sshift)| -> Option<(Point3f, Vector3f)> {
+                // Check if we can generate a ray for the shifted sample, and return the
+                // origin and direction if so.
+                if let Some(rx) = camera.generate_ray(&sshift, lambda) {
+                    Some((
+                        base_camera_ray.ray.o + (rx.ray.o - base_camera_ray.ray.o) / eps,
+                        base_camera_ray.ray.d + (rx.ray.d - base_camera_ray.ray.d) / eps,
+                    ))
+                } else {
+                    None
+                }
+            });
+
+        // The same for the y direction
+        let ry = [0.05, -0.05]
+            .iter()
+            .map(|eps| -> (Float, CameraSample) {
+                let mut sshift = sample.clone();
+                sshift.p_film.y += eps;
+                (*eps, sshift)
+            })
+            .find_map(|(eps, sshift)| -> Option<(Point3f, Vector3f)> {
+                if let Some(ry) = camera.generate_ray(&sshift, lambda) {
+                    Some((
+                        base_camera_ray.ray.o + (ry.ray.o - base_camera_ray.ray.o) / eps,
+                        base_camera_ray.ray.d + (ry.ray.d - base_camera_ray.ray.d) / eps,
+                    ))
+                } else {
+                    None
+                }
+            });
+
+        let aux = if let (Some(rx), Some(ry)) = (rx, ry) {
+            Some(AuxiliaryRays::new(rx.0, rx.1, ry.0, ry.1))
+        } else {
+            None
+        };
+
+        let ray_differential = RayDifferential::new(base_camera_ray.ray, aux);
+        Some(CameraRayDifferential::new(
+            ray_differential,
+            base_camera_ray.weight,
+        ))
+    }
+}
+
 pub struct CameraRay {
     ray: Ray,
     weight: SampledSpectrum,
@@ -42,6 +150,13 @@ pub struct CameraRayDifferential {
     weight: SampledSpectrum,
 }
 
+impl CameraRayDifferential {
+    pub fn new(ray: RayDifferential, weight: SampledSpectrum) -> CameraRayDifferential {
+        CameraRayDifferential { ray, weight }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct CameraSample {
     p_film: Point2f,
     p_lens: Point2f,
