@@ -70,6 +70,15 @@ impl CameraBase {
         &self.film
     }
 
+    pub fn init_metadata(&self, metadata: &mut ImageMetadata) {
+        metadata.camera_from_world = Some(
+            *self
+                .camera_transform
+                .camera_from_world(self.shutter_open)
+                .get_matrix(),
+        );
+    }
+
     // TODO need transforms for rays and ray differentials when those are implemented.
 
     pub fn render_from_camera_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
@@ -330,6 +339,18 @@ impl ProjectiveCameraBase {
             focal_distance,
         }
     }
+
+    pub fn init_metadata(&self, metadata: &mut ImageMetadata) {
+        self.camera_base.init_metadata(metadata);
+        if let Some(camera_from_world) = metadata.camera_from_world {
+            metadata.ndc_from_world = Some(
+                Transform::translate(Vector3f::new(0.5, 0.5, 0.5)).get_matrix()
+                    * Transform::scale(0.5, 0.5, 0.5).get_matrix()
+                    * self.screen_from_camera.get_matrix()
+                    * camera_from_world,
+            );
+        }
+    }
 }
 
 pub struct OrthographicCamera {
@@ -369,5 +390,40 @@ impl OrthographicCamera {
             dx_camera,
             dy_camera,
         }
+    }
+}
+
+impl CameraI for OrthographicCamera {
+    fn generate_ray(
+        &self,
+        sample: &CameraSample,
+        lambda: &SampledWavelengths,
+    ) -> Option<CameraRay> {
+        todo!()
+    }
+
+    fn generate_ray_differential(
+        &self,
+        sample: &CameraSample,
+        lamda: &SampledWavelengths,
+    ) -> Option<CameraRayDifferential> {
+        todo!()
+    }
+
+    fn film(&self) -> &Film {
+        &self.projective_base.camera_base.film
+    }
+
+    fn sample_time(&self, u: Float) -> Float {
+        self.projective_base.camera_base.sample_time(u)
+    }
+
+    fn init_metadata(&self, metadata: &mut ImageMetadata) {
+        self.projective_base.camera_base.init_metadata(metadata);
+        self.projective_base.init_metadata(metadata);
+    }
+
+    fn get_camera_transform(&self) -> &CameraTransform {
+        &self.projective_base.camera_base.camera_transform
     }
 }
