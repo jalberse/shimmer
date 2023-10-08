@@ -1,4 +1,5 @@
 use crate::{
+    bounding_box::Bounds2f,
     film::Film,
     image_metadata::ImageMetadata,
     math::lerp,
@@ -7,7 +8,7 @@ use crate::{
     ray::{AuxiliaryRays, Ray, RayDifferential},
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     transform::Transform,
-    vecmath::{Normal3f, Point2f, Point3f, Vector3f},
+    vecmath::{Normal3f, Point2f, Point3f, Tuple3, Vector3f},
     Float,
 };
 
@@ -269,5 +270,64 @@ impl CameraTransform {
 
     pub fn world_from_render(&self) -> &Transform {
         &self.world_from_render
+    }
+}
+
+/// Serves to provide shared functionality across orthographic and perspective cameras
+pub struct ProjectiveCameraBase {
+    camera_base: CameraBase,
+    screen_from_camera: Transform,
+    camera_from_raster: Transform,
+    raster_from_screen: Transform,
+    screen_from_raster: Transform,
+    lens_radius: Float,
+    focal_distance: Float,
+}
+
+impl ProjectiveCameraBase {
+    pub fn new(
+        camera_transform: CameraTransform,
+        shutter_open: Float,
+        shutter_close: Float,
+        film: Film,
+        medium: Medium,
+        lens_radius: Float,
+        focal_distance: Float,
+        screen_from_camera: Transform,
+        screen_window: Bounds2f,
+    ) -> ProjectiveCameraBase {
+        let camera_base = CameraBase::new(
+            camera_transform,
+            shutter_open,
+            shutter_close,
+            film.clone(),
+            medium,
+        );
+        let ndc_from_screen = Transform::scale(
+            1.0 / (screen_window.max.x - screen_window.min.x),
+            1.0 / (screen_window.max.y - screen_window.min.y),
+            1.0,
+        ) * Transform::translate(Vector3f::new(
+            -screen_window.min.x,
+            -screen_window.max.y,
+            1.0,
+        ));
+        let raster_from_ndc = Transform::scale(
+            film.full_resolution().x as Float,
+            -film.full_resolution().y as Float,
+            1.0,
+        );
+        let raster_from_screen = raster_from_ndc * ndc_from_screen;
+        let screen_from_raster = raster_from_screen.inverse();
+        let camera_from_raster = screen_from_camera.inverse() * screen_from_raster;
+        ProjectiveCameraBase {
+            camera_base,
+            screen_from_camera,
+            camera_from_raster,
+            raster_from_screen,
+            screen_from_raster,
+            lens_radius,
+            focal_distance,
+        }
     }
 }
