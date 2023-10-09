@@ -8,11 +8,13 @@ use once_cell::sync::Lazy;
 use crate::{
     color::{RGB, XYZ},
     colorspace::RgbColorSpace,
+    math::{linear_least_squares_3, linear_least_squares_4},
     spectra::{
         inner_product,
         spectrum::{SpectrumI, LAMBDA_MAX, LAMBDA_MIN},
         DenselySampled, PiecewiseLinear, Spectrum,
     },
+    square_matrix::SquareMatrix,
     vecmath::Point2i,
     Float,
 };
@@ -30,6 +32,7 @@ impl Film {
 }
 
 pub struct PixelSensor {
+    pub xyz_from_sensor_rgb: SquareMatrix<3>,
     /// The red RGB matching function
     r_bar: DenselySampled,
     /// The green RGB matching function
@@ -40,6 +43,7 @@ pub struct PixelSensor {
     imaging_ratio: Float,
 }
 
+// TODO test
 impl PixelSensor {
     pub fn new(
         r: Spectrum,
@@ -71,22 +75,34 @@ impl PixelSensor {
         }
 
         // compute xyz_output values for training swatches
-        let xyz_output = [[0.0; 3]; NUM_SWATCH_REFLECTANCES];
+        let mut xyz_output = [[0.0; 3]; NUM_SWATCH_REFLECTANCES];
         let sensor_white_g = inner_product(&sensor_illum, &g);
         let sensor_white_y =
             inner_product(&sensor_illum, Spectrum::get_cie(crate::spectra::CIE::Y));
         for i in 0..NUM_SWATCH_REFLECTANCES {
-            let s = SWATCH_REFLECTANCES[i];
+            let s = &SWATCH_REFLECTANCES[i];
             let xyz = Self::project_reflectance::<XYZ>(
-                &s,
-                *output_colorspace.illuminant,
+                s,
+                output_colorspace.illuminant.as_ref(),
                 Spectrum::get_cie(crate::spectra::CIE::X),
                 Spectrum::get_cie(crate::spectra::CIE::Y),
                 Spectrum::get_cie(crate::spectra::CIE::Z),
-            );
+            ) * (sensor_white_y / sensor_white_g);
+            for c in 0..3 {
+                xyz_output[i][c] = xyz[c];
+            }
         }
 
-        todo!()
+        let m = linear_least_squares_3::<NUM_SWATCH_REFLECTANCES>(&rgb_camera, &xyz_output)
+            .expect("Sensor XYZ from RGB matrix could not be solved");
+
+        PixelSensor {
+            xyz_from_sensor_rgb: m,
+            r_bar: DenselySampled::new(&r),
+            g_bar: DenselySampled::new(&g),
+            b_bar: DenselySampled::new(&b),
+            imaging_ratio: imaging_ratio,
+        }
     }
 
     // TODO we could further restrict to some "Triplet" T which only has 3 elements.

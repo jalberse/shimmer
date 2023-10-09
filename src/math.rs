@@ -1,6 +1,10 @@
 use std::ops::{Add, Mul};
 
-use crate::{compensated_float::CompensatedFloat, float::Float};
+use crate::{
+    compensated_float::CompensatedFloat,
+    float::Float,
+    square_matrix::{Invertible, SquareMatrix},
+};
 
 pub trait Sqrt {
     fn sqrt(self) -> Self;
@@ -225,6 +229,48 @@ pub fn find_interval(size: usize, pred: impl Fn(usize) -> bool) -> usize {
         last = if pred_result { last - (half + 1) } else { half };
     }
     i32::clamp(first - 1, 0, size as i32 - 2) as usize
+}
+
+pub fn linear_least_squares_3<const ROWS: usize>(
+    a: &[[Float; 3]; ROWS],
+    b: &[[Float; 3]; ROWS],
+) -> Option<SquareMatrix<3>> {
+    let (at_a, at_b) = linear_least_squares_helper::<3, ROWS>(a, b);
+    let at_ai = at_a.inverse()?;
+    Some((at_ai * at_b).transpose())
+}
+
+// TODO test
+pub fn linear_least_squares_4<const ROWS: usize>(
+    a: &[[Float; 4]; ROWS],
+    b: &[[Float; 4]; ROWS],
+) -> Option<SquareMatrix<4>> {
+    let (at_a, at_b) = linear_least_squares_helper::<4, ROWS>(a, b);
+
+    // We don't implement Invertible for all N, so we don't implement Invertible for a generic N,
+    // only for specific values e.g. SquareMatrix<3> and SquareMatrix<4>.
+    // This is due to Rust not supporting specialization for const generics.
+    // Here's someone running into the exact same issue, actually: https://stackoverflow.com/questions/74761968/rust-matrix-type-with-specialized-and-generic-functions
+    let at_ai = at_a.inverse()?;
+    Some((at_ai * at_b).transpose())
+}
+
+// This section of linear least squares can be generic over N, so let's do that.
+pub fn linear_least_squares_helper<const N: usize, const ROWS: usize>(
+    a: &[[Float; N]; ROWS],
+    b: &[[Float; N]; ROWS],
+) -> (SquareMatrix<N>, SquareMatrix<N>) {
+    let mut AtA = SquareMatrix::<N>::default();
+    let mut AtB = SquareMatrix::<N>::default();
+    for i in 0..N {
+        for j in 0..N {
+            for r in 0..ROWS {
+                AtA[i][j] += a[r][i] * a[r][j];
+                AtB[i][j] += a[r][i] * b[r][j];
+            }
+        }
+    }
+    (AtA, AtB)
 }
 
 #[cfg(test)]

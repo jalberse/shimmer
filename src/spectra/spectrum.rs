@@ -484,7 +484,7 @@ impl SpectrumI for RgbUnboundedSpectrum {
 pub struct RgbIlluminantSpectrum {
     scale: Float,
     rsp: RgbSigmoidPolynomial,
-    illuminant: Arc<DenselySampled>,
+    illuminant: Arc<Spectrum>,
 }
 
 impl RgbIlluminantSpectrum {

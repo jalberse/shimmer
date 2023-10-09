@@ -19,7 +19,7 @@ pub struct RgbColorSpace {
     /// Blue primary
     pub b: Point2f,
     pub whitepoint: Point2f,
-    pub illuminant: Arc<DenselySampled>,
+    pub illuminant: Arc<Spectrum>,
     pub xyz_from_rgb: SquareMatrix<3>,
     pub rgb_from_xyz: SquareMatrix<3>,
     /// This is analogous to the RGBToSpectrumTable pointer used by PBRT;
@@ -68,7 +68,7 @@ impl RgbColorSpace {
             g,
             b,
             whitepoint,
-            illuminant: Arc::new(illuminant),
+            illuminant: Arc::new(Spectrum::DenselySampled(illuminant)),
             xyz_from_rgb,
             rgb_from_xyz,
             gamut,

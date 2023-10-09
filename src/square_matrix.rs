@@ -147,6 +147,12 @@ impl<const N: usize> Index<usize> for SquareMatrix<N> {
     }
 }
 
+impl<const N: usize> IndexMut<usize> for SquareMatrix<N> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.m.index_mut(index)
+    }
+}
+
 impl<const N: usize> Add for &SquareMatrix<N> {
     type Output = SquareMatrix<N>;
 
