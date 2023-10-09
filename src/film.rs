@@ -6,7 +6,7 @@ use std::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    color::{RGB, XYZ},
+    color::{white_balance, RGB, XYZ},
     colorspace::RgbColorSpace,
     math::{linear_least_squares_3, linear_least_squares_4},
     spectra::{
@@ -43,9 +43,35 @@ pub struct PixelSensor {
     imaging_ratio: Float,
 }
 
-// TODO test
 impl PixelSensor {
+    /// Uses the XYZ matching functions for the pixel sensor's spectral response curves.
+    /// This is a reasonable default.
+    /// sensor_illum: If None is provided, no white balancing is done (it can be done in post-processing).
+    /// If a sensor_illum is provided to specify a color temperature, white balancing is handled via the
+    /// xyz_from_sensor_rgb matrix.
     pub fn new(
+        output_colorspace: &RgbColorSpace,
+        sensor_illum: Option<Spectrum>,
+        imaging_ratio: Float,
+    ) -> PixelSensor {
+        let xyz_from_sensor_rgb = if let Some(illum) = sensor_illum {
+            let source_white = XYZ::from_spectrum(&illum).xy();
+            let target_white = output_colorspace.whitepoint;
+            white_balance(&source_white, &target_white)
+        } else {
+            SquareMatrix::<3>::default()
+        };
+        PixelSensor {
+            xyz_from_sensor_rgb,
+            r_bar: DenselySampled::new(Spectrum::get_cie(crate::spectra::CIE::X)),
+            g_bar: DenselySampled::new(Spectrum::get_cie(crate::spectra::CIE::Y)),
+            b_bar: DenselySampled::new(Spectrum::get_cie(crate::spectra::CIE::Z)),
+            imaging_ratio,
+        }
+    }
+
+    /// Creates a new sensor given the RGB response curves.
+    pub fn new_with_rgb(
         r: Spectrum,
         g: Spectrum,
         b: Spectrum,
@@ -105,19 +131,24 @@ impl PixelSensor {
         }
     }
 
+    // TODO the ToSensorRGB() method.
+
     // TODO we could further restrict to some "Triplet" T which only has 3 elements.
-    fn project_reflectance<T>(
+    /// TRIPLET is a color such as XYZ or RGB with 3 values that can be accessed and modified
+    /// as the constraints specify.
+    fn project_reflectance<TRIPLET>(
         ref1: &Spectrum,
         illum: &Spectrum,
         b1: &Spectrum,
         b2: &Spectrum,
         b3: &Spectrum,
-    ) -> T
+    ) -> TRIPLET
     where
-        T: Default + IndexMut<usize> + MulAssign<Float> + std::ops::Div<f32, Output = T>,
-        <T as Index<usize>>::Output: AddAssign<f32>,
+        TRIPLET:
+            Default + IndexMut<usize> + MulAssign<Float> + std::ops::Div<f32, Output = TRIPLET>,
+        <TRIPLET as Index<usize>>::Output: AddAssign<f32>,
     {
-        let mut result = T::default();
+        let mut result = TRIPLET::default();
         let mut g_integral = 0.0;
         for lambda in (LAMBDA_MIN as i32)..=(LAMBDA_MAX as i32) {
             let lambda = lambda as Float;
