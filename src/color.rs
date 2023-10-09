@@ -160,6 +160,30 @@ impl_op_ex!(/|a: &XYZ, b: &Float| -> XYZ {
     }
 });
 
+impl_op_ex!(+=|a: &mut XYZ, b: &Float| {
+    a.x += b;
+    a.y += b;
+    a.z += b;
+});
+
+impl_op_ex!(-=|a: &mut XYZ, b: &Float| {
+    a.x -= b;
+    a.y -= b;
+    a.z -= b;
+});
+
+impl_op_ex!(*=|a: &mut XYZ, b: &Float| {
+    a.x *= b;
+    a.y *= b;
+    a.z *= b;
+});
+
+impl_op_ex!(/=|a: &mut XYZ, b: &Float| {
+    a.x /= b;
+    a.y /= b;
+    a.z /= b;
+});
+
 pub struct RGB {
     pub r: Float,
     pub g: Float,

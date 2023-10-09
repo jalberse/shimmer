@@ -1,3 +1,8 @@
+// TODO implement depth-of-field
+// TODO perspective camera
+// TODO circular camera (maybe, low priority)
+// TODO place Camera types into a Camera enum that impl CameraI (typical pattern).
+
 use crate::{
     bounding_box::Bounds2f,
     film::Film,
