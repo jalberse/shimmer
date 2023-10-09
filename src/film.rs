@@ -1,16 +1,15 @@
-use std::{
-    default,
-    ops::{AddAssign, Index, IndexMut, MulAssign},
-};
+use std::ops::{AddAssign, Index, IndexMut, MulAssign};
 
 use once_cell::sync::Lazy;
 
 use crate::{
     color::{white_balance, RGB, XYZ},
     colorspace::RgbColorSpace,
-    math::{linear_least_squares_3, linear_least_squares_4},
+    math::linear_least_squares_3,
     spectra::{
         inner_product,
+        sampled_spectrum::SampledSpectrum,
+        sampled_wavelengths::SampledWavelengths,
         spectrum::{SpectrumI, LAMBDA_MAX, LAMBDA_MIN},
         DenselySampled, PiecewiseLinear, Spectrum,
     },
@@ -51,11 +50,11 @@ impl PixelSensor {
     /// xyz_from_sensor_rgb matrix.
     pub fn new(
         output_colorspace: &RgbColorSpace,
-        sensor_illum: Option<Spectrum>,
+        sensor_illum: &Option<Spectrum>,
         imaging_ratio: Float,
     ) -> PixelSensor {
         let xyz_from_sensor_rgb = if let Some(illum) = sensor_illum {
-            let source_white = XYZ::from_spectrum(&illum).xy();
+            let source_white = XYZ::from_spectrum(illum).xy();
             let target_white = output_colorspace.whitepoint;
             white_balance(&source_white, &target_white)
         } else {
@@ -72,11 +71,11 @@ impl PixelSensor {
 
     /// Creates a new sensor given the RGB response curves.
     pub fn new_with_rgb(
-        r: Spectrum,
-        g: Spectrum,
-        b: Spectrum,
+        r: &Spectrum,
+        g: &Spectrum,
+        b: &Spectrum,
         output_colorspace: &RgbColorSpace,
-        sensor_illum: Spectrum,
+        sensor_illum: &Spectrum,
         imaging_ratio: Float,
     ) -> PixelSensor {
         // The RGB colorspace in which a pixel sensor records light is generally not
@@ -102,9 +101,8 @@ impl PixelSensor {
 
         // compute xyz_output values for training swatches
         let mut xyz_output = [[0.0; 3]; NUM_SWATCH_REFLECTANCES];
-        let sensor_white_g = inner_product(&sensor_illum, &g);
-        let sensor_white_y =
-            inner_product(&sensor_illum, Spectrum::get_cie(crate::spectra::CIE::Y));
+        let sensor_white_g = inner_product(sensor_illum, g);
+        let sensor_white_y = inner_product(sensor_illum, Spectrum::get_cie(crate::spectra::CIE::Y));
         for i in 0..NUM_SWATCH_REFLECTANCES {
             let s = &SWATCH_REFLECTANCES[i];
             let xyz = Self::project_reflectance::<XYZ>(
@@ -131,7 +129,15 @@ impl PixelSensor {
         }
     }
 
-    // TODO the ToSensorRGB() method.
+    /// Converts a point-sampled spectrum distribution to RGB coefficients in the sensor's color space.
+    pub fn to_sensor_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> RGB {
+        let l = l.safe_div(&lambda.pdf());
+        RGB::new(
+            (self.r_bar.sample(lambda) * l).average(),
+            (self.g_bar.sample(lambda) * l).average(),
+            (self.b_bar.sample(lambda) * l).average(),
+        ) * self.imaging_ratio
+    }
 
     // TODO we could further restrict to some "Triplet" T which only has 3 elements.
     /// TRIPLET is a color such as XYZ or RGB with 3 values that can be accessed and modified

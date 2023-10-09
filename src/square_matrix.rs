@@ -24,7 +24,7 @@ pub struct SquareMatrix<const N: usize> {
 }
 
 impl<const N: usize> SquareMatrix<N> {
-    pub fn new(m: [[Float; N]; N]) -> Self {
+    pub const fn new(m: [[Float; N]; N]) -> Self {
         Self { m }
     }
 
