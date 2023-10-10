@@ -389,6 +389,7 @@ const XYZ_FROM_LMS: SquareMatrix<3> = SquareMatrix::new([
     [-0.00852866, 0.0400428, 0.968487],
 ]);
 
+/// von Kries transform.
 pub fn white_balance(src_white: &Point2f, target_white: &Point2f) -> SquareMatrix<3> {
     let src_xyz = XYZ::from_xy_y_default(src_white);
     let dst_xyz = XYZ::from_xy_y_default(target_white);
