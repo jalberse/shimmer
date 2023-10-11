@@ -74,6 +74,9 @@ impl Interval {
         self.lower_bound() <= other.upper_bound() && self.upper_bound() >= other.lower_bound()
     }
 
+    /// This is NOT just shorthand for a * a.
+    /// It sometimes is able to compute a tighter bound than would be found
+    /// with that method.
     pub fn sqr(&self) -> Interval {
         let alow = Float::abs(self.lower_bound());
         let ahigh = Float::abs(self.upper_bound());
