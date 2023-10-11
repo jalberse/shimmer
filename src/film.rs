@@ -3,8 +3,10 @@ use std::ops::{AddAssign, Index, IndexMut, MulAssign};
 use once_cell::sync::Lazy;
 
 use crate::{
+    bounding_box::Bounds2f,
     color::{white_balance, RGB, XYZ},
     colorspace::RgbColorSpace,
+    interaction::SurfaceInteraction,
     math::linear_least_squares_3,
     spectra::{
         inner_product,
@@ -14,18 +16,58 @@ use crate::{
         DenselySampled, PiecewiseLinear, Spectrum,
     },
     square_matrix::SquareMatrix,
-    vecmath::Point2i,
+    vecmath::{Normal3f, Point2f, Point2i, Point3f, Vector3f},
     Float,
 };
 
-#[derive(Debug, Copy, Clone)]
-pub struct Film {
-    // TODO implement. I think Film will actually become an Enum with a FilmI interface.
-    // I just stubbed it out like this while working on Camera.
+pub trait FilmI {
+    // PAPERDOC - can likely discuss this.
+    // TODO - PBRT correctly assumes that multiple threads won't call add_sample() concurrently
+    // with the same p_film location, so I think it plays loose with mutual exclusion in implementation.
+    // We won't have that because we need to prove to the compiler that access will be OK.
+    // I don't have the full architecture in my head yet so I'm not sure how we'll do this differently;
+    // possibly with data structures independent per thread that are then collected later?
+    fn add_sample(
+        &mut self,
+        p_film: &Point2f,
+        l: &SampledSpectrum,
+        lambda: &SampledWavelengths,
+        visible_surface: &Option<VisibleSurface>,
+        weight: Float,
+    );
+
+    fn full_resolution(&self) -> Point2i;
+
+    /// The bounds of all the samples that may be generated;
+    /// different from the image bounds in the common case that the pixel filter
+    /// extents are wider than a pixel.
+    fn sample_bounds(&self) -> Bounds2f;
 }
 
-impl Film {
-    pub fn full_resolution(&self) -> Point2i {
+#[derive(Debug, Copy, Clone)]
+pub enum Film {
+    RgbFilm,
+}
+
+impl Film {}
+
+impl FilmI for Film {
+    fn add_sample(
+        &mut self,
+        p_film: &Point2f,
+        l: &SampledSpectrum,
+        lambda: &SampledWavelengths,
+        visible_surface: &Option<VisibleSurface>,
+        weight: Float,
+    ) {
+        todo!()
+    }
+
+    fn full_resolution(&self) -> Point2i {
+        todo!()
+    }
+
+    fn sample_bounds(&self) -> Bounds2f {
         todo!()
     }
 }
@@ -164,6 +206,41 @@ impl PixelSensor {
             result[2] += b3.get(lambda) * ref1.get(lambda) * illum.get(lambda);
         }
         result / g_integral
+    }
+}
+
+/// Information about a point on a surface which is visible from the camera.
+pub struct VisibleSurface {
+    /// Point in space
+    p: Point3f,
+    /// Normal
+    n: Normal3f,
+    /// Shading normal
+    ns: Normal3f,
+    uv: Point2f,
+    time: Float,
+    /// Partial derivative of depth at each pixel, where x and y are in raster space and
+    /// z is in camera space.
+    dpdx: Vector3f,
+    /// Partial derivative of depth at each pixel, where x and y are in raster space and
+    /// z is in camera space.
+    dpdy: Vector3f,
+    /// spectral distribution of reflected light under uniform illumination;
+    /// useful for separating texture from illumination before denoising.
+    albedo: SampledSpectrum,
+    set: bool,
+}
+
+impl VisibleSurface {
+    pub fn new(
+        si: &SurfaceInteraction,
+        albedo: &SampledSpectrum,
+        lambda: &SampledWavelengths,
+    ) -> VisibleSurface {
+        let set = true;
+        // TODO to set p from surface interaction, need to implement Point3fi -> Point3f, so we need to
+        // implement Interval, and Point3fi, and that conversion... Let's do it.
+        todo!()
     }
 }
 

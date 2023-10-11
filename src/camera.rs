@@ -5,7 +5,7 @@
 
 use crate::{
     bounding_box::Bounds2f,
-    film::Film,
+    film::{Film, FilmI},
     image_metadata::ImageMetadata,
     math::lerp,
     medium::Medium,

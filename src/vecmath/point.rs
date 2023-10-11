@@ -965,6 +965,10 @@ impl From<Point3f> for (Float, Float, Float) {
     }
 }
 
+pub struct Point3fi {
+    // TODO Implement this. It's a Point3<Interval>. Would need to implement Interval first..
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
