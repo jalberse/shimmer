@@ -5,7 +5,7 @@ use std::ops::{
 use super::has_nan::HasNan;
 use super::length::Length;
 use super::length_fns::{length2, length3, length_squared2, length_squared3};
-use super::normal::Normal3;
+use super::normal::{Normal3, Normal3fi};
 use super::normalize::Normalize;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{
@@ -14,6 +14,7 @@ use super::tuple_fns::{
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
+use crate::interval::Interval;
 use crate::math::lerp;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
@@ -1245,6 +1246,100 @@ impl From<Vector3f> for (Float, Float, Float) {
 impl From<&Vector3i> for Vector3f {
     fn from(value: &Vector3i) -> Self {
         Self::new(value.x as Float, value.y as Float, value.z as Float)
+    }
+}
+
+pub struct Vector3fi {
+    x: Interval,
+    y: Interval,
+    z: Interval,
+}
+
+impl Tuple3<Interval> for Vector3fi {
+    fn new(x: T, y: T, z: T) -> Self {
+        todo!()
+    }
+
+    fn x(&self) -> T {
+        todo!()
+    }
+
+    fn y(&self) -> T {
+        todo!()
+    }
+
+    fn z(&self) -> T {
+        todo!()
+    }
+
+    fn x_ref(&self) -> &T {
+        todo!()
+    }
+
+    fn y_ref(&self) -> &T {
+        todo!()
+    }
+
+    fn z_ref(&self) -> &T {
+        todo!()
+    }
+
+    fn x_mut(&mut self) -> &mut T {
+        todo!()
+    }
+
+    fn y_mut(&mut self) -> &mut T {
+        todo!()
+    }
+
+    fn z_mut(&mut self) -> &mut T {
+        todo!()
+    }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        todo!()
+    }
+}
+
+impl Vector3 for Vector3fi {
+    type ElementType = Interval;
+
+    type AssociatedNormalType = Normal3fi;
+
+    fn dot(&self, v: &Self) -> Self::ElementType {
+        todo!()
+    }
+
+    fn dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType {
+        todo!()
+    }
+
+    fn abs_dot(&self, v: &Self) -> Self::ElementType {
+        todo!()
+    }
+
+    fn abs_dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType {
+        todo!()
+    }
+
+    fn cross(&self, v: &Self) -> Self {
+        todo!()
+    }
+
+    fn cross_normal(&self, n: &Self::AssociatedNormalType) -> Self {
+        todo!()
+    }
+
+    fn angle_between(&self, v: &Self) -> Float {
+        todo!()
+    }
+
+    fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float {
+        todo!()
+    }
+
+    fn gram_schmidt(&self, w: &Self) -> Self {
+        todo!()
     }
 }
 

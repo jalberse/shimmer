@@ -108,6 +108,10 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 // https://github.com/rust-lang/rust/issues/31844
 // So, no, we can't do this. The current Trait approach is idiomatic Rust.
 
+// TODO Point3fi and Vector3fi.
+// TODO There's still chunks of code that are repeated, mainly in impl_op_ex()'s.
+//   I'd like to share them where possible, but that's not worth the effort at the time of writing.
+//   It may be worth it now that I want to do Interval types too, though...
 // TODO Face forward functions.
 // TODO ensure we debug_assert() with has_nan() where appropriate.
 // TODO Improve testing coverage.
@@ -124,5 +128,3 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 // TODO we likely need a FMA function for Tuple, but let's hold off implementing it until we do need it
 //   for something else. I've sent too long on vector math and not enough time on rendering.
 // TODO Consider splitting e.g. Vector2 and Vector3 (and associated types imlementing them) into separate files.
-// TODO There's still chunks of code that are repeated, mainly in impl_op_ex()'s.
-//   I'd like to share them where possible, but that's not worth the effort at the time of writing.

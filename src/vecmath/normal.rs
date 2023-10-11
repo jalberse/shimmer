@@ -13,6 +13,7 @@ use super::tuple_fns::{
 use super::vector::Vector3;
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
+use crate::interval::Interval;
 use crate::math::lerp;
 use auto_ops::*;
 
@@ -641,6 +642,12 @@ impl From<&Normal3i> for Normal3f {
             z: value.z as Float,
         }
     }
+}
+
+pub struct Normal3fi {
+    x: Interval,
+    y: Interval,
+    z: Interval,
 }
 
 #[cfg(test)]

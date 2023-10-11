@@ -3,6 +3,7 @@ use std::ops::{Add, Mul};
 use crate::{
     compensated_float::CompensatedFloat,
     float::Float,
+    interval::Interval,
     square_matrix::{Invertible, SquareMatrix},
 };
 
@@ -117,6 +118,11 @@ impl NumericLimit for i32 {
 impl NumericLimit for Float {
     const MIN: Float = Float::MIN;
     const MAX: Float = Float::MAX;
+}
+
+impl NumericLimit for Interval {
+    const MIN: Interval = Interval::from_val(Float::NEG_INFINITY);
+    const MAX: Interval = Interval::from_val(Float::INFINITY);
 }
 
 /// Provides the equivalent of f32::mul_add for the specified type.

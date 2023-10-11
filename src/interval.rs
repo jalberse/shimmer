@@ -9,7 +9,9 @@ use crate::{
         mul_round_down, mul_round_up, next_float_down, next_float_up, sqrt_round_down,
         sqrt_round_up, sub_round_down, sub_round_up,
     },
-    math::difference_of_products,
+    is_nan::IsNan,
+    math::{difference_of_products, Sqrt},
+    vecmath::{tuple::TupleElement, HasNan},
     Float,
 };
 
@@ -111,13 +113,6 @@ impl Interval {
 
     pub fn max(&self, other: &Interval) -> Float {
         Float::max(self.high, other.high)
-    }
-
-    pub fn sqrt(&self) -> Interval {
-        Interval {
-            low: sqrt_round_down(self.low),
-            high: sqrt_round_up(self.high),
-        }
     }
 
     pub fn fma(&self, b: &Interval, c: &Interval) -> Interval {
@@ -447,6 +442,45 @@ impl_op_ex!(/|f: &Float, i: &Interval| -> Interval
         Interval::new(div_round_down(*f, i.lower_bound()), div_round_up(*f, i.upper_bound()))
     }
 });
+
+impl HasNan for Interval {
+    fn has_nan(&self) -> bool {
+        self.low.is_nan() || self.high.is_nan()
+    }
+}
+
+impl IsNan for Interval {
+    fn is_nan(self) -> bool {
+        self.low.is_nan() || self.high.is_nan()
+    }
+}
+
+impl Sqrt for Interval {
+    fn sqrt(&self) -> Interval {
+        Interval {
+            low: sqrt_round_down(self.low),
+            high: sqrt_round_up(self.high),
+        }
+    }
+}
+
+impl TupleElement for Interval {
+    fn from_i32(val: i32) -> Self {
+        Self::from_val(val as Float)
+    }
+
+    fn into_float(self) -> Float {
+        self.into()
+    }
+
+    fn from_float(v: Float) -> Self {
+        Self::from_val(v)
+    }
+
+    fn zero() -> Self {
+        Interval::from_val(0.0);
+    }
+}
 
 #[cfg(test)]
 mod tests {
