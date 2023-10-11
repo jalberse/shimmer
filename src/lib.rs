@@ -8,6 +8,7 @@ mod float;
 mod frame;
 mod image_metadata;
 mod interaction;
+mod interval;
 mod is_nan;
 mod light;
 mod material;
