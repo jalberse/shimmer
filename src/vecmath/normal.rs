@@ -492,7 +492,7 @@ impl Normal3 for Normal3f {
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
     fn cross(&self, v: &Vector3f) -> Vector3f {
-        cross::<Normal3f, Vector3f, Vector3f>(self, v)
+        cross::<Normal3f, Vector3f, Vector3f, Float>(self, v)
     }
 
     /// Get the angle between this and another normal.
@@ -724,7 +724,7 @@ impl Normal3 for Normal3fi {
     }
 
     fn cross(&self, v: &Self::AssociatedVectorType) -> Self::AssociatedVectorType {
-        todo!()
+        cross::<Normal3fi, Vector3fi, Vector3fi, Interval>(self, v)
     }
 
     fn angle_between(&self, n: &Self) -> Float {

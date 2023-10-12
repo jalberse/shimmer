@@ -145,27 +145,35 @@ impl MulAdd for i32 {
     }
 }
 
+pub trait DifferenceOfProducts {
+    fn difference_of_products(a: Self, b: Self, c: Self, d: Self) -> Self;
+
+    fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self;
+}
+
+impl DifferenceOfProducts for Float {
+    /// Computes a * b - c * d using an error-free transformation (EFT) method.
+    /// See PBRT B.2.9.
+    fn difference_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
+        let cd = c * d;
+        let difference = Float::mul_add(a, b, -cd);
+        let error = Float::mul_add(-c, d, cd);
+        difference + error
+    }
+
+    /// Computes a * b + c * d using an error-free transformation (EFT) method.
+    /// See PBRT B.2.9.
+    fn sum_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
+        Self::difference_of_products(a, b, -c, d)
+    }
+}
+
 pub fn lerp<'a, T>(t: Float, a: &'a T, b: &'a T) -> T
 where
     T: Add<T, Output = T>,
     &'a T: Mul<Float, Output = T>,
 {
     a * (1.0 - t) + b * t
-}
-
-/// Computes a * b - c * d using an error-free transformation (EFT) method.
-/// See PBRT B.2.9.
-pub fn difference_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
-    let cd = c * d;
-    let difference = Float::mul_add(a, b, -cd);
-    let error = Float::mul_add(-c, d, cd);
-    difference + error
-}
-
-/// Computes a * b + c * d using an error-free transformation (EFT) method.
-/// See PBRT B.2.9.
-pub fn sum_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
-    difference_of_products(a, b, -c, d)
 }
 
 /// asin, with a check to ensure output is not slightly outside the legal range [-1, 1]
@@ -282,6 +290,9 @@ pub fn linear_least_squares_helper<const N: usize, const ROWS: usize>(
 
 #[cfg(test)]
 mod tests {
+    use super::DifferenceOfProducts;
+    use crate::Float;
+
     #[test]
     fn lerp() {
         let a = 0.0;
@@ -299,6 +310,6 @@ mod tests {
         let b = 10.0;
         let c = 5.0;
         let d = 5.0;
-        assert_eq!(75.0, super::difference_of_products(a, b, c, d));
+        assert_eq!(75.0, Float::difference_of_products(a, b, c, d));
     }
 }

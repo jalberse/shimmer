@@ -5,7 +5,7 @@ use std::ops::{Add, Sub};
 
 use crate::{
     float::PI_F,
-    math::{difference_of_products, safe_asin, sum_of_products, MulAdd},
+    math::{safe_asin, DifferenceOfProducts, MulAdd},
     Float,
 };
 
@@ -37,16 +37,17 @@ where
 /// V1: A vector (e.g. Vector3f or a Normal3f).
 /// V2: A vector (e.g. Vector3f or a Normal3f).
 /// V3: The type of the output cross product.
-pub fn cross<V1, V2, V3>(v1: &V1, v2: &V2) -> V3
+pub fn cross<V1, V2, V3, E>(v1: &V1, v2: &V2) -> V3
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
-    V3: Tuple3<Float>,
+    V1: Tuple3<E>,
+    V2: Tuple3<E>,
+    V3: Tuple3<E>,
+    E: TupleElement + DifferenceOfProducts,
 {
     V3::new(
-        difference_of_products(v1.y(), v2.z(), v1.z(), v2.y()),
-        difference_of_products(v1.z(), v2.x(), v1.x(), v2.z()),
-        difference_of_products(v1.x(), v2.y(), v1.y(), v2.x()),
+        E::difference_of_products(v1.y(), v2.z(), v1.z(), v2.y()),
+        E::difference_of_products(v1.z(), v2.x(), v1.x(), v2.z()),
+        E::difference_of_products(v1.x(), v2.y(), v1.y(), v2.x()),
     )
 }
 
@@ -72,7 +73,11 @@ where
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
 
-    MulAdd::mul_add(v.x(), w.x(), sum_of_products(v.y(), w.y(), v.z(), w.z()))
+    MulAdd::mul_add(
+        v.x(),
+        w.x(),
+        Float::sum_of_products(v.y(), w.y(), v.z(), w.z()),
+    )
 }
 
 /// Take the dot product of two vectors.
@@ -113,7 +118,7 @@ where
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
-    sum_of_products(v.x(), w.x(), v.y(), w.y())
+    Float::sum_of_products(v.x(), w.x(), v.y(), w.y())
 }
 
 /// Take the dot product of two vectors.

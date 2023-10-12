@@ -5,7 +5,7 @@ use auto_ops::impl_op_ex;
 use crate::{
     color::XYZ,
     float::Float,
-    math::{difference_of_products, inner_product},
+    math::{inner_product, DifferenceOfProducts},
 };
 
 pub trait Invertible: Sized {
@@ -262,44 +262,44 @@ impl Determinant for SquareMatrix<1> {
 
 impl Determinant for SquareMatrix<2> {
     fn determinant(&self) -> Float {
-        difference_of_products(self[0][0], self[1][1], self[0][1], self[1][0])
+        Float::difference_of_products(self[0][0], self[1][1], self[0][1], self[1][0])
     }
 }
 
 impl Determinant for SquareMatrix<3> {
     fn determinant(&self) -> Float {
-        let minor12 = difference_of_products(self[1][1], self[2][2], self[1][2], self[2][1]);
-        let minor02 = difference_of_products(self[1][0], self[2][2], self[1][2], self[2][0]);
-        let minor01 = difference_of_products(self[1][0], self[2][1], self[1][1], self[2][0]);
+        let minor12 = Float::difference_of_products(self[1][1], self[2][2], self[1][2], self[2][1]);
+        let minor02 = Float::difference_of_products(self[1][0], self[2][2], self[1][2], self[2][0]);
+        let minor01 = Float::difference_of_products(self[1][0], self[2][1], self[1][1], self[2][0]);
         Float::mul_add(
             self[0][2],
             minor01,
-            difference_of_products(self[0][0], minor12, self[0][1], minor02),
+            Float::difference_of_products(self[0][0], minor12, self[0][1], minor02),
         )
     }
 }
 
 impl Determinant for SquareMatrix<4> {
     fn determinant(&self) -> Float {
-        let s0 = difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
-        let s1 = difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
-        let s2 = difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
+        let s0 = Float::difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
+        let s1 = Float::difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
+        let s2 = Float::difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
 
-        let s3 = difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
-        let s4 = difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
-        let s5 = difference_of_products(self[0][2], self[1][3], self[1][2], self[0][3]);
+        let s3 = Float::difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
+        let s4 = Float::difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
+        let s5 = Float::difference_of_products(self[0][2], self[1][3], self[1][2], self[0][3]);
 
-        let c0 = difference_of_products(self[2][0], self[3][1], self[3][0], self[2][1]);
-        let c1 = difference_of_products(self[2][0], self[3][2], self[3][0], self[2][2]);
-        let c2 = difference_of_products(self[2][0], self[3][3], self[3][0], self[2][3]);
+        let c0 = Float::difference_of_products(self[2][0], self[3][1], self[3][0], self[2][1]);
+        let c1 = Float::difference_of_products(self[2][0], self[3][2], self[3][0], self[2][2]);
+        let c2 = Float::difference_of_products(self[2][0], self[3][3], self[3][0], self[2][3]);
 
-        let c3 = difference_of_products(self[2][1], self[3][2], self[3][1], self[2][2]);
-        let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
-        let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
+        let c3 = Float::difference_of_products(self[2][1], self[3][2], self[3][1], self[2][2]);
+        let c4 = Float::difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
+        let c5 = Float::difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
 
-        difference_of_products(s0, c5, s1, c4)
-            + difference_of_products(s2, c3, -s3, c2)
-            + difference_of_products(s5, c0, s4, c1)
+        Float::difference_of_products(s0, c5, s1, c4)
+            + Float::difference_of_products(s2, c3, -s3, c2)
+            + Float::difference_of_products(s5, c0, s4, c1)
     }
 }
 
@@ -315,23 +315,23 @@ impl Invertible for SquareMatrix<3> {
         let mut out = SquareMatrix::<3>::zero();
 
         out.m[0][0] =
-            inv_det * difference_of_products(self[1][1], self[2][2], self[1][2], self[2][1]);
+            inv_det * Float::difference_of_products(self[1][1], self[2][2], self[1][2], self[2][1]);
         out.m[1][0] =
-            inv_det * difference_of_products(self[1][2], self[2][0], self[1][0], self[2][2]);
+            inv_det * Float::difference_of_products(self[1][2], self[2][0], self[1][0], self[2][2]);
         out.m[2][0] =
-            inv_det * difference_of_products(self[1][0], self[2][1], self[1][1], self[2][0]);
+            inv_det * Float::difference_of_products(self[1][0], self[2][1], self[1][1], self[2][0]);
         out.m[0][1] =
-            inv_det * difference_of_products(self[0][2], self[2][1], self[0][1], self[2][2]);
+            inv_det * Float::difference_of_products(self[0][2], self[2][1], self[0][1], self[2][2]);
         out.m[1][1] =
-            inv_det * difference_of_products(self[0][0], self[2][2], self[0][2], self[2][0]);
+            inv_det * Float::difference_of_products(self[0][0], self[2][2], self[0][2], self[2][0]);
         out.m[2][1] =
-            inv_det * difference_of_products(self[0][1], self[2][0], self[0][0], self[2][1]);
+            inv_det * Float::difference_of_products(self[0][1], self[2][0], self[0][0], self[2][1]);
         out.m[0][2] =
-            inv_det * difference_of_products(self[0][1], self[1][2], self[0][2], self[1][1]);
+            inv_det * Float::difference_of_products(self[0][1], self[1][2], self[0][2], self[1][1]);
         out.m[1][2] =
-            inv_det * difference_of_products(self[0][2], self[1][0], self[0][0], self[1][2]);
+            inv_det * Float::difference_of_products(self[0][2], self[1][0], self[0][0], self[1][2]);
         out.m[2][2] =
-            inv_det * difference_of_products(self[0][0], self[1][1], self[0][1], self[1][0]);
+            inv_det * Float::difference_of_products(self[0][0], self[1][1], self[0][1], self[1][0]);
 
         Some(out)
     }
@@ -350,21 +350,21 @@ impl Invertible for SquareMatrix<4> {
         // excerpted here:
         //   http://www.geometrictools.com/Documentation/LaplaceExpansionTheorem.pdf
 
-        let s0 = difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
-        let s1 = difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
-        let s2 = difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
+        let s0 = Float::difference_of_products(self[0][0], self[1][1], self[1][0], self[0][1]);
+        let s1 = Float::difference_of_products(self[0][0], self[1][2], self[1][0], self[0][2]);
+        let s2 = Float::difference_of_products(self[0][0], self[1][3], self[1][0], self[0][3]);
 
-        let s3 = difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
-        let s4 = difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
-        let s5 = difference_of_products(self[0][2], self[1][3], self[1][2], self[0][3]);
+        let s3 = Float::difference_of_products(self[0][1], self[1][2], self[1][1], self[0][2]);
+        let s4 = Float::difference_of_products(self[0][1], self[1][3], self[1][1], self[0][3]);
+        let s5 = Float::difference_of_products(self[0][2], self[1][3], self[1][2], self[0][3]);
 
-        let c0 = difference_of_products(self[2][0], self[3][1], self[3][0], self[2][1]);
-        let c1 = difference_of_products(self[2][0], self[3][2], self[3][0], self[2][2]);
-        let c2 = difference_of_products(self[2][0], self[3][3], self[3][0], self[2][3]);
+        let c0 = Float::difference_of_products(self[2][0], self[3][1], self[3][0], self[2][1]);
+        let c1 = Float::difference_of_products(self[2][0], self[3][2], self[3][0], self[2][2]);
+        let c2 = Float::difference_of_products(self[2][0], self[3][3], self[3][0], self[2][3]);
 
-        let c3 = difference_of_products(self[2][1], self[3][2], self[3][1], self[2][2]);
-        let c4 = difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
-        let c5 = difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
+        let c3 = Float::difference_of_products(self[2][1], self[3][2], self[3][1], self[2][2]);
+        let c4 = Float::difference_of_products(self[2][1], self[3][3], self[3][1], self[2][3]);
+        let c5 = Float::difference_of_products(self[2][2], self[3][3], self[3][2], self[2][3]);
 
         let det: Float =
             inner_product(&[s0, -s1, s2, s3, s5, -s4], &[c5, c4, c3, c2, c0, c1]).into();

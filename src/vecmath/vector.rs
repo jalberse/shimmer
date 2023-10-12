@@ -1082,14 +1082,14 @@ impl Vector3 for Vector3f {
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
     fn cross(&self, v: &Self) -> Self {
-        cross::<Vector3f, Vector3f, Vector3f>(self, v)
+        cross::<Vector3f, Vector3f, Vector3f, Float>(self, v)
     }
 
     /// Take the cross product of this and a normal n.
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
     fn cross_normal(&self, n: &Normal3f) -> Self {
-        cross::<Vector3f, Normal3f, Vector3f>(self, n)
+        cross::<Vector3f, Normal3f, Vector3f, Float>(self, n)
     }
 
     /// Find the andle between this vector and another vector.
@@ -1335,6 +1335,8 @@ impl Vector3 for Vector3fi {
 
     type AssociatedNormalType = Normal3fi;
 
+    // TODO I think that we just need to make the tuple_fns implementations more generic and call them from here - restrict operations rather than say they're Float.
+
     fn dot(&self, v: &Self) -> Self::ElementType {
         todo!()
     }
@@ -1352,11 +1354,11 @@ impl Vector3 for Vector3fi {
     }
 
     fn cross(&self, v: &Self) -> Self {
-        todo!()
+        cross::<Vector3fi, Vector3fi, Vector3fi, Interval>(self, v)
     }
 
     fn cross_normal(&self, n: &Self::AssociatedNormalType) -> Self {
-        todo!()
+        cross::<Vector3fi, Normal3fi, Vector3fi, Interval>(self, n)
     }
 
     fn angle_between(&self, v: &Self) -> Float {

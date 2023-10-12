@@ -115,7 +115,9 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 // being a reasonable candidate for PartialOrd, but needing to be so for TupleElement - could
 // we rework it so the float interval types don't need that?
 // Generally I'd like to revisit all these types and refactor into more sane generics.
-// I do feel limited by the lack of specialization
+// I do feel limited by the lack of specialization.
+// But, I've actually made some things more generic in the process of implementing the 3fi variants,
+// so I may find it easier to share functionality by following that approach.
 // TODO Face forward functions.
 // TODO ensure we debug_assert() with has_nan() where appropriate.
 // TODO Improve testing coverage.

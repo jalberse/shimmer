@@ -1,5 +1,6 @@
 use std::ops::{Index, IndexMut, Neg};
 
+use crate::math::DifferenceOfProducts;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 use itertools::Itertools;
 
@@ -10,7 +11,7 @@ use crate::{
         sqrt_round_up, sub_round_down, sub_round_up,
     },
     is_nan::IsNan,
-    math::{difference_of_products, Abs, Ceil, Floor, Max, Min, Sqrt},
+    math::{Abs, Ceil, Floor, Max, Min, Sqrt},
     vecmath::tuple::TupleElement,
     Float,
 };
@@ -138,13 +139,15 @@ impl Interval {
         let high = high_options.iter().fold(Float::NAN, |a, &b| a.max(b));
         Interval { low, high }
     }
+}
 
-    pub fn difference_of_products(&self, b: &Interval, c: &Interval, d: &Interval) -> Interval {
+impl DifferenceOfProducts for Interval {
+    fn difference_of_products(a: Interval, b: Interval, c: Interval, d: Interval) -> Interval {
         let ab = [
-            self.low * b.low,
-            self.high * b.low,
-            self.low * b.high,
-            self.high * b.high,
+            a.low * b.low,
+            a.high * b.low,
+            a.low * b.high,
+            a.high * b.high,
         ];
         debug_assert!(!ab.iter().contains(&Float::NAN));
         let ab_low = ab.iter().fold(Float::NAN, |a, &b| a.min(b));
@@ -200,15 +203,15 @@ impl Interval {
         };
 
         // Invert cd indices if it's subtracted
-        let low = difference_of_products(
-            self[ab_low_index & 1],
+        let low = Float::difference_of_products(
+            a[ab_low_index & 1],
             b[ab_low_index >> 1],
             c[cd_high_index & 1],
             d[cd_high_index >> 1],
         );
 
-        let high = difference_of_products(
-            self[ab_high_index & 1],
+        let high = Float::difference_of_products(
+            a[ab_high_index & 1],
             b[ab_high_index >> 2],
             c[cd_low_index & 1],
             d[cd_low_index >> 1],
@@ -222,8 +225,8 @@ impl Interval {
         }
     }
 
-    pub fn sum_of_products(&self, b: &Interval, c: &Interval, d: &Interval) -> Interval {
-        self.difference_of_products(b, &-c, d)
+    fn sum_of_products(a: Interval, b: Interval, c: Interval, d: Interval) -> Interval {
+        Self::difference_of_products(a, b, -c, d)
     }
 }
 
