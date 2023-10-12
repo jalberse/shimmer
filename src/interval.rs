@@ -10,12 +10,23 @@ use crate::{
         sqrt_round_up, sub_round_down, sub_round_up,
     },
     is_nan::IsNan,
-    math::{difference_of_products, Sqrt},
-    vecmath::{tuple::TupleElement, HasNan},
+    math::{difference_of_products, Abs, Ceil, Floor, Max, Min, Sqrt},
+    vecmath::tuple::TupleElement,
     Float,
 };
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+// TODO I don't think that PartialOrd and PartialEq are necessarily correct here;
+//  Rust will first compare low, then high in the basic derive.
+//  But equality and ordering of intervals is not so simple.
+//  BUT, we need to satisfy PartialEq and PartialOrd to satisfy TupleElement type constraints.
+//  So, fixing this would require unravelling type constraints that I don't have time to do.
+//  I don't think that we rely on ordering of any interval points or vectors (that's mostly important
+//  in bounding boxes, I think), so for now I am okay with this bug existing until I go back
+//  and rework the vector math types to make a little more sense at some point.
+// PAPERDOC - This could be seen as a negative of Rust, in that you're "fighting the compiler"
+//  on a lot of stuff. Conversely, it actually is ensuring all of this is though through
+//  (or at least explicit).
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct Interval {
     low: Float,
     high: Float,
@@ -31,7 +42,7 @@ impl Interval {
         }
     }
 
-    pub fn from_val(v: Float) -> Interval {
+    pub const fn from_val(v: Float) -> Interval {
         Interval { low: v, high: v }
     }
 
@@ -56,6 +67,14 @@ impl Interval {
 
     pub fn midpoint(&self) -> Float {
         (self.low + self.high) / 2.0
+    }
+
+    pub fn floor(&self) -> Float {
+        Float::floor(self.low)
+    }
+
+    pub fn ceil(&self) -> Float {
+        Float::ceil(self.high)
     }
 
     pub fn width(&self) -> Float {
@@ -97,22 +116,6 @@ impl Interval {
             low: mul_round_down(alow, alow),
             high: mul_round_up(ahigh, ahigh),
         }
-    }
-
-    pub fn floor(&self) -> Float {
-        Float::floor(self.low)
-    }
-
-    pub fn ceil(&self) -> Float {
-        Float::ceil(self.high)
-    }
-
-    pub fn min(&self, other: &Interval) -> Float {
-        Float::min(self.low, other.low)
-    }
-
-    pub fn max(&self, other: &Interval) -> Float {
-        Float::max(self.high, other.high)
     }
 
     pub fn fma(&self, b: &Interval, c: &Interval) -> Interval {
@@ -222,11 +225,13 @@ impl Interval {
     pub fn sum_of_products(&self, b: &Interval, c: &Interval, d: &Interval) -> Interval {
         self.difference_of_products(b, &-c, d)
     }
+}
 
-    pub fn abs(&self) -> Interval {
+impl Abs for Interval {
+    fn abs(self) -> Interval {
         if self.low >= 0.0 {
             // The entire interval is greater than zero, so we're set
-            *self
+            self
         } else if self.high <= 0.0 {
             // The entire interval is less than zero
             Interval {
@@ -237,6 +242,36 @@ impl Interval {
             // The interval straddles zero
             Interval::new(0.0, Float::max(-self.low, self.high))
         }
+    }
+}
+
+impl Floor for Interval {
+    fn floor(self) -> Self {
+        Float::floor(self.low).into()
+    }
+}
+
+impl Ceil for Interval {
+    fn ceil(self) -> Interval {
+        Float::ceil(self.high).into()
+    }
+}
+
+impl Min for Interval {
+    fn min(self, other: Interval) -> Self {
+        Float::min(self.low, other.low).into()
+    }
+}
+
+impl Max for Interval {
+    fn max(self, a: Interval) -> Self {
+        Float::max(self.high, a.high).into()
+    }
+}
+
+impl From<Float> for Interval {
+    fn from(value: Float) -> Self {
+        Self::from_val(value)
     }
 }
 
@@ -443,12 +478,6 @@ impl_op_ex!(/|f: &Float, i: &Interval| -> Interval
     }
 });
 
-impl HasNan for Interval {
-    fn has_nan(&self) -> bool {
-        self.low.is_nan() || self.high.is_nan()
-    }
-}
-
 impl IsNan for Interval {
     fn is_nan(self) -> bool {
         self.low.is_nan() || self.high.is_nan()
@@ -456,7 +485,7 @@ impl IsNan for Interval {
 }
 
 impl Sqrt for Interval {
-    fn sqrt(&self) -> Interval {
+    fn sqrt(self) -> Interval {
         Interval {
             low: sqrt_round_down(self.low),
             high: sqrt_round_up(self.high),
@@ -478,7 +507,7 @@ impl TupleElement for Interval {
     }
 
     fn zero() -> Self {
-        Interval::from_val(0.0);
+        Interval::from_val(0.0)
     }
 }
 

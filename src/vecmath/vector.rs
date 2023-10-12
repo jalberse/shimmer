@@ -7,6 +7,7 @@ use super::length::Length;
 use super::length_fns::{length2, length3, length_squared2, length_squared3};
 use super::normal::{Normal3, Normal3fi};
 use super::normalize::Normalize;
+use super::point::Point3fi;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{
     abs_dot2, abs_dot2i, abs_dot3, abs_dot3i, angle_between, angle_between2, cross, cross_i32,
@@ -15,6 +16,7 @@ use super::tuple_fns::{
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
 use crate::interval::Interval;
+use crate::is_nan::{self, IsNan};
 use crate::math::lerp;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
@@ -1249,55 +1251,82 @@ impl From<&Vector3i> for Vector3f {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Vector3fi {
     x: Interval,
     y: Interval,
     z: Interval,
 }
 
+impl Vector3fi {
+    pub fn from_value_and_error(val: Vector3f, err: Vector3f) -> Vector3fi {
+        Vector3fi {
+            x: Interval::from_value_and_error(val.x, err.x),
+            y: Interval::from_value_and_error(val.y, err.y),
+            z: Interval::from_value_and_error(val.z, err.z),
+        }
+    }
+
+    pub fn error(&self) -> Vector3f {
+        Vector3f {
+            x: self.x.width() / 2.0,
+            y: self.y.width() / 2.0,
+            z: self.z.width() / 2.0,
+        }
+    }
+
+    pub fn is_exact(&self) -> bool {
+        self.x.width() == 0.0 && self.y.width() == 0.0 && self.z.width() == 0.0
+    }
+}
+
 impl Tuple3<Interval> for Vector3fi {
-    fn new(x: T, y: T, z: T) -> Self {
-        todo!()
+    fn new(x: Interval, y: Interval, z: Interval) -> Self {
+        Vector3fi { x, y, z }
     }
 
-    fn x(&self) -> T {
-        todo!()
+    fn x(&self) -> Interval {
+        self.x
     }
 
-    fn y(&self) -> T {
-        todo!()
+    fn y(&self) -> Interval {
+        self.y
     }
 
-    fn z(&self) -> T {
-        todo!()
+    fn z(&self) -> Interval {
+        self.z
     }
 
-    fn x_ref(&self) -> &T {
-        todo!()
+    fn x_ref(&self) -> &Interval {
+        &self.x
     }
 
-    fn y_ref(&self) -> &T {
-        todo!()
+    fn y_ref(&self) -> &Interval {
+        &self.y
     }
 
-    fn z_ref(&self) -> &T {
-        todo!()
+    fn z_ref(&self) -> &Interval {
+        &self.z
     }
 
-    fn x_mut(&mut self) -> &mut T {
-        todo!()
+    fn x_mut(&mut self) -> &mut Interval {
+        &mut self.x
     }
 
-    fn y_mut(&mut self) -> &mut T {
-        todo!()
+    fn y_mut(&mut self) -> &mut Interval {
+        &mut self.y
     }
 
-    fn z_mut(&mut self) -> &mut T {
-        todo!()
+    fn z_mut(&mut self) -> &mut Interval {
+        &mut self.z
     }
 
     fn lerp(t: Float, a: &Self, b: &Self) -> Self {
-        todo!()
+        Self {
+            x: lerp(t, &a.x, &b.x),
+            y: lerp(t, &a.y, &b.y),
+            z: lerp(t, &a.z, &b.z),
+        }
     }
 }
 
@@ -1340,6 +1369,109 @@ impl Vector3 for Vector3fi {
 
     fn gram_schmidt(&self, w: &Self) -> Self {
         todo!()
+    }
+}
+
+impl HasNan for Vector3fi {
+    fn has_nan(&self) -> bool {
+        self.x.is_nan() || self.y.is_nan() || self.z.is_nan()
+    }
+}
+
+impl Index<usize> for Vector3fi {
+    type Output = Interval;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        debug_assert!(index == 0 || index == 1 || index == 2);
+        if index == 0 {
+            &self.x
+        } else if index == 1 {
+            &self.y
+        } else {
+            &self.z
+        }
+    }
+}
+
+impl IndexMut<usize> for Vector3fi {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        debug_assert!(index == 0 || index == 1 || index == 2);
+        if index == 0 {
+            &mut self.x
+        } else if index == 1 {
+            &mut self.y
+        } else {
+            &mut self.z
+        }
+    }
+}
+
+// Vectors can be negated
+impl_op_ex!(-|v: &Vector3fi| -> Vector3fi { Vector3fi::new(-v.x, -v.y, -v.z) });
+// Vectors can add and subtract with other vectors
+impl_op_ex!(+ |v1: &Vector3fi, v2: &Vector3fi| -> Vector3fi {
+    Vector3fi::new(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z)});
+impl_op_ex!(-|v1: &Vector3fi, v2: &Vector3fi| -> Vector3fi {
+    Vector3fi::new(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z)
+});
+impl_op_ex!(+= |v1: &mut Vector3fi, v2: &Vector3fi| {
+    v1.x += v2.x;
+    v1.y += v2.y;
+    v1.z += v2.z;
+});
+impl_op_ex!(-= |n1: &mut Vector3fi, n2: &Vector3fi| {
+    n1.x -= n2.x;
+    n1.y -= n2.y;
+    n1.z -= n2.z;
+});
+
+// Vectors can be scaled
+impl_op_ex_commutative!(*|v: &Vector3fi, s: Interval| -> Vector3fi {
+    Vector3fi::new(v.x * s, v.y * s, v.z * s)
+});
+impl_op_ex!(/ |v: &Vector3fi, s: Interval| -> Vector3fi { Vector3fi::new(v.x / s, v.y / s, v.z / s) });
+impl_op_ex!(+= |v1: &mut Vector3fi, s: Interval| {
+    v1.x += s;
+    v1.y += s;
+    v1.z += s;
+});
+impl_op_ex!(*= |v1: &mut Vector3fi, s: Interval| {
+    v1.x *= s;
+    v1.y *= s;
+    v1.z *= s;
+});
+impl_op_ex!(/= |v1: &mut Vector3fi, s: Interval| {
+    v1.x /= s;
+    v1.y /= s;
+    v1.z /= s;
+});
+impl_op_ex!(*= |v1: &mut Vector3fi, v2: &Vector3fi| {
+    v1.x *= v2.x;
+    v1.y *= v2.y;
+    v1.z *= v2.z;
+});
+impl_op_ex!(/= |v1: &mut Vector3fi, v2: &Vector3fi| {
+    v1.x /= v2.x;
+    v1.y /= v2.y;
+    v1.z /= v2.z;
+});
+impl_op_ex!(/ |v1: &Vector3fi, v2: &Vector3fi| -> Vector3fi{
+    Vector3fi::new(
+        v1.x / v2.x,
+        v1.y / v2.y,
+        v1.z / v2.z)
+});
+impl_op_ex!(*|v1: &Vector3fi, v2: &Vector3fi| -> Vector3fi {
+    Vector3fi::new(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z)
+});
+
+impl From<Point3fi> for Vector3fi {
+    fn from(value: Point3fi) -> Self {
+        Vector3fi {
+            x: value.x(),
+            y: value.y(),
+            z: value.z(),
+        }
     }
 }
 

@@ -108,10 +108,14 @@ pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 // https://github.com/rust-lang/rust/issues/31844
 // So, no, we can't do this. The current Trait approach is idiomatic Rust.
 
-// TODO Point3fi and Vector3fi.
-// TODO There's still chunks of code that are repeated, mainly in impl_op_ex()'s.
-//   I'd like to share them where possible, but that's not worth the effort at the time of writing.
-//   It may be worth it now that I want to do Interval types too, though...
+// TODO Point3fi and Vector3fi
+// TODO There's still chunks of code that are repeated, mainly in impl_op_ex()'s
+// and across e.g. Point3* and Vector3* impls. I would like to go back and tighten everything up
+// to re-use code more intelligently. This type rework can also touch on e.g. Interval not really
+// being a reasonable candidate for PartialOrd, but needing to be so for TupleElement - could
+// we rework it so the float interval types don't need that?
+// Generally I'd like to revisit all these types and refactor into more sane generics.
+// I do feel limited by the lack of specialization
 // TODO Face forward functions.
 // TODO ensure we debug_assert() with has_nan() where appropriate.
 // TODO Improve testing coverage.

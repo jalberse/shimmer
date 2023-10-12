@@ -87,6 +87,7 @@ impl Min for i32 {
         <i32 as Ord>::min(self, a)
     }
 }
+
 pub trait Max {
     // Take the maximum of self and a
     fn max(self, a: Self) -> Self;

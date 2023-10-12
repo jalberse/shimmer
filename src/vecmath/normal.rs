@@ -10,10 +10,11 @@ use super::tuple::{Tuple3, TupleElement};
 use super::tuple_fns::{
     abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot3, dot3i, has_nan3,
 };
-use super::vector::Vector3;
+use super::vector::{Vector3, Vector3fi};
 use super::{Vector3f, Vector3i};
 use crate::float::Float;
 use crate::interval::Interval;
+use crate::is_nan::IsNan;
 use crate::math::lerp;
 use auto_ops::*;
 
@@ -644,11 +645,180 @@ impl From<&Normal3i> for Normal3f {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Normal3fi {
     x: Interval,
     y: Interval,
     z: Interval,
 }
+
+impl Tuple3<Interval> for Normal3fi {
+    fn new(x: Interval, y: Interval, z: Interval) -> Self {
+        Normal3fi { x, y, z }
+    }
+
+    fn x(&self) -> Interval {
+        self.x
+    }
+
+    fn y(&self) -> Interval {
+        self.y
+    }
+
+    fn z(&self) -> Interval {
+        self.z
+    }
+
+    fn x_ref(&self) -> &Interval {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &Interval {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &Interval {
+        &self.z
+    }
+
+    fn x_mut(&mut self) -> &mut Interval {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut Interval {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut Interval {
+        &mut self.z
+    }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        Normal3fi {
+            x: lerp(t, &a.x, &b.x),
+            y: lerp(t, &a.y, &b.y),
+            z: lerp(t, &a.z, &b.z),
+        }
+    }
+}
+
+impl Normal3 for Normal3fi {
+    type ElementType = Interval;
+
+    type AssociatedVectorType = Vector3fi;
+
+    fn dot(&self, n: &Self) -> Self::ElementType {
+        todo!()
+    }
+
+    fn dot_vector(&self, v: &Self::AssociatedVectorType) -> Self::ElementType {
+        todo!()
+    }
+
+    fn abs_dot(&self, n: &Self) -> Self::ElementType {
+        todo!()
+    }
+
+    fn abs_dot_vector(&self, v: &Self::AssociatedVectorType) -> Self::ElementType {
+        todo!()
+    }
+
+    fn cross(&self, v: &Self::AssociatedVectorType) -> Self::AssociatedVectorType {
+        todo!()
+    }
+
+    fn angle_between(&self, n: &Self) -> Float {
+        todo!()
+    }
+
+    fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float {
+        todo!()
+    }
+}
+
+impl Index<usize> for Normal3fi {
+    type Output = Interval;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        debug_assert!(index == 0 || index == 1 || index == 2);
+        if index == 0 {
+            &self.x
+        } else if index == 1 {
+            &self.y
+        } else {
+            &self.z
+        }
+    }
+}
+
+impl IndexMut<usize> for Normal3fi {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        debug_assert!(index == 0 || index == 1 || index == 2);
+        if index == 0 {
+            &mut self.x
+        } else if index == 1 {
+            &mut self.y
+        } else {
+            &mut self.z
+        }
+    }
+}
+
+impl HasNan for Normal3fi {
+    fn has_nan(&self) -> bool {
+        self.x.is_nan() || self.y.is_nan() || self.z.is_nan()
+    }
+}
+
+impl_op_ex!(-|n: &Normal3fi| -> Normal3fi { Normal3fi::new(-n.x, -n.y, -n.z) });
+
+impl_op_ex!(+ |n1: &Normal3fi, n2: &Normal3fi| -> Normal3fi { Normal3fi::new(n1.x + n2.x, n1.y + n2.y, n1.z + n2.z)});
+
+impl_op_ex!(-|n1: &Normal3fi, n2: &Normal3fi| -> Normal3fi {
+    Normal3fi::new(n1.x - n2.x, n1.y - n2.y, n1.z - n2.z)
+});
+
+impl_op_ex!(+= |n1: &mut Normal3fi, n2: &Normal3fi| {
+    n1.x += n2.x;
+    n1.y += n2.y;
+    n1.z += n2.z;
+});
+
+impl_op_ex!(-= |n1: &mut Normal3fi, n2: &Normal3fi| {
+    n1.x -= n2.x;
+    n1.y -= n2.y;
+    n1.z -= n2.z;
+});
+
+impl_op_ex_commutative!(*|n: &Normal3fi, s: Interval| -> Normal3fi {
+    Normal3fi::new(n.x * s, n.y * s, n.z * s)
+});
+
+impl_op_ex!(/ |n: &Normal3fi, s: Interval| -> Normal3fi { Normal3fi::new(n.x / s, n.y / s, n.z / s) });
+
+impl_op_ex!(*= |n1: &mut Normal3fi, s: Interval| {
+    n1.x *= s;
+    n1.y *= s;
+    n1.z *= s;
+});
+
+impl_op_ex!(/= |n1: &mut Normal3fi, s: Interval| {
+    n1.x /= s;
+    n1.y /= s;
+    n1.z /= s;
+});
+
+impl_op_ex!(-|n: &Normal3fi, v: &Vector3fi| -> Vector3fi {
+    Vector3fi::new(n.x - v.x(), n.y() - v.y(), n.z - v.z())
+});
+
+impl_op_ex!(-|v: &Vector3fi, n: &Normal3fi| -> Vector3fi {
+    Vector3fi::new(v.x() - n.x, v.y() - n.y, v.z() - n.z)
+});
+
+impl_op_ex_commutative!(+|n: &Normal3fi, v: &Vector3fi| -> Vector3fi {
+    Vector3fi::new(n.x + v.x(), n.y + v.y(), n.z + v.z())
+});
 
 #[cfg(test)]
 mod tests {

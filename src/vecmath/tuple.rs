@@ -15,9 +15,9 @@ pub trait TupleElement:
     + Floor
     + Min
     + Max
-    + PartialOrd
     + Copy
     + Clone
+    + PartialOrd
     + NumericLimit
     + Sqrt
     + Mul<Self, Output = Self>
@@ -27,6 +27,7 @@ pub trait TupleElement:
     + IsNan
 {
     fn from_i32(val: i32) -> Self;
+    // TODO rather, this should be a supertrait with From<Float>
     fn into_float(self) -> Float;
     fn from_float(v: Float) -> Self;
     fn zero() -> Self;

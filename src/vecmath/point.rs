@@ -5,9 +5,11 @@ use std::ops::{
 use super::has_nan::HasNan;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{has_nan2, has_nan3};
-use super::vector::{Vector2, Vector3};
+use super::vector::{Vector2, Vector3, Vector3fi};
 use super::{Vector2f, Vector2i, Vector3f, Vector3i};
 use crate::float::Float;
+use crate::interval::Interval;
+use crate::is_nan::IsNan;
 use crate::math::{self, lerp};
 use crate::vecmath::Length;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
@@ -42,7 +44,6 @@ pub trait Point3:
     + Add<Self::AssociatedVectorType, Output = Self>
     + AddAssign<Self::AssociatedVectorType>
     + Mul<Self::ElementType, Output = Self>
-    + Mul<Float, Output = Self>
     + MulAssign<Self::ElementType>
     + Div<Self::ElementType, Output = Self>
     + DivAssign<Self::ElementType>
@@ -965,9 +966,178 @@ impl From<Point3f> for (Float, Float, Float) {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Point3fi {
-    // TODO Implement this. It's a Point3<Interval>. Would need to implement Interval first..
+    x: Interval,
+    y: Interval,
+    z: Interval,
 }
+
+impl Point3fi {
+    pub fn from_value_and_error(val: Point3f, err: Point3f) -> Point3fi {
+        Point3fi {
+            x: Interval::from_value_and_error(val.x, err.x),
+            y: Interval::from_value_and_error(val.y, err.y),
+            z: Interval::from_value_and_error(val.z, err.z),
+        }
+    }
+
+    pub fn error(&self) -> Point3f {
+        Point3f {
+            x: self.x.width() / 2.0,
+            y: self.y.width() / 2.0,
+            z: self.z.width() / 2.0,
+        }
+    }
+
+    pub fn is_exact(&self) -> bool {
+        self.x.width() == 0.0 && self.y.width() == 0.0 && self.z.width() == 0.0
+    }
+}
+
+impl Tuple3<Interval> for Point3fi {
+    fn new(x: Interval, y: Interval, z: Interval) -> Self {
+        Point3fi { x, y, z }
+    }
+
+    fn x(&self) -> Interval {
+        self.x
+    }
+
+    fn y(&self) -> Interval {
+        self.y
+    }
+
+    fn z(&self) -> Interval {
+        self.z
+    }
+
+    fn x_ref(&self) -> &Interval {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &Interval {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &Interval {
+        &self.z
+    }
+
+    fn x_mut(&mut self) -> &mut Interval {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut Interval {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut Interval {
+        &mut self.z
+    }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        Point3fi {
+            x: lerp(t, &a.x, &b.x),
+            y: lerp(t, &a.y, &b.y),
+            z: lerp(t, &a.z, &b.z),
+        }
+    }
+}
+
+impl Point3 for Point3fi {
+    type ElementType = Interval;
+
+    type AssociatedVectorType = Vector3fi;
+
+    fn distance(&self, p: &Self) -> Self::ElementType {
+        todo!()
+    }
+
+    fn distance_squared(&self, p: &Self) -> Self::ElementType {
+        todo!()
+    }
+}
+
+impl HasNan for Point3fi {
+    fn has_nan(&self) -> bool {
+        self.x.is_nan() || self.y.is_nan() || self.z.is_nan()
+    }
+}
+
+impl Index<usize> for Point3fi {
+    type Output = Interval;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        debug_assert!(index == 0 || index == 1 || index == 2);
+        if index == 0 {
+            &self.x
+        } else if index == 1 {
+            &self.y
+        } else {
+            &self.z
+        }
+    }
+}
+
+impl IndexMut<usize> for Point3fi {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        debug_assert!(index == 0 || index == 1 || index == 2);
+        if index == 0 {
+            &mut self.x
+        } else if index == 1 {
+            &mut self.y
+        } else {
+            &mut self.z
+        }
+    }
+}
+
+impl_op_ex!(-|v: &Point3fi| -> Point3fi { Point3fi::new(-v.x, -v.y, -v.z) });
+
+// Points can be scaled elementwise
+impl_op_ex_commutative!(*|p: &Point3fi, s: Interval| -> Point3fi {
+    Point3fi::new(p.x * s, p.y * s, p.z * s)
+});
+impl_op_ex!(/ |p: &Point3fi, s: Interval| -> Point3fi {
+    Point3fi::new(p.x / s, p.y / s, p.z / s) });
+impl_op_ex!(*= |p: &mut Point3fi, s: Interval| {
+    p.x *= s;
+    p.y *= s;
+    p.z *= s;
+});
+impl_op_ex!(/= |p: &mut Point3fi, s: Interval| {
+    p.x /= s;
+    p.y /= s;
+    p.z /= s;
+});
+
+// Point + Vector -> Point
+impl_op_ex_commutative!(+ |p: Point3fi, v: Vector3fi| -> Point3fi
+{
+    Point3fi::new(p.x + v.x(), p.y + v.y(), p.z + v.z())
+});
+
+impl_op_ex!(+=|p: &mut Point3fi, v: Vector3fi| {
+    p.x += v.x();
+    p.y += v.y();
+    p.z += v.z();
+});
+
+// Point - Vector -> Point
+impl_op_ex!(-|p: &Point3fi, v: &Vector3fi| -> Point3fi {
+    Point3fi::new(p.x - v.x(), p.y - v.y(), p.z - v.z())
+});
+impl_op_ex!(-=|p: &mut Point3fi, v: &Vector3fi| {
+    p.x -= v.x();
+    p.y -= v.y();
+    p.z -= v.z();
+});
+
+// Point - Point -> Vector
+impl_op_ex!(-|p1: &Point3fi, p2: &Point3fi| -> Vector3fi {
+    Vector3fi::new(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z)
+});
 
 #[cfg(test)]
 mod tests {
