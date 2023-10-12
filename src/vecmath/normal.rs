@@ -182,14 +182,14 @@ impl Normal3 for Normal3i {
     }
 
     fn angle_between(&self, n: &Normal3i) -> Float {
-        angle_between::<Normal3f, Normal3f, Normal3f>(
+        angle_between::<Normal3f, Normal3f, Normal3f, Float>(
             &Normal3f::from(self).normalize(),
             &Normal3f::from(n).normalize(),
         )
     }
 
     fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float {
-        angle_between::<Normal3f, Vector3f, Vector3f>(
+        angle_between::<Normal3f, Vector3f, Vector3f, Float>(
             &Normal3f::from(self).normalize(),
             &Vector3f::from(v).normalize(),
         )
@@ -498,12 +498,12 @@ impl Normal3 for Normal3f {
     /// Get the angle between this and another normal.
     /// Both must be normalized.
     fn angle_between(&self, n: &Normal3f) -> Float {
-        angle_between::<Normal3f, Normal3f, Normal3f>(self, n)
+        angle_between::<Normal3f, Normal3f, Normal3f, Float>(self, n)
     }
 
     /// Get the angle between this normal and a vector.
     fn angle_between_vector(&self, v: &Vector3f) -> Float {
-        angle_between::<Normal3f, Vector3f, Vector3f>(self, v)
+        angle_between::<Normal3f, Vector3f, Vector3f, Float>(self, v)
     }
 }
 
@@ -728,11 +728,21 @@ impl Normal3 for Normal3fi {
     }
 
     fn angle_between(&self, n: &Self) -> Float {
-        todo!()
+        angle_between::<Normal3fi, Normal3fi, Normal3fi, Interval>(self, n)
     }
 
     fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float {
-        todo!()
+        angle_between::<Normal3fi, Vector3fi, Vector3fi, Interval>(self, v)
+    }
+}
+
+impl Length<Float> for Normal3fi {
+    fn length_squared(&self) -> Float {
+        length_squared3(self).into()
+    }
+
+    fn length(&self) -> Float {
+        length3(self).into()
     }
 }
 

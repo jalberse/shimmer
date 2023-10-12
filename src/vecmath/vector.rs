@@ -501,7 +501,10 @@ impl Vector3 for Vector3i {
     }
 
     fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float {
-        angle_between::<Vector3f, Normal3f, Vector3f>(&Vector3f::from(self), &Normal3f::from(n))
+        angle_between::<Vector3f, Normal3f, Vector3f, Float>(
+            &Vector3f::from(self),
+            &Normal3f::from(n),
+        )
     }
 
     /// Create a new vector orthogonal to w.
@@ -1101,7 +1104,7 @@ impl Vector3 for Vector3f {
     /// Find the angle between this vector and a normal
     /// Both vectors must be normalized.
     fn angle_between_normal(&self, n: &Normal3f) -> Float {
-        angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
+        angle_between::<Vector3f, Normal3f, Vector3f, Float>(self, n)
     }
 
     /// Create a new vector orthogonal to w.
@@ -1362,15 +1365,25 @@ impl Vector3 for Vector3fi {
     }
 
     fn angle_between(&self, v: &Self) -> Float {
-        todo!()
+        angle_between::<Vector3fi, Vector3fi, Vector3fi, Interval>(self, v)
     }
 
     fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float {
-        todo!()
+        angle_between::<Vector3fi, Normal3fi, Vector3fi, Interval>(self, n)
     }
 
     fn gram_schmidt(&self, w: &Self) -> Self {
         todo!()
+    }
+}
+
+impl Length<Float> for Vector3fi {
+    fn length_squared(&self) -> Float {
+        length_squared3(self).into()
+    }
+
+    fn length(&self) -> Float {
+        length3(self).into()
     }
 }
 

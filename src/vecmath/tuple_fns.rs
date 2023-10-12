@@ -159,17 +159,21 @@ where
 /// V3: The resulting type from adding or subtracting V1 and V2.
 ///   That is typically a Vector3f.
 ///   We just use the third type to be able to specify that that is the case.
-pub fn angle_between<'a, V1, V2, V3>(v1: &'a V1, v2: &'a V2) -> Float
+pub fn angle_between<'a, V1, V2, V3, E>(v1: &'a V1, v2: &'a V2) -> Float
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
-    V3: Tuple3<Float> + Length<Float>,
+    V1: Tuple3<E>,
+    V2: Tuple3<E>,
+    V3: Tuple3<E> + Length<Float>,
     &'a V1: Add<&'a V2, Output = V3>,
     &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,
+    E: TupleElement + MulAdd + DifferenceOfProducts + Into<Float>,
 {
+    // TODO I think we could simplify the constraints on this function.
+    // E might be able to be omitted, and instead specified as a constraint on the ElementType of V1.
+    // We could also omit V3 by replacing it with the Output of V1 + V2, I think.
     debug_assert!(!v1.has_nan());
     debug_assert!(!v2.has_nan());
-    if dot3(v1, v2) < 0.0 {
+    if dot3(v1, v2).into() < 0.0 {
         PI_F - 2.0 * safe_asin((v1 + v2).length() / 2.0)
     } else {
         2.0 * safe_asin((v2 - v1).length() / 2.0)
