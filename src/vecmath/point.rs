@@ -1045,17 +1045,23 @@ impl Tuple3<Interval> for Point3fi {
     }
 }
 
+// TODO The conversion to Float here probably isn't the best in actuality.
+//  Rather, we'd want a Length<Interval> implementation that preserves the error,
+//  and propagate that here. But I'm in "move fast and break things" mode, so
+//  just be wary of this.
 impl Point3 for Point3fi {
     type ElementType = Interval;
 
     type AssociatedVectorType = Vector3fi;
 
     fn distance(&self, p: &Self) -> Self::ElementType {
-        todo!()
+        debug_assert!(!self.has_nan());
+        Interval::from_val((self - p).length())
     }
 
     fn distance_squared(&self, p: &Self) -> Self::ElementType {
-        todo!()
+        debug_assert!(!self.has_nan());
+        Interval::from_val((self - p).length_squared())
     }
 }
 
