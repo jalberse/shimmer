@@ -16,7 +16,7 @@ use super::tuple_fns::{
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
 use crate::interval::Interval;
-use crate::is_nan::{self, IsNan};
+use crate::is_nan::IsNan;
 use crate::math::lerp;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
@@ -1338,19 +1338,19 @@ impl Vector3 for Vector3fi {
     // TODO I think that we just need to make the tuple_fns implementations more generic and call them from here - restrict operations rather than say they're Float.
 
     fn dot(&self, v: &Self) -> Self::ElementType {
-        todo!()
+        dot3(self, v)
     }
 
     fn dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType {
-        todo!()
+        dot3(self, n)
     }
 
     fn abs_dot(&self, v: &Self) -> Self::ElementType {
-        todo!()
+        abs_dot3(self, v)
     }
 
     fn abs_dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType {
-        todo!()
+        abs_dot3(self, n)
     }
 
     fn cross(&self, v: &Self) -> Self {

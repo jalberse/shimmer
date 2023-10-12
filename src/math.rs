@@ -127,8 +127,6 @@ impl NumericLimit for Interval {
 }
 
 /// Provides the equivalent of f32::mul_add for the specified type.
-/// Really just provided so that we can use a common interface for Float
-/// and integer types, even if the integer types won't benefit from this form.
 pub trait MulAdd {
     fn mul_add(self, a: Self, b: Self) -> Self;
 }

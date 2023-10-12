@@ -708,19 +708,19 @@ impl Normal3 for Normal3fi {
     type AssociatedVectorType = Vector3fi;
 
     fn dot(&self, n: &Self) -> Self::ElementType {
-        todo!()
+        dot3(self, n)
     }
 
     fn dot_vector(&self, v: &Self::AssociatedVectorType) -> Self::ElementType {
-        todo!()
+        dot3(self, v)
     }
 
     fn abs_dot(&self, n: &Self) -> Self::ElementType {
-        todo!()
+        abs_dot3(self, n)
     }
 
     fn abs_dot_vector(&self, v: &Self::AssociatedVectorType) -> Self::ElementType {
-        todo!()
+        abs_dot3(self, v)
     }
 
     fn cross(&self, v: &Self::AssociatedVectorType) -> Self::AssociatedVectorType {

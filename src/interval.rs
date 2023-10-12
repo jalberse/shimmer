@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut, Neg};
 
-use crate::math::DifferenceOfProducts;
+use crate::math::{DifferenceOfProducts, MulAdd};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 use itertools::Itertools;
 
@@ -118,8 +118,10 @@ impl Interval {
             high: mul_round_up(ahigh, ahigh),
         }
     }
+}
 
-    pub fn fma(&self, b: &Interval, c: &Interval) -> Interval {
+impl MulAdd for Interval {
+    fn mul_add(self, b: Interval, c: Interval) -> Interval {
         let low_options = [
             fma_round_down(self.low, b.low, c.low),
             fma_round_down(self.high, b.low, c.low),

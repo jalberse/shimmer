@@ -65,19 +65,16 @@ where
 }
 
 /// Take the dot product of two vectors.
-pub fn dot3<V1, V2>(v: &V1, w: &V2) -> Float
+pub fn dot3<V1, V2, E>(v: &V1, w: &V2) -> E
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
+    V1: Tuple3<E>,
+    V2: Tuple3<E>,
+    E: TupleElement + MulAdd + DifferenceOfProducts,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
 
-    MulAdd::mul_add(
-        v.x(),
-        w.x(),
-        Float::sum_of_products(v.y(), w.y(), v.z(), w.z()),
-    )
+    <E as MulAdd>::mul_add(v.x(), w.x(), E::sum_of_products(v.y(), w.y(), v.z(), w.z()))
 }
 
 /// Take the dot product of two vectors.
@@ -93,12 +90,13 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-pub fn abs_dot3<V1, V2>(v: &V1, w: &V2) -> Float
+pub fn abs_dot3<V1, V2, E>(v: &V1, w: &V2) -> E
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
+    V1: Tuple3<E>,
+    V2: Tuple3<E>,
+    E: TupleElement + MulAdd + DifferenceOfProducts,
 {
-    Float::abs(dot3(v, w))
+    E::abs(dot3(v, w))
 }
 
 /// Take the dot product of two vectors then take the absolute value.
