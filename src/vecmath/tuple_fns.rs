@@ -1,11 +1,14 @@
 //! A set of functions which help us implement the tuple traits for various types,
 //! but that we don't want exposed external to the vecmath module.
 
-use std::ops::{Add, Sub};
+use std::{
+    ops::{Add, Mul, Neg, Sub},
+    process::Output,
+};
 
 use crate::{
     float::PI_F,
-    math::{safe_asin, DifferenceOfProducts, MulAdd},
+    math::{safe_asin, DifferenceOfProducts, IsNeg, MulAdd},
     Float,
 };
 
@@ -194,5 +197,18 @@ where
         PI_F - 2.0 * safe_asin((v1 + v2).length() / 2.0)
     } else {
         2.0 * safe_asin((v2 - v1).length() / 2.0)
+    }
+}
+
+pub fn face_forward<T1, T2, E>(a: &T1, b: &T2) -> T1
+where
+    T1: Tuple3<E> + Neg<Output = T1>,
+    T2: Tuple3<E>,
+    E: TupleElement + MulAdd + DifferenceOfProducts + IsNeg,
+{
+    if dot3(a, b).is_neg() {
+        -*a
+    } else {
+        *a
     }
 }

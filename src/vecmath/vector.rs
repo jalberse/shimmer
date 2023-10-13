@@ -11,7 +11,7 @@ use super::point::Point3fi;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{
     abs_dot2, abs_dot2i, abs_dot3, abs_dot3i, angle_between, angle_between2, cross, cross_i32,
-    dot2, dot2i, dot3, dot3i, has_nan2, has_nan3,
+    dot2, dot2i, dot3, dot3i, face_forward, has_nan2, has_nan3,
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
@@ -107,6 +107,10 @@ pub trait Vector3:
     /// w must be normalized.
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self;
+
+    fn face_forward(&self, v2: &Self) -> Self;
+
+    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self;
 }
 
 // ---------------------------------------------------------------------------
@@ -512,6 +516,14 @@ impl Vector3 for Vector3i {
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self {
         self - self.dot(w) * w
+    }
+
+    fn face_forward(&self, v2: &Self) -> Self {
+        face_forward(self, v2)
+    }
+
+    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
+        face_forward(self, n)
     }
 }
 
@@ -1113,6 +1125,14 @@ impl Vector3 for Vector3f {
     fn gram_schmidt(&self, w: &Self) -> Self {
         self - self.dot(w) * w
     }
+
+    fn face_forward(&self, v2: &Self) -> Self {
+        face_forward(self, v2)
+    }
+
+    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
+        face_forward(self, n)
+    }
 }
 
 impl Index<usize> for Vector3f {
@@ -1338,8 +1358,6 @@ impl Vector3 for Vector3fi {
 
     type AssociatedNormalType = Normal3fi;
 
-    // TODO I think that we just need to make the tuple_fns implementations more generic and call them from here - restrict operations rather than say they're Float.
-
     fn dot(&self, v: &Self) -> Self::ElementType {
         dot3(self, v)
     }
@@ -1373,7 +1391,17 @@ impl Vector3 for Vector3fi {
     }
 
     fn gram_schmidt(&self, w: &Self) -> Self {
-        todo!()
+        // TODO should make a generic version. It should cover both Vector2 and Vector3.
+        // Can do that when we rework this whole module, though.
+        self - self.dot(w) * w
+    }
+
+    fn face_forward(&self, v2: &Self) -> Self {
+        face_forward(self, v2)
+    }
+
+    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
+        face_forward(self, n)
     }
 }
 

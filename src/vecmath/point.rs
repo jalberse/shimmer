@@ -890,6 +890,16 @@ impl Default for Point3f {
     }
 }
 
+impl From<Point3fi> for Point3f {
+    fn from(value: Point3fi) -> Self {
+        Point3f {
+            x: value.x.midpoint(),
+            y: value.y.midpoint(),
+            z: value.z.midpoint(),
+        }
+    }
+}
+
 impl_op_ex!(-|v: &Point3f| -> Point3f { Point3f::new(-v.x, -v.y, -v.z) });
 
 // Points can be scaled elementwise

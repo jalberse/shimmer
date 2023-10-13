@@ -1,7 +1,7 @@
 use crate::{
     light::Light,
     material::Material,
-    vecmath::{point::Point3fi, Normal3f, Point2f, Vector3f},
+    vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},
     Float,
 };
 
@@ -15,6 +15,7 @@ pub struct Interaction {
 }
 
 pub struct SurfaceInteraction {
+    pub interaction: Interaction,
     pub dpdu: Vector3f,
     pub dpdv: Vector3f,
     pub dndu: Normal3f,
@@ -29,6 +30,12 @@ pub struct SurfaceInteraction {
     pub dvdx: Float,
     pub dudy: Float,
     pub dvdy: Float,
+}
+
+impl SurfaceInteraction {
+    pub fn p(&self) -> Point3f {
+        self.interaction.pi.into()
+    }
 }
 
 pub struct SurfaceInteractionShading {

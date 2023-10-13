@@ -16,7 +16,7 @@ use crate::{
         DenselySampled, PiecewiseLinear, Spectrum,
     },
     square_matrix::SquareMatrix,
-    vecmath::{Normal3f, Point2f, Point2i, Point3f, Vector3f},
+    vecmath::{normal::Normal3, Normal3f, Point2f, Point2i, Point3f, Vector3f},
     Float,
 };
 
@@ -228,6 +228,9 @@ pub struct VisibleSurface {
     /// spectral distribution of reflected light under uniform illumination;
     /// useful for separating texture from illumination before denoising.
     albedo: SampledSpectrum,
+    // TODO I suspect that we shouldn't need this - it's to check if the struct has been
+    // intialized, but why can't we only initialzie in a valid state? They probably have a reason,
+    // but if we architect differently then we might not need this.
     set: bool,
 }
 
@@ -238,9 +241,25 @@ impl VisibleSurface {
         lambda: &SampledWavelengths,
     ) -> VisibleSurface {
         let set = true;
-        // TODO to set p from surface interaction, need to implement Point3fi -> Point3f, so we need to
-        // implement Interval, and Point3fi, and that conversion... Let's do it.
-        todo!()
+        let p = si.p();
+        let wo = si.interaction.wo;
+        let n = si.interaction.n.face_forward_v(&wo);
+        let ns = si.shading.n.face_forward_v(&wo);
+        let uv = si.interaction.uv;
+        let time = si.interaction.time;
+        let dpdx = si.dpdx;
+        let dpdy = si.dpdy;
+        VisibleSurface {
+            p,
+            n,
+            ns,
+            uv,
+            time,
+            dpdx,
+            dpdy,
+            albedo: albedo.clone(),
+            set,
+        }
     }
 }
 

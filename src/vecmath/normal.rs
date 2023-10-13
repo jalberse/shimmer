@@ -8,7 +8,7 @@ use super::length_fns::{length3, length_squared3};
 use super::normalize::Normalize;
 use super::tuple::{Tuple3, TupleElement};
 use super::tuple_fns::{
-    abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot3, dot3i, has_nan3,
+    abs_dot3, abs_dot3i, angle_between, cross, cross_i32, dot3, dot3i, face_forward, has_nan3,
 };
 use super::vector::{Vector3, Vector3fi};
 use super::{Vector3f, Vector3i};
@@ -55,6 +55,10 @@ pub trait Normal3:
 
     /// Get the angle between this normal and a vector.
     fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float;
+
+    fn face_forward(&self, n2: &Self) -> Self;
+
+    fn face_forward_v(&self, v: &Self::AssociatedVectorType) -> Self;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +197,14 @@ impl Normal3 for Normal3i {
             &Normal3f::from(self).normalize(),
             &Vector3f::from(v).normalize(),
         )
+    }
+
+    fn face_forward(&self, n2: &Self) -> Self {
+        face_forward(self, n2)
+    }
+
+    fn face_forward_v(&self, v: &Self::AssociatedVectorType) -> Self {
+        face_forward(self, v)
     }
 }
 
@@ -505,6 +517,14 @@ impl Normal3 for Normal3f {
     fn angle_between_vector(&self, v: &Vector3f) -> Float {
         angle_between::<Normal3f, Vector3f, Vector3f, Float>(self, v)
     }
+
+    fn face_forward(&self, n2: &Self) -> Self {
+        face_forward(self, n2)
+    }
+
+    fn face_forward_v(&self, v: &Self::AssociatedVectorType) -> Self {
+        face_forward(self, v)
+    }
 }
 
 impl Index<usize> for Normal3f {
@@ -733,6 +753,14 @@ impl Normal3 for Normal3fi {
 
     fn angle_between_vector(&self, v: &Self::AssociatedVectorType) -> Float {
         angle_between::<Normal3fi, Vector3fi, Vector3fi, Interval>(self, v)
+    }
+
+    fn face_forward(&self, n2: &Self) -> Self {
+        face_forward(self, n2)
+    }
+
+    fn face_forward_v(&self, v: &Self::AssociatedVectorType) -> Self {
+        face_forward(self, v)
     }
 }
 

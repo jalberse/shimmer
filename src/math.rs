@@ -166,6 +166,41 @@ impl DifferenceOfProducts for Float {
     }
 }
 
+impl DifferenceOfProducts for i32 {
+    fn difference_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+        a * b - c * d
+    }
+
+    fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+        a * b + c * d
+    }
+}
+
+pub trait IsNeg {
+    fn is_neg(&self) -> bool;
+}
+
+impl IsNeg for i32 {
+    fn is_neg(&self) -> bool {
+        self < &0
+    }
+}
+
+impl IsNeg for Float {
+    fn is_neg(&self) -> bool {
+        self < &0.0
+    }
+}
+
+impl IsNeg for Interval {
+    /// Returns true if the midpoint is negative, rather than if the entire interval is
+    /// negative. This is useful for e.g. checking if the dot of two Vector3<Interval> classes
+    /// is negative.
+    fn is_neg(&self) -> bool {
+        Into::<Float>::into(*self) < 0.0
+    }
+}
+
 pub fn lerp<'a, T>(t: Float, a: &'a T, b: &'a T) -> T
 where
     T: Add<T, Output = T>,
