@@ -3,7 +3,7 @@ use std::ops::{Add, Div, DivAssign, Index, IndexMut, Mul, MulAssign};
 use auto_ops::impl_op_ex;
 
 use crate::{
-    color::XYZ,
+    color::{RGB, XYZ},
     float::Float,
     math::{inner_product, DifferenceOfProducts},
 };
@@ -483,6 +483,14 @@ impl Mul<XYZ> for SquareMatrix<3> {
 
     fn mul(self, rhs: XYZ) -> Self::Output {
         mul_mat_vec::<3, XYZ, XYZ>(&self, &rhs)
+    }
+}
+
+impl Mul<RGB> for SquareMatrix<3> {
+    type Output = RGB;
+
+    fn mul(self, rhs: RGB) -> Self::Output {
+        mul_mat_vec::<3, RGB, RGB>(&self, &rhs)
     }
 }
 

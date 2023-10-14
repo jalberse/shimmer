@@ -4,8 +4,10 @@ mod color;
 mod colorspace;
 mod compensated_float;
 mod film;
+mod filter;
 mod float;
 mod frame;
+mod image;
 mod image_metadata;
 mod interaction;
 mod interval;
@@ -22,6 +24,7 @@ mod spectra;
 mod sphere;
 mod square_matrix;
 mod transform;
+mod vec2d;
 mod vecmath;
 
 // For convenience, re-export.

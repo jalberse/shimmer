@@ -3,9 +3,12 @@ use std::ops::{AddAssign, Index, IndexMut, MulAssign};
 use once_cell::sync::Lazy;
 
 use crate::{
-    bounding_box::Bounds2f,
+    bounding_box::{Bounds2f, Bounds2i},
     color::{white_balance, RGB, XYZ},
     colorspace::RgbColorSpace,
+    filter::{Filter, FilterI},
+    image::Image,
+    image_metadata::ImageMetadata,
     interaction::SurfaceInteraction,
     math::linear_least_squares_3,
     spectra::{
@@ -16,7 +19,11 @@ use crate::{
         DenselySampled, PiecewiseLinear, Spectrum,
     },
     square_matrix::SquareMatrix,
-    vecmath::{normal::Normal3, Normal3f, Point2f, Point2i, Point3f, Vector3f},
+    vec2d::Vec2d,
+    vecmath::{
+        normal::Normal3, HasNan, Normal3f, Point2f, Point2i, Point3f, Tuple2, Vector2f, Vector2i,
+        Vector3f,
+    },
     Float,
 };
 
@@ -29,24 +36,54 @@ pub trait FilmI {
     // possibly with data structures independent per thread that are then collected later?
     fn add_sample(
         &mut self,
-        p_film: &Point2f,
+        p_film: &Point2i,
         l: &SampledSpectrum,
         lambda: &SampledWavelengths,
         visible_surface: &Option<VisibleSurface>,
         weight: Float,
     );
 
+    fn add_splat(&mut self, p: &Point2f, l: &SampledSpectrum, lambda: &SampledWavelengths);
+
     fn full_resolution(&self) -> Point2i;
+
+    fn pixel_bounds(&self) -> Bounds2i;
 
     /// The bounds of all the samples that may be generated;
     /// different from the image bounds in the common case that the pixel filter
     /// extents are wider than a pixel.
     fn sample_bounds(&self) -> Bounds2f;
+
+    // The diagonal length of the sensor, in meters
+    fn diagonal(&self) -> Float;
+
+    fn uses_visible_surface(&self) -> bool;
+
+    /// Samples the range of wavelengths that the film's sensor responds to
+    fn sample_wavelengths(&self, u: Float) -> SampledWavelengths;
+
+    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image;
+
+    fn write_image(&self, metadata: &ImageMetadata, splat_scale: Float);
+
+    /// Gets the RGB value that results for the given spectral radiance samples from
+    /// applying the PixelSensor's model, performing white balancing, and then
+    /// converting to the output color space.
+    fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> RGB;
+
+    /// Primarily useful for displaying in-progress images during rendering.
+    fn get_pixel_rgb(&self, p: &Point2i, splat_scale: Float) -> RGB;
+
+    fn get_filter(&self) -> &Filter;
+
+    fn get_pixel_sensor(&self) -> &PixelSensor;
+
+    fn get_filename(&self) -> &str;
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub enum Film {
-    RgbFilm,
+    RgbFilm(RgbFilm),
 }
 
 impl Film {}
@@ -54,7 +91,7 @@ impl Film {}
 impl FilmI for Film {
     fn add_sample(
         &mut self,
-        p_film: &Point2f,
+        p_film: &Point2i,
         l: &SampledSpectrum,
         lambda: &SampledWavelengths,
         visible_surface: &Option<VisibleSurface>,
@@ -63,15 +100,325 @@ impl FilmI for Film {
         todo!()
     }
 
+    fn add_splat(&mut self, p: &Point2f, l: &SampledSpectrum, lambda: &SampledWavelengths) {
+        todo!()
+    }
+
     fn full_resolution(&self) -> Point2i {
+        todo!()
+    }
+
+    fn pixel_bounds(&self) -> Bounds2i {
         todo!()
     }
 
     fn sample_bounds(&self) -> Bounds2f {
         todo!()
     }
+
+    fn diagonal(&self) -> Float {
+        todo!()
+    }
+
+    fn uses_visible_surface(&self) -> bool {
+        todo!()
+    }
+
+    fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
+        todo!()
+    }
+
+    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image {
+        todo!()
+    }
+
+    fn write_image(&self, metadata: &ImageMetadata, splat_scale: Float) {
+        todo!()
+    }
+
+    fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> RGB {
+        todo!()
+    }
+
+    fn get_pixel_rgb(&self, p: &Point2i, splat_scale: Float) -> RGB {
+        todo!()
+    }
+
+    fn get_filter(&self) -> &Filter {
+        todo!()
+    }
+
+    fn get_pixel_sensor(&self) -> &PixelSensor {
+        todo!()
+    }
+
+    fn get_filename(&self) -> &str {
+        todo!()
+    }
 }
 
+// Other structs wihch implement FilmI can have a FilmBase which
+// implements shared functionality.
+#[derive(Debug)]
+struct FilmBase {
+    pub full_resolution: Point2i,
+    pub pixel_bounds: Bounds2i,
+    pub filter: Filter,
+    pub diagonal: Float,
+    pub sensor: PixelSensor,
+    pub filename: String,
+}
+
+impl FilmBase {
+    // TODO I think that the PixelSensor might need to become an Rc pointer.
+    pub fn new(
+        full_resolution: Point2i,
+        pixel_bounds: Bounds2i,
+        filter: Filter,
+        diagonal: Float,
+        sensor: PixelSensor,
+        filename: String,
+    ) -> FilmBase {
+        FilmBase {
+            full_resolution,
+            pixel_bounds,
+            filter,
+            diagonal,
+            sensor,
+            filename,
+        }
+    }
+
+    pub fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
+        SampledWavelengths::sample_visible(u)
+    }
+
+    pub fn sample_bounds(&self) -> Bounds2f {
+        let radius = self.filter.radius();
+        let min: Point2f = self.pixel_bounds.min.into();
+        let max: Point2f = self.pixel_bounds.max.into();
+        // Half pixel offset to account for PBRT pixel coordinate conventions;
+        // see PBRTv4 8.1.4.
+        Bounds2f::new(
+            min - radius + Vector2f::new(0.5, 0.5),
+            max + radius - Vector2f::new(0.5, 0.5),
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct RgbFilm {
+    base: FilmBase,
+    // TODO this might need to become an Rc, or an Arc.
+    color_space: RgbColorSpace,
+    max_component_value: Float,
+    // Controls the floating-point precision of the output image
+    write_fp16: bool,
+    /// Cache for the filter's integral
+    filter_integral: Float,
+    output_rgb_from_sensor_rgb: SquareMatrix<3>,
+    pixels: Vec2d<RgbFilmPixel>,
+}
+
+/// Double precision is used for the contained values due to overflow
+/// constraints for images with extremely large sample counts.
+#[derive(Debug, Default, Copy, Clone)]
+struct RgbFilmPixel {
+    /// Running weighted sums of pixel contributions
+    rgb_sum: [f64; 3],
+    /// The sum of filter weight values for the sample contributions
+    weight_sum: f64,
+    // TODO this will need to be atomic.
+    /// Unweighted sum of sample splats
+    rgb_splat: [f64; 3],
+}
+
+impl RgbFilm {
+    pub fn new(
+        full_resolution: Point2i,
+        pixel_bounds: Bounds2i,
+        filter: Filter,
+        diagonal: Float,
+        sensor: PixelSensor,
+        filename: String,
+        color_space: RgbColorSpace,
+        max_component_value: Float,
+        write_fp16: bool,
+    ) -> RgbFilm {
+        debug_assert!(!pixel_bounds.is_empty());
+        let filter_integral = filter.integral();
+        let output_rgb_from_sensor_rgb = color_space.rgb_from_xyz * sensor.xyz_from_sensor_rgb;
+        let pixels = Vec2d::from_bounds(pixel_bounds);
+        let base = FilmBase::new(
+            full_resolution,
+            pixel_bounds,
+            filter,
+            diagonal,
+            sensor,
+            filename,
+        );
+        // TODO film_pixel_memory ?
+        RgbFilm {
+            base,
+            color_space,
+            max_component_value,
+            write_fp16,
+            filter_integral,
+            output_rgb_from_sensor_rgb,
+            pixels,
+        }
+    }
+}
+
+impl FilmI for RgbFilm {
+    fn add_sample(
+        &mut self,
+        p_film: &Point2i,
+        l: &SampledSpectrum,
+        lambda: &SampledWavelengths,
+        _visible_surface: &Option<VisibleSurface>,
+        weight: Float,
+    ) {
+        // convert sample radiance for PixelSensor RGB
+        let rgb = self.base.sensor.to_sensor_rgb(l, lambda);
+        // Optionally clamp sensor RGB value
+        // This is principally to avoid firefly effects in monte carlo integration.
+        debug_assert!(!rgb.has_nan());
+        let m = Float::max(Float::max(rgb.r, rgb.b), rgb.b);
+        let rgb = if m > self.max_component_value {
+            rgb * self.max_component_value / m
+        } else {
+            rgb
+        };
+
+        // Update pixel values with filtered sample contribution
+        let pixel = self.pixels.get_mut(*p_film);
+        for c in 0..3 {
+            pixel.rgb_sum[c] += (weight * rgb[c]) as f64
+        }
+        pixel.weight_sum += weight as f64;
+    }
+
+    fn add_splat(&mut self, p: &Point2f, l: &SampledSpectrum, lambda: &SampledWavelengths) {
+        // convert sample radiance for PixelSensor RGB
+        let rgb = self.base.sensor.to_sensor_rgb(l, lambda);
+        // Optionally clamp sensor RGB value
+        // This is principally to avoid firefly effects in monte carlo integration.
+        debug_assert!(!rgb.has_nan());
+        let m = Float::max(Float::max(rgb.r, rgb.b), rgb.b);
+        let rgb = if m > self.max_component_value {
+            rgb * self.max_component_value / m
+        } else {
+            rgb
+        };
+
+        // Compute bounds of affected pixels for splat, splat_bounds.
+        let p_discrete = p + Vector2f::new(0.5, 0.5);
+        let radius = self.base.filter.radius();
+        let splat_bounds = Bounds2i::new(
+            Point2i::from((p_discrete - radius).floor()),
+            Point2i::from((p_discrete + radius).floor()) + Vector2i::ONE,
+        );
+
+        let splat_bounds = splat_bounds
+            .intersect(&self.pixel_bounds())
+            .expect("Splat bounds expected to intersect pixel bounds but don't!");
+
+        // TODO would be better to have an iterator in Bounds2i that
+        // moved a Point2i to cover the whole region.
+        for x in splat_bounds.min.x..=splat_bounds.max.x {
+            for y in splat_bounds.min.y..=splat_bounds.max.y {
+                let pi = Point2i::new(x, y);
+                // Evaluate filter at _pi_ and add splat contribution
+                let wt = self.base.filter.evaluate(Point2f::from(
+                    *p - Point2f::from(pi) - Vector2f::new(0.5, 0.5),
+                ));
+                if wt != 0.0 {
+                    let pixel = self.pixels.get_mut(pi);
+                    for c in 0..3 {
+                        pixel.rgb_splat[c] += (wt * rgb[c]) as f64;
+                    }
+                }
+            }
+        }
+
+        // Note that unlike in add_sample(), no sum of filter weights is maintained;
+        // normalization is handled using the filter's integral.
+    }
+
+    fn full_resolution(&self) -> Point2i {
+        self.base.full_resolution
+    }
+
+    fn pixel_bounds(&self) -> Bounds2i {
+        self.base.pixel_bounds
+    }
+
+    fn sample_bounds(&self) -> Bounds2f {
+        self.base.sample_bounds()
+    }
+
+    fn diagonal(&self) -> Float {
+        self.base.diagonal
+    }
+
+    fn uses_visible_surface(&self) -> bool {
+        false
+    }
+
+    fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
+        self.base.sample_wavelengths(u)
+    }
+
+    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image {
+        // TODO fills in image using get_pixel_rgb() for each pixel's value.
+        todo!()
+    }
+
+    fn write_image(&self, metadata: &ImageMetadata, splat_scale: Float) {
+        // TODo call get_image then write it.
+        todo!()
+    }
+
+    fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> RGB {
+        let sensor_rgb = self.base.sensor.to_sensor_rgb(l, lambda);
+        self.output_rgb_from_sensor_rgb * sensor_rgb
+    }
+
+    fn get_pixel_rgb(&self, p: &Point2i, splat_scale: Float) -> RGB {
+        let pixel = self.pixels.get(*p);
+        let mut rgb = RGB::new(
+            pixel.rgb_sum[0] as Float,
+            pixel.rgb_sum[1] as Float,
+            pixel.rgb_sum[2] as Float,
+        );
+        // Normalize rgb with weight sum
+        let weight_sum = pixel.weight_sum;
+        if weight_sum != 0.0 {
+            rgb /= weight_sum as Float;
+        }
+        // Add splat value at pixel
+        for c in 0..3 {
+            rgb[c] += splat_scale * pixel.rgb_splat[c] as Float / self.filter_integral;
+        }
+        // Convert rgb to output color space
+        self.output_rgb_from_sensor_rgb * rgb
+    }
+
+    fn get_filter(&self) -> &Filter {
+        &self.base.filter
+    }
+
+    fn get_pixel_sensor(&self) -> &PixelSensor {
+        &self.base.sensor
+    }
+
+    fn get_filename(&self) -> &str {
+        &self.base.filename
+    }
+}
+
+#[derive(Debug)]
 pub struct PixelSensor {
     pub xyz_from_sensor_rgb: SquareMatrix<3>,
     /// The red RGB matching function
@@ -209,6 +556,10 @@ impl PixelSensor {
     }
 }
 
+// TODO I don't think I plan to implement anything but RgbFilm for quite some time,
+// which doesn't use VisibleSurface. I shouldn't have implemented it in the first place
+// since it won't get used - so maybe delete it now until we'll implement the GBufferFilm?
+// That's only really useful for certain algorithms.
 /// Information about a point on a surface which is visible from the camera.
 pub struct VisibleSurface {
     /// Point in space
@@ -260,6 +611,10 @@ impl VisibleSurface {
             albedo: albedo.clone(),
             set,
         }
+    }
+
+    pub fn set(&self) -> bool {
+        self.set
     }
 }
 

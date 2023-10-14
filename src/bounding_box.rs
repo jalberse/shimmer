@@ -17,7 +17,7 @@ pub type Bounds2f = Bounds2<Point2f, Vector2f>;
 pub type Bounds3i = Bounds3<Point3i, Vector3i>;
 pub type Bounds3f = Bounds3<Point3f, Vector3f>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Bounds2<P, V> {
     pub min: P,
     pub max: P,

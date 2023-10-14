@@ -341,13 +341,8 @@ impl ProjectiveCameraBase {
         screen_from_camera: Transform,
         screen_window: Bounds2f,
     ) -> ProjectiveCameraBase {
-        let camera_base = CameraBase::new(
-            camera_transform,
-            shutter_open,
-            shutter_close,
-            film.clone(),
-            medium,
-        );
+        let camera_base =
+            CameraBase::new(camera_transform, shutter_open, shutter_close, film, medium);
         let ndc_from_screen = Transform::scale(
             1.0 / (screen_window.max.x - screen_window.min.x),
             1.0 / (screen_window.max.y - screen_window.min.y),
@@ -358,8 +353,8 @@ impl ProjectiveCameraBase {
             1.0,
         ));
         let raster_from_ndc = Transform::scale(
-            film.full_resolution().x as Float,
-            -film.full_resolution().y as Float,
+            camera_base.film.full_resolution().x as Float,
+            -camera_base.film.full_resolution().y as Float,
             1.0,
         );
         let raster_from_screen = raster_from_ndc * ndc_from_screen;

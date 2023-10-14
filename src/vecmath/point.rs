@@ -658,6 +658,24 @@ impl Default for Point2f {
     }
 }
 
+impl From<Point2i> for Point2f {
+    fn from(value: Point2i) -> Self {
+        Point2f {
+            x: value.x as Float,
+            y: value.y as Float,
+        }
+    }
+}
+
+impl From<Point2f> for Point2i {
+    fn from(value: Point2f) -> Self {
+        Point2i {
+            x: value.x as i32,
+            y: value.y as i32,
+        }
+    }
+}
+
 impl_op_ex!(-|p: &Point2f| -> Point2f { Point2f::new(-p.x, -p.y) });
 
 // Points can be scaled elementwise
