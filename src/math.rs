@@ -308,17 +308,17 @@ pub fn linear_least_squares_helper<const N: usize, const ROWS: usize>(
     a: &[[Float; N]; ROWS],
     b: &[[Float; N]; ROWS],
 ) -> (SquareMatrix<N>, SquareMatrix<N>) {
-    let mut AtA = SquareMatrix::<N>::default();
-    let mut AtB = SquareMatrix::<N>::default();
+    let mut a_t_a = SquareMatrix::<N>::default();
+    let mut a_t_b = SquareMatrix::<N>::default();
     for i in 0..N {
         for j in 0..N {
             for r in 0..ROWS {
-                AtA[i][j] += a[r][i] * a[r][j];
-                AtB[i][j] += a[r][i] * b[r][j];
+                a_t_a[i][j] += a[r][i] * a[r][j];
+                a_t_b[i][j] += a[r][i] * b[r][j];
             }
         }
     }
-    (AtA, AtB)
+    (a_t_a, a_t_b)
 }
 
 #[cfg(test)]
