@@ -370,14 +370,30 @@ impl FilmI for RgbFilm {
         self.base.sample_wavelengths(u)
     }
 
-    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image {
+    // TODO we can write the ImageMetadata into a # comment in PPM files. But maybe just don't for now,
+    // and handle metadata when we get a "real" image format going.
+    fn get_image(&self, _metadata: &ImageMetadata, splat_scale: Float) -> Image {
         // TODO fills in image using get_pixel_rgb() for each pixel's value.
-        todo!()
+        // TODO can parallelize
+        let mut image = Image::new(self.pixel_bounds());
+
+        for x in self.pixel_bounds().min.x..=self.pixel_bounds().max.x {
+            for y in self.pixel_bounds().min.y..=self.pixel_bounds().max.y {
+                let p = Point2i::new(x, y);
+                let rgb = self.get_pixel_rgb(&p, splat_scale);
+                let offset = Point2i::new(
+                    p.x - self.pixel_bounds().min.x,
+                    p.y - self.pixel_bounds().min.y,
+                );
+                image.data.set(offset, rgb);
+            }
+        }
+        image
     }
 
-    fn write_image(&self, metadata: &ImageMetadata, splat_scale: Float) {
-        // TODo call get_image then write it.
-        todo!()
+    fn write_image(&self, _metadata: &ImageMetadata, splat_scale: Float) {
+        let image = self.get_image(_metadata, splat_scale);
+        image.write();
     }
 
     fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> RGB {

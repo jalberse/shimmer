@@ -208,6 +208,14 @@ where
     pub fn is_degenerate(&self) -> bool {
         self.min.x() > self.max.x() || self.min.y() > self.max.y()
     }
+
+    pub fn width(&self) -> P::ElementType {
+        self.max.x() - self.min.x()
+    }
+
+    pub fn height(&self) -> P::ElementType {
+        self.max.y() - self.min.y()
+    }
 }
 
 impl<P: Point2, V: Vector2> Default for Bounds2<P, V> {

@@ -185,6 +185,7 @@ impl_op_ex!(/=|a: &mut XYZ, b: &Float| {
     a.z /= b;
 });
 
+#[derive(Debug, Copy, Clone)]
 pub struct RGB {
     pub r: Float,
     pub g: Float,

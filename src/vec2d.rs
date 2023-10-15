@@ -27,6 +27,11 @@ where
         self.data[(y * width + x) as usize].clone()
     }
 
+    pub fn get_xy(&self, x: i32, y: i32) -> T {
+        let width = self.width();
+        self.data[(y * width + x) as usize].clone()
+    }
+
     pub fn get_mut(&mut self, p: Point2i) -> &mut T {
         let (x, y) = self.xy(p);
         let width = self.width();
@@ -47,5 +52,9 @@ where
         let x = p.x - self.extent.min.x;
         let y = p.y - self.extent.min.y;
         (x, y)
+    }
+
+    pub fn extent(&self) -> Bounds2i {
+        self.extent
     }
 }
