@@ -97,63 +97,93 @@ impl FilmI for Film {
         visible_surface: &Option<VisibleSurface>,
         weight: Float,
     ) {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.add_sample(p_film, l, lambda, visible_surface, weight),
+        }
     }
 
     fn add_splat(&mut self, p: &Point2f, l: &SampledSpectrum, lambda: &SampledWavelengths) {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.add_splat(p, l, lambda),
+        }
     }
 
     fn full_resolution(&self) -> Point2i {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.full_resolution(),
+        }
     }
 
     fn pixel_bounds(&self) -> Bounds2i {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.pixel_bounds(),
+        }
     }
 
     fn sample_bounds(&self) -> Bounds2f {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.sample_bounds(),
+        }
     }
 
     fn diagonal(&self) -> Float {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.diagonal(),
+        }
     }
 
     fn uses_visible_surface(&self) -> bool {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.uses_visible_surface(),
+        }
     }
 
     fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.sample_wavelengths(u),
+        }
     }
 
     fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.get_image(metadata, splat_scale),
+        }
     }
 
     fn write_image(&self, metadata: &ImageMetadata, splat_scale: Float) {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.write_image(metadata, splat_scale),
+        }
     }
 
     fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> RGB {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.to_output_rgb(l, lambda),
+        }
     }
 
     fn get_pixel_rgb(&self, p: &Point2i, splat_scale: Float) -> RGB {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.get_pixel_rgb(p, splat_scale),
+        }
     }
 
     fn get_filter(&self) -> &Filter {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.get_filter(),
+        }
     }
 
     fn get_pixel_sensor(&self) -> &PixelSensor {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.get_pixel_sensor(),
+        }
     }
 
     fn get_filename(&self) -> &str {
-        todo!()
+        match self {
+            Film::RgbFilm(f) => f.get_filename(),
+        }
     }
 }
 
