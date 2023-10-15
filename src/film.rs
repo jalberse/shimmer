@@ -270,7 +270,7 @@ impl RgbFilm {
         filter: Filter,
         diagonal: Float,
         sensor: PixelSensor,
-        filename: String,
+        filename: &str,
         color_space: RgbColorSpace,
         max_component_value: Float,
         write_fp16: bool,
@@ -285,7 +285,7 @@ impl RgbFilm {
             filter,
             diagonal,
             sensor,
-            filename,
+            filename.to_owned(),
         );
         // TODO film_pixel_memory ?
         RgbFilm {
@@ -356,8 +356,8 @@ impl FilmI for RgbFilm {
 
         // TODO would be better to have an iterator in Bounds2i that
         // moved a Point2i to cover the whole region.
-        for x in splat_bounds.min.x..=splat_bounds.max.x {
-            for y in splat_bounds.min.y..=splat_bounds.max.y {
+        for x in splat_bounds.min.x..splat_bounds.max.x {
+            for y in splat_bounds.min.y..splat_bounds.max.y {
                 let pi = Point2i::new(x, y);
                 // Evaluate filter at _pi_ and add splat contribution
                 let wt = self.base.filter.evaluate(Point2f::from(
@@ -407,8 +407,8 @@ impl FilmI for RgbFilm {
         // TODO can parallelize
         let mut image = Image::new(self.pixel_bounds());
 
-        for x in self.pixel_bounds().min.x..=self.pixel_bounds().max.x {
-            for y in self.pixel_bounds().min.y..=self.pixel_bounds().max.y {
+        for x in self.pixel_bounds().min.x..self.pixel_bounds().max.x {
+            for y in self.pixel_bounds().min.y..self.pixel_bounds().max.y {
                 let p = Point2i::new(x, y);
                 let rgb = self.get_pixel_rgb(&p, splat_scale);
                 let offset = Point2i::new(

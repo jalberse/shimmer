@@ -10,7 +10,9 @@ use crate::{
     vecmath::{Point2f, Tuple2},
 };
 
-#[derive(Debug, PartialEq)]
+// TODO I derived Clone for the construction of Film; but I think we might want to wrap the RgbColorSpace in an Rc instead?
+// I'd rather have one copy than many, but it shouldn't be that expensive to clone either.
+#[derive(Debug, PartialEq, Clone)]
 pub struct RgbColorSpace {
     /// Red primary
     pub r: Point2f,
