@@ -3,7 +3,7 @@ use rgb2spec::{self, RGB2Spec};
 
 use crate::color::RGB;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Gamut {
     SRGB,
     XYZ,

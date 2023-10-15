@@ -484,7 +484,7 @@ impl SpectrumI for RgbUnboundedSpectrum {
 pub struct RgbIlluminantSpectrum {
     scale: Float,
     rsp: RgbSigmoidPolynomial,
-    illuminant: Arc<DenselySampled>,
+    illuminant: Arc<Spectrum>,
 }
 
 impl RgbIlluminantSpectrum {
@@ -684,7 +684,6 @@ mod tests {
         assert_approx_eq!(Float, 50.0, spectrum.get(590.0));
     }
 
-    // TODO Do other spectra tests.
     #[test]
     fn spectrum_max_value() {
         assert_eq!(2.5, Constant::new(2.5).max_value());

@@ -6,7 +6,11 @@ use super::{
     NUM_SPECTRUM_SAMPLES,
 };
 
-use crate::{math::lerp, Float};
+use crate::{
+    math::lerp,
+    sampling::{sample_visible_wavelengths, visible_wavelengths_pdf},
+    Float,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct SampledWavelengths {
@@ -47,6 +51,22 @@ impl SampledWavelengths {
             pdf[i] = 1.0 / (lambda_max - lambda_min)
         }
 
+        SampledWavelengths { lambda, pdf }
+    }
+
+    pub fn sample_visible(u: Float) -> SampledWavelengths {
+        let mut lambda = [0.0; NUM_SPECTRUM_SAMPLES];
+        let mut pdf = [0.0; NUM_SPECTRUM_SAMPLES];
+
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            // Takes uniform steps across [0, 1.0] before sampling each wavelength.
+            let mut up = u + (i as Float) / (NUM_SPECTRUM_SAMPLES as Float);
+            if up > 1.0 {
+                up -= 1.0;
+            }
+            lambda[i] = sample_visible_wavelengths(up);
+            pdf[i] = visible_wavelengths_pdf(lambda[i]);
+        }
         SampledWavelengths { lambda, pdf }
     }
 

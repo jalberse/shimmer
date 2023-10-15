@@ -3,6 +3,7 @@ use auto_ops::impl_op_ex;
 use crate::{
     bounding_box::Bounds3f,
     frame::Frame,
+    ray::{Ray, RayDifferential},
     square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f},
     Float,
@@ -98,6 +99,11 @@ impl Transform {
             [0.0, 0.0, 0.0, 1.0],
         ]);
         Self::new(m, m_inv)
+    }
+
+    pub fn orthographic(z_near: Float, z_far: Float) -> Transform {
+        Transform::scale(1.0, 1.0, 1.0 / (z_far - z_near))
+            * Transform::translate(Vector3f::new(0.0, 0.0, -z_near))
     }
 
     pub fn has_scale(&self) -> bool {
@@ -364,7 +370,22 @@ impl Transform {
         Self::apply_n_helper(&self.m, n)
     }
 
-    // TODO ray transforms
+    // TODO ray transforms. Requires Interval, and Point<Interval>
+    pub fn apply_r(&self, r: &Ray) -> Ray {
+        todo!()
+    }
+
+    pub fn apply_r_inv(&self, r: &Ray) -> Ray {
+        todo!()
+    }
+
+    pub fn apply_rd(&self, r: &RayDifferential) -> RayDifferential {
+        todo!()
+    }
+
+    pub fn apply_rd_inv(&self, r: &RayDifferential) -> RayDifferential {
+        todo!()
+    }
 
     pub fn apply_bb(&self, bb: &Bounds3f) -> Bounds3f {
         // TODO this could be made more efficient.

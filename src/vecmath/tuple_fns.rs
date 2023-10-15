@@ -1,11 +1,14 @@
 //! A set of functions which help us implement the tuple traits for various types,
 //! but that we don't want exposed external to the vecmath module.
 
-use std::ops::{Add, Sub};
+use std::{
+    ops::{Add, Mul, Neg, Sub},
+    process::Output,
+};
 
 use crate::{
     float::PI_F,
-    math::{difference_of_products, safe_asin, sum_of_products, MulAdd},
+    math::{safe_asin, DifferenceOfProducts, IsNeg, MulAdd},
     Float,
 };
 
@@ -37,16 +40,17 @@ where
 /// V1: A vector (e.g. Vector3f or a Normal3f).
 /// V2: A vector (e.g. Vector3f or a Normal3f).
 /// V3: The type of the output cross product.
-pub fn cross<V1, V2, V3>(v1: &V1, v2: &V2) -> V3
+pub fn cross<V1, V2, V3, E>(v1: &V1, v2: &V2) -> V3
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
-    V3: Tuple3<Float>,
+    V1: Tuple3<E>,
+    V2: Tuple3<E>,
+    V3: Tuple3<E>,
+    E: TupleElement + DifferenceOfProducts,
 {
     V3::new(
-        difference_of_products(v1.y(), v2.z(), v1.z(), v2.y()),
-        difference_of_products(v1.z(), v2.x(), v1.x(), v2.z()),
-        difference_of_products(v1.x(), v2.y(), v1.y(), v2.x()),
+        E::difference_of_products(v1.y(), v2.z(), v1.z(), v2.y()),
+        E::difference_of_products(v1.z(), v2.x(), v1.x(), v2.z()),
+        E::difference_of_products(v1.x(), v2.y(), v1.y(), v2.x()),
     )
 }
 
@@ -64,15 +68,16 @@ where
 }
 
 /// Take the dot product of two vectors.
-pub fn dot3<V1, V2>(v: &V1, w: &V2) -> Float
+pub fn dot3<V1, V2, E>(v: &V1, w: &V2) -> E
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
+    V1: Tuple3<E>,
+    V2: Tuple3<E>,
+    E: TupleElement + MulAdd + DifferenceOfProducts,
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
 
-    MulAdd::mul_add(v.x(), w.x(), sum_of_products(v.y(), w.y(), v.z(), w.z()))
+    <E as MulAdd>::mul_add(v.x(), w.x(), E::sum_of_products(v.y(), w.y(), v.z(), w.z()))
 }
 
 /// Take the dot product of two vectors.
@@ -88,12 +93,13 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-pub fn abs_dot3<V1, V2>(v: &V1, w: &V2) -> Float
+pub fn abs_dot3<V1, V2, E>(v: &V1, w: &V2) -> E
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
+    V1: Tuple3<E>,
+    V2: Tuple3<E>,
+    E: TupleElement + MulAdd + DifferenceOfProducts,
 {
-    Float::abs(dot3(v, w))
+    E::abs(dot3(v, w))
 }
 
 /// Take the dot product of two vectors then take the absolute value.
@@ -113,7 +119,7 @@ where
 {
     debug_assert!(!v.has_nan());
     debug_assert!(!w.has_nan());
-    sum_of_products(v.x(), w.x(), v.y(), w.y())
+    Float::sum_of_products(v.x(), w.x(), v.y(), w.y())
 }
 
 /// Take the dot product of two vectors.
@@ -156,17 +162,21 @@ where
 /// V3: The resulting type from adding or subtracting V1 and V2.
 ///   That is typically a Vector3f.
 ///   We just use the third type to be able to specify that that is the case.
-pub fn angle_between<'a, V1, V2, V3>(v1: &'a V1, v2: &'a V2) -> Float
+pub fn angle_between<'a, V1, V2, V3, E>(v1: &'a V1, v2: &'a V2) -> Float
 where
-    V1: Tuple3<Float>,
-    V2: Tuple3<Float>,
-    V3: Tuple3<Float> + Length<Float>,
+    V1: Tuple3<E>,
+    V2: Tuple3<E>,
+    V3: Tuple3<E> + Length<Float>,
     &'a V1: Add<&'a V2, Output = V3>,
     &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,
+    E: TupleElement + MulAdd + DifferenceOfProducts + Into<Float>,
 {
+    // TODO I think we could simplify the constraints on this function.
+    // E might be able to be omitted, and instead specified as a constraint on the ElementType of V1.
+    // We could also omit V3 by replacing it with the Output of V1 + V2, I think.
     debug_assert!(!v1.has_nan());
     debug_assert!(!v2.has_nan());
-    if dot3(v1, v2) < 0.0 {
+    if dot3(v1, v2).into() < 0.0 {
         PI_F - 2.0 * safe_asin((v1 + v2).length() / 2.0)
     } else {
         2.0 * safe_asin((v2 - v1).length() / 2.0)
@@ -187,5 +197,18 @@ where
         PI_F - 2.0 * safe_asin((v1 + v2).length() / 2.0)
     } else {
         2.0 * safe_asin((v2 - v1).length() / 2.0)
+    }
+}
+
+pub fn face_forward<T1, T2, E>(a: &T1, b: &T2) -> T1
+where
+    T1: Tuple3<E> + Neg<Output = T1>,
+    T2: Tuple3<E>,
+    E: TupleElement + MulAdd + DifferenceOfProducts + IsNeg,
+{
+    if dot3(a, b).is_neg() {
+        -*a
+    } else {
+        *a
     }
 }

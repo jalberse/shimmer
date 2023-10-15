@@ -99,6 +99,8 @@ pub fn visible_wavelengths_pdf(lambda: Float) -> Float {
     0.0039398042 / (x * x)
 }
 
+// TODO get_camera_sample() pg 516; need to implement the Sampler interface/enum first.
+
 #[cfg(test)]
 mod tests {
     use crate::sampling::visible_wavelengths_pdf;

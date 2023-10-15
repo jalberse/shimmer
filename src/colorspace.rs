@@ -10,7 +10,9 @@ use crate::{
     vecmath::{Point2f, Tuple2},
 };
 
-#[derive(Debug, PartialEq)]
+// TODO I derived Clone for the construction of Film; but I think we might want to wrap the RgbColorSpace in an Rc instead?
+// I'd rather have one copy than many, but it shouldn't be that expensive to clone either.
+#[derive(Debug, PartialEq, Clone)]
 pub struct RgbColorSpace {
     /// Red primary
     pub r: Point2f,
@@ -19,7 +21,7 @@ pub struct RgbColorSpace {
     /// Blue primary
     pub b: Point2f,
     pub whitepoint: Point2f,
-    pub illuminant: Arc<DenselySampled>,
+    pub illuminant: Arc<Spectrum>,
     pub xyz_from_rgb: SquareMatrix<3>,
     pub rgb_from_xyz: SquareMatrix<3>,
     /// This is analogous to the RGBToSpectrumTable pointer used by PBRT;
@@ -68,7 +70,7 @@ impl RgbColorSpace {
             g,
             b,
             whitepoint,
-            illuminant: Arc::new(illuminant),
+            illuminant: Arc::new(Spectrum::DenselySampled(illuminant)),
             xyz_from_rgb,
             rgb_from_xyz,
             gamut,

@@ -17,7 +17,7 @@ pub type Bounds2f = Bounds2<Point2f, Vector2f>;
 pub type Bounds3i = Bounds3<Point3i, Vector3i>;
 pub type Bounds3f = Bounds3<Point3f, Vector3f>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Bounds2<P, V> {
     pub min: P,
     pub max: P,
@@ -207,6 +207,14 @@ where
 
     pub fn is_degenerate(&self) -> bool {
         self.min.x() > self.max.x() || self.min.y() > self.max.y()
+    }
+
+    pub fn width(&self) -> P::ElementType {
+        self.max.x() - self.min.x()
+    }
+
+    pub fn height(&self) -> P::ElementType {
+        self.max.y() - self.min.y()
     }
 }
 

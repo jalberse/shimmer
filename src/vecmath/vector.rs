@@ -5,15 +5,18 @@ use std::ops::{
 use super::has_nan::HasNan;
 use super::length::Length;
 use super::length_fns::{length2, length3, length_squared2, length_squared3};
-use super::normal::Normal3;
+use super::normal::{Normal3, Normal3fi};
 use super::normalize::Normalize;
+use super::point::Point3fi;
 use super::tuple::{Tuple2, Tuple3, TupleElement};
 use super::tuple_fns::{
     abs_dot2, abs_dot2i, abs_dot3, abs_dot3i, angle_between, angle_between2, cross, cross_i32,
-    dot2, dot2i, dot3, dot3i, has_nan2, has_nan3,
+    dot2, dot2i, dot3, dot3i, face_forward, has_nan2, has_nan3,
 };
 use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
+use crate::interval::Interval;
+use crate::is_nan::IsNan;
 use crate::math::lerp;
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
@@ -104,6 +107,10 @@ pub trait Vector3:
     /// w must be normalized.
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self;
+
+    fn face_forward(&self, v2: &Self) -> Self;
+
+    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self;
 }
 
 // ---------------------------------------------------------------------------
@@ -498,7 +505,10 @@ impl Vector3 for Vector3i {
     }
 
     fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float {
-        angle_between::<Vector3f, Normal3f, Vector3f>(&Vector3f::from(self), &Normal3f::from(n))
+        angle_between::<Vector3f, Normal3f, Vector3f, Float>(
+            &Vector3f::from(self),
+            &Normal3f::from(n),
+        )
     }
 
     /// Create a new vector orthogonal to w.
@@ -506,6 +516,14 @@ impl Vector3 for Vector3i {
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self {
         self - self.dot(w) * w
+    }
+
+    fn face_forward(&self, v2: &Self) -> Self {
+        face_forward(self, v2)
+    }
+
+    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
+        face_forward(self, n)
     }
 }
 
@@ -1079,14 +1097,14 @@ impl Vector3 for Vector3f {
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
     fn cross(&self, v: &Self) -> Self {
-        cross::<Vector3f, Vector3f, Vector3f>(self, v)
+        cross::<Vector3f, Vector3f, Vector3f, Float>(self, v)
     }
 
     /// Take the cross product of this and a normal n.
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
     fn cross_normal(&self, n: &Normal3f) -> Self {
-        cross::<Vector3f, Normal3f, Vector3f>(self, n)
+        cross::<Vector3f, Normal3f, Vector3f, Float>(self, n)
     }
 
     /// Find the andle between this vector and another vector.
@@ -1098,7 +1116,7 @@ impl Vector3 for Vector3f {
     /// Find the angle between this vector and a normal
     /// Both vectors must be normalized.
     fn angle_between_normal(&self, n: &Normal3f) -> Float {
-        angle_between::<Vector3f, Normal3f, Vector3f>(self, n)
+        angle_between::<Vector3f, Normal3f, Vector3f, Float>(self, n)
     }
 
     /// Create a new vector orthogonal to w.
@@ -1106,6 +1124,14 @@ impl Vector3 for Vector3f {
     /// See PBRTv4 3.2
     fn gram_schmidt(&self, w: &Self) -> Self {
         self - self.dot(w) * w
+    }
+
+    fn face_forward(&self, v2: &Self) -> Self {
+        face_forward(self, v2)
+    }
+
+    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
+        face_forward(self, n)
     }
 }
 
@@ -1245,6 +1271,250 @@ impl From<Vector3f> for (Float, Float, Float) {
 impl From<&Vector3i> for Vector3f {
     fn from(value: &Vector3i) -> Self {
         Self::new(value.x as Float, value.y as Float, value.z as Float)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Vector3fi {
+    x: Interval,
+    y: Interval,
+    z: Interval,
+}
+
+impl Vector3fi {
+    pub fn from_value_and_error(val: Vector3f, err: Vector3f) -> Vector3fi {
+        Vector3fi {
+            x: Interval::from_value_and_error(val.x, err.x),
+            y: Interval::from_value_and_error(val.y, err.y),
+            z: Interval::from_value_and_error(val.z, err.z),
+        }
+    }
+
+    pub fn error(&self) -> Vector3f {
+        Vector3f {
+            x: self.x.width() / 2.0,
+            y: self.y.width() / 2.0,
+            z: self.z.width() / 2.0,
+        }
+    }
+
+    pub fn is_exact(&self) -> bool {
+        self.x.width() == 0.0 && self.y.width() == 0.0 && self.z.width() == 0.0
+    }
+}
+
+impl Tuple3<Interval> for Vector3fi {
+    fn new(x: Interval, y: Interval, z: Interval) -> Self {
+        Vector3fi { x, y, z }
+    }
+
+    fn x(&self) -> Interval {
+        self.x
+    }
+
+    fn y(&self) -> Interval {
+        self.y
+    }
+
+    fn z(&self) -> Interval {
+        self.z
+    }
+
+    fn x_ref(&self) -> &Interval {
+        &self.x
+    }
+
+    fn y_ref(&self) -> &Interval {
+        &self.y
+    }
+
+    fn z_ref(&self) -> &Interval {
+        &self.z
+    }
+
+    fn x_mut(&mut self) -> &mut Interval {
+        &mut self.x
+    }
+
+    fn y_mut(&mut self) -> &mut Interval {
+        &mut self.y
+    }
+
+    fn z_mut(&mut self) -> &mut Interval {
+        &mut self.z
+    }
+
+    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+        Self {
+            x: lerp(t, &a.x, &b.x),
+            y: lerp(t, &a.y, &b.y),
+            z: lerp(t, &a.z, &b.z),
+        }
+    }
+}
+
+impl Vector3 for Vector3fi {
+    type ElementType = Interval;
+
+    type AssociatedNormalType = Normal3fi;
+
+    fn dot(&self, v: &Self) -> Self::ElementType {
+        dot3(self, v)
+    }
+
+    fn dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType {
+        dot3(self, n)
+    }
+
+    fn abs_dot(&self, v: &Self) -> Self::ElementType {
+        abs_dot3(self, v)
+    }
+
+    fn abs_dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType {
+        abs_dot3(self, n)
+    }
+
+    fn cross(&self, v: &Self) -> Self {
+        cross::<Vector3fi, Vector3fi, Vector3fi, Interval>(self, v)
+    }
+
+    fn cross_normal(&self, n: &Self::AssociatedNormalType) -> Self {
+        cross::<Vector3fi, Normal3fi, Vector3fi, Interval>(self, n)
+    }
+
+    fn angle_between(&self, v: &Self) -> Float {
+        angle_between::<Vector3fi, Vector3fi, Vector3fi, Interval>(self, v)
+    }
+
+    fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float {
+        angle_between::<Vector3fi, Normal3fi, Vector3fi, Interval>(self, n)
+    }
+
+    fn gram_schmidt(&self, w: &Self) -> Self {
+        // TODO should make a generic version. It should cover both Vector2 and Vector3.
+        // Can do that when we rework this whole module, though.
+        self - self.dot(w) * w
+    }
+
+    fn face_forward(&self, v2: &Self) -> Self {
+        face_forward(self, v2)
+    }
+
+    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
+        face_forward(self, n)
+    }
+}
+
+impl Length<Float> for Vector3fi {
+    fn length_squared(&self) -> Float {
+        length_squared3(self).into()
+    }
+
+    fn length(&self) -> Float {
+        length3(self).into()
+    }
+}
+
+impl HasNan for Vector3fi {
+    fn has_nan(&self) -> bool {
+        self.x.is_nan() || self.y.is_nan() || self.z.is_nan()
+    }
+}
+
+impl Index<usize> for Vector3fi {
+    type Output = Interval;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        debug_assert!(index == 0 || index == 1 || index == 2);
+        if index == 0 {
+            &self.x
+        } else if index == 1 {
+            &self.y
+        } else {
+            &self.z
+        }
+    }
+}
+
+impl IndexMut<usize> for Vector3fi {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        debug_assert!(index == 0 || index == 1 || index == 2);
+        if index == 0 {
+            &mut self.x
+        } else if index == 1 {
+            &mut self.y
+        } else {
+            &mut self.z
+        }
+    }
+}
+
+// Vectors can be negated
+impl_op_ex!(-|v: &Vector3fi| -> Vector3fi { Vector3fi::new(-v.x, -v.y, -v.z) });
+// Vectors can add and subtract with other vectors
+impl_op_ex!(+ |v1: &Vector3fi, v2: &Vector3fi| -> Vector3fi {
+    Vector3fi::new(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z)});
+impl_op_ex!(-|v1: &Vector3fi, v2: &Vector3fi| -> Vector3fi {
+    Vector3fi::new(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z)
+});
+impl_op_ex!(+= |v1: &mut Vector3fi, v2: &Vector3fi| {
+    v1.x += v2.x;
+    v1.y += v2.y;
+    v1.z += v2.z;
+});
+impl_op_ex!(-= |n1: &mut Vector3fi, n2: &Vector3fi| {
+    n1.x -= n2.x;
+    n1.y -= n2.y;
+    n1.z -= n2.z;
+});
+
+// Vectors can be scaled
+impl_op_ex_commutative!(*|v: &Vector3fi, s: Interval| -> Vector3fi {
+    Vector3fi::new(v.x * s, v.y * s, v.z * s)
+});
+impl_op_ex!(/ |v: &Vector3fi, s: Interval| -> Vector3fi { Vector3fi::new(v.x / s, v.y / s, v.z / s) });
+impl_op_ex!(+= |v1: &mut Vector3fi, s: Interval| {
+    v1.x += s;
+    v1.y += s;
+    v1.z += s;
+});
+impl_op_ex!(*= |v1: &mut Vector3fi, s: Interval| {
+    v1.x *= s;
+    v1.y *= s;
+    v1.z *= s;
+});
+impl_op_ex!(/= |v1: &mut Vector3fi, s: Interval| {
+    v1.x /= s;
+    v1.y /= s;
+    v1.z /= s;
+});
+impl_op_ex!(*= |v1: &mut Vector3fi, v2: &Vector3fi| {
+    v1.x *= v2.x;
+    v1.y *= v2.y;
+    v1.z *= v2.z;
+});
+impl_op_ex!(/= |v1: &mut Vector3fi, v2: &Vector3fi| {
+    v1.x /= v2.x;
+    v1.y /= v2.y;
+    v1.z /= v2.z;
+});
+impl_op_ex!(/ |v1: &Vector3fi, v2: &Vector3fi| -> Vector3fi{
+    Vector3fi::new(
+        v1.x / v2.x,
+        v1.y / v2.y,
+        v1.z / v2.z)
+});
+impl_op_ex!(*|v1: &Vector3fi, v2: &Vector3fi| -> Vector3fi {
+    Vector3fi::new(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z)
+});
+
+impl From<Point3fi> for Vector3fi {
+    fn from(value: Point3fi) -> Self {
+        Vector3fi {
+            x: value.x(),
+            y: value.y(),
+            z: value.z(),
+        }
     }
 }
 
