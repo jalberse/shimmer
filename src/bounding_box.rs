@@ -1,6 +1,7 @@
 use std::{marker::PhantomData, ops::Index};
 
 use crate::{
+    float::gamma,
     math::{lerp, Max, NumericLimit, Sqrt},
     sphere::Sphere,
     Float,
@@ -480,24 +481,85 @@ where
     pub fn is_degenerate(&self) -> bool {
         self.min.x() > self.max.x() || self.min.y() > self.max.y() || self.min.z() > self.max.z()
     }
+}
 
+impl Bounds3<Point3f, Vector3f> {
     /// Returns the two parametric times (hit_time_0, hit_time_1) that the given ray
     /// intersects with these bounds. Intersections outside of (0, t_max) are ignored.
     /// If the ray's origin is inside the box, 0 is returned for hit_time_0.
-    pub fn intersect_p(&self, o: Point3f, d: Vector3f, t_max: Float) -> HitTimes {
+    pub fn intersect_p(&self, o: Point3f, d: Vector3f, t_max: Float) -> Option<HitTimes> {
         let mut t0 = 0.0;
         let mut t1 = t_max;
         for i in 0..3 {
             // Update the interval for the ith bounding box slab, where
             // a slab is the region between two parallel planes
-            // TODO this
+            let inv_ray_dir = 1.0 / d[i];
+            let t_near = (self.min[i] - o[i]) * inv_ray_dir;
+            let t_far = (self.max[i] - o[i]) * inv_ray_dir;
+            // Update parametric interval from slap itnersection t values
+            let (t_near, t_far) = if t_near > t_far {
+                (t_far, t_near)
+            } else {
+                (t_near, t_far)
+            };
+            // Update t_far to ensure robust ray-bounds intersection
+            // This is not intuitive; see PBRTv4 6.8.2 "Conservative Ray-Bounds Intersections" pg 369.
+            let t_far = t_far * (1.0 + 2.0 * gamma(3));
+
+            t0 = if t_near > 0.0 { t_near } else { t0 };
+            t1 = if t_far < t1 { t_far } else { t1 };
+            if t0 > t1 {
+                return None;
+            }
         }
         let hit_t_0 = t0;
         let hit_t_1 = t1;
-        HitTimes {
+        Some(HitTimes {
             time_0: hit_t_0,
             time_1: hit_t_1,
+        })
+    }
+
+    /// Similar to intersect_p(), but allows for passing certain pre-calculated (ideally cached) values to avoid
+    /// some additional operations. This version also does not return the hit times.
+    /// Returns true if the ray segment is entirely isnide the bounding box, even if the intersections are
+    /// not within the ray's (0, t_max) range.
+    pub fn intersect_p_cached(
+        &self,
+        o: Point3f,
+        _d: Vector3f,
+        ray_t_max: Float,
+        inv_dir: Vector3f,
+        dir_is_neg: [usize; 3],
+    ) -> bool {
+        // Check for ray intersections with the x and y slabs
+        let t_min = (self[dir_is_neg[0]].x - o.x) * inv_dir.x;
+        let t_max = (self[1 - dir_is_neg[0]].x - o.x) * inv_dir.x;
+        let ty_min = (self[dir_is_neg[1]].y - o.y) * inv_dir.y;
+        let ty_max = (self[1 - dir_is_neg[1]].y - o.y) * inv_dir.y;
+        // Update the maximum values to ensure robust bounds intersection
+        let t_max = t_max * (1.0 + 2.0 * gamma(3));
+        let ty_max = ty_max * (1.0 + 2.0 * gamma(3));
+
+        if t_min > ty_max || ty_min > t_max {
+            return false;
         }
+        let t_min = if ty_min > t_min { ty_min } else { t_min };
+        let t_max = if ty_max < t_max { ty_max } else { t_max };
+
+        // Check for ray intersection
+        let tz_min = (self[dir_is_neg[2]].z - o.z) * inv_dir.z;
+        let tz_max = (self[1 - dir_is_neg[2]].z - o.z) * inv_dir.z;
+        // Update the maximum value to ensure robust bounds intersection
+        let tz_max = tz_max * (1.0 + 2.0 * gamma(3));
+
+        if t_min > tz_max || tz_min > t_max {
+            return false;
+        }
+        let t_min = if tz_min > t_min { tz_min } else { t_min };
+        let t_max = if tz_max < t_max { tz_max } else { t_max };
+
+        t_min < ray_t_max && t_max > 0.0
     }
 }
 
