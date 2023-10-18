@@ -197,7 +197,7 @@ impl Transform {
         }
     }
 
-    pub fn rotation(theta: Float, axis: &Vector3f) -> Transform {
+    pub fn rotate(theta: Float, axis: &Vector3f) -> Transform {
         Transform::rotate_helper(Float::sin(theta), Float::cos(theta), axis)
     }
 
@@ -370,7 +370,7 @@ impl Transform {
         Self::apply_n_helper(&self.m, n)
     }
 
-    // TODO ray transforms. Requires Interval, and Point<Interval>
+    // TODO ray transforms. Requires Interval, and Point<Interval> (we have those now, do it)
     pub fn apply_r(&self, r: &Ray) -> Ray {
         todo!()
     }

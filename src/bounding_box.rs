@@ -3,6 +3,7 @@ use std::{marker::PhantomData, ops::Index};
 use crate::{
     math::{lerp, Max, NumericLimit, Sqrt},
     sphere::Sphere,
+    Float,
 };
 
 use super::vecmath::{
@@ -479,6 +480,30 @@ where
     pub fn is_degenerate(&self) -> bool {
         self.min.x() > self.max.x() || self.min.y() > self.max.y() || self.min.z() > self.max.z()
     }
+
+    /// Returns the two parametric times (hit_time_0, hit_time_1) that the given ray
+    /// intersects with these bounds. Intersections outside of (0, t_max) are ignored.
+    /// If the ray's origin is inside the box, 0 is returned for hit_time_0.
+    pub fn intersect_p(&self, o: Point3f, d: Vector3f, t_max: Float) -> HitTimes {
+        let mut t0 = 0.0;
+        let mut t1 = t_max;
+        for i in 0..3 {
+            // Update the interval for the ith bounding box slab, where
+            // a slab is the region between two parallel planes
+            // TODO this
+        }
+        let hit_t_0 = t0;
+        let hit_t_1 = t1;
+        HitTimes {
+            time_0: hit_t_0,
+            time_1: hit_t_1,
+        }
+    }
+}
+
+pub struct HitTimes {
+    time_0: Float,
+    time_1: Float,
 }
 
 impl<P: Point3, V: Vector3> Default for Bounds3<P, V> {
