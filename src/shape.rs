@@ -4,8 +4,10 @@ use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
     interaction::{Interaction, SurfaceInteraction},
+    math::radians,
     ray::Ray,
-    vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},
+    transform::Transform,
+    vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Tuple3, Vector3f},
     Float,
 };
 
@@ -59,6 +61,12 @@ pub struct ShapeIntersection {
     pub t_hit: Float,
 }
 
+pub struct QuadricIntersection {
+    pub t_hit: Float,
+    pub p_obj: Point3f,
+    pub phi: Float,
+}
+
 pub struct ShapeSample {
     /// Interaction corresponding to the sampled point on the surface
     pub intr: Interaction,
@@ -106,6 +114,117 @@ impl ShapeSampleContext {
     }
 
     pub fn spawn_ray(w: Vector3f) -> Ray {
+        todo!()
+    }
+}
+
+pub struct Sphere {
+    radius: Float,
+    /// Minimum z value; can "cut off" the bottom of the sphere if < radius.
+    z_min: Float,
+    /// Maximum z value; can "cut off" the top of the sphere if > radius.
+    z_max: Float,
+    /// The theta corresponding to the minimum z value.
+    theta_z_min: Float,
+    /// The theta corresponding tot he maximum z value.
+    theta_z_max: Float,
+    /// phi can be limited to "cut off" to result in a partial sphere covering phi degrees. (0, 360).
+    phi_max: Float,
+    // TODO we probably want these to be an Rc to a cache of transforms
+    render_from_object: Transform,
+    object_from_render: Transform,
+    /// Reverses the orientation of the surface normals.
+    reverse_orientation: bool,
+    transform_swaps_handedness: bool,
+}
+
+impl Sphere {
+    pub fn new(
+        render_from_object: Transform,
+        object_from_render: Transform,
+        reverse_orientation: bool,
+        radius: Float,
+        z_min: Float,
+        z_max: Float,
+        phi_max: Float,
+    ) -> Sphere {
+        Sphere {
+            radius,
+            z_min: Float::clamp(Float::min(z_min, z_max), -radius, radius),
+            z_max: Float::clamp(Float::max(z_min, z_max), -radius, radius),
+            theta_z_min: Float::acos(Float::clamp(Float::min(z_min, z_max) / radius, -1.0, 1.0)),
+            theta_z_max: Float::acos(Float::clamp(Float::max(z_min, z_max) / radius, -1.0, 1.0)),
+            phi_max: radians(Float::clamp(phi_max, 0.0, 360.0)),
+            render_from_object,
+            object_from_render,
+            reverse_orientation,
+            transform_swaps_handedness: render_from_object.swaps_handedness(),
+        }
+    }
+}
+
+impl Sphere {
+    pub fn basic_intersect(&self, ray: &Ray, t_max: Float) -> Option<QuadricIntersection> {
+        let mut phi = 0.0;
+        let mut p_hit = 0.0;
+        // Transform ray origin and direction to object space
+        // TODO we need transformations on Point3fi and Vector3fi I think...
+        todo!()
+    }
+
+    pub fn interaction_from_intersection(
+        &self,
+        isect: &QuadricIntersection,
+        wo: Vector3f,
+        time: Float,
+    ) -> SurfaceInteraction {
+        todo!()
+    }
+}
+
+impl ShapeI for Sphere {
+    fn bounds(&self) -> Bounds3f {
+        // TODO could be made tighter when self.phi_max < 3pi/2.
+        self.render_from_object.apply_bb(&Bounds3f::new(
+            Point3f::new(-self.radius, -self.radius, self.z_min),
+            Point3f::new(self.radius, self.radius, self.z_max),
+        ))
+    }
+
+    fn normal_bounds(&self) -> DirectionCone {
+        DirectionCone::entire_sphere()
+    }
+
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
+        let isect = self.basic_intersect(ray, t_max)?;
+        let intr = self.interaction_from_intersection(&isect, -ray.d, ray.time);
+        Some(ShapeIntersection {
+            intr,
+            t_hit: isect.t_hit,
+        })
+    }
+
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
+        todo!()
+    }
+
+    fn area(&self) -> Float {
+        todo!()
+    }
+
+    fn sample(&self, u: Point2f) -> Option<ShapeSample> {
+        todo!()
+    }
+
+    fn pdf(&self, interaction: &Interaction) -> Float {
+        todo!()
+    }
+
+    fn sample_with_context(&self, ctx: &ShapeSampleContext, u: Point2f) -> Option<ShapeSample> {
+        todo!()
+    }
+
+    fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vector3f) -> Float {
         todo!()
     }
 }

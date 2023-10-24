@@ -1002,7 +1002,7 @@ pub struct Point3fi {
 }
 
 impl Point3fi {
-    pub fn from_value_and_error(val: Point3f, err: Point3f) -> Point3fi {
+    pub fn from_value_and_error(val: Point3f, err: Vector3f) -> Point3fi {
         Point3fi {
             x: Interval::from_value_and_error(val.x, err.x),
             y: Interval::from_value_and_error(val.y, err.y),
