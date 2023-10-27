@@ -282,23 +282,23 @@ impl CameraTransform {
     }
 
     pub fn camera_from_render_p(&self, p: &Point3f, _time: Float) -> Point3f {
-        self.render_from_camera.apply_p_inv(p)
+        self.render_from_camera.apply_inv(p)
     }
     pub fn camera_from_render_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
-        self.render_from_camera.apply_v_inv(v)
+        self.render_from_camera.apply_inv(v)
     }
     pub fn camera_from_render_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
-        self.render_from_camera.apply_n_inv(n)
+        self.render_from_camera.apply_inv(n)
     }
     pub fn camera_from_render_r(&self, r: &Ray, _time: Float) -> Ray {
-        self.render_from_camera.apply_r_inv(r)
+        self.render_from_camera.apply_inv(r)
     }
     pub fn camera_from_render_rd(&self, r: &RayDifferential, _time: Float) -> RayDifferential {
-        self.render_from_camera.apply_rd_inv(r)
+        self.render_from_camera.apply_inv(r)
     }
 
     pub fn render_from_world_p(&self, p: &Point3f) -> Point3f {
-        self.world_from_render.apply_p_inv(p)
+        self.world_from_render.apply_inv(p)
     }
 
     pub fn render_from_world(&self) -> Transform {
