@@ -3,11 +3,18 @@
 use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
+    float::{gamma, PI_F},
     interaction::{Interaction, SurfaceInteraction},
-    math::radians,
+    interval::Interval,
+    math::DifferenceOfProducts,
+    math::{radians, safe_acos, safe_sqrt, Sqrt},
     ray::Ray,
     transform::Transform,
-    vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Tuple3, Vector3f},
+    vecmath::{
+        point::{Point3, Point3fi},
+        vector::{Vector3, Vector3fi},
+        Length, Normal3f, Normalize, Point2f, Point3f, Tuple3, Vector3f,
+    },
     Float,
 };
 
@@ -165,11 +172,105 @@ impl Sphere {
 
 impl Sphere {
     pub fn basic_intersect(&self, ray: &Ray, t_max: Float) -> Option<QuadricIntersection> {
-        let mut phi = 0.0;
-        let mut p_hit = 0.0;
         // Transform ray origin and direction to object space
-        // TODO we need transformations on Point3fi and Vector3fi I think...
-        todo!()
+        let oi: Point3fi = self.object_from_render.apply_p(&ray.o).into();
+        let di: Vector3fi = self.object_from_render.apply_v(&ray.d).into();
+        // Solve quadratic equation to compute sphere t0 and t1
+
+        // Compute sphere quadric coefficients
+        let a: Interval = di.x().sqr() + di.y().sqr() + di.z().sqr();
+        let b: Interval = 2.0 * (di.x() * oi.x() + di.y() * oi.y() + di.z() * oi.z());
+        let c: Interval =
+            oi.x().sqr() + oi.y().sqr() + oi.z().sqr() - Interval::from(self.radius).sqr();
+        // Compute sphere quadratic discriminant
+        let v = Vector3fi::from(oi - b / (2.0 * a) * di);
+        let length = v.length();
+        let discrim = 4.0
+            * a
+            * (Interval::from(self.radius) + length)
+            * (Interval::from(self.radius) - length);
+        if discrim.lower_bound() < 0.0 {
+            return None;
+        }
+        // Compute quadratic t values
+        let root_discrim = discrim.sqrt();
+        let q = if Float::from(b) < 0.0 {
+            -0.5 * (b - root_discrim)
+        } else {
+            -0.5 * (b + root_discrim)
+        };
+        let t0 = q / a;
+        let t1 = c / q;
+        // Swap quadratic t values so that t0 is the lesser
+        let (t0, t1) = if t0.lower_bound() > t1.lower_bound() {
+            (t1, t0)
+        } else {
+            (t0, t1)
+        };
+        // Check quadric shape for nearest intersection.
+        if t0.upper_bound() > t_max || t1.lower_bound() <= 0.0 {
+            return None;
+        }
+        let mut t_shape_hit = t0;
+        if t_shape_hit.lower_bound() <= 0.0 {
+            t_shape_hit = t1;
+            if t_shape_hit.upper_bound() > t_max {
+                return None;
+            }
+        }
+
+        // Compute sphere hit position and phi
+        let mut p_hit = Point3f::from(oi) + Float::from(t_shape_hit) * Vector3f::from(di);
+        // Refine sphere intersection point
+        p_hit *= self.radius / p_hit.distance(&Point3f::ZERO);
+
+        if p_hit.x == 0.0 && p_hit.y == 0.0 {
+            p_hit.x = 1e-5 * self.radius;
+        }
+        let mut phi = Float::atan2(p_hit.y, p_hit.x);
+        if phi < 0.0 {
+            phi += 2.0 * PI_F;
+        }
+
+        // Test sphere intersection against clipping parameters
+        if (self.z_min > -self.radius && p_hit.z < self.z_min)
+            || (self.z_max < self.radius && p_hit.z > self.z_max)
+            || phi > self.phi_max
+        {
+            // Since t0 isn't valid, try again with t1
+            if t_shape_hit == t1 {
+                return None;
+            }
+            if t1.upper_bound() > t_max {
+                return None;
+            }
+            t_shape_hit = t1;
+            // Compute sphere hit position and phi
+            p_hit = Point3f::from(oi) + Float::from(t_shape_hit) * Vector3f::from(di);
+            // Refine sphere intersection point
+            p_hit *= self.radius / p_hit.distance(&Point3f::ZERO);
+
+            if p_hit.x == 0.0 && p_hit.y == 0.0 {
+                p_hit.x = 1e-5 * self.radius;
+            }
+            phi = Float::atan2(p_hit.y, p_hit.x);
+            if phi < 0.0 {
+                phi += 2.0 * PI_F;
+            }
+
+            if (self.z_min > -self.radius && p_hit.z < self.z_min)
+                || (self.z_max < self.radius && p_hit.z > self.z_max)
+                || phi > self.phi_max
+            {
+                return None;
+            }
+        }
+
+        Some(QuadricIntersection {
+            t_hit: Float::from(t_shape_hit),
+            p_obj: p_hit,
+            phi,
+        })
     }
 
     pub fn interaction_from_intersection(
@@ -178,6 +279,60 @@ impl Sphere {
         wo: Vector3f,
         time: Float,
     ) -> SurfaceInteraction {
+        let p_hit = isect.p_obj;
+        let phi = isect.phi;
+        // Find parametric representation of sphere hit
+        let u: Float = phi / self.phi_max;
+        let cos_theta = p_hit.z / self.radius;
+        let theta = safe_acos(cos_theta);
+        let v = (theta - self.theta_z_min) / (self.theta_z_max - self.theta_z_min);
+        // Compute sphere $\dpdu$ and $\dpdv$
+        let z_radius = Float::sqrt(p_hit.x() * p_hit.x() + p_hit.y() * p_hit.y());
+        let cos_phi = p_hit.x() / z_radius;
+        let sin_phi = p_hit.y() / z_radius;
+        let dpdu = Vector3f::new(-self.phi_max * p_hit.y(), self.phi_max * p_hit.x(), 0.0);
+        let sin_theta = safe_sqrt(1.0 - cos_theta * cos_theta);
+        let dpdv = (self.theta_z_max - self.theta_z_min)
+            * Vector3f::new(
+                p_hit.z() * cos_phi,
+                p_hit.z() * sin_phi,
+                -self.radius * sin_theta,
+            );
+
+        // Compute sphere $\dndu$ and $\dndv$
+        let d2Pduu = -self.phi_max * self.phi_max * Vector3f::new(p_hit.x(), p_hit.y(), 0.0);
+        let d2Pduv = (self.theta_z_max - self.theta_z_min)
+            * p_hit.z()
+            * self.phi_max
+            * Vector3f::new(-sin_phi, cos_phi, 0.);
+        let d2Pdvv = -((self.theta_z_max - self.theta_z_min)
+            * (self.theta_z_max - self.theta_z_min))
+            * Vector3f::new(p_hit.x(), p_hit.y(), p_hit.z());
+        // Compute coefficients for fundamental forms
+        let E1 = dpdu.dot(&dpdu);
+        let F1 = dpdu.dot(&dpdv);
+        let G1 = dpdv.dot(&dpdv);
+        let n = dpdu.cross(&dpdv).normalize();
+        let e = n.dot(&d2Pduu);
+        let f = n.dot(&d2Pduv);
+        let g = n.dot(&d2Pdvv);
+
+        // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
+        let EGF2 = Float::difference_of_products(E1, G1, F1, F1);
+        let invEGF2 = if EGF2 == 0.0 { 0.0 } else { 1.0 / EGF2 };
+        let dndu =
+            Normal3f::from((f * F1 - e * G1) * invEGF2 * dpdu + (e * F1 - f * E1) * invEGF2 * dpdv);
+        let dndv =
+            Normal3f::from((g * F1 - f * G1) * invEGF2 * dpdu + (f * F1 - g * E1) * invEGF2 * dpdv);
+
+        // Compute error bounds for sphere intersection
+        let p_error = gamma(5) * Vector3f::from(p_hit).abs();
+
+        // Return _SurfaceInteraction_ for quadric intersection
+        let flip_normal: bool = self.reverse_orientation ^ self.transform_swaps_handedness;
+        let wo_object = self.object_from_render.apply_v(&wo);
+        // TODO construct the SurfaceInteraction from this information
+        // TODO need to impl transform for surface itneraction so that we can transform back to render space
         todo!()
     }
 }
@@ -205,7 +360,7 @@ impl ShapeI for Sphere {
     }
 
     fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
-        todo!()
+        self.basic_intersect(ray, t_max).is_some()
     }
 
     fn area(&self) -> Float {
@@ -228,3 +383,5 @@ impl ShapeI for Sphere {
         todo!()
     }
 }
+
+// TODO Tests! Intersection tests should be pretty straightforward.

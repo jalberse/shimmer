@@ -1274,6 +1274,16 @@ impl From<&Vector3i> for Vector3f {
     }
 }
 
+impl From<Vector3fi> for Vector3f {
+    fn from(value: Vector3fi) -> Self {
+        Vector3f {
+            x: value.x.into(),
+            y: value.y.into(),
+            z: value.z.into(),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Vector3fi {
     x: Interval,
@@ -1445,6 +1455,16 @@ impl IndexMut<usize> for Vector3fi {
             &mut self.y
         } else {
             &mut self.z
+        }
+    }
+}
+
+impl From<Vector3f> for Vector3fi {
+    fn from(value: Vector3f) -> Self {
+        Vector3fi {
+            x: value.x.into(),
+            y: value.y.into(),
+            z: value.z.into(),
         }
     }
 }

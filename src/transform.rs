@@ -4,7 +4,7 @@ use crate::{
     bounding_box::Bounds3f,
     float::gamma,
     frame::Frame,
-    ray::{Ray, RayDifferential},
+    ray::{AuxiliaryRays, Ray, RayDifferential},
     square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{
         point::Point3fi,
@@ -312,6 +312,11 @@ impl Transform {
         s.determinant() < 0.0
     }
 
+    // TODO the far superior API (I just realized that I read an article about this, too)
+    // is to create a Transformable trait, and take a T: Transformable on ONE apply() function.
+    //  Then it just calls Transformable::apply() for the type. It moves implementations to
+    //  trait impls, rather than having to specify
+
     fn apply_p_helper(m: &SquareMatrix<4>, p: &Point3f) -> Point3f {
         // TODO We may need this to be generic on P: Point3. Until then, let's
         // stick with Point3f as concrete.
@@ -440,8 +445,6 @@ impl Transform {
         }
     }
 
-    // TODO apply_pi_inv()\
-
     pub fn apply_pi_inv(&self, p: Point3fi) -> Point3fi {
         let x: Float = p.x().into();
         let y: Float = p.y().into();
@@ -564,17 +567,45 @@ impl Transform {
         Vector3fi::from_value_and_error(Vector3f::new(xp, yp, zp), v_out_err)
     }
 
-    // TODO ray transforms. Requires Interval, and Point<Interval> (we have those now, do it)
+    // TODO note that we may also want a version that calculates a new t_max, or add that to this one
     pub fn apply_r(&self, r: &Ray) -> Ray {
-        todo!()
+        let o: Point3fi = self.apply_p(&r.o).into();
+        let d: Vector3fi = self.apply_v(&r.d).into();
+        // Offset ray origin to edge of error bounds and compute t_max
+        let length_squared = d.length_squared();
+        let o: Point3fi = if length_squared > 0.0 {
+            let dt = d.abs().dot(&o.error().into()) / length_squared;
+            o + d * dt
+        } else {
+            o
+        };
+        Ray::new_with_time(o.into(), d.into(), r.time, r.medium)
     }
 
     pub fn apply_r_inv(&self, r: &Ray) -> Ray {
         todo!()
     }
 
+    // TODO note we may also wanta versiont hat calculates the new t_max, or add that to this one
     pub fn apply_rd(&self, r: &RayDifferential) -> RayDifferential {
-        todo!()
+        // Get the transformed base ray
+        let tr: Ray = self.apply_r(&r.ray);
+        // Get the transformed aux rays, if any
+        let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &r.auxiliary {
+            let rx_origin = self.apply_p(&aux.rx_origin);
+            let rx_direction = self.apply_v(&aux.rx_direction);
+            let ry_origin = self.apply_p(&aux.ry_origin);
+            let ry_direction = self.apply_v(&aux.ry_direction);
+            Some(AuxiliaryRays::new(
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            ))
+        } else {
+            None
+        };
+        RayDifferential { ray: tr, auxiliary }
     }
 
     pub fn apply_rd_inv(&self, r: &RayDifferential) -> RayDifferential {
