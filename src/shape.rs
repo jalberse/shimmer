@@ -173,8 +173,8 @@ impl Sphere {
 impl Sphere {
     pub fn basic_intersect(&self, ray: &Ray, t_max: Float) -> Option<QuadricIntersection> {
         // Transform ray origin and direction to object space
-        let oi: Point3fi = self.object_from_render.apply_p(&ray.o).into();
-        let di: Vector3fi = self.object_from_render.apply_v(&ray.d).into();
+        let oi: Point3fi = self.object_from_render.apply(&ray.o).into();
+        let di: Vector3fi = self.object_from_render.apply(&ray.d).into();
         // Solve quadratic equation to compute sphere t0 and t1
 
         // Compute sphere quadric coefficients
@@ -330,7 +330,7 @@ impl Sphere {
 
         // Return _SurfaceInteraction_ for quadric intersection
         let flip_normal: bool = self.reverse_orientation ^ self.transform_swaps_handedness;
-        let wo_object = self.object_from_render.apply_v(&wo);
+        let wo_object = self.object_from_render.apply(&wo);
         // TODO construct the SurfaceInteraction from this information
         // TODO need to impl transform for surface itneraction so that we can transform back to render space
         todo!()
@@ -340,7 +340,7 @@ impl Sphere {
 impl ShapeI for Sphere {
     fn bounds(&self) -> Bounds3f {
         // TODO could be made tighter when self.phi_max < 3pi/2.
-        self.render_from_object.apply_bb(&Bounds3f::new(
+        self.render_from_object.apply(&Bounds3f::new(
             Point3f::new(-self.radius, -self.radius, self.z_min),
             Point3f::new(self.radius, self.radius, self.z_max),
         ))

@@ -102,7 +102,7 @@ impl DirectionCone {
         if wr.length_squared() == 0.0 {
             return DirectionCone::entire_sphere();
         }
-        let w = Transform::rotate(degrees(theta_r), &wr).apply_v(&self.w);
+        let w = Transform::rotate(degrees(theta_r), &wr).apply(&self.w);
         DirectionCone::new(w, Float::cos(theta_o))
     }
 }
