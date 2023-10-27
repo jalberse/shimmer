@@ -640,14 +640,48 @@ impl InverseTransformable for Point3fi {
 }
 
 impl InverseTransformable for Ray {
+    // TODO we likely want to include a t_max computation in here.
     fn apply_inverse(&self, transform: &Transform) -> Self {
-        todo!()
+        let o: Point3fi = Point3fi::from(self.o).apply_inverse(transform);
+        let d: Vector3f = self.d.apply_inverse(transform);
+        // Offset ray origin to edge of error bounds
+        // TODO And compute t_max
+        let length_squared = d.length_squared();
+        let o = if length_squared > 0.0 {
+            let o_error = Vector3f::new(
+                o.x().width() / 2.0,
+                o.y().width() / 2.0,
+                o.z().width() / 2.0,
+            );
+            let dt = d.abs().dot(&o_error) / length_squared;
+            o + (d * dt).into()
+        } else {
+            o
+        };
+        Ray::new_with_time(Point3f::from(o), d, self.time, self.medium)
     }
 }
 
 impl InverseTransformable for RayDifferential {
     fn apply_inverse(&self, transform: &Transform) -> Self {
-        todo!()
+        // Get the transformed base ray
+        let tr: Ray = transform.apply_inv(&self.ray);
+        // Get the transformed aux rays, if any
+        let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &self.auxiliary {
+            let rx_origin = transform.apply_inv(&aux.rx_origin);
+            let rx_direction = transform.apply_inv(&aux.rx_direction);
+            let ry_origin = transform.apply_inv(&aux.ry_origin);
+            let ry_direction = transform.apply_inv(&aux.ry_direction);
+            Some(AuxiliaryRays::new(
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            ))
+        } else {
+            None
+        };
+        RayDifferential { ray: tr, auxiliary }
     }
 }
 
