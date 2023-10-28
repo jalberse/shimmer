@@ -433,5 +433,27 @@ mod tests {
         assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
     }
 
-    // sphere_basic_with_transform()
+    #[test]
+    fn sphere_partial_basic() {
+        let sphere = Sphere::new(
+            Transform::default(),
+            Transform::default(),
+            false,
+            1.0,
+            -0.5,
+            0.5,
+            360.0,
+        );
+        let ray = Ray::new(Point3f::new(0.0, -2.0, 1e-5), Vector3f::Y, None);
+        assert!(sphere.intersect_predicate(&ray, Float::INFINITY));
+
+        let ray = Ray::new(ray.o, -ray.d, None);
+        assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
+
+        let ray = Ray::new(Point3f::new(0.0, 1e-5, 0.5001), Vector3f::Y, None);
+        assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
+
+        let ray = Ray::new(Point3f::new(0.0, 1e-5, -0.5001), Vector3f::Y, None);
+        assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
+    }
 }
