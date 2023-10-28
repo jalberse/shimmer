@@ -382,15 +382,15 @@ impl ShapeI for Sphere {
     }
 
     fn area(&self) -> Float {
-        todo!()
+        self.phi_max * self.radius * (self.z_max - self.z_min)
     }
 
     fn sample(&self, u: Point2f) -> Option<ShapeSample> {
         todo!()
     }
 
-    fn pdf(&self, interaction: &Interaction) -> Float {
-        todo!()
+    fn pdf(&self, _interaction: &Interaction) -> Float {
+        1.0 / self.area()
     }
 
     fn sample_with_context(&self, ctx: &ShapeSampleContext, u: Point2f) -> Option<ShapeSample> {
@@ -429,7 +429,7 @@ mod tests {
         let ray = Ray::new(ray.o, -ray.d, None);
         assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
 
-        let ray = Ray::new(Point3f::new(0.0, 1.1, -2.0), Vector3f::Z, None);
+        let ray = Ray::new(Point3f::new(0.0, 1.0001, -2.0), Vector3f::Z, None);
         assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
     }
 
