@@ -4,9 +4,11 @@ use crate::{
     bounding_box::Bounds3f,
     float::gamma,
     frame::Frame,
+    interaction::{Interaction, SurfaceInteraction, SurfaceInteractionShading},
     ray::{AuxiliaryRays, Ray, RayDifferential},
     square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{
+        normal::Normal3,
         point::Point3fi,
         vector::{Vector3, Vector3fi},
         Length, Normal3f, Normalize, Point3f, Tuple3, Vector3f,
@@ -542,6 +544,44 @@ impl Transformable for Bounds3f {
         }
 
         out
+    }
+}
+
+impl Transformable for SurfaceInteraction {
+    fn apply(&self, transform: &Transform) -> Self {
+        let t = transform.inverse();
+
+        let n = t.apply(&self.interaction.n).normalize();
+
+        SurfaceInteraction {
+            interaction: Interaction {
+                pi: transform.apply(&self.interaction.pi),
+                time: self.interaction.time,
+                wo: t.apply(&self.interaction.wo).normalize(),
+                n,
+                uv: self.interaction.uv,
+            },
+            dpdu: t.apply(&self.dpdu),
+            dpdv: t.apply(&self.dpdv),
+            dndu: t.apply(&self.dndu),
+            dndv: t.apply(&self.dndv),
+            shading: SurfaceInteractionShading {
+                n: t.apply(&self.shading.n).normalize().face_forward(&n),
+                dpdu: t.apply(&self.shading.dpdu),
+                dpdv: t.apply(&self.shading.dpdv),
+                dndu: t.apply(&self.shading.dndu),
+                dndv: t.apply(&self.shading.dndv),
+            },
+            face_index: self.face_index,
+            material: self.material,
+            area_light: self.area_light,
+            dpdx: t.apply(&self.dpdx),
+            dpdy: t.apply(&self.dpdy),
+            dudx: self.dudx,
+            dvdx: self.dvdx,
+            dudy: self.dudy,
+            dvdy: self.dvdy,
+        }
     }
 }
 
