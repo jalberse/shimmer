@@ -13,7 +13,7 @@ use crate::{
     vecmath::{
         point::{Point3, Point3fi},
         vector::{Vector3, Vector3fi},
-        Length, Normal3f, Normalize, Point2f, Point3f, Tuple3, Vector3f,
+        Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f,
     },
     Float,
 };
@@ -300,30 +300,32 @@ impl Sphere {
             );
 
         // Compute sphere $\dndu$ and $\dndv$
-        let d2Pduu = -self.phi_max * self.phi_max * Vector3f::new(p_hit.x(), p_hit.y(), 0.0);
-        let d2Pduv = (self.theta_z_max - self.theta_z_min)
+        let d2pduu = -self.phi_max * self.phi_max * Vector3f::new(p_hit.x(), p_hit.y(), 0.0);
+        let d2pduv = (self.theta_z_max - self.theta_z_min)
             * p_hit.z()
             * self.phi_max
             * Vector3f::new(-sin_phi, cos_phi, 0.);
-        let d2Pdvv = -((self.theta_z_max - self.theta_z_min)
+        let d2pdvv = -((self.theta_z_max - self.theta_z_min)
             * (self.theta_z_max - self.theta_z_min))
             * Vector3f::new(p_hit.x(), p_hit.y(), p_hit.z());
         // Compute coefficients for fundamental forms
-        let E1 = dpdu.dot(&dpdu);
-        let F1 = dpdu.dot(&dpdv);
-        let G1 = dpdv.dot(&dpdv);
+        let e1 = dpdu.dot(&dpdu);
+        let f1 = dpdu.dot(&dpdv);
+        let g1 = dpdv.dot(&dpdv);
         let n = dpdu.cross(&dpdv).normalize();
-        let e = n.dot(&d2Pduu);
-        let f = n.dot(&d2Pduv);
-        let g = n.dot(&d2Pdvv);
+        let e = n.dot(&d2pduu);
+        let f = n.dot(&d2pduv);
+        let g = n.dot(&d2pdvv);
 
         // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
-        let EGF2 = Float::difference_of_products(E1, G1, F1, F1);
-        let invEGF2 = if EGF2 == 0.0 { 0.0 } else { 1.0 / EGF2 };
-        let dndu =
-            Normal3f::from((f * F1 - e * G1) * invEGF2 * dpdu + (e * F1 - f * E1) * invEGF2 * dpdv);
-        let dndv =
-            Normal3f::from((g * F1 - f * G1) * invEGF2 * dpdu + (f * F1 - g * E1) * invEGF2 * dpdv);
+        let egf2 = Float::difference_of_products(e1, g1, f1, f1);
+        let env_egf2 = if egf2 == 0.0 { 0.0 } else { 1.0 / egf2 };
+        let dndu = Normal3f::from(
+            (f * f1 - e * g1) * env_egf2 * dpdu + (e * f1 - f * e1) * env_egf2 * dpdv,
+        );
+        let dndv = Normal3f::from(
+            (g * f1 - f * g1) * env_egf2 * dpdu + (f * f1 - g * e1) * env_egf2 * dpdv,
+        );
 
         // Compute error bounds for sphere intersection
         let p_error = gamma(5) * Vector3f::from(p_hit).abs();
@@ -331,9 +333,19 @@ impl Sphere {
         // Return _SurfaceInteraction_ for quadric intersection
         let flip_normal: bool = self.reverse_orientation ^ self.transform_swaps_handedness;
         let wo_object = self.object_from_render.apply(&wo);
-        // TODO construct the SurfaceInteraction from this information
-        // TODO need to impl transform for surface itneraction so that we can transform back to render space
-        todo!()
+
+        let si = SurfaceInteraction::new(
+            Point3fi::from_value_and_error(p_hit, p_error),
+            Point2f::new(u, v),
+            wo_object,
+            dpdu,
+            dpdv,
+            dndu,
+            dndv,
+            time,
+            flip_normal,
+        );
+        self.render_from_object.apply(&si)
     }
 }
 
@@ -383,5 +395,3 @@ impl ShapeI for Sphere {
         todo!()
     }
 }
-
-// TODO Tests! Intersection tests should be pretty straightforward.

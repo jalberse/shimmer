@@ -575,8 +575,16 @@ impl Transformable for SurfaceInteraction {
             face_index: self.face_index,
             material: self.material,
             area_light: self.area_light,
-            dpdx: t.apply(&self.dpdx),
-            dpdy: t.apply(&self.dpdy),
+            dpdx: if let Some(dpdx) = self.dpdx {
+                Some(t.apply(&dpdx))
+            } else {
+                None
+            },
+            dpdy: if let Some(dpdy) = self.dpdy {
+                Some(t.apply(&dpdy))
+            } else {
+                None
+            },
             dudx: self.dudx,
             dvdx: self.dvdx,
             dudy: self.dudy,
