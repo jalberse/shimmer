@@ -17,6 +17,7 @@ use crate::{
     },
     Float,
 };
+use log::warn;
 
 /// The Shape interface provides basic geometric properties of the primitive,
 /// such as its surface area and its ray intersection routine. The non-geometric
@@ -185,6 +186,11 @@ impl Sphere {
         // Compute sphere quadratic discriminant
         let v = Vector3fi::from(oi - b / (2.0 * a) * di);
         let length = v.length();
+        if length.is_nan() {
+            // This can occur with rays perfectly aimed at the center of the sphere.
+            warn!("Sphere intersection failed; intermediate NaN value");
+            return None;
+        }
         let discrim = 4.0
             * a
             * (Interval::from(self.radius) + length)
@@ -394,4 +400,38 @@ impl ShapeI for Sphere {
     fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vector3f) -> Float {
         todo!()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        ray::Ray,
+        shape::{ShapeI, Sphere},
+        transform::Transform,
+        vecmath::{Point3f, Tuple3, Vector3f},
+        Float,
+    };
+
+    #[test]
+    fn sphere_basic() {
+        let sphere = Sphere::new(
+            Transform::default(),
+            Transform::default(),
+            false,
+            1.0,
+            -1.0,
+            1.0,
+            360.0,
+        );
+        let ray = Ray::new(Point3f::new(0.0, 1e-5, -2.0), Vector3f::Z, None);
+        assert!(sphere.intersect_predicate(&ray, Float::INFINITY));
+
+        let ray = Ray::new(ray.o, -ray.d, None);
+        assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
+
+        let ray = Ray::new(Point3f::new(0.0, 1.1, -2.0), Vector3f::Z, None);
+        assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
+    }
+
+    // sphere_basic_with_transform()
 }
