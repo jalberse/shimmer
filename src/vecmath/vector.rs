@@ -1012,6 +1012,16 @@ impl Vector3f {
         z: -1.0,
     };
 
+    pub fn spherical_direction(sin_theta: Float, cos_theta: Float, phi: Float) -> Vector3f {
+        debug_assert!(sin_theta >= -1.0001 && sin_theta <= 1.0001);
+        debug_assert!(cos_theta >= -1.0001 && cos_theta <= 1.0001);
+        Vector3f::new(
+            sin_theta.clamp(-1.0, 1.0) * Float::cos(phi),
+            sin_theta.clamp(-1.0, 1.0) * Float::sin(phi),
+            cos_theta.clamp(-1.0, 1.0),
+        )
+    }
+
     pub fn coordinate_system(&self) -> (Vector3f, Vector3f) {
         let sign = Float::copysign(1.0, self.z);
 
@@ -1274,6 +1284,16 @@ impl From<&Vector3i> for Vector3f {
     }
 }
 
+impl From<Vector3fi> for Vector3f {
+    fn from(value: Vector3fi) -> Self {
+        Vector3f {
+            x: value.x.into(),
+            y: value.y.into(),
+            z: value.z.into(),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Vector3fi {
     x: Interval,
@@ -1445,6 +1465,16 @@ impl IndexMut<usize> for Vector3fi {
             &mut self.y
         } else {
             &mut self.z
+        }
+    }
+}
+
+impl From<Vector3f> for Vector3fi {
+    fn from(value: Vector3f) -> Self {
+        Vector3fi {
+            x: value.x.into(),
+            y: value.y.into(),
+            z: value.z.into(),
         }
     }
 }

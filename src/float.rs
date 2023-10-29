@@ -13,6 +13,8 @@ pub const PI_F: Float = std::f64::consts::PI;
 #[cfg(not(use_f64))]
 pub const PI_F: Float = std::f32::consts::PI;
 
+const MACHINE_EPSILON: Float = Float::EPSILON * 0.5;
+
 /// Use **unsafe**
 /// [std::mem::transmute_copy][transmute_copy]
 /// to convert *f32* to *u32* (or *u64* to *f64* if use_f64 enabled)
@@ -78,6 +80,10 @@ pub fn next_float_down(v: Float) -> Float {
         }
         bits_to_float(ui)
     }
+}
+
+pub fn gamma(n: i32) -> Float {
+    (n as Float * MACHINE_EPSILON) / (1.0 - n as Float * MACHINE_EPSILON)
 }
 
 pub fn add_round_up(a: Float, b: Float) -> Float {

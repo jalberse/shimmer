@@ -2,7 +2,7 @@ use std::ops::{Add, Mul};
 
 use crate::{
     compensated_float::CompensatedFloat,
-    float::Float,
+    float::{Float, PI_F},
     interval::Interval,
     square_matrix::{Invertible, SquareMatrix},
 };
@@ -209,6 +209,16 @@ where
     a * (1.0 - t) + b * t
 }
 
+/// Radians from degrees
+pub fn radians(deg: Float) -> Float {
+    (PI_F / 180.0) * deg
+}
+
+/// Degrees from radians
+pub fn degrees(rad: Float) -> Float {
+    (180.0 / PI_F) * rad
+}
+
 /// asin, with a check to ensure output is not slightly outside the legal range [-1, 1]
 /// See PBRTv4 8.2.3
 pub fn safe_asin(x: Float) -> Float {
@@ -219,6 +229,13 @@ pub fn safe_asin(x: Float) -> Float {
 /// See PBRTv4 8.2.3
 pub fn safe_acos(x: Float) -> Float {
     Float::asin(Float::clamp(x, -1.0, 1.0))
+}
+
+/// Returns the square root of the value, clamping it to zero in case of rounding errors
+/// causing the value to be slightly negative.
+pub fn safe_sqrt(x: Float) -> Float {
+    debug_assert!(x >= -1e-3); // not too negative
+    Float::sqrt(Float::max(0.0, x))
 }
 
 /// Inner Products with error free transformations.

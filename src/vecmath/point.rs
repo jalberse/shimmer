@@ -1002,7 +1002,7 @@ pub struct Point3fi {
 }
 
 impl Point3fi {
-    pub fn from_value_and_error(val: Point3f, err: Point3f) -> Point3fi {
+    pub fn from_value_and_error(val: Point3f, err: Vector3f) -> Point3fi {
         Point3fi {
             x: Interval::from_value_and_error(val.x, err.x),
             y: Interval::from_value_and_error(val.y, err.y),
@@ -1010,8 +1010,8 @@ impl Point3fi {
         }
     }
 
-    pub fn error(&self) -> Point3f {
-        Point3f {
+    pub fn error(&self) -> Vector3f {
+        Vector3f {
             x: self.x.width() / 2.0,
             y: self.y.width() / 2.0,
             z: self.z.width() / 2.0,
@@ -1073,7 +1073,7 @@ impl Tuple3<Interval> for Point3fi {
     }
 }
 
-// TODO The conversion to Float here probably isn't the best in actuality.
+// TODO The conversion to Float here for distance probably isn't the best in actuality.
 //  Rather, we'd want a Length<Interval> implementation that preserves the error,
 //  and propagate that here. But I'm in "move fast and break things" mode, so
 //  just be wary of this.
@@ -1123,6 +1123,16 @@ impl IndexMut<usize> for Point3fi {
             &mut self.y
         } else {
             &mut self.z
+        }
+    }
+}
+
+impl From<Point3f> for Point3fi {
+    fn from(value: Point3f) -> Self {
+        Point3fi {
+            x: value.x.into(),
+            y: value.y.into(),
+            z: value.z.into(),
         }
     }
 }

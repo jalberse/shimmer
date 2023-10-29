@@ -1,8 +1,11 @@
+// TODO these shouldn't all be public; reorganize.
+
 pub mod bounding_box;
 pub mod camera;
 pub mod color;
 pub mod colorspace;
 pub mod compensated_float;
+mod direction_cone;
 pub mod film;
 pub mod filter;
 pub mod float;
@@ -20,6 +23,7 @@ pub mod options;
 pub mod ray;
 pub mod rgb_to_spectra;
 pub mod sampling;
+pub mod shape;
 pub mod spectra;
 pub mod sphere;
 pub mod square_matrix;

@@ -1,5 +1,7 @@
 use super::vecmath::point::Point3;
 
+// TODO I used this for finding the bounding sphere of a Bounding Box, but I think that
+// we should replace that use case with shape::Sphere instead.
 pub struct Sphere<C, T> {
     pub center: C,
     pub radius: T,

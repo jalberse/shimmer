@@ -42,6 +42,56 @@ pub trait CameraI {
     fn get_camera_transform(&self) -> &CameraTransform;
 }
 
+pub enum Camera {
+    Orthographic(OrthographicCamera),
+}
+
+impl CameraI for Camera {
+    fn generate_ray(
+        &self,
+        sample: &CameraSample,
+        lambda: &SampledWavelengths,
+    ) -> Option<CameraRay> {
+        match self {
+            Camera::Orthographic(c) => c.generate_ray(sample, lambda),
+        }
+    }
+
+    fn generate_ray_differential(
+        &self,
+        sample: &CameraSample,
+        lambda: &SampledWavelengths,
+    ) -> Option<CameraRayDifferential> {
+        match self {
+            Camera::Orthographic(c) => c.generate_ray_differential(sample, lambda),
+        }
+    }
+
+    fn film(&self) -> &Film {
+        match self {
+            Camera::Orthographic(c) => c.film(),
+        }
+    }
+
+    fn sample_time(&self, u: Float) -> Float {
+        match self {
+            Camera::Orthographic(c) => c.sample_time(u),
+        }
+    }
+
+    fn init_metadata(&self, metadata: &mut ImageMetadata) {
+        match self {
+            Camera::Orthographic(c) => c.init_metadata(metadata),
+        }
+    }
+
+    fn get_camera_transform(&self) -> &CameraTransform {
+        match self {
+            Camera::Orthographic(c) => c.get_camera_transform(),
+        }
+    }
+}
+
 /// Shared implementation details for different kinds of cameras.
 struct CameraBase {
     camera_transform: CameraTransform,
@@ -248,7 +298,7 @@ impl CameraTransform {
         let world_from_render = match options.rendering_coord_system {
             RenderingCoordinateSystem::Camera => *world_from_camera,
             RenderingCoordinateSystem::CameraWorld => {
-                let p_camera = world_from_camera.apply_p(&Point3f::ZERO);
+                let p_camera = world_from_camera.apply(&Point3f::ZERO);
                 Transform::translate(p_camera.into())
             }
             RenderingCoordinateSystem::World => Transform::default(),
@@ -266,39 +316,39 @@ impl CameraTransform {
     }
 
     pub fn render_from_camera_p(&self, p: &Point3f) -> Point3f {
-        self.render_from_camera.apply_p(p)
+        self.render_from_camera.apply(p)
     }
     pub fn render_from_camera_v(&self, v: &Vector3f) -> Vector3f {
-        self.render_from_camera.apply_v(v)
+        self.render_from_camera.apply(v)
     }
     pub fn render_from_camera_n(&self, n: &Normal3f) -> Normal3f {
-        self.render_from_camera.apply_n(n)
+        self.render_from_camera.apply(n)
     }
     pub fn render_from_camera_r(&self, r: &Ray) -> Ray {
-        self.render_from_camera.apply_r(r)
+        self.render_from_camera.apply(r)
     }
     pub fn render_from_camera_rd(&self, r: &RayDifferential) -> RayDifferential {
-        self.render_from_camera.apply_rd(r)
+        self.render_from_camera.apply(r)
     }
 
     pub fn camera_from_render_p(&self, p: &Point3f, _time: Float) -> Point3f {
-        self.render_from_camera.apply_p_inv(p)
+        self.render_from_camera.apply_inv(p)
     }
     pub fn camera_from_render_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
-        self.render_from_camera.apply_v_inv(v)
+        self.render_from_camera.apply_inv(v)
     }
     pub fn camera_from_render_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
-        self.render_from_camera.apply_n_inv(n)
+        self.render_from_camera.apply_inv(n)
     }
     pub fn camera_from_render_r(&self, r: &Ray, _time: Float) -> Ray {
-        self.render_from_camera.apply_r_inv(r)
+        self.render_from_camera.apply_inv(r)
     }
     pub fn camera_from_render_rd(&self, r: &RayDifferential, _time: Float) -> RayDifferential {
-        self.render_from_camera.apply_rd_inv(r)
+        self.render_from_camera.apply_inv(r)
     }
 
     pub fn render_from_world_p(&self, p: &Point3f) -> Point3f {
-        self.world_from_render.apply_p_inv(p)
+        self.world_from_render.apply_inv(p)
     }
 
     pub fn render_from_world(&self) -> Transform {
@@ -413,8 +463,8 @@ impl OrthographicCamera {
             screen_from_camera,
             screen_window,
         );
-        let dx_camera = projective_base.camera_from_raster.apply_v(&Vector3f::X);
-        let dy_camera = projective_base.camera_from_raster.apply_v(&Vector3f::Y);
+        let dx_camera = projective_base.camera_from_raster.apply(&Vector3f::X);
+        let dy_camera = projective_base.camera_from_raster.apply(&Vector3f::Y);
 
         OrthographicCamera {
             projective_base,
@@ -431,7 +481,7 @@ impl CameraI for OrthographicCamera {
         lambda: &SampledWavelengths,
     ) -> Option<CameraRay> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective_base.camera_from_raster.apply_p(&p_film);
+        let p_camera = self.projective_base.camera_from_raster.apply(&p_film);
 
         let ray = Ray::new_with_time(
             p_camera,
@@ -453,7 +503,7 @@ impl CameraI for OrthographicCamera {
         lambda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective_base.camera_from_raster.apply_p(&p_film);
+        let p_camera = self.projective_base.camera_from_raster.apply(&p_film);
 
         let ray = Ray::new_with_time(
             p_camera,

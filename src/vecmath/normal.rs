@@ -494,6 +494,12 @@ impl Normal3 for Normal3f {
         abs_dot3(self, n)
     }
 
+    // TODO Rather than having a *_vector(), we could probably restructure these functions
+    // to take a trait and emulate operator overloading in that way. It would simplify the API
+    // a bit. This is true for all the types in the vector math module.
+    // I was just writing this module after coming back to Rust after quite some time,
+    // so I had forgotten some useful patterns like this...
+
     /// Compute the dot with a vector and take the absolute value.
     fn abs_dot_vector(&self, v: &Vector3f) -> Float {
         abs_dot3(self, v)
