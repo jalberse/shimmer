@@ -84,3 +84,9 @@ pub fn cos_d_phi(wa: Vector3f, wb: Vector3f) -> Float {
         1.0,
     )
 }
+
+/// Checks if w and wp lie in the same hemisphere with respect to the
+/// surface normal in the BSDF coordinate system
+pub fn same_hemisphere(w: Vector3f, wp: Vector3f) -> bool {
+    w.z * wp.z > 0.0
+}

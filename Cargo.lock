@@ -250,6 +250,7 @@ name = "shimmer"
 version = "0.1.0"
 dependencies = [
  "auto_ops",
+ "bitflags",
  "env_logger",
  "float-cmp",
  "float_next_after",
