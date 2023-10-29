@@ -1,10 +1,19 @@
 use bitflags::bitflags;
+use itertools::Diff;
 
 use crate::{
     float::PI_F,
-    sampling::{sample_uniform_hemisphere, sample_uniform_sphere, uniform_hemisphere_pdf},
+    math::INV_PI,
+    sampling::{
+        cosine_hemisphere_pdf, sample_cosine_hemisphere, sample_uniform_hemisphere,
+        sample_uniform_sphere, uniform_hemisphere_pdf,
+    },
     spectra::sampled_spectrum::SampledSpectrum,
-    vecmath::{point::Point2f, spherical::abs_cos_theta, Vector3f},
+    vecmath::{
+        point::Point2f,
+        spherical::{abs_cos_theta, same_hemisphere},
+        Vector3f,
+    },
     Float,
 };
 
@@ -127,6 +136,77 @@ impl BxDFI for BxDF {
 
     fn flags(&self) -> BxDFFLags {
         todo!()
+    }
+}
+
+pub struct DiffuseBxDF {
+    /// Values in range [0, 1] that specify the fraction of incident light that is scattered.
+    r: SampledSpectrum,
+}
+
+impl DiffuseBxDF {
+    pub fn new(r: SampledSpectrum) -> DiffuseBxDF {
+        DiffuseBxDF { r }
+    }
+}
+
+impl BxDFI for DiffuseBxDF {
+    fn f(&self, wo: Vector3f, wi: Vector3f, _mode: TransportMode) -> SampledSpectrum {
+        if !same_hemisphere(wo, wi) {
+            return SampledSpectrum::from_const(0.0);
+        }
+        // Normalize so that total integrated reflectance equals R
+        self.r * INV_PI
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        _uc: Float,
+        u: Point2f,
+        _mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        if sample_flags.bits() & BxDFReflTransFlags::REFLECTION.bits() == 0 {
+            return None;
+        }
+        // Sample cosine-weighted hemisphere to compute wi and pdf
+        let mut wi = sample_cosine_hemisphere(u);
+        if wo.z < 0.0 {
+            wi.z *= -1.0;
+        }
+        let pdf = cosine_hemisphere_pdf(abs_cos_theta(wi));
+
+        Some(BSDFSample::new(
+            self.r * INV_PI,
+            wi,
+            pdf,
+            BxDFFLags::DIFFUSE_REFLECTION,
+        ))
+    }
+
+    fn pdf(
+        &self,
+        wo: Vector3f,
+        wi: Vector3f,
+        _mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        if sample_flags.bits() & BxDFReflTransFlags::REFLECTION.bits() == 0
+            || !same_hemisphere(wo, wi)
+        {
+            0.0
+        } else {
+            cosine_hemisphere_pdf(abs_cos_theta(wi))
+        }
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        if self.r.is_zero() {
+            BxDFFLags::UNSET
+        } else {
+            BxDFFLags::DIFFUSE_REFLECTION
+        }
     }
 }
 

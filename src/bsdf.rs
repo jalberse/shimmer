@@ -71,7 +71,7 @@ impl BSDF {
         }
         // Sample bxdf and return BSDFSample
         let mut bs = self.bxdf.sample_f(wo, u, u2, mode, sample_flags)?;
-        if !bs.f || bs.pdf == 0.0 || bs.wi.z == 0.0 {
+        if bs.f.is_zero() || bs.pdf == 0.0 || bs.wi.z == 0.0 {
             return None;
         }
         debug_assert!(bs.pdf > 0.0);

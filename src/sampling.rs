@@ -1,7 +1,7 @@
 use crate::{
     float::{next_float_down, Float, PI_F},
-    math::{lerp, safe_sqrt, INV_2PI},
-    vecmath::{Point2f, Vector3f},
+    math::{lerp, safe_sqrt, INV_2PI, INV_PI, PI_OVER_2, PI_OVER_4},
+    vecmath::{Point2f, Tuple2, Vector2f, Vector3f},
 };
 
 // See PBRT v4 2.14
@@ -124,6 +124,37 @@ pub fn sample_uniform_hemisphere(u: Point2f) -> Vector3f {
 
 pub fn uniform_hemisphere_pdf() -> Float {
     INV_2PI
+}
+
+pub fn sample_cosine_hemisphere(u: Point2f) -> Vector3f {
+    let d = sample_uniform_disk_concentric(u);
+    let z = safe_sqrt(1.0 - d.x * d.x - d.y * d.y);
+    Vector3f {
+        x: d.x,
+        y: d.y,
+        z: z,
+    }
+}
+
+pub fn cosine_hemisphere_pdf(cos_theta: Float) -> Float {
+    cos_theta * INV_PI
+}
+
+pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
+    // map u to [-1, 1]^2 and handle degeneracy at origin
+    let u_offset = 2.0 * u - Vector2f::ONE;
+    if u_offset.x == 0.0 && u_offset.y == 0.0 {
+        return Point2f::ZERO;
+    }
+    let (theta, r) = if u_offset.x.abs() > u_offset.y.abs() {
+        (u_offset.x, PI_OVER_4 * (u_offset.y / u_offset.x))
+    } else {
+        (
+            u_offset.y,
+            PI_OVER_2 - PI_OVER_4 * (u_offset.x / u_offset.y),
+        )
+    };
+    r * Point2f::new(Float::cos(theta), Float::sin(theta))
 }
 
 // TODO get_camera_sample() pg 516; need to implement the Sampler interface/enum first.
