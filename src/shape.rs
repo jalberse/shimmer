@@ -67,6 +67,68 @@ pub trait ShapeI {
     fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vector3f) -> Float;
 }
 
+// TODO consider using enum_dispatch or equivalent; I'm doing this explicitly because I
+// am doing write-ups comparing Rust and C++, so "raw rust" can be helpful.
+pub enum Shape {
+    Sphere(Sphere),
+}
+
+impl ShapeI for Shape {
+    fn bounds(&self) -> Bounds3f {
+        match self {
+            Shape::Sphere(s) => s.bounds(),
+        }
+    }
+
+    fn normal_bounds(&self) -> DirectionCone {
+        match self {
+            Shape::Sphere(s) => s.normal_bounds(),
+        }
+    }
+
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
+        match self {
+            Shape::Sphere(s) => s.intersect(ray, t_max),
+        }
+    }
+
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
+        match self {
+            Shape::Sphere(s) => s.intersect_predicate(ray, t_max),
+        }
+    }
+
+    fn area(&self) -> Float {
+        match self {
+            Shape::Sphere(s) => s.area(),
+        }
+    }
+
+    fn sample(&self, u: Point2f) -> Option<ShapeSample> {
+        match self {
+            Shape::Sphere(s) => s.sample(u),
+        }
+    }
+
+    fn pdf(&self, interaction: &Interaction) -> Float {
+        match self {
+            Shape::Sphere(s) => s.pdf(interaction),
+        }
+    }
+
+    fn sample_with_context(&self, ctx: &ShapeSampleContext, u: Point2f) -> Option<ShapeSample> {
+        match self {
+            Shape::Sphere(s) => s.sample_with_context(ctx, u),
+        }
+    }
+
+    fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vector3f) -> Float {
+        match self {
+            Shape::Sphere(s) => s.pdf_with_context(ctx, wi),
+        }
+    }
+}
+
 pub struct ShapeIntersection {
     pub intr: SurfaceInteraction,
     pub t_hit: Float,
