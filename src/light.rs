@@ -5,7 +5,10 @@ use crate::{
     bounding_box::Bounds3f,
     interaction::{Interaction, SurfaceInteraction},
     ray::Ray,
-    spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
+    spectra::{
+        sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths, DenselySampled,
+    },
+    transform::Transform,
     vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},
     Float,
 };
@@ -76,6 +79,94 @@ pub trait LightI {
     // TODO sample_le() and pdf_le() which are crucial for bidirectional light transport;
     // those are explained in the online version (source code available).
     // We can skip for now, because I don't think we'll be implementing bidirectional soon.
+}
+
+pub enum Light {}
+
+impl LightI for Light {
+    fn phi(&self, lambda: SampledWavelengths) -> SampledSpectrum {
+        todo!()
+    }
+
+    fn light_type(&self) -> LightType {
+        todo!()
+    }
+
+    fn sample_li(
+        &self,
+        ctx: LightSampleContext,
+        u: Point2f,
+        lambda: SampledWavelengths,
+        allow_incomplete_pdf: bool,
+    ) -> Option<LightLiSample> {
+        todo!()
+    }
+
+    fn pdf_li(
+        &self,
+        ctx: LightSampleContext,
+        lambda: SampledWavelengths,
+        allow_incomplete_pdf: bool,
+    ) -> Float {
+        todo!()
+    }
+
+    fn l(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        uv: Point2f,
+        w: Vector3f,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
+        todo!()
+    }
+
+    fn le(ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
+        todo!()
+    }
+
+    fn preprocess(&mut self, scene_bounds: &Bounds3f) {
+        todo!()
+    }
+}
+
+/// Specific types of lights (e.g. point lights and spotlights) can *have* a LightBase,
+/// which provides shared functionality.
+pub struct LightBase {
+    light_type: LightType,
+    /// Defines the light's coordinate system w.r.t. render space.
+    render_from_light: Transform,
+    // TODO MediumInterface, when we implement Medium.
+}
+
+impl LightBase {
+    pub fn light_type(&self) -> LightType {
+        self.light_type
+    }
+
+    /// Default implementation for LightI::l() so that lights which are not area lights
+    /// don't need to implement their own version
+    pub fn l(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        uv: Point2f,
+        w: Vector3f,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
+        SampledSpectrum::from_const(0.0)
+    }
+
+    /// Defualt implementation for LightI::le() so that lights which are not infinite
+    /// don't need to implement their own version.
+    pub fn le(ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
+        SampledSpectrum::from_const(0.0)
+    }
+
+    // TODO We won't implement cacheing of DenselySampled spectra just yet (see pg 745 12.1)
+    // but when we do, LightBase should also include a LookupSpectrum() function to get a
+    // cached DenselySample spectrum.
 }
 
 /// Provides context for sampling a light via LightI::sample_li().
@@ -192,9 +283,4 @@ impl LightType {
     pub fn is_delta(&self) -> bool {
         *self == Self::DeltaDirection || *self == Self::DeltaPosition
     }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct Light {
-    // TODO implement. Also, this will likely be an enum.
 }
