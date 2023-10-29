@@ -106,11 +106,15 @@ pub trait BxDFI {
     }
 }
 
-pub enum BxDF {}
+pub enum BxDF {
+    Diffuse(DiffuseBxDF),
+}
 
 impl BxDFI for BxDF {
     fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
-        todo!()
+        match self {
+            BxDF::Diffuse(v) => v.f(wo, wi, mode),
+        }
     }
 
     fn sample_f(
@@ -121,7 +125,9 @@ impl BxDFI for BxDF {
         mode: TransportMode,
         sample_flags: BxDFReflTransFlags,
     ) -> Option<BSDFSample> {
-        todo!()
+        match self {
+            BxDF::Diffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+        }
     }
 
     fn pdf(
@@ -131,11 +137,15 @@ impl BxDFI for BxDF {
         mode: TransportMode,
         sample_flags: BxDFReflTransFlags,
     ) -> Float {
-        todo!()
+        match self {
+            BxDF::Diffuse(v) => v.pdf(wo, wi, mode, sample_flags),
+        }
     }
 
     fn flags(&self) -> BxDFFLags {
-        todo!()
+        match self {
+            BxDF::Diffuse(v) => v.flags(),
+        }
     }
 }
 
