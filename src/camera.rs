@@ -42,6 +42,56 @@ pub trait CameraI {
     fn get_camera_transform(&self) -> &CameraTransform;
 }
 
+pub enum Camera {
+    Orthographic(OrthographicCamera),
+}
+
+impl CameraI for Camera {
+    fn generate_ray(
+        &self,
+        sample: &CameraSample,
+        lambda: &SampledWavelengths,
+    ) -> Option<CameraRay> {
+        match self {
+            Camera::Orthographic(c) => c.generate_ray(sample, lambda),
+        }
+    }
+
+    fn generate_ray_differential(
+        &self,
+        sample: &CameraSample,
+        lambda: &SampledWavelengths,
+    ) -> Option<CameraRayDifferential> {
+        match self {
+            Camera::Orthographic(c) => c.generate_ray_differential(sample, lambda),
+        }
+    }
+
+    fn film(&self) -> &Film {
+        match self {
+            Camera::Orthographic(c) => c.film(),
+        }
+    }
+
+    fn sample_time(&self, u: Float) -> Float {
+        match self {
+            Camera::Orthographic(c) => c.sample_time(u),
+        }
+    }
+
+    fn init_metadata(&self, metadata: &mut ImageMetadata) {
+        match self {
+            Camera::Orthographic(c) => c.init_metadata(metadata),
+        }
+    }
+
+    fn get_camera_transform(&self) -> &CameraTransform {
+        match self {
+            Camera::Orthographic(c) => c.get_camera_transform(),
+        }
+    }
+}
+
 /// Shared implementation details for different kinds of cameras.
 struct CameraBase {
     camera_transform: CameraTransform,
