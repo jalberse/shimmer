@@ -145,6 +145,14 @@ impl SampledSpectrum {
     }
 }
 
+impl Default for SampledSpectrum {
+    fn default() -> Self {
+        Self {
+            values: Default::default(),
+        }
+    }
+}
+
 impl Index<usize> for SampledSpectrum {
     type Output = Float;
 
@@ -210,6 +218,19 @@ impl_op_ex_commutative!(*|s1: &SampledSpectrum, v: &Float| -> SampledSpectrum {
     SampledSpectrum::new(result)
 });
 
+impl_op_ex!(/|s: &SampledSpectrum, v: &Float| -> SampledSpectrum
+{
+    debug_assert_ne!(v, &0.0);
+    debug_assert!(!v.is_nan());
+    let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+    for i in 0..NUM_SPECTRUM_SAMPLES
+    {
+        result[i] = s[i] / v;
+    }
+    debug_assert!(!result.has_nan());
+    SampledSpectrum::new(result)
+});
+
 impl_op_ex!(/|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum
 {
     let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
@@ -250,6 +271,14 @@ impl_op_ex!(/=|s1: &mut SampledSpectrum, s2: &SampledSpectrum|
     for i in 0..NUM_SPECTRUM_SAMPLES
     {
         s1[i] /= s2[i];
+    }
+});
+
+impl_op_ex!(/=|s1: &mut SampledSpectrum, v: &Float|
+{
+    for i in 0..NUM_SPECTRUM_SAMPLES
+    {
+        s1[i] /= v;
     }
 });
 

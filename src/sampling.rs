@@ -1,6 +1,6 @@
 use crate::{
     float::{next_float_down, Float, PI_F},
-    math::{lerp, safe_sqrt},
+    math::{lerp, safe_sqrt, INV_2PI},
     vecmath::{Point2f, Vector3f},
 };
 
@@ -109,6 +109,21 @@ pub fn sample_uniform_sphere(u: Point2f) -> Vector3f {
         y: r * Float::sin(phi),
         z,
     }
+}
+
+pub fn sample_uniform_hemisphere(u: Point2f) -> Vector3f {
+    let z = u[0];
+    let r = safe_sqrt(1.0 - z * z);
+    let phi = 2.0 * PI_F * u[1];
+    Vector3f {
+        x: r * Float::cos(phi),
+        y: r * Float::sin(phi),
+        z: z,
+    }
+}
+
+pub fn uniform_hemisphere_pdf() -> Float {
+    INV_2PI
 }
 
 // TODO get_camera_sample() pg 516; need to implement the Sampler interface/enum first.

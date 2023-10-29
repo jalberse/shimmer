@@ -1,8 +1,10 @@
 use bitflags::bitflags;
 
 use crate::{
+    float::PI_F,
+    sampling::{sample_uniform_hemisphere, sample_uniform_sphere, uniform_hemisphere_pdf},
     spectra::sampled_spectrum::SampledSpectrum,
-    vecmath::{point::Point2f, Vector3f},
+    vecmath::{point::Point2f, spherical::abs_cos_theta, Vector3f},
     Float,
 };
 
@@ -20,6 +22,7 @@ pub trait BxDFI {
     /// uc will generally be used to choose between different kinds of sampling (e.g. reflection or transmission)
     /// and u for the direction.
     fn sample_f(
+        &self,
         wo: Vector3f,
         uc: Float,
         u: Point2f,
@@ -39,6 +42,59 @@ pub trait BxDFI {
     ) -> Float;
 
     fn flags(&self) -> BxDFFLags;
+
+    /// Computes the hemispherical-directional reflectance function rho_hd (PBRTv4 4.12)
+    fn rho_hd(&self, wo: Vector3f, uc: &[Float], u2: &[Point2f]) -> SampledSpectrum {
+        if wo.z == 0.0 {
+            return SampledSpectrum::default();
+        }
+        let mut r = SampledSpectrum::from_const(0.0);
+        debug_assert_eq!(uc.len(), u2.len());
+        for i in 0..uc.len() {
+            // Compute estimate of rho_hd.
+            let bs = self.sample_f(
+                wo,
+                uc[i],
+                u2[i],
+                TransportMode::Radiance,
+                BxDFReflTransFlags::ALL,
+            );
+            if let Some(bs) = bs {
+                if bs.pdf > 0.0 {
+                    r += bs.f * abs_cos_theta(bs.wi) / bs.pdf;
+                }
+            }
+        }
+        r / uc.len() as Float
+    }
+
+    /// Computes the hemispherical-hemispherical reflectance function rho_hh (PBRTv4 4.13)
+    fn rho_hh(&self, u1: &[Point2f], uc: &[Float], u2: &[Point2f]) -> SampledSpectrum {
+        debug_assert_eq!(u1.len(), uc.len());
+        debug_assert_eq!(uc.len(), u2.len());
+        let mut r = SampledSpectrum::from_const(0.0);
+        for i in 0..uc.len() {
+            // Compute estimate of rho_hh.
+            let wo = sample_uniform_hemisphere(u1[i]);
+            if wo.z == 0.0 {
+                continue;
+            }
+            let pdfo = uniform_hemisphere_pdf();
+            let bs = self.sample_f(
+                wo,
+                uc[i],
+                u2[i],
+                TransportMode::Radiance,
+                BxDFReflTransFlags::ALL,
+            );
+            if let Some(bs) = bs {
+                if bs.pdf > 0.0 {
+                    r += bs.f * abs_cos_theta(bs.wi) * abs_cos_theta(wo) / (pdfo * bs.pdf);
+                }
+            }
+        }
+        r / (PI_F * uc.len() as Float)
+    }
 }
 
 pub struct BSDFSample {

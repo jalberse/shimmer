@@ -7,6 +7,8 @@ use crate::{
     square_matrix::{Invertible, SquareMatrix},
 };
 
+pub const INV_2PI: Float = 0.15915494309189533577;
+
 pub trait Sqrt {
     fn sqrt(self) -> Self;
 }
