@@ -33,10 +33,10 @@ pub trait SpectrumI {
 
 #[derive(Debug, PartialEq)]
 pub enum Spectrum {
-    Constant(Constant),
-    DenselySampled(DenselySampled),
-    PiecewiseLinear(PiecewiseLinear),
-    Blackbody(Blackbody),
+    Constant(ConstantSpectrum),
+    DenselySampled(DenselySampledSpectrum),
+    PiecewiseLinear(PiecewiseLinearSpectrum),
+    Blackbody(BlackbodySpectrum),
     RgbAlbedoSpectrum(RgbAlbedoSpectrum),
     RgbUnboundedSpectrum(RgbUnboundedSpectrum),
     RgbIlluminantSpectrum(RgbIlluminantSpectrum),
@@ -119,17 +119,17 @@ impl Spectrum {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Constant {
+pub struct ConstantSpectrum {
     c: Float,
 }
 
-impl Constant {
+impl ConstantSpectrum {
     pub fn new(c: Float) -> Self {
         Self { c }
     }
 }
 
-impl SpectrumI for Constant {
+impl SpectrumI for ConstantSpectrum {
     fn get(&self, _lambda: Float) -> Float {
         self.c
     }
@@ -144,26 +144,30 @@ impl SpectrumI for Constant {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct DenselySampled {
+pub struct DenselySampledSpectrum {
     lambda_min: i32,
     lambda_max: i32,
     values: Vec<Float>,
 }
 
-impl DenselySampled {
+impl DenselySampledSpectrum {
     /// Samples from the provided spectrum to create a DenselySampled spectrum
-    pub fn new(spectrum: &Spectrum) -> DenselySampled {
+    pub fn new(spectrum: &Spectrum) -> DenselySampledSpectrum {
         Self::new_range(spectrum, LAMBDA_MIN as i32, LAMBDA_MAX as i32)
     }
 
     /// Samples from the provided spectrum to create a DenselySampled spectrum
-    pub fn new_range(spectrum: &Spectrum, lambda_min: i32, lambda_max: i32) -> DenselySampled {
+    pub fn new_range(
+        spectrum: &Spectrum,
+        lambda_min: i32,
+        lambda_max: i32,
+    ) -> DenselySampledSpectrum {
         // PAPERDOC This is a fun area where idiomatic rust code (map -> collect) is arguably cleaner
         // than similar C++ code (allowing e.g. const correctness). Of course, C++ can accomplish similar.
         let values: Vec<Float> = (lambda_min..=lambda_max)
             .map(|lambda: i32| spectrum.get(lambda as Float))
             .collect();
-        DenselySampled {
+        DenselySampledSpectrum {
             lambda_min,
             lambda_max,
             values,
@@ -174,12 +178,12 @@ impl DenselySampled {
         f: impl Fn(Float) -> Float,
         lambda_min: usize,
         lambda_max: usize,
-    ) -> DenselySampled {
+    ) -> DenselySampledSpectrum {
         let mut values = vec![0.0; lambda_max - lambda_min + 1];
         for lambda in lambda_min..=lambda_max {
             values[lambda - lambda_min] = f(lambda as Float);
         }
-        DenselySampled {
+        DenselySampledSpectrum {
             values,
             lambda_min: lambda_min as i32,
             lambda_max: lambda_max as i32,
@@ -187,7 +191,7 @@ impl DenselySampled {
     }
 }
 
-impl SpectrumI for DenselySampled {
+impl SpectrumI for DenselySampledSpectrum {
     fn get(&self, lambda: Float) -> Float {
         let offset = lambda as i32 - self.lambda_min;
         if offset < 0 || offset >= self.values.len() as i32 {
@@ -225,15 +229,18 @@ impl SpectrumI for DenselySampled {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct PiecewiseLinear {
+pub struct PiecewiseLinearSpectrum {
     lambdas: Vec<Float>,
     values: Vec<Float>,
 }
 
-impl PiecewiseLinear {
+impl PiecewiseLinearSpectrum {
     /// Creates a piecewise linear spectrum from associated lambdas and values;
     /// these slices must be sorted.
-    pub fn new<const N: usize>(lambdas: &[Float; N], values: &[Float; N]) -> PiecewiseLinear {
+    pub fn new<const N: usize>(
+        lambdas: &[Float; N],
+        values: &[Float; N],
+    ) -> PiecewiseLinearSpectrum {
         // PAPERDOC I think this is a good way to ensure lambdas.len() == values.len() at compile-time,
         // rather than a runtime check as in PBRTv4. I'll need to see how it fairs in practice.
         // I think you can do this in C++ too though.
@@ -246,7 +253,7 @@ impl PiecewiseLinear {
         v.copy_from_slice(values);
         // Check that lambdas are sorted
         assert!(l.windows(2).all(|p| p[0] <= p[1]));
-        PiecewiseLinear {
+        PiecewiseLinearSpectrum {
             lambdas: l,
             values: v,
         }
@@ -260,7 +267,7 @@ impl PiecewiseLinear {
     pub fn from_interleaved<const N: usize, const S: usize>(
         samples: &[Float; N],
         normalize: bool,
-    ) -> PiecewiseLinear {
+    ) -> PiecewiseLinearSpectrum {
         assert_eq!(N / 2, S);
         assert_eq!(0, samples.len() % 2);
         let n = samples.len() / 2;
@@ -295,7 +302,7 @@ impl PiecewiseLinear {
         // let's do this for now.
         // TODO switch off of interleaved data structures so we can just use one value N.
         // This means changing the named spectra to have separate lambda and value arrays.
-        let mut spectrum = PiecewiseLinear::new::<S>(
+        let mut spectrum = PiecewiseLinearSpectrum::new::<S>(
             lambda.as_slice().try_into().expect("Invalid length"),
             v.as_slice().try_into().expect("Invalid length"),
         );
@@ -303,7 +310,7 @@ impl PiecewiseLinear {
         if normalize {
             spectrum.scale(
                 CIE_Y_INTEGRAL
-                    / inner_product::<PiecewiseLinear, Spectrum>(
+                    / inner_product::<PiecewiseLinearSpectrum, Spectrum>(
                         &spectrum,
                         Spectrum::get_cie(CIE::Y),
                     ),
@@ -320,7 +327,7 @@ impl PiecewiseLinear {
     }
 }
 
-impl SpectrumI for PiecewiseLinear {
+impl SpectrumI for PiecewiseLinearSpectrum {
     fn get(&self, lambda: Float) -> Float {
         if self.lambdas.is_empty()
             || lambda < *self.lambdas.first().unwrap()
@@ -357,18 +364,18 @@ impl SpectrumI for PiecewiseLinear {
 
 /// Normalized blackbody spectrum where the maximum value at any wavelength is 1.
 #[derive(Debug, PartialEq)]
-pub struct Blackbody {
+pub struct BlackbodySpectrum {
     /// Temperature K
     t: Float,
     /// Normalization factor s.t. the maximum value is 1.0.
     normalization_factor: Float,
 }
 
-impl Blackbody {
-    pub fn new(t: Float) -> Blackbody {
+impl BlackbodySpectrum {
+    pub fn new(t: Float) -> BlackbodySpectrum {
         let lambda_max = 2.8977721e-3 / t; // Wien's displacement law
-        let normalization_factor = 1.0 / Blackbody::blackbody(lambda_max * 1e9, t);
-        Blackbody {
+        let normalization_factor = 1.0 / BlackbodySpectrum::blackbody(lambda_max * 1e9, t);
+        BlackbodySpectrum {
             t,
             normalization_factor,
         }
@@ -392,9 +399,9 @@ impl Blackbody {
     }
 }
 
-impl SpectrumI for Blackbody {
+impl SpectrumI for BlackbodySpectrum {
     fn get(&self, lambda: Float) -> Float {
-        Blackbody::blackbody(lambda, self.t) * self.normalization_factor
+        BlackbodySpectrum::blackbody(lambda, self.t) * self.normalization_factor
     }
 
     fn max_value(&self) -> Float {
@@ -404,7 +411,7 @@ impl SpectrumI for Blackbody {
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
         let mut s = [0.0; NUM_SPECTRUM_SAMPLES];
         for i in 0..NUM_SPECTRUM_SAMPLES {
-            s[i] = Blackbody::blackbody(lambda[i], self.t) * self.normalization_factor;
+            s[i] = BlackbodySpectrum::blackbody(lambda[i], self.t) * self.normalization_factor;
         }
         SampledSpectrum::new(s)
     }
@@ -544,16 +551,16 @@ mod tests {
             sampled_spectrum::SampledSpectrum,
             sampled_wavelengths::SampledWavelengths,
             spectrum::{RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, SpectrumI},
-            Blackbody, Constant, Spectrum, CIE, CIE_Y_INTEGRAL,
+            BlackbodySpectrum, ConstantSpectrum, Spectrum, CIE, CIE_Y_INTEGRAL,
         },
         Float,
     };
 
-    use super::{DenselySampled, PiecewiseLinear, LAMBDA_MAX, LAMBDA_MIN};
+    use super::{DenselySampledSpectrum, PiecewiseLinearSpectrum, LAMBDA_MAX, LAMBDA_MIN};
 
     #[test]
     fn get_constant() {
-        let c = Constant::new(5.0);
+        let c = ConstantSpectrum::new(5.0);
         assert_eq!(5.0, c.get(999.0));
         let spectrum = Spectrum::Constant(c);
         assert_eq!(5.0, spectrum.get(999.0))
@@ -578,7 +585,7 @@ mod tests {
             let lambda = v[i][0];
             let t = v[i][1];
             let le_expected = v[i][2];
-            assert!(err(Blackbody::blackbody(lambda, t), le_expected) < 0.001);
+            assert!(err(BlackbodySpectrum::blackbody(lambda, t), le_expected) < 0.001);
         }
 
         // Use Wien's displacement law to compute maximum wavelength for a few
@@ -587,9 +594,9 @@ mod tests {
         for t in [2700.0, 3000.0, 4500.0, 5600.0, 6000.0] {
             let lambda_max = 2.8977721e-3 / t * 1e9;
             let lambda: [Float; 3] = [0.99 * lambda_max, lambda_max, 1.01 * lambda_max];
-            let result0 = Blackbody::blackbody(lambda[0], t);
-            let result1 = Blackbody::blackbody(lambda[1], t);
-            let result2 = Blackbody::blackbody(lambda[2], t);
+            let result0 = BlackbodySpectrum::blackbody(lambda[0], t);
+            let result1 = BlackbodySpectrum::blackbody(lambda[1], t);
+            let result2 = BlackbodySpectrum::blackbody(lambda[2], t);
             assert!(result0 < result1);
             assert!(result1 > result2);
         }
@@ -649,7 +656,7 @@ mod tests {
     fn piecewise_linear_ctor() {
         let lambdas = [0.0, 5.0, 10.0, 100.0];
         let values = [0.0, 10.0, 20.0, 200.0];
-        let spectrum = PiecewiseLinear::new(&lambdas, &values);
+        let spectrum = PiecewiseLinearSpectrum::new(&lambdas, &values);
         assert_eq!(
             [0.0, 5.0, 10.0, 100.0].as_slice(),
             spectrum.lambdas.as_slice()
@@ -664,7 +671,7 @@ mod tests {
     fn piecewise_linear_get() {
         let lambdas = [0.0, 5.0, 10.0, 100.0];
         let values = [0.0, 10.0, 20.0, 200.0];
-        let spectrum = PiecewiseLinear::new(&lambdas, &values);
+        let spectrum = PiecewiseLinearSpectrum::new(&lambdas, &values);
         assert_eq!(5.0, spectrum.get(2.5));
         assert_eq!(15.0, spectrum.get(7.5));
         assert_eq!(110.0, spectrum.get(55.0));
@@ -676,8 +683,8 @@ mod tests {
     fn densely_sampled_basic() {
         let lambdas = [360.0, 820.0];
         let values = [0.0, 100.0];
-        let spectrum = PiecewiseLinear::new(&lambdas, &values);
-        let spectrum = DenselySampled::new(&Spectrum::PiecewiseLinear(spectrum));
+        let spectrum = PiecewiseLinearSpectrum::new(&lambdas, &values);
+        let spectrum = DenselySampledSpectrum::new(&Spectrum::PiecewiseLinear(spectrum));
 
         assert_approx_eq!(Float, 0.0, spectrum.get(360.0));
         assert_approx_eq!(Float, 100.0, spectrum.get(820.0));
@@ -686,11 +693,11 @@ mod tests {
 
     #[test]
     fn spectrum_max_value() {
-        assert_eq!(2.5, Constant::new(2.5).max_value());
+        assert_eq!(2.5, ConstantSpectrum::new(2.5).max_value());
 
         assert_eq!(
             10.1,
-            PiecewiseLinear::new(
+            PiecewiseLinearSpectrum::new(
                 &[300.0, 380.0, 510.0, 620.0, 700.0],
                 &[1.5, 2.6, 10.1, 5.3, 7.7]
             )
@@ -700,7 +707,7 @@ mod tests {
         assert_approx_eq!(
             Float,
             1.0,
-            Blackbody::new(5000.0).max_value(),
+            BlackbodySpectrum::new(5000.0).max_value(),
             epsilon = 0.0001
         );
 

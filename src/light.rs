@@ -6,7 +6,8 @@ use crate::{
     interaction::{Interaction, SurfaceInteraction},
     ray::Ray,
     spectra::{
-        sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths, DenselySampled,
+        sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
+        DenselySampledSpectrum,
     },
     transform::Transform,
     vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},

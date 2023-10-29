@@ -417,7 +417,7 @@ mod tests {
                 RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, SpectrumI,
                 LAMBDA_MAX, LAMBDA_MIN,
             },
-            DenselySampled,
+            DenselySampledSpectrum,
         },
         vecmath::{Point2f, Tuple2},
         Float,
@@ -583,7 +583,7 @@ mod tests {
             );
             let rs = RgbAlbedoSpectrum::new(cs, &rgb);
 
-            let rs_illum = DenselySampled::sample_function(
+            let rs_illum = DenselySampledSpectrum::sample_function(
                 |lambda: Float| -> Float { rs.get(lambda) * cs.illuminant.get(lambda) },
                 LAMBDA_MIN as usize,
                 LAMBDA_MAX as usize,
@@ -615,7 +615,7 @@ mod tests {
             );
             let rs = RgbAlbedoSpectrum::new(cs, &rgb);
 
-            let rs_illum = DenselySampled::sample_function(
+            let rs_illum = DenselySampledSpectrum::sample_function(
                 |lambda: Float| -> Float { rs.get(lambda) * cs.illuminant.get(lambda) },
                 LAMBDA_MIN as usize,
                 LAMBDA_MAX as usize,
@@ -647,7 +647,7 @@ mod tests {
             );
             let rs = RgbAlbedoSpectrum::new(cs, &rgb);
 
-            let rs_illum = DenselySampled::sample_function(
+            let rs_illum = DenselySampledSpectrum::sample_function(
                 |lambda: Float| -> Float { rs.get(lambda) * cs.illuminant.get(lambda) },
                 LAMBDA_MIN as usize,
                 LAMBDA_MAX as usize,
@@ -679,7 +679,7 @@ mod tests {
             );
             let rs = RgbIlluminantSpectrum::new(cs, &rgb);
 
-            let rs_illum = DenselySampled::sample_function(
+            let rs_illum = DenselySampledSpectrum::sample_function(
                 |lambda: Float| -> Float { rs.get(lambda) },
                 LAMBDA_MIN as usize,
                 LAMBDA_MAX as usize,
@@ -711,7 +711,7 @@ mod tests {
             );
             let rs = RgbIlluminantSpectrum::new(cs, &rgb);
 
-            let rs_illum = DenselySampled::sample_function(
+            let rs_illum = DenselySampledSpectrum::sample_function(
                 |lambda: Float| -> Float { rs.get(lambda) },
                 LAMBDA_MIN as usize,
                 LAMBDA_MAX as usize,
@@ -743,7 +743,7 @@ mod tests {
             );
             let rs = RgbIlluminantSpectrum::new(cs, &rgb);
 
-            let rs_illum = DenselySampled::sample_function(
+            let rs_illum = DenselySampledSpectrum::sample_function(
                 |lambda: Float| -> Float { rs.get(lambda) },
                 LAMBDA_MIN as usize,
                 LAMBDA_MAX as usize,
