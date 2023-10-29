@@ -1,6 +1,8 @@
 // TODO these shouldn't all be public; reorganize.
 
 pub mod bounding_box;
+mod bsdf;
+mod bxdf;
 pub mod camera;
 pub mod color;
 pub mod colorspace;

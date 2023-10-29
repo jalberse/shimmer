@@ -48,6 +48,7 @@ mod length_fns;
 pub mod normal;
 pub mod normalize;
 pub mod point;
+pub mod spherical;
 pub mod tuple;
 mod tuple_fns;
 pub mod vector;
