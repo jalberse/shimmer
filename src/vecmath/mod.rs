@@ -41,6 +41,7 @@
 //! use the enum_dispatch crate to generate an enum of implementing types and thus
 //! use static dispatch.
 
+pub mod frame;
 pub mod has_nan;
 pub mod length;
 mod length_fns;
