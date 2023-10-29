@@ -1,6 +1,7 @@
 use crate::{
-    float::{next_float_down, Float},
-    math::lerp,
+    float::{next_float_down, Float, PI_F},
+    math::{lerp, safe_sqrt},
+    vecmath::{Point2f, Vector3f},
 };
 
 // See PBRT v4 2.14
@@ -97,6 +98,17 @@ pub fn visible_wavelengths_pdf(lambda: Float) -> Float {
     }
     let x = Float::cosh(0.0072 * (lambda - 538.0));
     0.0039398042 / (x * x)
+}
+
+pub fn sample_uniform_sphere(u: Point2f) -> Vector3f {
+    let z = 1.0 - 2.0 * u[0];
+    let r = safe_sqrt(1.0 - z * z);
+    let phi = 2.0 * PI_F * u[1];
+    Vector3f {
+        x: r * Float::cos(phi),
+        y: r * Float::sin(phi),
+        z,
+    }
 }
 
 // TODO get_camera_sample() pg 516; need to implement the Sampler interface/enum first.

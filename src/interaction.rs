@@ -24,6 +24,10 @@ impl Interaction {
             uv,
         }
     }
+
+    pub fn p(&self) -> Point3f {
+        self.pi.into()
+    }
 }
 
 pub struct SurfaceInteraction {
@@ -85,7 +89,7 @@ impl SurfaceInteraction {
     }
 
     pub fn p(&self) -> Point3f {
-        self.interaction.pi.into()
+        self.interaction.p()
     }
 }
 

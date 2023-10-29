@@ -4,13 +4,16 @@ use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
     float::{gamma, PI_F},
+    frame::Frame,
     interaction::{Interaction, SurfaceInteraction},
     interval::Interval,
     math::DifferenceOfProducts,
     math::{radians, safe_acos, safe_sqrt, Sqrt},
     ray::Ray,
+    sampling::sample_uniform_sphere,
     transform::Transform,
     vecmath::{
+        normal::Normal3,
         point::{Point3, Point3fi},
         vector::{Vector3, Vector3fi},
         Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f,
@@ -113,15 +116,16 @@ impl ShapeSampleContext {
         self.pi.into()
     }
 
-    pub fn offset_ray_origin(w: Vector3f) -> Point3f {
+    pub fn offset_ray_origin(&self, w: Vector3f) -> Point3f {
         todo!() // TODO these function definitions are in 6.8.6; we can get to them later.
     }
 
-    pub fn offset_ray_origin_pt(pt: Point3f) -> Point3f {
+    // TODO Could use a trait to "overload" offset_ray_origin() instead.
+    pub fn offset_ray_origin_pt(&self, pt: Point3f) -> Point3f {
         todo!()
     }
 
-    pub fn spawn_ray(w: Vector3f) -> Ray {
+    pub fn spawn_ray(&self, w: Vector3f) -> Ray {
         todo!()
     }
 }
@@ -386,7 +390,34 @@ impl ShapeI for Sphere {
     }
 
     fn sample(&self, u: Point2f) -> Option<ShapeSample> {
-        todo!()
+        let mut p_obj: Point3f = Point3f::ZERO + sample_uniform_sphere(u) * self.radius;
+        // Reproject p_obj to sphere surface and compute p_obj_error
+        p_obj *= self.radius / p_obj.distance(&Point3f::ZERO);
+        let p_obj_error: Vector3f = gamma(5) * Vector3f::from(p_obj).abs();
+
+        // Compute surface normal for sphere sample and return shape sample
+        let n_obj = Normal3f::new(p_obj.x, p_obj.y, p_obj.z);
+        let normal_sign = if self.reverse_orientation { -1.0 } else { 1.0 };
+        let n = normal_sign * self.render_from_object.apply(&n_obj).normalize();
+
+        let theta = safe_acos(p_obj.z / self.radius);
+        let mut phi = Float::atan2(p_obj.y, p_obj.x);
+        if phi < 0.0 {
+            phi += 2.0 * PI_F;
+        }
+        let uv = Point2f::new(
+            phi / self.phi_max,
+            (theta - self.theta_z_min) / (self.theta_z_max - self.theta_z_min),
+        );
+
+        let pi = self
+            .render_from_object
+            .apply(&Point3fi::from_value_and_error(p_obj, p_obj_error));
+
+        Some(ShapeSample {
+            intr: Interaction::new(pi, n, uv, Vector3f::default(), 0.0),
+            pdf: 1.0 / self.area(),
+        })
     }
 
     fn pdf(&self, _interaction: &Interaction) -> Float {
@@ -394,11 +425,123 @@ impl ShapeI for Sphere {
     }
 
     fn sample_with_context(&self, ctx: &ShapeSampleContext, u: Point2f) -> Option<ShapeSample> {
-        todo!()
+        let p_center: Point3f = self.render_from_object.apply(&Point3f::ZERO);
+        let p_origin: Point3f = ctx.offset_ray_origin_pt(p_center);
+        // Sample uniformly on sphere if $\pt{}$ is inside it
+        if p_origin.distance_squared(&p_center) <= self.radius * self.radius {
+            // Sample shape by area and compute incident direction _wi_
+            let mut ss = self.sample(u).expect("Sphere sample() failed!");
+            ss.intr.time = ctx.time;
+            let wi: Vector3f = ss.intr.p() - ctx.p();
+            if wi.length_squared() == 0.0 {
+                return None;
+            }
+            let wi = wi.normalize();
+
+            // Convert area sampling PDF in _ss_ to solid angle measure
+            ss.pdf /= ss.intr.n.abs_dot_vector(&-wi) / ctx.p().distance_squared(&ss.intr.p());
+            if ss.pdf.is_infinite() {
+                return None;
+            }
+            return Some(ss);
+        }
+
+        // Sample sphere uniformly inside subtended cone
+        // Compute quantities related to the $\theta_\roman{max}$ for cone
+        let sin_theta_max: Float = self.radius / ctx.p().distance(&p_center);
+        let sin2_theta_max: Float = sin_theta_max * sin_theta_max;
+        let cos_theta_max: Float = safe_sqrt(1.0 - sin2_theta_max);
+        let mut one_minus_cos_theta_max: Float = 1.0 - cos_theta_max;
+
+        // Compute $\theta$ and $\phi$ values for sample in cone
+        let mut cos_theta: Float = (cos_theta_max - 1.0) * u[0] + 1.0;
+        let mut sin2_theta: Float = 1.0 - cos_theta * cos_theta;
+        if sin2_theta_max < 0.00068523
+        /* sin^2(1.5 deg) */
+        {
+            // Compute cone sample via Taylor series expansion for small angles
+            sin2_theta = sin2_theta_max * u[0];
+            cos_theta = Float::sqrt(1.0 - sin2_theta);
+            one_minus_cos_theta_max = sin2_theta_max / 2.0;
+        }
+
+        // Compute angle $\alpha$ from center of sphere to sampled point on surface
+        let cos_alpha: Float = sin2_theta / sin_theta_max
+            + cos_theta * safe_sqrt(1.0 - sin2_theta / sin_theta_max * sin_theta_max);
+        let sin_alpha: Float = safe_sqrt(1.0 - cos_alpha * cos_alpha);
+
+        // Compute surface normal and sampled point on sphere
+        let phi = u[1] * 2.0 * PI_F;
+        let w = Vector3f::spherical_direction(sin_alpha, cos_alpha, phi);
+        let sampling_frame = Frame::from_z((p_center - ctx.p()).normalize());
+        let normal_sign = if self.reverse_orientation { -1.0 } else { 1.0 };
+        let n = normal_sign * Normal3f::from(sampling_frame.from_local_v(&-w));
+        let p = p_center + Vector3f::new(n.x, n.y, n.z) * self.radius;
+
+        // Return _ShapeSample_ for sampled point on sphere
+        // Compute _pError_ for sampled point on sphere
+        let p_error: Vector3f = gamma(5) * Vector3f::from(p).abs();
+
+        // Compute $(u,v)$ coordinates for sampled point on sphere
+        let p_obj = self.object_from_render.apply(&p);
+        let theta = safe_acos(p_obj.z / self.radius);
+        let mut sphere_phi = Float::atan2(p_obj.y, p_obj.x);
+        if sphere_phi < 0.0 {
+            sphere_phi += 2.0 * PI_F;
+        }
+        let uv = Point2f::new(
+            sphere_phi / self.phi_max,
+            (theta - self.theta_z_min) / (self.theta_z_max - self.theta_z_min),
+        );
+
+        debug_assert_ne!(one_minus_cos_theta_max, 0.0); // very small far away sphere
+        let pi = Point3fi::from_value_and_error(p, p_error);
+        let interaction = Interaction {
+            pi,
+            time: ctx.time,
+            wo: Vector3f::default(),
+            n,
+            uv,
+        };
+        Some(ShapeSample {
+            intr: interaction,
+            pdf: 1.0 / (2.0 * PI_F * one_minus_cos_theta_max),
+        })
     }
 
     fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vector3f) -> Float {
-        todo!()
+        let p_center = self.render_from_object.apply(&Point3f::ZERO);
+        let p_origin = ctx.offset_ray_origin_pt(p_center);
+        if p_origin.distance_squared(&p_center) <= self.radius * self.radius {
+            // Return solid angle PDF for point inside sphere
+            // Intersect sample ray with shape geometry
+            let ray = ctx.spawn_ray(wi);
+            let isect = self.intersect(&ray, Float::INFINITY);
+            if isect.is_none() {
+                return 0.0;
+            }
+            let isect = isect.unwrap();
+
+            // Compute PDF in solid angle measure from shape intersection point
+            let pdf = (1.0 / self.area())
+                / isect.intr.interaction.n.abs_dot_vector(&-wi)
+                / ctx.p().distance_squared(&isect.intr.p());
+            if pdf.is_infinite() {
+                return 0.0;
+            } else {
+                return pdf;
+            }
+        }
+        // Compute general solid angle sphere PDF
+        let sin2_theta_max = self.radius * self.radius / ctx.p().distance_squared(&p_center);
+        let cos_theta_max = safe_sqrt(1.0 - sin2_theta_max);
+        let mut one_minus_cos_theta_max = 1.0 - cos_theta_max;
+        // Compute more accurate _oneMinusCosThetaMax_ for small solid angle
+        // sin^2(1.5 deg)
+        if sin2_theta_max < 0.00068523 {
+            one_minus_cos_theta_max = sin2_theta_max / 2.0;
+        }
+        return 1.0 / (2.90 * PI_F * one_minus_cos_theta_max);
     }
 }
 
