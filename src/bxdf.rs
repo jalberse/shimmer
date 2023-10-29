@@ -97,19 +97,52 @@ pub trait BxDFI {
     }
 }
 
+pub enum BxDF {}
+
+impl BxDFI for BxDF {
+    fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
+        todo!()
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        uc: Float,
+        u: Point2f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        todo!()
+    }
+
+    fn pdf(
+        &self,
+        wo: Vector3f,
+        wi: Vector3f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        todo!()
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        todo!()
+    }
+}
+
 pub struct BSDFSample {
     /// Value of the BSDF f()
-    f: SampledSpectrum,
+    pub f: SampledSpectrum,
     /// Sampled direction wi (given wo). BxDF specify wi wrt to the local reflection coordinate system;
     /// BSDF::Sample_f() should transform wi to rendering space before returning, however.
-    wi: Vector3f,
+    pub wi: Vector3f,
     /// PDF of wi with respect to solid angle
-    pdf: Float,
+    pub pdf: Float,
     /// Characteristics of the particular sample
-    flags: BxDFFLags,
-    eta: Float,
+    pub flags: BxDFFLags,
+    pub eta: Float,
     /// Useful for a layered BxDF; in most cases, false.
-    pdf_is_proportional: bool,
+    pub pdf_is_proportional: bool,
 }
 
 impl BSDFSample {

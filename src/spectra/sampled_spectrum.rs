@@ -1,4 +1,4 @@
-use std::ops::{Deref, Index, IndexMut};
+use std::ops::{Deref, Index, IndexMut, Not};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
@@ -150,6 +150,19 @@ impl Default for SampledSpectrum {
         Self {
             values: Default::default(),
         }
+    }
+}
+
+impl Not for SampledSpectrum {
+    type Output = bool;
+
+    fn not(self) -> Self::Output {
+        for i in 0..NUM_SPECTRUM_SAMPLES {
+            if self.values[i] != 0.0 {
+                return false;
+            }
+        }
+        true
     }
 }
 
