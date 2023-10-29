@@ -81,6 +81,7 @@ pub trait LightI {
     // We can skip for now, because I don't think we'll be implementing bidirectional soon.
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum Light {}
 
 impl LightI for Light {
