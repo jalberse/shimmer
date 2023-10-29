@@ -71,6 +71,7 @@ pub trait ShapeI {
 // am doing write-ups comparing Rust and C++, so "raw rust" can be helpful.
 pub enum Shape {
     Sphere(Sphere),
+    // TODO expand to other shapes - notably Triangle.
 }
 
 impl ShapeI for Shape {
