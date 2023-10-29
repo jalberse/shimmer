@@ -14,6 +14,18 @@ pub struct Interaction {
     // TODO Medium, MediumInterface. But omitting for now for simplicity.
 }
 
+impl Default for Interaction {
+    fn default() -> Self {
+        Self {
+            pi: Default::default(),
+            time: Default::default(),
+            wo: Default::default(),
+            n: Default::default(),
+            uv: Default::default(),
+        }
+    }
+}
+
 impl Interaction {
     pub fn new(pi: Point3fi, n: Normal3f, uv: Point2f, wo: Vector3f, time: Float) -> Interaction {
         Interaction {

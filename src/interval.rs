@@ -120,6 +120,15 @@ impl Interval {
     }
 }
 
+impl Default for Interval {
+    fn default() -> Self {
+        Self {
+            low: Default::default(),
+            high: Default::default(),
+        }
+    }
+}
+
 impl MulAdd for Interval {
     fn mul_add(self, b: Interval, c: Interval) -> Interval {
         let low_options = [
