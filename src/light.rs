@@ -1,5 +1,6 @@
-// TODO we'll want to implement the Light interface, but also a LightSampler.
-// We can start with just the PointLight and add others later.
+// TODO Implement LightSampler. Then we can move on from Lights for now,
+// and implement them later as needed - but just a PointLight should be sufficient for now
+// to render early test scenes.
 
 use crate::{
     bounding_box::Bounds3f,
@@ -187,7 +188,7 @@ impl LightBase {
         SampledSpectrum::from_const(0.0)
     }
 
-    // TODO We should implement a cacheing system for the DenselySampleSpectrum (see pg 745 12.1)
+    // TODO We should implement a caching system for the DenselySampleSpectrum (see pg 745 12.1)
     // When we do, LightBase should also include a LookupSpectrum() function to get a
     // cached DenselySample spectrum.
     // We could also then make Lights impl Copy, and take them out of Rc in e.g. SurfaceInteraction.
