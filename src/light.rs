@@ -61,7 +61,7 @@ pub trait LightI {
     /// Takes information about the intersection point and the outgoing direction.
     /// Should only be called for lights with associated geometry.
     /// TODO - Should this be moved to another AreaLightI trait to enforce that it should
-    /// not be called for non-area-lights? Same for Le().
+    /// not be called for non-area-lights? Similar for Le() (but that would be in another trait I think).
     fn l(
         &self,
         p: Point3f,
