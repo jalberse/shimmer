@@ -23,6 +23,7 @@ pub mod material;
 pub mod math;
 pub mod medium;
 pub mod options;
+mod primitive;
 pub mod ray;
 pub mod rgb_to_spectra;
 pub mod sampling;
