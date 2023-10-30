@@ -143,7 +143,7 @@ impl SpectrumI for ConstantSpectrum {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DenselySampledSpectrum {
     lambda_min: i32,
     lambda_max: i32,

@@ -20,7 +20,7 @@ use crate::{
 // de-duplicate them in use. C.2.3 InternCache. We likely want something like that,
 // but for now we will abstain.
 
-#[derive(PartialEq, PartialOrd, Copy, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
 pub struct Transform {
     m: SquareMatrix<4>,
     // Inverse of m
@@ -574,7 +574,14 @@ impl Transformable for SurfaceInteraction {
             },
             face_index: self.face_index,
             material: self.material,
-            area_light: self.area_light,
+            // TODO - This clone() is expensive. It's only necessary right now because
+            // the lights contain a DenselySamppledSpectrum, which can't/shouldn't implement Copy.
+            // We should implement a caching system for Light which will store a reference to
+            // a cached DenselySampledSpectrum instead, so that we're only copying a small reference
+            // rather than the whole spectrum.
+            // Alternatively could we have these store an Rc to area lights instead?
+            // That's likely the easier short-term solution.
+            area_light: self.area_light.clone(),
             dpdx: if let Some(dpdx) = self.dpdx {
                 Some(t.apply(&dpdx))
             } else {

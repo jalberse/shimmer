@@ -3,20 +3,24 @@
 
 use crate::{
     bounding_box::Bounds3f,
+    float::PI_F,
     interaction::{Interaction, SurfaceInteraction},
     ray::Ray,
     spectra::{
         sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
-        DenselySampledSpectrum,
+        spectrum::SpectrumI, DenselySampledSpectrum, Spectrum,
     },
     transform::Transform,
-    vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},
+    vecmath::{
+        point::{Point3, Point3fi},
+        Normal3f, Normalize, Point2f, Point3f, Vector3f,
+    },
     Float,
 };
 
 pub trait LightI {
     /// Returns the total emitted power _phi_
-    fn phi(&self, lambda: SampledWavelengths) -> SampledSpectrum;
+    fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
 
     /// Soemtimes, knowing the type of light is necessary for efficiency and
     /// correctness. This tells us which type of light this is (NOT which
@@ -69,7 +73,7 @@ pub trait LightI {
     /// Only for lights with LightType::Infinite; enables them to contribute radiance to rays
     /// that do not hit geometry in the scene.
     /// TODO can we enforce that it's only for infinite via a different trait?
-    fn le(ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum;
+    fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum;
 
     /// Invoked prior to rendering, informs the lights of the scene bounds, which
     /// may not be available whiel constructing the lights.
@@ -82,16 +86,22 @@ pub trait LightI {
     // We can skip for now, because I don't think we'll be implementing bidirectional soon.
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum Light {}
+#[derive(Debug, Clone)]
+pub enum Light {
+    Point(PointLight),
+}
 
 impl LightI for Light {
-    fn phi(&self, lambda: SampledWavelengths) -> SampledSpectrum {
-        todo!()
+    fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        match self {
+            Light::Point(l) => l.phi(lambda),
+        }
     }
 
     fn light_type(&self) -> LightType {
-        todo!()
+        match self {
+            Light::Point(l) => l.light_type(),
+        }
     }
 
     fn sample_li(
@@ -101,7 +111,9 @@ impl LightI for Light {
         lambda: SampledWavelengths,
         allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
-        todo!()
+        match self {
+            Light::Point(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+        }
     }
 
     fn pdf_li(
@@ -110,7 +122,9 @@ impl LightI for Light {
         lambda: SampledWavelengths,
         allow_incomplete_pdf: bool,
     ) -> Float {
-        todo!()
+        match self {
+            Light::Point(l) => l.pdf_li(ctx, lambda, allow_incomplete_pdf),
+        }
     }
 
     fn l(
@@ -121,20 +135,27 @@ impl LightI for Light {
         w: Vector3f,
         lambda: &SampledWavelengths,
     ) -> SampledSpectrum {
-        todo!()
+        match self {
+            Light::Point(l) => l.l(p, n, uv, w, lambda),
+        }
     }
 
-    fn le(ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
-        todo!()
+    fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
+        match self {
+            Light::Point(l) => l.le(ray, lambda),
+        }
     }
 
     fn preprocess(&mut self, scene_bounds: &Bounds3f) {
-        todo!()
+        match self {
+            Light::Point(l) => l.preprocess(scene_bounds),
+        }
     }
 }
 
 /// Specific types of lights (e.g. point lights and spotlights) can *have* a LightBase,
 /// which provides shared functionality.
+#[derive(Debug, Copy, Clone)]
 pub struct LightBase {
     light_type: LightType,
     /// Defines the light's coordinate system w.r.t. render space.
@@ -162,13 +183,106 @@ impl LightBase {
 
     /// Defualt implementation for LightI::le() so that lights which are not infinite
     /// don't need to implement their own version.
-    pub fn le(ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
+    pub fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
         SampledSpectrum::from_const(0.0)
     }
 
-    // TODO We won't implement cacheing of DenselySampled spectra just yet (see pg 745 12.1)
-    // but when we do, LightBase should also include a LookupSpectrum() function to get a
+    // TODO We should implement a cacheing system for the DenselySampleSpectrum (see pg 745 12.1)
+    // When we do, LightBase should also include a LookupSpectrum() function to get a
     // cached DenselySample spectrum.
+    // When we do that, we can also make Lights copy-able - we can't do that
+    // right now while they hold a full DenselySampledSpectrum, though (holds a Vec).
+    // This is actually pretty important, because otherwise there are spots where we're
+    // going to be doing expensive clone() calls on lights. Or we could go to those locations
+    // and use an Rc - that's actually probably a good idea, the cache should really just be
+    // about saving memory.
+}
+
+/// Isotropic point light source that emites the same amount of light in all directions.
+#[derive(Debug, Clone)]
+pub struct PointLight {
+    base: LightBase,
+    i: DenselySampledSpectrum,
+    scale: Float,
+}
+
+impl PointLight {
+    pub fn new(render_from_light: Transform, i: Spectrum, scale: Float) -> PointLight {
+        let base = LightBase {
+            light_type: LightType::DeltaPosition,
+            render_from_light,
+        };
+        PointLight {
+            base,
+            i: DenselySampledSpectrum::new(&i),
+            scale,
+        }
+    }
+}
+
+impl LightI for PointLight {
+    fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        4.0 * PI_F * self.scale * self.i.sample(&lambda)
+    }
+
+    fn light_type(&self) -> LightType {
+        self.base.light_type()
+    }
+
+    // It's technically incorrect to use radiance to describe light arriving at a point
+    // from a point light, but the correctness doesn't suffer and this lets us keep one
+    // entry point for the light interface.
+    fn sample_li(
+        &self,
+        ctx: LightSampleContext,
+        _u: Point2f,
+        lambda: SampledWavelengths,
+        _allow_incomplete_pdf: bool,
+    ) -> Option<LightLiSample> {
+        let p = self.base.render_from_light.apply(&Point3f::ZERO);
+        let wi = (p - ctx.p()).normalize();
+        let li = self.scale * self.i.sample(&lambda) / p.distance_squared(&ctx.p());
+        // TODO I do think this is correct compared to PBRT,
+        // but I don't love just leaving many fields default().
+        // Can we represent this better? Option?
+        let interaction = Interaction {
+            pi: p.into(),
+            time: Default::default(),
+            wo: Default::default(),
+            n: Default::default(),
+            uv: Default::default(),
+        };
+        Some(LightLiSample::new(li, wi, 1.0, interaction))
+    }
+
+    fn pdf_li(
+        &self,
+        _ctx: LightSampleContext,
+        _lambda: SampledWavelengths,
+        _allow_incomplete_pdf: bool,
+    ) -> Float {
+        // Due to delta distribution; won't randonly select an infinitesimal light source.
+        0.0
+    }
+
+    fn l(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        uv: Point2f,
+        w: Vector3f,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
+        self.base.l(p, n, uv, w, lambda)
+    }
+
+    fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
+        self.base.le(ray, lambda)
+    }
+
+    fn preprocess(&mut self, _scene_bounds: &Bounds3f) {
+        // Nothing to do!
+    }
 }
 
 /// Provides context for sampling a light via LightI::sample_li().
