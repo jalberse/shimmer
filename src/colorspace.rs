@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use crate::{
     color::{RgbSigmoidPolynomial, RGB, XYZ},
     rgb_to_spectra::{self, Gamut},
-    spectra::{DenselySampled, Spectrum},
+    spectra::{DenselySampledSpectrum, Spectrum},
     square_matrix::{mul_mat_vec, Invertible, SquareMatrix},
     vecmath::{Point2f, Tuple2},
 };
@@ -63,7 +63,7 @@ impl RgbColorSpace {
         let rgb_from_xyz = xyz_from_rgb.inverse().expect("Uninvertible!");
 
         // Convert the spectrum given to a DenselySampled spectrum.
-        let illuminant = DenselySampled::new(illuminant);
+        let illuminant = DenselySampledSpectrum::new(illuminant);
 
         RgbColorSpace {
             r,

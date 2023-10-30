@@ -16,7 +16,7 @@ use crate::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{SpectrumI, LAMBDA_MAX, LAMBDA_MIN},
-        DenselySampled, PiecewiseLinear, Spectrum,
+        DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum,
     },
     square_matrix::SquareMatrix,
     vec2d::Vec2d,
@@ -468,11 +468,11 @@ impl FilmI for RgbFilm {
 pub struct PixelSensor {
     pub xyz_from_sensor_rgb: SquareMatrix<3>,
     /// The red RGB matching function
-    r_bar: DenselySampled,
+    r_bar: DenselySampledSpectrum,
     /// The green RGB matching function
-    g_bar: DenselySampled,
+    g_bar: DenselySampledSpectrum,
     /// The blue RGB matching function
-    b_bar: DenselySampled,
+    b_bar: DenselySampledSpectrum,
     /// Shutter time and ISO setting are collected into this quantity
     imaging_ratio: Float,
 }
@@ -497,9 +497,9 @@ impl PixelSensor {
         };
         PixelSensor {
             xyz_from_sensor_rgb,
-            r_bar: DenselySampled::new(Spectrum::get_cie(crate::spectra::CIE::X)),
-            g_bar: DenselySampled::new(Spectrum::get_cie(crate::spectra::CIE::Y)),
-            b_bar: DenselySampled::new(Spectrum::get_cie(crate::spectra::CIE::Z)),
+            r_bar: DenselySampledSpectrum::new(Spectrum::get_cie(crate::spectra::CIE::X)),
+            g_bar: DenselySampledSpectrum::new(Spectrum::get_cie(crate::spectra::CIE::Y)),
+            b_bar: DenselySampledSpectrum::new(Spectrum::get_cie(crate::spectra::CIE::Z)),
             imaging_ratio,
         }
     }
@@ -557,9 +557,9 @@ impl PixelSensor {
 
         PixelSensor {
             xyz_from_sensor_rgb: m,
-            r_bar: DenselySampled::new(&r),
-            g_bar: DenselySampled::new(&g),
-            b_bar: DenselySampled::new(&b),
+            r_bar: DenselySampledSpectrum::new(&r),
+            g_bar: DenselySampledSpectrum::new(&g),
+            b_bar: DenselySampledSpectrum::new(&b),
             imaging_ratio: imaging_ratio,
         }
     }
@@ -673,7 +673,7 @@ const HALF_NUM_SWATCH_SPECTRUM_SAMPLES: usize = 36;
 // http://www.babelcolor.com/index_htm_files/ColorChecker_RGB_and_spectra.zip
 static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::new(|| {
     [
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -687,7 +687,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -701,7 +701,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -715,7 +715,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -729,7 +729,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -743,7 +743,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -757,7 +757,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -771,7 +771,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -785,7 +785,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -799,7 +799,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -813,7 +813,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -827,7 +827,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -841,7 +841,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -855,7 +855,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -869,7 +869,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -883,7 +883,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -897,7 +897,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -911,7 +911,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -925,7 +925,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -939,7 +939,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -953,7 +953,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -967,7 +967,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -981,7 +981,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(
@@ -995,7 +995,7 @@ static SWATCH_REFLECTANCES: Lazy<[Spectrum; NUM_SWATCH_REFLECTANCES]> = Lazy::ne
             ],
             false,
         )),
-        Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<
+        Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<
             NUM_SWATCH_SPECTRUM_SAMPLES,
             HALF_NUM_SWATCH_SPECTRUM_SAMPLES,
         >(

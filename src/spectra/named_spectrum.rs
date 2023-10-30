@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 
 use crate::Float;
 
-use super::{PiecewiseLinear, Spectrum};
+use super::{PiecewiseLinearSpectrum, Spectrum};
 
 // TODO add other named spectra. I'm happy to just have the system in place for
 // now though, we can add them as we need them or when I have time to go through
@@ -21,28 +21,28 @@ pub enum NamedSpectrum {
 // NOTE: These intentionally use static, not const.
 // const will compile, but will not work properly. See once_cell documentation.
 pub static STD_ILLUM_D65: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<214, 107>(
+    Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<214, 107>(
         &CIE_ILLUM_D6500,
         true,
     ))
 });
 
 pub static ILLUM_ACES_D60: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<214, 107>(
+    Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<214, 107>(
         &ACES_ILLUM_D60,
         true,
     ))
 });
 
 pub static GLASS_BK7_ETA: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<58, 24>(
+    Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<58, 24>(
         &GLASS_BK7_ETA_SAMPLES,
         false,
     ))
 });
 
 pub static GLASS_BAF10_ETA: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinear::from_interleaved::<54, 27>(
+    Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<54, 27>(
         &GLASS_BAF10_ETA_SAMPLES,
         false,
     ))

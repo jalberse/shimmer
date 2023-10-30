@@ -1137,6 +1137,16 @@ impl From<Point3f> for Point3fi {
     }
 }
 
+impl Default for Point3fi {
+    fn default() -> Self {
+        Self {
+            x: Default::default(),
+            y: Default::default(),
+            z: Default::default(),
+        }
+    }
+}
+
 impl_op_ex!(-|v: &Point3fi| -> Point3fi { Point3fi::new(-v.x, -v.y, -v.z) });
 
 // Points can be scaled elementwise

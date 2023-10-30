@@ -2,7 +2,7 @@
 /// Separated to keep other modules readable.
 use once_cell::sync::Lazy;
 
-use super::{DenselySampled, PiecewiseLinear, Spectrum};
+use super::{DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum};
 use crate::Float;
 
 pub const NUM_CIE_SAMPLES: usize = 471;
@@ -16,21 +16,27 @@ pub enum CIE {
 }
 
 pub static X: Lazy<Spectrum> = Lazy::new(|| {
-    let xpls =
-        Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_X));
-    Spectrum::DenselySampled(DenselySampled::new(&xpls))
+    let xpls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new::<NUM_CIE_SAMPLES>(
+        &CIE_LAMBDA,
+        &CIE_X,
+    ));
+    Spectrum::DenselySampled(DenselySampledSpectrum::new(&xpls))
 });
 
 pub static Y: Lazy<Spectrum> = Lazy::new(|| {
-    let ypls =
-        Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_Y));
-    Spectrum::DenselySampled(DenselySampled::new(&ypls))
+    let ypls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new::<NUM_CIE_SAMPLES>(
+        &CIE_LAMBDA,
+        &CIE_Y,
+    ));
+    Spectrum::DenselySampled(DenselySampledSpectrum::new(&ypls))
 });
 
 pub static Z: Lazy<Spectrum> = Lazy::new(|| {
-    let zpls =
-        Spectrum::PiecewiseLinear(PiecewiseLinear::new::<NUM_CIE_SAMPLES>(&CIE_LAMBDA, &CIE_Z));
-    Spectrum::DenselySampled(DenselySampled::new(&zpls))
+    let zpls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new::<NUM_CIE_SAMPLES>(
+        &CIE_LAMBDA,
+        &CIE_Z,
+    ));
+    Spectrum::DenselySampled(DenselySampledSpectrum::new(&zpls))
 });
 
 const CIE_LAMBDA: [Float; NUM_CIE_SAMPLES] = [

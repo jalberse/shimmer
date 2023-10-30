@@ -18,6 +18,7 @@ pub mod interaction;
 pub mod interval;
 pub mod is_nan;
 pub mod light;
+mod light_sampler;
 pub mod material;
 pub mod math;
 pub mod medium;

@@ -20,7 +20,7 @@ use crate::{
 // de-duplicate them in use. C.2.3 InternCache. We likely want something like that,
 // but for now we will abstain.
 
-#[derive(PartialEq, PartialOrd, Copy, Clone)]
+#[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
 pub struct Transform {
     m: SquareMatrix<4>,
     // Inverse of m
@@ -574,7 +574,7 @@ impl Transformable for SurfaceInteraction {
             },
             face_index: self.face_index,
             material: self.material,
-            area_light: self.area_light,
+            area_light: self.area_light.clone(),
             dpdx: if let Some(dpdx) = self.dpdx {
                 Some(t.apply(&dpdx))
             } else {

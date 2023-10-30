@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     light::Light,
     material::Material,
@@ -12,6 +14,18 @@ pub struct Interaction {
     pub n: Normal3f,
     pub uv: Point2f,
     // TODO Medium, MediumInterface. But omitting for now for simplicity.
+}
+
+impl Default for Interaction {
+    fn default() -> Self {
+        Self {
+            pi: Default::default(),
+            time: Default::default(),
+            wo: Default::default(),
+            n: Default::default(),
+            uv: Default::default(),
+        }
+    }
 }
 
 impl Interaction {
@@ -39,7 +53,10 @@ pub struct SurfaceInteraction {
     pub shading: SurfaceInteractionShading,
     pub face_index: i32,
     pub material: Option<Material>,
-    pub area_light: Option<Light>,
+    // TODO consider using just an Option<Light> if I make Light copyable.
+    // Would require moving to cacheing DenselySampledSpectrum in Lights to avoid
+    // a large/impossible copy.
+    pub area_light: Option<Rc<Light>>,
     pub dpdx: Option<Vector3f>,
     pub dpdy: Option<Vector3f>,
     pub dudx: Float,
