@@ -190,12 +190,7 @@ impl LightBase {
     // TODO We should implement a cacheing system for the DenselySampleSpectrum (see pg 745 12.1)
     // When we do, LightBase should also include a LookupSpectrum() function to get a
     // cached DenselySample spectrum.
-    // When we do that, we can also make Lights copy-able - we can't do that
-    // right now while they hold a full DenselySampledSpectrum, though (holds a Vec).
-    // This is actually pretty important, because otherwise there are spots where we're
-    // going to be doing expensive clone() calls on lights. Or we could go to those locations
-    // and use an Rc - that's actually probably a good idea, the cache should really just be
-    // about saving memory.
+    // We could also then make Lights impl Copy, and take them out of Rc in e.g. SurfaceInteraction.
 }
 
 /// Isotropic point light source that emites the same amount of light in all directions.
