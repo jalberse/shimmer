@@ -508,7 +508,7 @@ impl Transformable for Ray {
 }
 
 impl Transformable for RayDifferential {
-    // TODO note we may also wanta versiont hat calculates the new t_max, or add that to this one
+    // TODO note we may also wanta version that calculates the new t_max, or add that to this one
     fn apply(&self, transform: &Transform) -> Self {
         // Get the transformed base ray
         let tr: Ray = transform.apply(&self.ray);
@@ -573,7 +573,7 @@ impl Transformable for SurfaceInteraction {
                 dndv: t.apply(&self.shading.dndv),
             },
             face_index: self.face_index,
-            material: self.material,
+            material: self.material.clone(),
             area_light: self.area_light.clone(),
             dpdx: if let Some(dpdx) = self.dpdx {
                 Some(t.apply(&dpdx))
