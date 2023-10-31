@@ -573,7 +573,7 @@ impl Transformable for SurfaceInteraction {
                 dndv: t.apply(&self.shading.dndv),
             },
             face_index: self.face_index,
-            material: self.material,
+            material: self.material.clone(),
             area_light: self.area_light.clone(),
             dpdx: if let Some(dpdx) = self.dpdx {
                 Some(t.apply(&dpdx))

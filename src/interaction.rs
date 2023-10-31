@@ -52,7 +52,7 @@ pub struct SurfaceInteraction {
     pub dndv: Normal3f,
     pub shading: SurfaceInteractionShading,
     pub face_index: i32,
-    pub material: Option<Material>,
+    pub material: Option<Rc<Material>>,
     // TODO consider using just an Option<Light> if I make Light copyable.
     // Would require moving to cacheing DenselySampledSpectrum in Lights to avoid
     // a large/impossible copy.
@@ -107,6 +107,16 @@ impl SurfaceInteraction {
 
     pub fn p(&self) -> Point3f {
         self.interaction.p()
+    }
+
+    // TODO We'll also want to add the Medium information here, once we implement participating media. pg 398.
+    pub fn set_intersection_properties(
+        &mut self,
+        mtl: &Rc<Material>,
+        area_light: &Option<Rc<Light>>,
+    ) {
+        self.area_light = area_light.clone();
+        self.material = Some(mtl.clone());
     }
 }
 
