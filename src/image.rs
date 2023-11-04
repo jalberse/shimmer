@@ -6,6 +6,7 @@ use crate::{bounding_box::Bounds2i, color::RGB, math::lerp, vec2d::Vec2d};
 //  given only 8 bits for each channel. But it's simple, which is why I'm using it during development.
 //  We should later follow PBRT's image architecture to support OpenEXR.
 // TODO We also only support writing to stdout right now, so filenames aren't really used.
+#[derive(Debug)]
 pub struct Image {
     pub data: Vec2d<RGB>,
 }
