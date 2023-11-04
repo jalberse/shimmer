@@ -1,6 +1,6 @@
 use crate::{
     bsdf::BSDF,
-    bxdf::DiffuseBxDF,
+    bxdf::{BxDF, DiffuseBxDF},
     image::Image,
     interaction::SurfaceInteraction,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
@@ -10,10 +10,6 @@ use crate::{
 };
 
 pub trait MaterialI {
-    // TODO issue with this one is that the Enum Material can't choose a constant ConcreteBxDF.
-    // Indeed, if enum Material implemented this, then get_bxdf() would return whatever the Material::ConcreteBxDF is
-    // rather than whatever the variants' one is.
-    // ConcreteBxDF really only makes sense for the concrete variants...
     type ConcreteBxDF;
 
     // TODO Consider a ScratchBuffer equivalent for these functions; probably necessary for performance.
@@ -24,7 +20,6 @@ pub trait MaterialI {
         lambda: &SampledWavelengths,
     ) -> Self::ConcreteBxDF;
 
-    // TODO PBRT gets arcane with GetBSDF. Is there a simple Rust solution?
     fn get_bsdf<T: TextureEvaluatorI>(
         &self,
         tex_eval: &T,
@@ -53,7 +48,9 @@ pub enum Material {
 }
 
 impl MaterialI for Material {
-    type ConcreteBxDF = ();
+    /// Since this Material encompasses all the Material variants, its concrete BxDF
+    /// encompasses all the BxDF variants.
+    type ConcreteBxDF = BxDF;
 
     fn get_bxdf<T: TextureEvaluatorI>(
         &self,
@@ -61,7 +58,9 @@ impl MaterialI for Material {
         ctx: &MaterialEvalContext,
         lambda: &SampledWavelengths,
     ) -> Self::ConcreteBxDF {
-        todo!()
+        match self {
+            Material::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
+        }
     }
 
     fn get_bsdf<T: TextureEvaluatorI>(
@@ -70,25 +69,35 @@ impl MaterialI for Material {
         ctx: &MaterialEvalContext,
         lambda: &SampledWavelengths,
     ) -> BSDF {
+        // PAPERDOC - PBRT's implementation of GetBsdf() involves some semi-arcane C++.
+        // Rust's associated types makes this implementation much simpler.
         match self {
             Material::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
     fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool {
-        todo!()
+        match self {
+            Material::Diffuse(m) => m.can_evaluate_textures(tex_eval),
+        }
     }
 
     fn get_normal_map(&self) -> Option<Image> {
-        todo!()
+        match self {
+            Material::Diffuse(m) => m.get_normal_map(),
+        }
     }
 
     fn get_bump_map(&self) -> Option<FloatTexture> {
-        todo!()
+        match self {
+            Material::Diffuse(m) => m.get_bump_map(),
+        }
     }
 
     fn has_subsurface_scattering(&self) -> bool {
-        todo!()
+        match self {
+            Material::Diffuse(m) => m.has_subsurface_scattering(),
+        }
     }
 }
 
