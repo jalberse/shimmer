@@ -1,15 +1,76 @@
 use crate::{
     interaction::{Interaction, SurfaceInteraction},
+    spectra::{
+        sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
+        spectrum::SpectrumI, Spectrum,
+    },
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Vector3f},
     Float,
 };
 
+pub trait FloatTextureI {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float;
+}
+
+pub enum FloatTexture {
+    Constant(FloatConstantTexture),
+}
+
+impl FloatTextureI for FloatTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
+        match self {
+            FloatTexture::Constant(t) => t.evaluate(ctx),
+        }
+    }
+}
+
+pub struct FloatConstantTexture {
+    value: Float,
+}
+
+impl FloatTextureI for FloatConstantTexture {
+    fn evaluate(&self, _ctx: &TextureEvalContext) -> Float {
+        self.value
+    }
+}
+
+pub trait SpectrumTextureI {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum;
+}
+
+pub enum SpectrumTexture {
+    Constant(SpectrumConstantTexture),
+}
+
+impl SpectrumTextureI for SpectrumTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        match self {
+            SpectrumTexture::Constant(t) => t.evaluate(ctx, lambda),
+        }
+    }
+}
+
+pub struct SpectrumConstantTexture {
+    value: Spectrum,
+}
+
+impl SpectrumTextureI for SpectrumConstantTexture {
+    fn evaluate(&self, _ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        self.value.sample(lambda)
+    }
+}
+
+/// Provides an interface for 2D texture coordinate generation.
 pub trait TextureMapping2DI {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D;
 }
 
+// TODO let's also provide a 3D mapping equivalent. pg 654.
+
+/// Provides 2D texture coordinate generation.
 pub enum TextureMapping2D {
     UV(UVMapping),
+    // TODO spherical, cylindrical, and Planar mapping.
 }
 
 impl TextureMapping2DI for TextureMapping2D {
