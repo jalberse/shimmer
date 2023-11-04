@@ -618,10 +618,10 @@ pub struct VisibleSurface {
     time: Float,
     /// Partial derivative of depth at each pixel, where x and y are in raster space and
     /// z is in camera space.
-    dpdx: Option<Vector3f>,
+    dpdx: Vector3f,
     /// Partial derivative of depth at each pixel, where x and y are in raster space and
     /// z is in camera space.
-    dpdy: Option<Vector3f>,
+    dpdy: Vector3f,
     /// spectral distribution of reflected light under uniform illumination;
     /// useful for separating texture from illumination before denoising.
     albedo: SampledSpectrum,

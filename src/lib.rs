@@ -31,6 +31,7 @@ pub mod shape;
 pub mod spectra;
 pub mod sphere;
 pub mod square_matrix;
+mod texture;
 pub mod transform;
 pub mod vec2d;
 pub mod vecmath;

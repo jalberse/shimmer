@@ -57,8 +57,8 @@ pub struct SurfaceInteraction {
     // Would require moving to cacheing DenselySampledSpectrum in Lights to avoid
     // a large/impossible copy.
     pub area_light: Option<Rc<Light>>,
-    pub dpdx: Option<Vector3f>,
-    pub dpdy: Option<Vector3f>,
+    pub dpdx: Vector3f,
+    pub dpdy: Vector3f,
     pub dudx: Float,
     pub dvdx: Float,
     pub dudy: Float,
@@ -96,8 +96,8 @@ impl SurfaceInteraction {
             face_index: 0,
             material: None,
             area_light: None,
-            dpdx: None,
-            dpdy: None,
+            dpdx: Vector3f::ZERO,
+            dpdy: Vector3f::ZERO,
             dudx: 0.0,
             dvdx: 0.0,
             dudy: 0.0,
