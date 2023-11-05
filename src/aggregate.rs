@@ -5,9 +5,16 @@
 // PBRT constructs with pointers first and then converts to a vec-based implementation.
 //   I could try to do the same I suppose, but I suspect we'll run into ownership issues.
 
-use std::{io::Split, rc::Rc, sync::Mutex};
+use std::{
+    io::Split,
+    rc::Rc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Mutex,
+    },
+};
 
-use itertools::Itertools;
+use itertools::{partition, Itertools};
 
 use crate::{
     bounding_box::Bounds3f,
@@ -18,13 +25,15 @@ use crate::{
     Float,
 };
 
+#[derive(Debug, Copy, Clone)]
 pub enum SplitMethod {
-    // TODO Other split methods; Middle isn't very good, but simple for the first implementation.
+    // TODO Other split methods; Middle isn't very good, but simple for the first implementation.\
+    // EqualCounts is the next simplest.
     Middle,
 }
 
-struct BvhAggregate {
-    max_prims_in_node: i32,
+pub struct BvhAggregate {
+    max_prims_in_node: usize,
     primitives: Vec<Rc<Primitive>>,
     split_method: SplitMethod,
     nodes: Vec<LinearBvhNode>,
@@ -47,14 +56,14 @@ impl PrimitiveI for BvhAggregate {
 impl BvhAggregate {
     pub fn new(
         mut primitives: Vec<Rc<Primitive>>,
-        max_prims_in_node: i32,
+        max_prims_in_node: usize,
         split_method: SplitMethod,
     ) -> BvhAggregate {
         debug_assert!(!primitives.is_empty());
 
         // Build BVH from primitives
         // Initialize bvh_primitives array to store compact information about primitives while building.
-        let bvh_primitives: Vec<BvhPrimitive> = primitives
+        let mut bvh_primitives: Vec<BvhPrimitive> = primitives
             .iter()
             .enumerate()
             .map(|(i, &ref p)| BvhPrimitive {
@@ -71,11 +80,9 @@ impl BvhAggregate {
         // primitives array after the tree is constructed.
         let mut ordered_primitives: Vec<Rc<Primitive>> = Vec::with_capacity(primitives.len());
 
-        // TODO The counters will probably be an Arc mutex actually.
-
         // Keeps track of the number of nodes created; this makes it possible to allocate exactly
         // the right size Vec for the LinearBvhNodes list.
-        let mut total_nodes = Mutex::new(0);
+        let total_nodes = AtomicUsize::new(0);
 
         // Build the BVH according to the selected split method
         let root = match split_method {
@@ -83,12 +90,14 @@ impl BvhAggregate {
             _ => {
                 // Keeps track of where the next free entry in ordered_primitives is, so that leaf nodes can claim
                 // it as their starting primitive index, and reserve the next n slots for their n primitives.
-                let mut ordered_prims_offset = Mutex::new(0);
+                let ordered_prims_offset = AtomicUsize::new(0);
                 Self::build_recursive(
-                    &bvh_primitives,
-                    &mut total_nodes,
-                    &mut ordered_prims_offset,
+                    &mut bvh_primitives,
+                    &primitives,
+                    &total_nodes,
+                    &ordered_prims_offset,
                     &mut ordered_primitives,
+                    split_method,
                 )
             }
         };
@@ -99,27 +108,136 @@ impl BvhAggregate {
         // This can be a significant chunk of memory that we don't need anymore; free it.
         drop(bvh_primitives);
 
-        let mut nodes: Vec<LinearBvhNode> = Vec::with_capacity(*total_nodes.lock().unwrap());
+        let mut nodes: Vec<LinearBvhNode> = Vec::with_capacity(total_nodes.load(Ordering::SeqCst));
 
         let mut offset = 0;
         Self::flatten_bvh(&mut nodes, Some(Box::new(root)), &mut offset);
-        debug_assert_eq!(*total_nodes.lock().unwrap(), offset);
+        debug_assert_eq!(total_nodes.load(Ordering::SeqCst), offset);
 
         BvhAggregate {
-            max_prims_in_node: i32::max(255, max_prims_in_node),
+            max_prims_in_node: usize::max(255, max_prims_in_node),
             primitives,
             split_method,
             nodes,
         }
     }
 
+    /// Builds the BVH recursively; it is under the returned BvhBuildNode.
+    ///
+    /// bvh_primitives: The primitives that will be stored within the BVH under the returned BvhBuildNode.
+    /// primitives: Stores the actual primitives; BvhPrimitive indexes into this.
+    /// total_nodes: Tracks total number of nodes that are created.
+    /// ordered_prims_offset: Tracks the current offset into ordered_prims, so that nodes
+    ///   can reserve a chunk of it on their creation.
+    /// ordered_prims: A vector with the same length as primitives; this function populates
+    ///   ordered_prims with the primitives, but ordered such that each nodes' primitives are
+    ///   contiguous, for efficient memory access. Passed in rather than constructed to enable
+    ///   recursive behavior and to allow it to be initialized with the correct capacity from the start.
+    /// split_metho: The algorithm by which we split the primitives
     fn build_recursive(
-        bvh_primitives: &[BvhPrimitive],
-        total_nodes: &mut Mutex<usize>,
-        ordered_prims_offset: &mut Mutex<usize>,
+        bvh_primitives: &mut [BvhPrimitive],
+        primitives: &Vec<Rc<Primitive>>,
+        total_nodes: &AtomicUsize,
+        ordered_prims_offset: &AtomicUsize,
         ordered_prims: &mut Vec<Rc<Primitive>>,
+        split_method: SplitMethod,
     ) -> BvhBuildNode {
-        todo!()
+        debug_assert!(bvh_primitives.len() != 0);
+        debug_assert!(ordered_prims.len() == primitives.len());
+
+        let mut node = BvhBuildNode::default();
+
+        total_nodes.fetch_add(1, Ordering::SeqCst);
+
+        // Compute the bounds of all primitives in the primitive range.
+        // The default of bounds should be an infinite extent, such that the union will restrict it.
+        let bounds = bvh_primitives
+            .iter()
+            .fold(Bounds3f::default(), |acc, p| acc.union(&p.bounds));
+
+        if bounds.surface_area() == 0.0 || bvh_primitives.len() == 1 {
+            // Create leaf BvhBuildNode
+            let first_prim_offset =
+                ordered_prims_offset.fetch_add(bvh_primitives.len(), Ordering::SeqCst);
+            for i in 0..bvh_primitives.len() {
+                let index = bvh_primitives[i].primitive_index;
+                ordered_prims[first_prim_offset + i] = primitives[index].clone();
+            }
+            node.init_leaf(first_prim_offset, bvh_primitives.len(), bounds);
+            return node;
+        }
+        {
+            // Compute bound of primitive centroids and choose split dimension to be the largest dimension of the bounds.
+            let centroid_bounds = bvh_primitives
+                .iter()
+                .fold(Bounds3f::default(), |acc, p| acc.union(&p.bounds));
+            let dim = centroid_bounds.max_dimension();
+
+            if centroid_bounds.max[dim] == centroid_bounds.min[dim] {
+                // Unusual edge case; create leaf BvhBuildNode
+                let first_prim_offset =
+                    ordered_prims_offset.fetch_add(bvh_primitives.len(), Ordering::SeqCst);
+                for i in 0..bvh_primitives.len() {
+                    let index = bvh_primitives[i].primitive_index;
+                    ordered_prims[first_prim_offset + i] = primitives[index].clone();
+                }
+                node.init_leaf(first_prim_offset, bvh_primitives.len(), bounds);
+                return node;
+            } else {
+                // Partition primitives based on the split method, and get the index of the split.
+                let split_index = match split_method {
+                    SplitMethod::Middle => {
+                        let pmid = (centroid_bounds.min[dim] + centroid_bounds.max[dim]) / 2.0;
+                        // TODO We want to partition bvh_primitives in place, which means we want
+                        // a mutable slice, and we also want to use iter_mut().partition_in_place() which
+                        // is nightly, or an equivalent...
+                        let split_index =
+                            partition(bvh_primitives.iter_mut(), |pi: &BvhPrimitive| {
+                                pi.centroid()[dim] < pmid
+                            });
+
+                        if split_index == 0 || split_index == bvh_primitives.len() {
+                            // If the primitives have large overlapping bounding boxes, this may
+                            // fail to partition them; in which case, split by equal counts instead.
+                            split_index
+                            // TODO Actually implement the EqualCounts case and do that here instead
+                            //  of returning split_index
+                        } else {
+                            split_index
+                        }
+                    }
+                };
+
+                // TODO This can be done in parallel, but let's do it sequentially for now.
+                // C++ is quite happy to take disjoint subspans and operate on them in different threads,
+                // which is fine if we know that they truly are disjoint.
+                // Rust will likely complain if I try to do that here via some naive operations.
+                // Luckily, Rayon would handle this for us.
+                // https://doc.rust-lang.org/std/primitive.slice.html#method.split_at_mut
+
+                let left_child = Box::new(Self::build_recursive(
+                    &mut bvh_primitives[0..split_index],
+                    primitives,
+                    total_nodes,
+                    ordered_prims_offset,
+                    ordered_prims,
+                    split_method,
+                ));
+
+                let right_child = Some(Box::new(Self::build_recursive(
+                    &mut bvh_primitives[split_index..],
+                    primitives,
+                    total_nodes,
+                    ordered_prims_offset,
+                    ordered_prims,
+                    split_method,
+                )));
+
+                node.init_interior(dim as u8, left_child, right_child)
+            }
+        }
+
+        node
     }
 
     // Performs a depth-first traversal and stores the nodes in memory in linear order.
@@ -214,40 +332,52 @@ struct BvhBuildNode {
     // The nodes in [first_prim_offset, first_prim_offset + n_primitives) are contained
     // within this node.
     first_prim_offset: usize,
-    n_primitives: i32,
+    n_primitives: usize,
+}
+
+impl Default for BvhBuildNode {
+    fn default() -> Self {
+        Self {
+            bounds: Default::default(),
+            left_child: Default::default(),
+            right_child: Default::default(),
+            split_axis: Default::default(),
+            first_prim_offset: Default::default(),
+            n_primitives: Default::default(),
+        }
+    }
 }
 
 impl BvhBuildNode {
-    pub fn leaf(first_prim_offset: usize, n_primitives: i32, bounds: Bounds3f) -> BvhBuildNode {
-        BvhBuildNode {
-            bounds,
-            left_child: None,
-            right_child: None,
-            split_axis: 0,
-            first_prim_offset,
-            n_primitives,
-        }
+    pub fn init_leaf(&mut self, first_prim_offset: usize, n_primitives: usize, bounds: Bounds3f) {
+        self.bounds = bounds;
+        self.left_child = None;
+        self.right_child = None;
+        self.split_axis = 0;
+        self.first_prim_offset = first_prim_offset;
+        self.n_primitives = n_primitives;
     }
 
-    pub fn interior(
+    pub fn init_interior(
+        &mut self,
         split_axis: u8,
         left_child: Box<BvhBuildNode>,
         right_child: Option<Box<BvhBuildNode>>,
-    ) -> BvhBuildNode {
+    ) {
         // Interior nodes always have at least one child.
         let bounds = if let Some(right) = &right_child {
             left_child.bounds.union(&right.bounds)
         } else {
             left_child.bounds
         };
+        self.bounds = bounds;
+        self.left_child = Some(left_child);
+        self.right_child = right_child;
+        self.split_axis = split_axis;
         // The primitive offset and num_primitives are 0 because interior nodes do not contain primitives.
-        BvhBuildNode {
-            bounds,
-            left_child: Some(left_child),
-            right_child: right_child,
-            split_axis,
-            first_prim_offset: 0,
-            n_primitives: 0,
-        }
+        self.first_prim_offset = 0;
+        self.n_primitives = 0;
     }
 }
+
+// TODO Let's write some tests for constructing a Bvh.
