@@ -41,7 +41,8 @@ pub struct BvhAggregate {
 
 impl PrimitiveI for BvhAggregate {
     fn bounds(&self) -> Bounds3f {
-        todo!()
+        // The root node's bounds cover the full extent.
+        self.nodes[0].bounds
     }
 
     fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
@@ -78,6 +79,13 @@ impl BvhAggregate {
         // This will store the primitives ordered such that the primitives in each leaf node occupy a
         // contiguous range in the array for efficient access. It will be swapped with the original
         // primitives array after the tree is constructed.
+
+        // TODO This is a bug as-is, since we're just getting capacity, not zero-intializing everything...
+        // I thought about default-initializing, but what's the default a polymorphic Primitive?
+        // With Rc being non-nullable, we can't just initialize with null Rc pointers as PBRT does.
+        // The solution might be MaybeUninit, which is some Fun Unsafe Rust Code.
+        // MaybeUninit is a bit like Option without runtime tracking or safety checks.
+        // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
         let mut ordered_primitives: Vec<Rc<Primitive>> = Vec::with_capacity(primitives.len());
 
         // Keeps track of the number of nodes created; this makes it possible to allocate exactly
@@ -143,6 +151,8 @@ impl BvhAggregate {
         split_method: SplitMethod,
     ) -> BvhBuildNode {
         debug_assert!(bvh_primitives.len() != 0);
+        // TODO this fails. Why? Ordered_prims is length 0 (unexpected), primitives is length 1 (expected).
+        // Ah, because it's with capacity, not default-initializing them.
         debug_assert!(ordered_prims.len() == primitives.len());
 
         let mut node = BvhBuildNode::default();
@@ -384,3 +394,44 @@ impl BvhBuildNode {
 }
 
 // TODO Let's write some tests for constructing a Bvh.
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use crate::{
+        aggregate::BvhAggregate,
+        material::{DiffuseMaterial, Material},
+        primitive::{Primitive, PrimitiveI, SimplePrimitive},
+        shape::{Shape, Sphere},
+        spectra::{ConstantSpectrum, Spectrum},
+        texture::SpectrumConstantTexture,
+        transform::Transform,
+    };
+
+    #[test]
+    fn single_primitive_bvh() {
+        let radius = 1.0;
+        let sphere = Sphere::new(
+            Transform::default(),
+            Transform::default(),
+            false,
+            radius,
+            -radius,
+            radius,
+            360.0,
+        );
+        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+            shape: Shape::Sphere(sphere),
+            material,
+        }));
+        let expected_bounds = prim.as_ref().bounds();
+        let prims = vec![prim];
+        let bvh = BvhAggregate::new(prims, 1, crate::aggregate::SplitMethod::Middle);
+        // The BVH boudning box should match the bounding box of the primitive
+        assert_eq!(expected_bounds, bvh.bounds());
+    }
+}

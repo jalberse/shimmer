@@ -55,7 +55,7 @@ impl SpectrumTextureI for SpectrumTexture {
 
 #[derive(Debug)]
 pub struct SpectrumConstantTexture {
-    value: Spectrum,
+    pub value: Spectrum,
 }
 
 impl SpectrumTextureI for SpectrumConstantTexture {

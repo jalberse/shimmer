@@ -61,8 +61,8 @@ impl PrimitiveI for Primitive {
 /// A Primitive which simply adds material information to the surface interaction of
 /// the shape.
 pub struct SimplePrimitive {
-    shape: Shape,
-    material: Rc<Material>,
+    pub shape: Shape,
+    pub material: Rc<Material>,
 }
 
 impl PrimitiveI for SimplePrimitive {
