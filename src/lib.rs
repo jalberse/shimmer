@@ -1,5 +1,6 @@
 // TODO these shouldn't all be public; reorganize.
 
+mod aggregate;
 pub mod bounding_box;
 mod bsdf;
 mod bxdf;
