@@ -4,7 +4,7 @@ use crate::{
     Float,
 };
 
-trait RayI {
+pub trait RayI {
     fn get(&self, t: Float) -> Point3f;
 }
 

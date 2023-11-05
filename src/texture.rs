@@ -12,6 +12,7 @@ pub trait FloatTextureI {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float;
 }
 
+#[derive(Debug)]
 pub enum FloatTexture {
     Constant(FloatConstantTexture),
 }
@@ -24,6 +25,7 @@ impl FloatTextureI for FloatTexture {
     }
 }
 
+#[derive(Debug)]
 pub struct FloatConstantTexture {
     value: Float,
 }
@@ -38,6 +40,7 @@ pub trait SpectrumTextureI {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
 
+#[derive(Debug)]
 pub enum SpectrumTexture {
     Constant(SpectrumConstantTexture),
 }
@@ -50,6 +53,7 @@ impl SpectrumTextureI for SpectrumTexture {
     }
 }
 
+#[derive(Debug)]
 pub struct SpectrumConstantTexture {
     value: Spectrum,
 }
@@ -176,6 +180,22 @@ impl TextureEvalContext {
 
 impl From<SurfaceInteraction> for TextureEvalContext {
     fn from(value: SurfaceInteraction) -> Self {
+        Self {
+            p: value.p(),
+            dpdx: value.dpdx,
+            dpdy: value.dpdy,
+            n: value.interaction.n,
+            uv: value.interaction.uv,
+            dudx: value.dudx,
+            dudy: value.dudy,
+            dvdx: value.dvdx,
+            dvdy: value.dvdy,
+        }
+    }
+}
+
+impl From<&SurfaceInteraction> for TextureEvalContext {
+    fn from(value: &SurfaceInteraction) -> Self {
         Self {
             p: value.p(),
             dpdx: value.dpdx,

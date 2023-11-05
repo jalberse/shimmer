@@ -1,9 +1,20 @@
 use std::rc::Rc;
 
 use crate::{
+    bsdf::BSDF,
+    bxdf::{self, DiffuseBxDF},
+    camera::{Camera, CameraI},
     light::Light,
-    material::Material,
-    vecmath::{point::Point3fi, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Vector3f},
+    material::{Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
+    math::DifferenceOfProducts,
+    options::Options,
+    ray::RayDifferential,
+    sampler::{Sampler, SamplerI},
+    spectra::sampled_wavelengths::SampledWavelengths,
+    vecmath::{
+        normal::Normal3, point::Point3fi, vector::Vector3, Normal3f, Normalize, Point2f, Point3f,
+        Vector3f,
+    },
     Float,
 };
 
@@ -117,6 +128,159 @@ impl SurfaceInteraction {
     ) {
         self.area_light = area_light.clone();
         self.material = Some(mtl.clone());
+    }
+
+    // TODO Can this and compute_differentials() be made const?
+    //   Although I suppose that surface interactions are short-lived, so perhaps it's okay
+    //   to leave them mut.
+    pub fn get_bsdf(
+        &mut self,
+        ray: &RayDifferential,
+        lambda: &SampledWavelengths,
+        camera: &Camera,
+        sampler: &mut Sampler,
+        options: &Options,
+    ) -> BSDF {
+        // Estimate (u, v) and position differentials at intersection point
+        // TODO compute_differentials() is done now, so we can implement this.
+        //      Go reference this in the book.
+        //      I think that once this is implemented, we can look at implementing an integrator?
+        //      starting with randomwalk I suppose.
+        self.compute_differentials(ray, camera, sampler.samples_per_pixel(), options);
+
+        // TODO resolve MixMaterial, once I create MixMaterial.
+
+        // This should occur only at a non-scattering interface between two types of participating media.
+        if self.material.is_none() {
+            Default::default()
+        }
+
+        let material = self.material.as_ref().unwrap();
+
+        let displacement = material.as_ref().get_bump_map();
+        let normal_map = material.as_ref().get_normal_map();
+        if displacement.is_some() || normal_map.is_some() {
+            // TODO handle shading using normal or bump map
+            panic!("Normal and displacement maps not fully implemented yet!");
+        }
+
+        let material_eval_context = MaterialEvalContext::from(&*self);
+        let bsdf = material.get_bsdf(
+            &UniversalTextureEvaluator {},
+            &material_eval_context,
+            lambda,
+        );
+
+        let bsdf = if options.force_diffuse {
+            // TODO PBRT also checks if bsdf is null. PBRT does this alot with its
+            //   tagged pointers. We might want to have a "Null" variant of our equivalent enums
+            //   and check for that? We could wrap in Option, which perhaps expresses intent better,
+            //   but it also involves more memory consumption...
+
+            // Override bsdf with the diffuse equivalent
+            let r = bsdf.rho_hd(
+                self.interaction.wo,
+                &[sampler.get_1d()],
+                &[sampler.get_2d()],
+            );
+            BSDF::new(
+                self.shading.n,
+                self.shading.dpdu,
+                bxdf::BxDF::Diffuse(DiffuseBxDF::new(r)),
+            )
+        } else {
+            bsdf
+        };
+
+        bsdf
+    }
+
+    pub fn compute_differentials(
+        &mut self,
+        ray: &RayDifferential,
+        camera: &Camera,
+        samples_per_pixel: i32,
+        options: &Options,
+    ) {
+        if options.disable_texture_filtering {
+            self.dudx = 0.0;
+            self.dudy = 0.0;
+            self.dvdx = 0.0;
+            self.dvdy = 0.0;
+            self.dpdx = Vector3f::ZERO;
+            self.dpdy = Vector3f::ZERO;
+            return;
+        }
+
+        if ray.auxiliary.as_ref().is_some_and(|aux| {
+            self.interaction.n.dot_vector(&aux.rx_direction) != 0.0
+                && self.interaction.n.dot_vector(&aux.ry_direction) != 0.0
+        }) {
+            let aux = ray.auxiliary.as_ref().unwrap();
+            // Estimate screen-space change in pt using ray differentials
+            // Compute auxiliary intersecrtion points iwth plane, px and py
+            let d = -self.interaction.n.dot_vector(&self.p().into());
+            let tx = (-self.interaction.n.dot_vector(&aux.rx_origin.into()) - d)
+                / self.interaction.n.dot_vector(&aux.rx_direction);
+            debug_assert!(tx.is_finite() && !tx.is_nan());
+            let px = aux.rx_origin + tx * aux.rx_direction;
+            let ty = (-self.interaction.n.dot_vector(&aux.ry_origin.into()) - d)
+                / self.interaction.n.dot_vector(&aux.ry_direction);
+            debug_assert!(ty.is_finite() && !ty.is_nan());
+            let py = aux.ry_origin + ty * aux.ry_direction;
+
+            self.dpdx = px - self.p();
+            self.dpdy = py - self.p();
+        } else {
+            // Approximate screen-based change in pt based on camera projection
+            (self.dpdx, self.dpdy) = camera.approximate_dp_dxy(
+                self.p(),
+                self.interaction.n,
+                self.interaction.time,
+                samples_per_pixel,
+                options,
+            );
+        }
+
+        // Estimate screen-space changes in (u, v).
+        let ata00 = self.dpdu.dot(&self.dpdu);
+        let ata01 = self.dpdu.dot(&self.dpdv);
+        let ata11 = self.dpdv.dot(&self.dpdv);
+        let inv_det = 1.0 / Float::difference_of_products(ata00, ata11, ata01, ata01);
+        let inv_det = if inv_det.is_finite() { inv_det } else { 0.0 };
+
+        let atb0x = self.dpdu.dot(&self.dpdx);
+        let atb1x = self.dpdv.dot(&self.dpdx);
+        let atb0y = self.dpdu.dot(&self.dpdy);
+        let atb1y = self.dpdv.dot(&self.dpdy);
+
+        // COmpute u and v derivatives wrt x and y
+        self.dudx = Float::difference_of_products(ata11, atb0x, ata01, atb1x) * inv_det;
+        self.dvdx = Float::difference_of_products(ata00, atb1x, ata01, atb0x) * inv_det;
+        self.dudy = Float::difference_of_products(ata11, atb0y, ata01, atb1y) * inv_det;
+        self.dvdy = Float::difference_of_products(ata00, atb1y, ata01, atb0y) * inv_det;
+
+        // Clamp derivatives to reasonable values
+        self.dudx = if self.dudx.is_finite() {
+            Float::clamp(self.dudx, -1e8, 1e8)
+        } else {
+            0.0
+        };
+        self.dvdx = if self.dvdx.is_finite() {
+            Float::clamp(self.dvdx, -1e8, 1e8)
+        } else {
+            0.0
+        };
+        self.dudy = if self.dudy.is_finite() {
+            Float::clamp(self.dudy, -1e8, 1e8)
+        } else {
+            0.0
+        };
+        self.dvdy = if self.dvdy.is_finite() {
+            Float::clamp(self.dvdy, -1e8, 1e8)
+        } else {
+            0.0
+        };
     }
 }
 
