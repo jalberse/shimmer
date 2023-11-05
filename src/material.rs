@@ -158,8 +158,8 @@ pub struct MaterialEvalContext {
     dpdus: Vector3f,
 }
 
-impl MaterialEvalContext {
-    pub fn new(si: &SurfaceInteraction) -> MaterialEvalContext {
+impl From<&SurfaceInteraction> for MaterialEvalContext {
+    fn from(si: &SurfaceInteraction) -> Self {
         MaterialEvalContext {
             tex_ctx: TextureEvalContext::from(si),
             wo: si.interaction.wo,

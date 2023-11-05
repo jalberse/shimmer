@@ -26,6 +26,7 @@ pub mod options;
 mod primitive;
 pub mod ray;
 pub mod rgb_to_spectra;
+mod sampler;
 pub mod sampling;
 pub mod shape;
 pub mod spectra;

@@ -10,10 +10,10 @@ use crate::{
     math::lerp,
     medium::Medium,
     options::{Options, RenderingCoordinateSystem},
-    ray::{AuxiliaryRays, Ray, RayDifferential},
+    ray::{AuxiliaryRays, Ray, RayDifferential, RayI},
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     transform::Transform,
-    vecmath::{Normal3f, Point2f, Point3f, Tuple3, Vector3f},
+    vecmath::{normal::Normal3, Normal3f, Normalize, Point2f, Point3f, Tuple3, Vector3f},
     Float,
 };
 
@@ -40,6 +40,16 @@ pub trait CameraI {
     fn init_metadata(&self, metadata: &mut ImageMetadata);
 
     fn get_camera_transform(&self) -> &CameraTransform;
+
+    /// Returns an appoximation for (dpdx, dpdy) for a point in the scene.
+    fn approximate_dp_dxy(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        time: Float,
+        samples_per_pixel: i32,
+        options: &Options,
+    ) -> (Vector3f, Vector3f);
 }
 
 pub enum Camera {
@@ -90,6 +100,19 @@ impl CameraI for Camera {
             Camera::Orthographic(c) => c.get_camera_transform(),
         }
     }
+
+    fn approximate_dp_dxy(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        time: Float,
+        samples_per_pixel: i32,
+        options: &Options,
+    ) -> (Vector3f, Vector3f) {
+        match self {
+            Camera::Orthographic(c) => c.approximate_dp_dxy(p, n, time, samples_per_pixel, options),
+        }
+    }
 }
 
 /// Shared implementation details for different kinds of cameras.
@@ -102,25 +125,13 @@ struct CameraBase {
     film: Film,
     /// The scattering medium that the camera lies in, if any.
     medium: Option<Medium>,
+    min_pos_differential_x: Vector3f,
+    min_pos_differential_y: Vector3f,
+    min_dir_differential_x: Vector3f,
+    min_dir_differential_y: Vector3f,
 }
 
 impl CameraBase {
-    pub fn new(
-        camera_transform: CameraTransform,
-        shutter_open: Float,
-        shutter_close: Float,
-        film: Film,
-        medium: Option<Medium>,
-    ) -> CameraBase {
-        CameraBase {
-            camera_transform,
-            shutter_open,
-            shutter_close,
-            film,
-            medium,
-        }
-    }
-
     pub fn get_film(&self) -> &Film {
         &self.film
     }
@@ -133,6 +144,9 @@ impl CameraBase {
                 .get_matrix(),
         );
     }
+
+    // TODO rather than _v variants etc, should probably just specify that these are Trasnformable via generic constraint.
+    // I think I already have that available in Transform now anyways?
 
     pub fn render_from_camera_v(&self, v: &Vector3f) -> Vector3f {
         self.camera_transform.render_from_camera_v(v)
@@ -243,6 +257,53 @@ impl CameraBase {
             base_camera_ray.weight,
         ))
     }
+
+    pub fn approximate_dp_dxy(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        time: Float,
+        samples_per_pixel: i32,
+        options: &Options,
+    ) -> (Vector3f, Vector3f) {
+        let p_camera = self.camera_from_render_p(&p, time);
+
+        // Compute tangent plane equation for ray differential intersections
+        let down_z_from_camera =
+            Transform::rotate_from_to(&Vector3f::from(p_camera).normalize(), &Vector3f::Z);
+        let p_down_z = down_z_from_camera.apply(&p_camera);
+        let n_down_z = down_z_from_camera.apply(&self.camera_from_render_n(n, time));
+        let d = n_down_z.z * p_down_z.z;
+
+        // Find intersection points for approximated camera differential rays
+        let x_ray = Ray::new(
+            Point3f::ZERO + self.min_pos_differential_x,
+            Vector3f::Z + self.min_dir_differential_x,
+            None,
+        );
+        let tx = -(n_down_z.dot_vector(&x_ray.o.into()) - d) / n_down_z.dot_vector(&x_ray.d);
+        let y_ray = Ray::new(
+            Point3f::ZERO + self.min_pos_differential_y,
+            Vector3f::Z + self.min_dir_differential_y,
+            None,
+        );
+
+        let ty = -(n_down_z.dot_vector(&y_ray.o.into()) - d) / n_down_z.dot_vector(&y_ray.d);
+        let px = x_ray.get(tx);
+        let py = y_ray.get(ty);
+
+        let spp_scale = if options.disable_pixel_jitter {
+            1.0
+        } else {
+            Float::max(0.125, 1.0 / (samples_per_pixel as Float).sqrt())
+        };
+
+        let dpdx =
+            spp_scale * self.render_from_camera_v(&down_z_from_camera.apply_inv(&(px - p_down_z)));
+        let dpdy =
+            spp_scale * self.render_from_camera_v(&down_z_from_camera.apply_inv(&(py - p_down_z)));
+        (dpdx, dpdy)
+    }
 }
 
 pub struct CameraRay {
@@ -293,7 +354,7 @@ pub struct CameraTransform {
 }
 
 impl CameraTransform {
-    pub fn new(world_from_camera: &Transform, options: Options) -> CameraTransform {
+    pub fn new(world_from_camera: &Transform, options: &Options) -> CameraTransform {
         // TODO would need to update this for AnimatedTransform
         let world_from_render = match options.rendering_coord_system {
             RenderingCoordinateSystem::Camera => *world_from_camera,
@@ -391,8 +452,18 @@ impl ProjectiveCameraBase {
         screen_from_camera: Transform,
         screen_window: Bounds2f,
     ) -> ProjectiveCameraBase {
-        let camera_base =
-            CameraBase::new(camera_transform, shutter_open, shutter_close, film, medium);
+        let camera_base = CameraBase {
+            camera_transform,
+            shutter_open,
+            shutter_close,
+            film,
+            medium,
+            // These differentials can be set by the calling code. TODO - Can we improve this?
+            min_pos_differential_x: Default::default(),
+            min_pos_differential_y: Default::default(),
+            min_dir_differential_x: Default::default(),
+            min_dir_differential_y: Default::default(),
+        };
         let ndc_from_screen = Transform::scale(
             1.0 / (screen_window.max.x - screen_window.min.x),
             1.0 / (screen_window.max.y - screen_window.min.y),
@@ -452,7 +523,8 @@ impl OrthographicCamera {
         screen_window: Bounds2f,
     ) -> OrthographicCamera {
         let screen_from_camera = Transform::orthographic(0.0, 1.0);
-        let projective_base = ProjectiveCameraBase::new(
+
+        let mut projective_base = ProjectiveCameraBase::new(
             camera_transform,
             shutter_open,
             shutter_close,
@@ -465,6 +537,13 @@ impl OrthographicCamera {
         );
         let dx_camera = projective_base.camera_from_raster.apply(&Vector3f::X);
         let dy_camera = projective_base.camera_from_raster.apply(&Vector3f::Y);
+
+        // TODO I don't love having to make projective_base mutable and initializing these values
+        // here; can we re-work the initialization to keep things const?
+        projective_base.camera_base.min_dir_differential_x = Vector3f::ZERO;
+        projective_base.camera_base.min_dir_differential_y = Vector3f::ZERO;
+        projective_base.camera_base.min_pos_differential_x = dx_camera;
+        projective_base.camera_base.min_pos_differential_y = dy_camera;
 
         OrthographicCamera {
             projective_base,
@@ -537,5 +616,18 @@ impl CameraI for OrthographicCamera {
 
     fn get_camera_transform(&self) -> &CameraTransform {
         &self.projective_base.camera_base.camera_transform
+    }
+
+    fn approximate_dp_dxy(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        time: Float,
+        samples_per_pixel: i32,
+        options: &Options,
+    ) -> (Vector3f, Vector3f) {
+        self.projective_base
+            .camera_base
+            .approximate_dp_dxy(p, n, time, samples_per_pixel, options)
     }
 }
