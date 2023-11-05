@@ -297,10 +297,13 @@ impl BvhAggregate {
 /// or the offset to the second child.
 pub enum LinearOffset {
     PrimitivesOffset(usize),
+    /// Only the second child offset is needed, as the first child
+    /// immediately follows the parent in the flat vector.
     SecondChildOffset(usize),
 }
 
 /// A BVH Node that is stored in a compact, linear representation of a BVH.
+#[repr(align(32))]
 pub struct LinearBvhNode {
     bounds: Bounds3f,
     offset: LinearOffset,
