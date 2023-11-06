@@ -6,12 +6,8 @@
 //   I could try to do the same I suppose, but I suspect we'll run into ownership issues.
 
 use std::{
-    io::Split,
     rc::Rc,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Mutex,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use itertools::{partition, Itertools};
@@ -80,13 +76,11 @@ impl BvhAggregate {
         // contiguous range in the array for efficient access. It will be swapped with the original
         // primitives array after the tree is constructed.
 
-        // TODO This is a bug as-is, since we're just getting capacity, not zero-intializing everything...
-        // I thought about default-initializing, but what's the default a polymorphic Primitive?
-        // With Rc being non-nullable, we can't just initialize with null Rc pointers as PBRT does.
-        // The solution might be MaybeUninit, which is some Fun Unsafe Rust Code.
-        // MaybeUninit is a bit like Option without runtime tracking or safety checks.
+        // TODO Consider using MaybeUninit to avoid runtime costs of Option.
         // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
-        let mut ordered_primitives: Vec<Rc<Primitive>> = Vec::with_capacity(primitives.len());
+        // OR, we can reorganize this code to build ordered_primitives as we go (and use with_capacity(primitives.len()))
+        // rather than initializing a pre-allocated vec.
+        let mut ordered_primitives: Vec<Option<Rc<Primitive>>> = vec![None; primitives.len()];
 
         // Keeps track of the number of nodes created; this makes it possible to allocate exactly
         // the right size Vec for the LinearBvhNodes list.
@@ -110,17 +104,29 @@ impl BvhAggregate {
             }
         };
 
+        let mut ordered_primitives = ordered_primitives
+            .into_iter()
+            .map(|p| p.expect("Not all ordered primitives initialized in BVH construction!"))
+            .collect_vec();
+
         // Swap so that primtives stores the ordered primitives.
         std::mem::swap(&mut primitives, &mut ordered_primitives);
 
         // This can be a significant chunk of memory that we don't need anymore; free it.
         drop(bvh_primitives);
 
-        let mut nodes: Vec<LinearBvhNode> = Vec::with_capacity(total_nodes.load(Ordering::SeqCst));
+        // TODO This has the same issue as the ordered_primitives above; we probably want a
+        // similar solution to what we do there.
+        let mut nodes: Vec<Option<LinearBvhNode>> = vec![None; total_nodes.load(Ordering::SeqCst)];
 
         let mut offset = 0;
         Self::flatten_bvh(&mut nodes, Some(Box::new(root)), &mut offset);
         debug_assert_eq!(total_nodes.load(Ordering::SeqCst), offset);
+
+        let nodes = nodes
+            .into_iter()
+            .map(|n| n.expect("Not all nodes initialized in flatten_bvh()!"))
+            .collect_vec();
 
         BvhAggregate {
             max_prims_in_node: usize::max(255, max_prims_in_node),
@@ -147,12 +153,10 @@ impl BvhAggregate {
         primitives: &Vec<Rc<Primitive>>,
         total_nodes: &AtomicUsize,
         ordered_prims_offset: &AtomicUsize,
-        ordered_prims: &mut Vec<Rc<Primitive>>,
+        ordered_prims: &mut Vec<Option<Rc<Primitive>>>,
         split_method: SplitMethod,
     ) -> BvhBuildNode {
         debug_assert!(bvh_primitives.len() != 0);
-        // TODO this fails. Why? Ordered_prims is length 0 (unexpected), primitives is length 1 (expected).
-        // Ah, because it's with capacity, not default-initializing them.
         debug_assert!(ordered_prims.len() == primitives.len());
 
         let mut node = BvhBuildNode::default();
@@ -171,7 +175,8 @@ impl BvhAggregate {
                 ordered_prims_offset.fetch_add(bvh_primitives.len(), Ordering::SeqCst);
             for i in 0..bvh_primitives.len() {
                 let index = bvh_primitives[i].primitive_index;
-                ordered_prims[first_prim_offset + i] = primitives[index].clone();
+                debug_assert!(ordered_prims[first_prim_offset + i].is_none());
+                ordered_prims[first_prim_offset + i] = Some(primitives[index].clone());
             }
             node.init_leaf(first_prim_offset, bvh_primitives.len(), bounds);
             return node;
@@ -189,7 +194,8 @@ impl BvhAggregate {
                     ordered_prims_offset.fetch_add(bvh_primitives.len(), Ordering::SeqCst);
                 for i in 0..bvh_primitives.len() {
                     let index = bvh_primitives[i].primitive_index;
-                    ordered_prims[first_prim_offset + i] = primitives[index].clone();
+                    debug_assert!(ordered_prims[first_prim_offset + i].is_none());
+                    ordered_prims[first_prim_offset + i] = Some(primitives[index].clone());
                 }
                 node.init_leaf(first_prim_offset, bvh_primitives.len(), bounds);
                 return node;
@@ -255,7 +261,7 @@ impl BvhAggregate {
     // node is the root of the tree; this function is recursive, so it is also the root of sub-trees
     // as this traverses down the tree.
     fn flatten_bvh(
-        linear_nodes: &mut Vec<LinearBvhNode>,
+        linear_nodes: &mut Vec<Option<LinearBvhNode>>,
         node: Option<Box<BvhBuildNode>>,
         offset: &mut usize,
     ) -> usize {
@@ -297,7 +303,8 @@ impl BvhAggregate {
                 axis: linear_node_axis,
             }
         };
-        linear_nodes[node_offset] = linear_node;
+        debug_assert!(linear_nodes[node_offset].is_none());
+        linear_nodes[node_offset] = Some(linear_node);
 
         node_offset
     }
@@ -305,6 +312,7 @@ impl BvhAggregate {
 
 /// Within a LinearBvhNode, stores either the offset to the primitives for the node,
 /// or the offset to the second child.
+#[derive(Debug, Copy, Clone)]
 pub enum LinearOffset {
     PrimitivesOffset(usize),
     /// Only the second child offset is needed, as the first child
@@ -314,6 +322,7 @@ pub enum LinearOffset {
 
 /// A BVH Node that is stored in a compact, linear representation of a BVH.
 #[repr(align(32))]
+#[derive(Debug, Copy, Clone)]
 pub struct LinearBvhNode {
     bounds: Bounds3f,
     offset: LinearOffset,
@@ -392,8 +401,6 @@ impl BvhBuildNode {
         self.n_primitives = 0;
     }
 }
-
-// TODO Let's write some tests for constructing a Bvh.
 
 #[cfg(test)]
 mod tests {
