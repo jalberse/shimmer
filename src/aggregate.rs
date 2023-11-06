@@ -661,7 +661,8 @@ mod tests {
         assert_approx_eq!(Float, si.intr.p().y, 0.0);
         assert_approx_eq!(Float, si.intr.p().y, 0.0);
 
-        // TODO test the predicate intersection as well.
+        let hit = bvh.intersect_predicate(&ray, Float::INFINITY);
+        assert!(hit);
 
         // This ray should not intersect the spheres.
         let ray = Ray::new(
@@ -671,5 +672,7 @@ mod tests {
         );
         let si = bvh.intersect(&ray, Float::INFINITY);
         assert!(si.is_none());
+        let hit = bvh.intersect_predicate(&ray, Float::INFINITY);
+        assert!(!hit);
     }
 }
