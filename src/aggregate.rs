@@ -129,7 +129,7 @@ impl BvhAggregate {
             .collect_vec();
 
         BvhAggregate {
-            max_prims_in_node: usize::max(255, max_prims_in_node),
+            max_prims_in_node: usize::min(255, max_prims_in_node),
             primitives,
             split_method,
             nodes,
@@ -443,5 +443,6 @@ mod tests {
         let bvh = BvhAggregate::new(prims, 1, crate::aggregate::SplitMethod::Middle);
         // The BVH boudning box should match the bounding box of the primitive
         assert_eq!(expected_bounds, bvh.bounds());
+        assert_eq!(1, bvh.max_prims_in_node);
     }
 }
