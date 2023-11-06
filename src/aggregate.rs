@@ -155,8 +155,8 @@ impl PrimitiveI for BvhAggregate {
                     if to_visit_offset == 0 {
                         break;
                     }
-                    current_node_index = nodes_to_visit[to_visit_offset];
                     to_visit_offset -= 1;
+                    current_node_index = nodes_to_visit[to_visit_offset];
                 } else {
                     // Interior node; put far BVH node on nodes_to_visit stack,
                     // advance to the near node
@@ -174,8 +174,8 @@ impl PrimitiveI for BvhAggregate {
                 if to_visit_offset == 0 {
                     break;
                 }
-                current_node_index = nodes_to_visit[to_visit_offset];
                 to_visit_offset -= 1;
+                current_node_index = nodes_to_visit[to_visit_offset];
             }
         }
         false
@@ -599,10 +599,6 @@ mod tests {
         let prims = vec![prim];
         let bvh = BvhAggregate::new(prims, 1, crate::aggregate::SplitMethod::Middle);
 
-        // TODO Both this and the next test seem to fail because of a floating point precision bug
-        // in the sphere intersection code. Fix that and I think these should work, without issues around being exactly pointed at the center of the sphere.
-        // I'm going through and dealing with that floating point precision stuff now...
-
         let ray = Ray::new(Point3f::NEG_X * 5.0, Vector3f::X, None);
         let si = bvh.intersect(&ray, Float::INFINITY);
         assert!(si.is_some());
@@ -612,7 +608,7 @@ mod tests {
         // Ray started at -5, radius is 1, so it hits at 4.0.
         assert_approx_eq!(Float, si.t_hit, 4.0);
         // The hit should be at just about (-1, 0, 0)
-        assert_approx_eq!(Float, si.intr.p().x, -1.0);
+        assert_approx_eq!(Float, si.intr.p().x, -1.0, epsilon = 0.000001);
         assert_approx_eq!(Float, si.intr.p().y, 0.0);
         assert_approx_eq!(Float, si.intr.p().y, 0.0);
     }
@@ -620,7 +616,7 @@ mod tests {
     #[test]
     fn set_of_spheres() {
         let mut prims: Vec<Rc<Primitive>> = Vec::new();
-        for multiplier in [-3.5, 0.0, 3.5] {
+        for multiplier in [-3.5, 0.0, 5.0] {
             let radius = 1.0;
 
             let x_translate = Transform::translate(Vector3f::X * multiplier);
@@ -659,9 +655,9 @@ mod tests {
         // The normal should be in the negative X direction (we're hitting a sphere head-on in the positive X direction)
         assert_approx_eq!(Float, si.intr.shading.n.dot(&Normal3f::NEG_X), 1.0);
         // Ray started at -10, radius is 1 pushing the closest sphere's position to -3.5 - 1.0 == -4.5, so it hits at 5.5.
-        assert_approx_eq!(Float, si.t_hit, 5.5);
-        // The hit should be at just about (-1, 0, 0)
-        assert_approx_eq!(Float, si.intr.p().x, -5.5);
+        assert_approx_eq!(Float, si.t_hit, 5.5, epsilon = 0.00001);
+        // The hit should be at just about (-4.5, 0, 0), as center is at (-3.5, 0, 0) and it has a radius of 1.
+        assert_approx_eq!(Float, si.intr.p().x, -4.5, epsilon = 0.00001);
         assert_approx_eq!(Float, si.intr.p().y, 0.0);
         assert_approx_eq!(Float, si.intr.p().y, 0.0);
 

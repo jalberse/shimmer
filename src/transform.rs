@@ -253,8 +253,8 @@ impl Transform {
 
     pub fn inverse(&self) -> Transform {
         Transform {
-            m: self.m,
-            m_inv: self.m_inv,
+            m: self.m_inv,
+            m_inv: self.m,
         }
     }
 

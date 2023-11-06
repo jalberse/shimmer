@@ -631,7 +631,6 @@ mod tests {
         let ray = Ray::new(ray.o, -ray.d, None);
         assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
 
-        // TODO This is returning a hit? Wtf?
         let ray = Ray::new(Point3f::new(0.0, 1.0001, -2.0), Vector3f::Z, None);
         assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
     }
