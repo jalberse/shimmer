@@ -17,11 +17,11 @@ use crate::{
     primitive::{Primitive, PrimitiveI},
     ray::Ray,
     shape::ShapeIntersection,
-    vecmath::Point3f,
+    vecmath::{Point3f, Tuple3, Vector3f},
     Float,
 };
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SplitMethod {
     // TODO Other split methods; Middle isn't very good, but simple for the first implementation.\
     // EqualCounts is the next simplest.
@@ -42,11 +42,143 @@ impl PrimitiveI for BvhAggregate {
     }
 
     fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
-        todo!()
+        if self.nodes.is_empty() {
+            return None;
+        }
+
+        let inv_dir = Vector3f::new(1.0 / ray.d.x, 1.0 / ray.d.y, 1.0 / ray.d.z);
+        let dir_is_neg: [usize; 3] = [
+            (inv_dir.x < 0.0) as usize,
+            (inv_dir.y < 0.0) as usize,
+            (inv_dir.z < 0.0) as usize,
+        ];
+
+        // Follow the ray through BVH nodes to find primitive intersections
+        let mut si: Option<ShapeIntersection> = None;
+        let mut t_max = t_max;
+
+        let mut to_visit_offset = 0;
+        let mut current_node_index = 0;
+        // Acts as a stack storing the nodes that still need to be visited
+        let mut nodes_to_visit = [0; 64];
+
+        loop {
+            let node = &self.nodes[current_node_index];
+            // Check ray against BVH node
+            if node
+                .bounds
+                .intersect_p_cached(ray.o, ray.d, t_max, inv_dir, dir_is_neg)
+            {
+                if node.n_primitives > 0 {
+                    // Leaf node; intersect ray with primitives in the node
+                    for i in 0..node.n_primitives {
+                        // TODO Actually, given this use case, let's not store the offset
+                        // in a variant. The runtime cost of the match while extremely small
+                        // is probably less important than saving the byte or whatever.
+                        let prim_si = self.primitives[node.primitive_offset + i as usize]
+                            .as_ref()
+                            .intersect(ray, t_max);
+                        if let Some(prim_si) = prim_si {
+                            // Don't break; there may be a closer intersection, enforced by t_max.
+                            t_max = prim_si.t_hit;
+                            si = Some(prim_si);
+                        }
+                    }
+                    if to_visit_offset == 0 {
+                        break;
+                    }
+                    current_node_index = nodes_to_visit[to_visit_offset];
+                    to_visit_offset -= 1;
+                } else {
+                    // Interior node; put far BVH node on nodes_to_visit stack,
+                    // advance to the near node
+                    if dir_is_neg[node.axis as usize] != 0 {
+                        nodes_to_visit[to_visit_offset] = current_node_index + 1;
+                        to_visit_offset += 1;
+                        current_node_index = node.second_child_offset;
+                    } else {
+                        nodes_to_visit[to_visit_offset] = node.second_child_offset;
+                        to_visit_offset += 1;
+                        current_node_index += 1;
+                    }
+                }
+            } else {
+                if to_visit_offset == 0 {
+                    break;
+                }
+                current_node_index = nodes_to_visit[to_visit_offset];
+                to_visit_offset -= 1;
+            }
+        }
+
+        si
     }
 
     fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
-        todo!()
+        if self.nodes.is_empty() {
+            return false;
+        }
+
+        let inv_dir = Vector3f::new(1.0 / ray.d.x, 1.0 / ray.d.y, 1.0 / ray.d.z);
+        let dir_is_neg: [usize; 3] = [
+            (inv_dir.x < 0.0) as usize,
+            (inv_dir.y < 0.0) as usize,
+            (inv_dir.z < 0.0) as usize,
+        ];
+
+        // Follow the ray through BVH nodes to find primitive intersections
+        let mut to_visit_offset = 0;
+        let mut current_node_index = 0;
+        // Acts as a stack storing the nodes that still need to be visited
+        let mut nodes_to_visit = [0; 64];
+
+        loop {
+            let node = &self.nodes[current_node_index];
+            // Check ray against BVH node
+            if node
+                .bounds
+                .intersect_p_cached(ray.o, ray.d, t_max, inv_dir, dir_is_neg)
+            {
+                if node.n_primitives > 0 {
+                    // Leaf node; intersect ray with primitives in the node
+                    for i in 0..node.n_primitives {
+                        // TODO Actually, given this use case, let's not store the offset
+                        // in a variant. The runtime cost of the match while extremely small
+                        // is probably less important than saving the byte or whatever.
+                        if self.primitives[node.primitive_offset + i as usize]
+                            .as_ref()
+                            .intersect_predicate(ray, t_max)
+                        {
+                            return true;
+                        }
+                    }
+                    if to_visit_offset == 0 {
+                        break;
+                    }
+                    current_node_index = nodes_to_visit[to_visit_offset];
+                    to_visit_offset -= 1;
+                } else {
+                    // Interior node; put far BVH node on nodes_to_visit stack,
+                    // advance to the near node
+                    if dir_is_neg[node.axis as usize] != 0 {
+                        nodes_to_visit[to_visit_offset] = current_node_index + 1;
+                        to_visit_offset += 1;
+                        current_node_index = node.second_child_offset;
+                    } else {
+                        nodes_to_visit[to_visit_offset] = node.second_child_offset;
+                        to_visit_offset += 1;
+                        current_node_index += 1;
+                    }
+                }
+            } else {
+                if to_visit_offset == 0 {
+                    break;
+                }
+                current_node_index = nodes_to_visit[to_visit_offset];
+                to_visit_offset -= 1;
+            }
+        }
+        false
     }
 }
 
@@ -284,11 +416,11 @@ impl BvhAggregate {
             // Leaf node!
             debug_assert!(node.left_child.is_none() && node.right_child.is_none());
             debug_assert!(node.n_primitives < 65536);
-            let linear_node_offset = LinearOffset::PrimitivesOffset(node.first_prim_offset);
             let linear_nod_n_primitives = node.n_primitives as u16;
             LinearBvhNode {
                 bounds: linear_node_bounds,
-                offset: linear_node_offset,
+                primitive_offset: node.first_prim_offset,
+                second_child_offset: 0,
                 n_primitives: linear_nod_n_primitives,
                 axis: 0,
             }
@@ -298,10 +430,10 @@ impl BvhAggregate {
             let linear_node_n_primitives = 0;
             Self::flatten_bvh(linear_nodes, node.left_child, offset);
             let second_child_offset = Self::flatten_bvh(linear_nodes, node.right_child, offset);
-            let linear_node_offset = LinearOffset::SecondChildOffset(second_child_offset);
             LinearBvhNode {
                 bounds: linear_node_bounds,
-                offset: linear_node_offset,
+                primitive_offset: 0,
+                second_child_offset,
                 n_primitives: linear_node_n_primitives,
                 axis: linear_node_axis,
             }
@@ -313,22 +445,15 @@ impl BvhAggregate {
     }
 }
 
-/// Within a LinearBvhNode, stores either the offset to the primitives for the node,
-/// or the offset to the second child.
-#[derive(Debug, Copy, Clone)]
-pub enum LinearOffset {
-    PrimitivesOffset(usize),
-    /// Only the second child offset is needed, as the first child
-    /// immediately follows the parent in the flat vector.
-    SecondChildOffset(usize),
-}
-
 /// A BVH Node that is stored in a compact, linear representation of a BVH.
 #[repr(align(32))]
 #[derive(Debug, Copy, Clone)]
 pub struct LinearBvhNode {
     bounds: Bounds3f,
-    offset: LinearOffset,
+    primitive_offset: usize,
+    /// Only the second child offset is needed, as the first child
+    /// immediately follows the parent in the flat vector.
+    second_child_offset: usize,
     n_primitives: u16,
     axis: u8,
 }
@@ -410,7 +535,7 @@ mod tests {
     use std::rc::Rc;
 
     use crate::{
-        aggregate::BvhAggregate,
+        aggregate::{BvhAggregate, SplitMethod},
         material::{DiffuseMaterial, Material},
         primitive::{Primitive, PrimitiveI, SimplePrimitive},
         shape::{Shape, Sphere},
@@ -444,5 +569,6 @@ mod tests {
         // The BVH boudning box should match the bounding box of the primitive
         assert_eq!(expected_bounds, bvh.bounds());
         assert_eq!(1, bvh.max_prims_in_node);
+        assert_eq!(SplitMethod::Middle, bvh.split_method);
     }
 }
