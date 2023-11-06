@@ -770,12 +770,12 @@ impl Normal3 for Normal3fi {
     }
 }
 
-impl Length<Float> for Normal3fi {
-    fn length_squared(&self) -> Float {
+impl Length<Interval> for Normal3fi {
+    fn length_squared(&self) -> Interval {
         length_squared3(self).into()
     }
 
-    fn length(&self) -> Float {
+    fn length(&self) -> Interval {
         length3(self).into()
     }
 }

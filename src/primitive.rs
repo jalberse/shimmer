@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
+    aggregate::BvhAggregate,
     bounding_box::Bounds3f,
     material::Material,
     ray::Ray,
@@ -28,6 +29,7 @@ pub trait PrimitiveI {
 pub enum Primitive {
     Simple(SimplePrimitive),
     Transformed(TransformedPrimitive),
+    BvhAggregate(BvhAggregate),
 }
 
 impl PrimitiveI for Primitive {
@@ -35,6 +37,7 @@ impl PrimitiveI for Primitive {
         match self {
             Primitive::Simple(p) => p.bounds(),
             Primitive::Transformed(p) => p.bounds(),
+            Primitive::BvhAggregate(a) => a.bounds(),
         }
     }
 
@@ -42,6 +45,7 @@ impl PrimitiveI for Primitive {
         match self {
             Primitive::Simple(p) => p.intersect(ray, t_max),
             Primitive::Transformed(p) => p.intersect(ray, t_max),
+            Primitive::BvhAggregate(a) => a.intersect(ray, t_max),
         }
     }
 
@@ -49,6 +53,7 @@ impl PrimitiveI for Primitive {
         match self {
             Primitive::Simple(p) => p.intersect_predicate(ray, t_max),
             Primitive::Transformed(p) => p.intersect_predicate(ray, t_max),
+            Primitive::BvhAggregate(a) => a.intersect_predicate(ray, t_max),
         }
     }
 }
@@ -56,8 +61,8 @@ impl PrimitiveI for Primitive {
 /// A Primitive which simply adds material information to the surface interaction of
 /// the shape.
 pub struct SimplePrimitive {
-    shape: Shape,
-    material: Rc<Material>,
+    pub shape: Shape,
+    pub material: Rc<Material>,
 }
 
 impl PrimitiveI for SimplePrimitive {

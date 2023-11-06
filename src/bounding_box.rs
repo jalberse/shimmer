@@ -245,7 +245,7 @@ impl<P: Point2, V: Vector2> Index<usize> for Bounds2<P, V> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Bounds3<P, V> {
     pub min: P,
     pub max: P,

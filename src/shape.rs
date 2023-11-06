@@ -241,8 +241,8 @@ impl Sphere {
 impl Sphere {
     pub fn basic_intersect(&self, ray: &Ray, t_max: Float) -> Option<QuadricIntersection> {
         // Transform ray origin and direction to object space
-        let oi: Point3fi = self.object_from_render.apply(&ray.o).into();
-        let di: Vector3fi = self.object_from_render.apply(&ray.d).into();
+        let oi: Point3fi = self.object_from_render.apply(&Point3fi::from(ray.o));
+        let di: Vector3fi = self.object_from_render.apply(&Vector3fi::from(ray.d));
         // Solve quadratic equation to compute sphere t0 and t1
 
         // Compute sphere quadric coefficients
@@ -252,12 +252,8 @@ impl Sphere {
             oi.x().sqr() + oi.y().sqr() + oi.z().sqr() - Interval::from(self.radius).sqr();
         // Compute sphere quadratic discriminant
         let v = Vector3fi::from(oi - b / (2.0 * a) * di);
-        let length = v.length();
-        if length.is_nan() {
-            // This can occur with rays perfectly aimed at the center of the sphere.
-            warn!("Sphere intersection failed; intermediate NaN value");
-            return None;
-        }
+        let length: Interval = v.length();
+
         let discrim = 4.0
             * a
             * (Interval::from(self.radius) + length)
@@ -629,7 +625,7 @@ mod tests {
             1.0,
             360.0,
         );
-        let ray = Ray::new(Point3f::new(0.0, 1e-5, -2.0), Vector3f::Z, None);
+        let ray = Ray::new(Point3f::new(0.0, 0.0, -2.0), Vector3f::Z, None);
         assert!(sphere.intersect_predicate(&ray, Float::INFINITY));
 
         let ray = Ray::new(ray.o, -ray.d, None);
@@ -650,16 +646,16 @@ mod tests {
             0.5,
             360.0,
         );
-        let ray = Ray::new(Point3f::new(0.0, -2.0, 1e-5), Vector3f::Y, None);
+        let ray = Ray::new(Point3f::new(0.0, -2.0, 0.0), Vector3f::Y, None);
         assert!(sphere.intersect_predicate(&ray, Float::INFINITY));
 
         let ray = Ray::new(ray.o, -ray.d, None);
         assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
 
-        let ray = Ray::new(Point3f::new(0.0, 1e-5, 0.5001), Vector3f::Y, None);
+        let ray = Ray::new(Point3f::new(0.0, 0.0, 0.5001), Vector3f::Y, None);
         assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
 
-        let ray = Ray::new(Point3f::new(0.0, 1e-5, -0.5001), Vector3f::Y, None);
+        let ray = Ray::new(Point3f::new(0.0, 0.0, -0.5001), Vector3f::Y, None);
         assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
     }
 }

@@ -1084,12 +1084,12 @@ impl Point3 for Point3fi {
 
     fn distance(&self, p: &Self) -> Self::ElementType {
         debug_assert!(!self.has_nan());
-        Interval::from_val((self - p).length())
+        (self - p).length()
     }
 
     fn distance_squared(&self, p: &Self) -> Self::ElementType {
         debug_assert!(!self.has_nan());
-        Interval::from_val((self - p).length_squared())
+        (self - p).length_squared()
     }
 }
 

@@ -253,8 +253,8 @@ impl Transform {
 
     pub fn inverse(&self) -> Transform {
         Transform {
-            m: self.m,
-            m_inv: self.m_inv,
+            m: self.m_inv,
+            m_inv: self.m,
         }
     }
 
@@ -382,18 +382,21 @@ impl Transformable for Point3fi {
         // Compute absolute error for transformed point
         let p_error: Vector3f = if self.is_exact() {
             // Compute error for transformed exact _p_
-            let err_x = Float::abs(transform.m[0][0] * x)
-                + Float::abs(transform.m[0][1] * y)
-                + Float::abs(transform.m[0][2] * z)
-                + Float::abs(transform.m[0][3]);
-            let err_y = Float::abs(transform.m[1][0] * x)
-                + Float::abs(transform.m[1][1] * y)
-                + Float::abs(transform.m[1][2] * z)
-                + Float::abs(transform.m[1][3]);
-            let err_z = Float::abs(transform.m[2][0] * x)
-                + Float::abs(transform.m[2][1] * y)
-                + Float::abs(transform.m[2][2] * z)
-                + Float::abs(transform.m[2][3]);
+            let err_x = gamma(3)
+                * (Float::abs(transform.m[0][0] * x)
+                    + Float::abs(transform.m[0][1] * y)
+                    + Float::abs(transform.m[0][2] * z)
+                    + Float::abs(transform.m[0][3]));
+            let err_y = gamma(3)
+                * (Float::abs(transform.m[1][0] * x)
+                    + Float::abs(transform.m[1][1] * y)
+                    + Float::abs(transform.m[1][2] * z)
+                    + Float::abs(transform.m[1][3]));
+            let err_z = gamma(3)
+                * (Float::abs(transform.m[2][0] * x)
+                    + Float::abs(transform.m[2][1] * y)
+                    + Float::abs(transform.m[2][2] * z)
+                    + Float::abs(transform.m[2][3]));
             Vector3f::new(err_x, err_y, err_z)
         } else {
             // Compute error for transformed approximate _p_
@@ -494,12 +497,12 @@ impl Transformable for Vector3fi {
 impl Transformable for Ray {
     fn apply(&self, transform: &Transform) -> Self {
         let o: Point3fi = transform.apply(&self.o).into();
-        let d: Vector3fi = transform.apply(&self.d).into();
+        let d: Vector3f = transform.apply(&self.d);
         // Offset ray origin to edge of error bounds and compute t_max
         let length_squared = d.length_squared();
         let o: Point3fi = if length_squared > 0.0 {
             let dt = d.abs().dot(&o.error().into()) / length_squared;
-            o + d * dt
+            o + (d * dt).into()
         } else {
             o
         };

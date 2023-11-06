@@ -107,6 +107,12 @@ pub struct DiffuseMaterial {
     // TODO Add normal map and bump map, and update the getters for those.
 }
 
+impl DiffuseMaterial {
+    pub fn new(reflectance: SpectrumTexture) -> DiffuseMaterial {
+        DiffuseMaterial { reflectance }
+    }
+}
+
 impl MaterialI for DiffuseMaterial {
     type ConcreteBxDF = DiffuseBxDF;
 
