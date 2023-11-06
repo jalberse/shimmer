@@ -534,14 +534,19 @@ impl BvhBuildNode {
 mod tests {
     use std::rc::Rc;
 
+    use float_cmp::assert_approx_eq;
+
     use crate::{
         aggregate::{BvhAggregate, SplitMethod},
         material::{DiffuseMaterial, Material},
         primitive::{Primitive, PrimitiveI, SimplePrimitive},
+        ray::Ray,
         shape::{Shape, Sphere},
         spectra::{ConstantSpectrum, Spectrum},
         texture::SpectrumConstantTexture,
         transform::Transform,
+        vecmath::{normal::Normal3, Normal3f, Point3f, Vector3f},
+        Float,
     };
 
     #[test]
@@ -570,5 +575,46 @@ mod tests {
         assert_eq!(expected_bounds, bvh.bounds());
         assert_eq!(1, bvh.max_prims_in_node);
         assert_eq!(SplitMethod::Middle, bvh.split_method);
+    }
+
+    #[test]
+    fn single_primitive_bvh_intersetion() {
+        let radius = 1.0;
+        let sphere = Sphere::new(
+            Transform::default(),
+            Transform::default(),
+            false,
+            radius,
+            -radius,
+            radius,
+            360.0,
+        );
+        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+            shape: Shape::Sphere(sphere),
+            material,
+        }));
+        let prims = vec![prim];
+        let bvh = BvhAggregate::new(prims, 1, crate::aggregate::SplitMethod::Middle);
+
+        // Use a slightly off-axis ray to avoid floating point shenanigans when ray and sphere centers are perfectly on axis
+        let ray = Ray::new(
+            Point3f::NEG_X * 5.0 + Vector3f::Z * 0.000005,
+            Vector3f::X,
+            None,
+        );
+        let si = bvh.intersect(&ray, Float::INFINITY);
+        assert!(si.is_some());
+        let si = si.unwrap();
+        // The normal should be in the negative X direction (we're hitting a sphere head-on in the positive X direction)
+        assert_approx_eq!(Float, si.intr.shading.n.dot(&Normal3f::NEG_X), 1.0);
+        // Ray started at -5, radius is 1, so it hits at 4.0.
+        assert_approx_eq!(Float, si.t_hit, 4.0);
+        // The hit should be at just about (-1, 0, 0) (off slightly since we're just off axis)
+        assert_approx_eq!(Float, si.intr.p().x, -1.0, epsilon = 0.000001);
+        assert_approx_eq!(Float, si.intr.p().y, 0.0);
+        assert_approx_eq!(Float, si.intr.p().y, 0.0);
     }
 }
