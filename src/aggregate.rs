@@ -164,10 +164,11 @@ impl BvhAggregate {
         total_nodes.fetch_add(1, Ordering::SeqCst);
 
         // Compute the bounds of all primitives in the primitive range.
-        // The default of bounds should be an infinite extent, such that the union will restrict it.
         let bounds = bvh_primitives
             .iter()
-            .fold(Bounds3f::default(), |acc, p| acc.union(&p.bounds));
+            .fold(Bounds3f::new(Point3f::ZERO, Point3f::ZERO), |acc, p| {
+                acc.union(&p.bounds)
+            });
 
         if bounds.surface_area() == 0.0 || bvh_primitives.len() == 1 {
             // Create leaf BvhBuildNode
@@ -185,7 +186,9 @@ impl BvhAggregate {
             // Compute bound of primitive centroids and choose split dimension to be the largest dimension of the bounds.
             let centroid_bounds = bvh_primitives
                 .iter()
-                .fold(Bounds3f::default(), |acc, p| acc.union(&p.bounds));
+                .fold(Bounds3f::new(Point3f::ZERO, Point3f::ZERO), |acc, p| {
+                    acc.union(&p.bounds)
+                });
             let dim = centroid_bounds.max_dimension();
 
             if centroid_bounds.max[dim] == centroid_bounds.min[dim] {
