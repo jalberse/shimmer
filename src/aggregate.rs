@@ -663,6 +663,13 @@ mod tests {
 
         // TODO test the predicate intersection as well.
 
-        // TODO test a ray that misses entirely as well.
+        // This ray should not intersect the spheres.
+        let ray = Ray::new(
+            Point3f::NEG_X * 10.0 + Vector3f::Z * 1.001,
+            Vector3f::X,
+            None,
+        );
+        let si = bvh.intersect(&ray, Float::INFINITY);
+        assert!(si.is_none());
     }
 }
