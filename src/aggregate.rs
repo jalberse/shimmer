@@ -644,8 +644,6 @@ mod tests {
 
         let bvh = BvhAggregate::new(prims, 1, crate::aggregate::SplitMethod::Middle);
 
-        // TODO Assert on structure of bvh.
-
         let ray = Ray::new(Point3f::NEG_X * 10.0, Vector3f::X, None);
 
         let si = bvh.intersect(&ray, Float::INFINITY);
