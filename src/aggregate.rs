@@ -87,8 +87,8 @@ impl PrimitiveI for BvhAggregate {
                     if to_visit_offset == 0 {
                         break;
                     }
-                    current_node_index = nodes_to_visit[to_visit_offset];
                     to_visit_offset -= 1;
+                    current_node_index = nodes_to_visit[to_visit_offset];
                 } else {
                     // Interior node; put far BVH node on nodes_to_visit stack,
                     // advance to the near node
@@ -106,8 +106,8 @@ impl PrimitiveI for BvhAggregate {
                 if to_visit_offset == 0 {
                     break;
                 }
-                current_node_index = nodes_to_visit[to_visit_offset];
                 to_visit_offset -= 1;
+                current_node_index = nodes_to_visit[to_visit_offset];
             }
         }
 
@@ -599,12 +599,11 @@ mod tests {
         let prims = vec![prim];
         let bvh = BvhAggregate::new(prims, 1, crate::aggregate::SplitMethod::Middle);
 
-        // Use a slightly off-axis ray to avoid floating point shenanigans when ray and sphere centers are perfectly on axis
-        let ray = Ray::new(
-            Point3f::NEG_X * 5.0 + Vector3f::Z * 0.000005,
-            Vector3f::X,
-            None,
-        );
+        // TODO Both this and the next test seem to fail because of a floating point precision bug
+        // in the sphere intersection code. Fix that and I think these should work, without issues around being exactly pointed at the center of the sphere.
+        // I'm going through and dealing with that floating point precision stuff now...
+
+        let ray = Ray::new(Point3f::NEG_X * 5.0, Vector3f::X, None);
         let si = bvh.intersect(&ray, Float::INFINITY);
         assert!(si.is_some());
         let si = si.unwrap();
@@ -612,9 +611,62 @@ mod tests {
         assert_approx_eq!(Float, si.intr.shading.n.dot(&Normal3f::NEG_X), 1.0);
         // Ray started at -5, radius is 1, so it hits at 4.0.
         assert_approx_eq!(Float, si.t_hit, 4.0);
-        // The hit should be at just about (-1, 0, 0) (off slightly since we're just off axis)
-        assert_approx_eq!(Float, si.intr.p().x, -1.0, epsilon = 0.000001);
+        // The hit should be at just about (-1, 0, 0)
+        assert_approx_eq!(Float, si.intr.p().x, -1.0);
         assert_approx_eq!(Float, si.intr.p().y, 0.0);
         assert_approx_eq!(Float, si.intr.p().y, 0.0);
+    }
+
+    #[test]
+    fn set_of_spheres() {
+        let mut prims: Vec<Rc<Primitive>> = Vec::new();
+        for multiplier in [-3.5, 0.0, 3.5] {
+            let radius = 1.0;
+
+            let x_translate = Transform::translate(Vector3f::X * multiplier);
+            let x_translate_inv = x_translate.inverse();
+
+            let sphere = Sphere::new(
+                x_translate,
+                x_translate_inv,
+                false,
+                radius,
+                -radius,
+                radius,
+                360.0,
+            );
+            let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+            let kd =
+                crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+            let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+                shape: Shape::Sphere(sphere),
+                material,
+            }));
+            prims.push(prim);
+        }
+
+        let bvh = BvhAggregate::new(prims, 1, crate::aggregate::SplitMethod::Middle);
+
+        // TODO Assert on structure of bvh.
+
+        let ray = Ray::new(Point3f::NEG_X * 10.0, Vector3f::X, None);
+
+        let si = bvh.intersect(&ray, Float::INFINITY);
+
+        assert!(si.is_some());
+        let si = si.unwrap();
+        // The normal should be in the negative X direction (we're hitting a sphere head-on in the positive X direction)
+        assert_approx_eq!(Float, si.intr.shading.n.dot(&Normal3f::NEG_X), 1.0);
+        // Ray started at -10, radius is 1 pushing the closest sphere's position to -3.5 - 1.0 == -4.5, so it hits at 5.5.
+        assert_approx_eq!(Float, si.t_hit, 5.5);
+        // The hit should be at just about (-1, 0, 0)
+        assert_approx_eq!(Float, si.intr.p().x, -5.5);
+        assert_approx_eq!(Float, si.intr.p().y, 0.0);
+        assert_approx_eq!(Float, si.intr.p().y, 0.0);
+
+        // TODO test the predicate intersection as well.
+
+        // TODO test a ray that misses entirely as well.
     }
 }

@@ -1425,13 +1425,13 @@ impl Vector3 for Vector3fi {
     }
 }
 
-impl Length<Float> for Vector3fi {
-    fn length_squared(&self) -> Float {
-        length_squared3(self).into()
+impl Length<Interval> for Vector3fi {
+    fn length_squared(&self) -> Interval {
+        length_squared3(self)
     }
 
-    fn length(&self) -> Float {
-        length3(self).into()
+    fn length(&self) -> Interval {
+        length3(self)
     }
 }
 
