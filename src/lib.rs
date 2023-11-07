@@ -15,6 +15,7 @@ pub mod float;
 pub mod frame;
 pub mod image;
 pub mod image_metadata;
+mod integrator;
 pub mod interaction;
 pub mod interval;
 pub mod is_nan;
