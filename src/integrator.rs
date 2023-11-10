@@ -96,7 +96,7 @@ impl IntegratorI for RandomWalkIntegrator {
         let mut scratch_buffer = Bump::with_capacity(256);
 
         // TODO Render image in waves
-        let pixel_bounds = self.camera.film().pixel_bounds();
+        let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
         // TODO init a progress reporter. Reference my old ray tracer.
 
@@ -142,7 +142,7 @@ impl IntegratorI for RandomWalkIntegrator {
                 let metadata = ImageMetadata::new();
                 // TODO populate metadata here!
                 self.camera
-                    .film()
+                    .get_film()
                     .write_image(&metadata, 1.0 / wave_start as Float);
             }
         }
@@ -181,10 +181,10 @@ impl RandomWalkIntegrator {
         } else {
             self.sampler_prototype.get_1d()
         };
-        let lambda = self.camera.film().sample_wavelengths(lu);
+        let lambda = self.camera.get_film().sample_wavelengths(lu);
 
         // Initialize camera_sample for the current sample
-        let filter = self.camera.film().get_filter();
+        let filter = self.camera.get_film().get_filter();
         // TODO need to use get_camera_sample(); implement it.
 
         todo!()
