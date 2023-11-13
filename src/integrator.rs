@@ -277,6 +277,10 @@ impl RandomWalkIntegrator {
         options: &Options,
     ) -> SampledSpectrum {
         let si = self.base.intersect(&ray.ray, Float::INFINITY);
+
+        // TODO Since this is a random walk, it will never hit point lights.
+        //  We probably want to implement an infinite light, then.
+
         if si.is_none() {
             // Return emitted light from infinite light sources
             let mut le = SampledSpectrum::from_const(0.0);
