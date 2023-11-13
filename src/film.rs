@@ -631,6 +631,22 @@ pub struct VisibleSurface {
     set: bool,
 }
 
+impl Default for VisibleSurface {
+    fn default() -> Self {
+        Self {
+            p: Default::default(),
+            n: Default::default(),
+            ns: Default::default(),
+            uv: Default::default(),
+            time: Default::default(),
+            dpdx: Default::default(),
+            dpdy: Default::default(),
+            albedo: Default::default(),
+            set: Default::default(),
+        }
+    }
+}
+
 impl VisibleSurface {
     pub fn new(
         si: &SurfaceInteraction,

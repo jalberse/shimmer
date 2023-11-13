@@ -6,6 +6,7 @@ use itertools::Itertools;
 use crate::{
     camera::{Camera, CameraI},
     film::{FilmI, VisibleSurface},
+    float::PI_F,
     image::Image,
     image_metadata::ImageMetadata,
     light::{Light, LightI, LightType},
@@ -14,9 +15,10 @@ use crate::{
     primitive::{Primitive, PrimitiveI},
     ray::{Ray, RayDifferential},
     sampler::{Sampler, SamplerI},
+    sampling::{get_camera_sample, sample_uniform_sphere},
     shape::ShapeIntersection,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
-    vecmath::{Point2i, Tuple2, Vector3f},
+    vecmath::{vector::Vector3, HasNan, Length, Point2i, Tuple2, Vector3f},
     Float,
 };
 
@@ -73,15 +75,14 @@ impl IntegratorBase {
     }
 }
 
-// TODO I'm implementing just RandomWalkIntegrator first as a concrete class,
-// The inheritance scheme from PBRT really doesn't work well in Rust, so we
-// should find another way to share behavior. That's easier *asfter* writing
-// out stuff concretely, so let's do that.
+// TODO When we write other integrators, look at how we can pull out common functionality.
+//   I am writing a single working RandomWalkIntegrator first, though.
+
 pub struct RandomWalkIntegrator {
-    integrator_base: IntegratorBase,
+    base: IntegratorBase,
     camera: Camera,
-    // TODO note this is the sampler_prototype because we'll clone into individual
-    //   samplers for each thread.
+    // This is named sampler_prototype because we will clone individual samplers
+    // for each thread.
     sampler_prototype: Sampler,
 
     max_depth: i32,
@@ -89,13 +90,11 @@ pub struct RandomWalkIntegrator {
 
 impl IntegratorI for RandomWalkIntegrator {
     fn render(&mut self, options: &Options) {
-        // Declare common variables for rendering image in tiles
-
-        // TODO Be wary of allocating anything on this that uses the heap.
+        // TODO Be wary of allocating anything on this that uses the heap top avoid memory leaks;
+        //   it doesn't call their drop()!
         // TODO When we implement multi-threading, we'll want this to be one per thread.
         let mut scratch_buffer = Bump::with_capacity(256);
 
-        // TODO Render image in waves
         let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
         // TODO init a progress reporter. Reference my old ray tracer.
@@ -104,6 +103,9 @@ impl IntegratorI for RandomWalkIntegrator {
         let mut wave_end = 1;
         let mut next_wave_size = 1;
 
+        // TODO We'll need to have a sampler for each thread; as with a few other variables.
+        let mut sampler = self.sampler_prototype.clone();
+
         // TODO record pixel statistics option and other things PBRT handles here.
         // Not necessary for just getting a rendered image though.
 
@@ -111,7 +113,6 @@ impl IntegratorI for RandomWalkIntegrator {
         while wave_start < spp {
             // TODO We won't divide into tiles right now, but we should later.
             //  We'll just go pixel by pixel to start, in waves.
-            // TODO
             for x in pixel_bounds.min.x..pixel_bounds.max.x {
                 for y in pixel_bounds.min.y..pixel_bounds.max.y {
                     let p_pixel = Point2i::new(x, y);
@@ -121,6 +122,7 @@ impl IntegratorI for RandomWalkIntegrator {
                         self.evaluate_pixel_sample(
                             p_pixel,
                             sample_index,
+                            &mut sampler,
                             &mut scratch_buffer,
                             options,
                         );
@@ -158,23 +160,21 @@ impl RandomWalkIntegrator {
         max_depth: i32,
     ) -> RandomWalkIntegrator {
         RandomWalkIntegrator {
-            integrator_base: IntegratorBase::new(aggregate, lights),
+            base: IntegratorBase::new(aggregate, lights),
             camera,
             sampler_prototype: sampler,
             max_depth,
         }
     }
 
-    // TODO This will also take a Sampler, when we aren't just using the sampler_protoype directly
-    //  but rather using one per thread.
     pub fn evaluate_pixel_sample(
         &mut self,
         p_pixel: Point2i,
         sample_index: i32,
+        sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
     ) {
-        // TODO In PBRT, this is in RayIntegrator (which RandomWalk inherits from)
         // Sample wavelengths for the ray
         let lu = if options.disable_wavelength_jitter {
             0.5
@@ -185,21 +185,84 @@ impl RandomWalkIntegrator {
 
         // Initialize camera_sample for the current sample
         let filter = self.camera.get_film().get_filter();
-        // TODO need to use get_camera_sample(); implement it.
+        let camera_sample =
+            get_camera_sample(&mut self.sampler_prototype, p_pixel, filter, options);
+
+        let camera_ray = self
+            .camera
+            .generate_ray_differential(&camera_sample, &lambda);
+
+        let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
+            debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
+            debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
+
+            // TODO Scale camera ray differentials absed on image sampling rate.
+            let ray_diff_scale = Float::max(
+                0.125,
+                1.0 / Float::sqrt(self.sampler_prototype.samples_per_pixel() as Float),
+            );
+            if !options.disable_pixel_jitter {
+                camera_ray.ray.scale_differentials(ray_diff_scale);
+            }
+
+            // TODO increment number of camera rays (I think that's just useful for logging though)
+
+            // Evaluate radiance along the camera ray
+            let visible_surface = if self.camera.get_film().uses_visible_surface() {
+                Some(VisibleSurface::default())
+            } else {
+                None
+            };
+
+            // TODO RandomWalk won't use visible surface, but others would expect
+            //   one they can initialize. Q: why not restructure so li() just creates it?
+            let l = camera_ray.weight
+                * self.li(
+                    &camera_ray.ray,
+                    &lambda,
+                    sampler,
+                    &visible_surface,
+                    scratch_buffer,
+                    options,
+                );
+
+            if l.has_nan() {
+                // TODO log error, set SampledSpectrum l to 0.
+                // Use env_logger.
+            } else if l.y(&lambda).is_infinite() {
+                // TODO log error, set SampledSpectrum l to 0
+            }
+
+            (l, visible_surface)
+        } else {
+            (
+                SampledSpectrum::from_const(0.0),
+                Some(VisibleSurface::default()),
+            )
+        };
+
+        // Add the camera ray's contribution to the image.
+        self.camera.get_film().add_sample(
+            &p_pixel,
+            &l,
+            &lambda,
+            &visible_surface,
+            camera_sample.filter_weight,
+        );
 
         todo!()
     }
 
-    // TODO should take buffer
     pub fn li(
         &self,
         ray: &RayDifferential,
         lambda: &SampledWavelengths,
-        sampler: &Sampler,
-        _visible_surface: &VisibleSurface,
+        sampler: &mut Sampler,
+        _visible_surface: &Option<VisibleSurface>,
         scratch_buffer: &mut Bump,
+        options: &Options,
     ) -> SampledSpectrum {
-        self.li_random_walk(ray, lambda, sampler, 0, scratch_buffer)
+        self.li_random_walk(ray, lambda, sampler, 0, scratch_buffer, options)
     }
 
     /// Depth is the *current depth* of the recursive call to this.
@@ -208,11 +271,58 @@ impl RandomWalkIntegrator {
         &self,
         ray: &RayDifferential,
         lambda: &SampledWavelengths,
-        sampler: &Sampler,
+        sampler: &mut Sampler,
         depth: i32,
         scratch_buffer: &mut Bump,
+        options: &Options,
     ) -> SampledSpectrum {
-        // TODO and, finally, this is in RandomWalk.
-        todo!()
+        let si = self.base.intersect(&ray.ray, Float::INFINITY);
+        if si.is_none() {
+            // Return emitted light from infinite light sources
+            let mut le = SampledSpectrum::from_const(0.0);
+            for light in self.base.infinite_lights.iter() {
+                le += light.le(&ray.ray, lambda);
+            }
+            return le;
+        }
+        // Note that we declare the interaction as mutable; this is because
+        // we must calculate differentials stored within the surface interaction.
+        // TODO Could we modify how we handle this to allow us to use const?
+        let mut si = si.unwrap();
+        let isect = &mut si.intr;
+
+        // Get emitted radiance at surface intersection
+        let wo = -ray.ray.d;
+        let le = isect.le(wo, lambda);
+
+        // Terminate the walk if the maximum depth has been reached
+        if depth == self.max_depth {
+            return le;
+        }
+
+        // Compute BSDF at random walk intersection point.
+        let bsdf = isect.get_bsdf(ray, lambda, &self.camera, sampler, &options);
+        if bsdf.is_none() {
+            return le;
+        }
+        let bsdf = bsdf.unwrap();
+
+        // Randomnly sample direction leaving surface for random walk
+        let u = sampler.get_2d();
+        let wp = sample_uniform_sphere(u);
+
+        // Evaluate bsdf at surface for sampled direction
+        let f = bsdf.f(wo, wp, crate::bxdf::TransportMode::Radiance);
+        if f.is_none() {
+            return le;
+        }
+        let f = f.unwrap();
+        let fcos = f * wp.abs_dot_normal(&isect.shading.n);
+
+        // Recursively trace ray to estimate incident radiance at surface
+        let ray = isect.interaction.spawn_ray(wp);
+
+        le + fcos * self.li_random_walk(&ray, lambda, sampler, depth + 1, scratch_buffer, options)
+            / (1.0 / (4.0 * PI_F))
     }
 }

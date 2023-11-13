@@ -4,13 +4,13 @@ use crate::{
     bsdf::BSDF,
     bxdf::{self, DiffuseBxDF},
     camera::{Camera, CameraI},
-    light::Light,
+    light::{Light, LightI},
     material::{Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
     math::DifferenceOfProducts,
     options::Options,
-    ray::RayDifferential,
+    ray::{Ray, RayDifferential},
     sampler::{Sampler, SamplerI},
-    spectra::sampled_wavelengths::SampledWavelengths,
+    spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     vecmath::{
         normal::Normal3, point::Point3fi, vector::Vector3, Normal3f, Normalize, Point2f, Point3f,
         Vector3f,
@@ -52,6 +52,18 @@ impl Interaction {
 
     pub fn p(&self) -> Point3f {
         self.pi.into()
+    }
+
+    pub fn offset_ray_origin(&self, w: Vector3f) -> Point3f {
+        Ray::offset_ray_origin(self.pi, self.n, w)
+    }
+
+    pub fn spawn_ray(&self, d: Vector3f) -> RayDifferential {
+        let ray = Ray::new(self.offset_ray_origin(d), d, None);
+        RayDifferential {
+            ray,
+            auxiliary: None,
+        }
     }
 }
 
@@ -140,19 +152,15 @@ impl SurfaceInteraction {
         camera: &Camera,
         sampler: &mut Sampler,
         options: &Options,
-    ) -> BSDF {
+    ) -> Option<BSDF> {
         // Estimate (u, v) and position differentials at intersection point
-        // TODO compute_differentials() is done now, so we can implement this.
-        //      Go reference this in the book.
-        //      I think that once this is implemented, we can look at implementing an integrator?
-        //      starting with randomwalk I suppose.
         self.compute_differentials(ray, camera, sampler.samples_per_pixel(), options);
 
         // TODO resolve MixMaterial, once I create MixMaterial.
 
         // This should occur only at a non-scattering interface between two types of participating media.
         if self.material.is_none() {
-            Default::default()
+            return None;
         }
 
         let material = self.material.as_ref().unwrap();
@@ -192,7 +200,7 @@ impl SurfaceInteraction {
             bsdf
         };
 
-        bsdf
+        Some(bsdf)
     }
 
     pub fn compute_differentials(
@@ -281,6 +289,18 @@ impl SurfaceInteraction {
         } else {
             0.0
         };
+    }
+
+    /// If this surface interaction is for a light source, return the emitted radiance.
+    /// Else, return a zeroed SampledSpectrum.
+    pub fn le(&self, w: Vector3f, lambda: &SampledWavelengths) -> SampledSpectrum {
+        if let Some(area_light) = &self.area_light {
+            area_light
+                .as_ref()
+                .l(self.p(), self.interaction.n, self.interaction.uv, w, lambda)
+        } else {
+            SampledSpectrum::from_const(0.0)
+        }
     }
 }
 
