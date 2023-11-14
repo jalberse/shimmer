@@ -13,6 +13,13 @@ use shimmer::{
 };
 
 fn main() {
+    // TODO I'd like to set up a simple scene: just two spheres, one with a diffuse material (in a SimplePrimitive)
+    // and one with an emissive light (in a GeometricPrimitive).
+    // They'll be side by side and in view of the camera. We should be able to render that.
+    // TODO PBRT uses a DiffuseAreaLight for this type of test in integrators_test.cpp.
+    //   So I think I should implement that variant first.
+    //   The DiffuseAreaLight has an image OPTIONALLY, so we can just implement the not-image case for now.
+
     let cs = RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB);
     let sensor = PixelSensor::new(cs, &None, 1.0);
     let mut film = RgbFilm::new(

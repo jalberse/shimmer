@@ -2,19 +2,27 @@
 // and implement them later as needed - but just a PointLight should be sufficient for now
 // to render early test scenes.
 
+use std::rc::Rc;
+
+use itertools::Diff;
+use log::warn;
+
 use crate::{
     bounding_box::Bounds3f,
     float::PI_F,
     interaction::{Interaction, SurfaceInteraction},
     ray::Ray,
+    shape::{Shape, ShapeI, ShapeSampleContext},
     spectra::{
         sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
         spectrum::SpectrumI, DenselySampledSpectrum, Spectrum,
     },
+    texture::FloatTexture,
     transform::Transform,
     vecmath::{
+        normal::Normal3,
         point::{Point3, Point3fi},
-        Normal3f, Normalize, Point2f, Point3f, Vector3f,
+        Length, Normal3f, Normalize, Point2f, Point3f, Vector3f,
     },
     Float,
 };
@@ -50,12 +58,7 @@ pub trait LightI {
     /// Assumes that a ray from ctx in the direction wi has already been found to intersect
     /// the light source. PDF is measured w.r.t. solid angle; 0 if the light is described
     /// by a Dirac delta function.
-    fn pdf_li(
-        &self,
-        ctx: LightSampleContext,
-        lambda: SampledWavelengths,
-        allow_incomplete_pdf: bool,
-    ) -> Float;
+    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float;
 
     /// For area light sources, finds the radiance that is emitted back along the ray.
     /// Takes information about the intersection point and the outgoing direction.
@@ -90,18 +93,21 @@ pub trait LightI {
 #[derive(Debug, Clone)]
 pub enum Light {
     Point(PointLight),
+    DiffuseAreaLight(DiffuseAreaLight),
 }
 
 impl LightI for Light {
     fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
         match self {
             Light::Point(l) => l.phi(lambda),
+            Light::DiffuseAreaLight(l) => l.phi(lambda),
         }
     }
 
     fn light_type(&self) -> LightType {
         match self {
             Light::Point(l) => l.light_type(),
+            Light::DiffuseAreaLight(l) => l.light_type(),
         }
     }
 
@@ -114,17 +120,14 @@ impl LightI for Light {
     ) -> Option<LightLiSample> {
         match self {
             Light::Point(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+            Light::DiffuseAreaLight(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
         }
     }
 
-    fn pdf_li(
-        &self,
-        ctx: LightSampleContext,
-        lambda: SampledWavelengths,
-        allow_incomplete_pdf: bool,
-    ) -> Float {
+    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float {
         match self {
-            Light::Point(l) => l.pdf_li(ctx, lambda, allow_incomplete_pdf),
+            Light::Point(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
+            Light::DiffuseAreaLight(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
         }
     }
 
@@ -138,18 +141,21 @@ impl LightI for Light {
     ) -> SampledSpectrum {
         match self {
             Light::Point(l) => l.l(p, n, uv, w, lambda),
+            Light::DiffuseAreaLight(l) => l.l(p, n, uv, w, lambda),
         }
     }
 
     fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
         match self {
             Light::Point(l) => l.le(ray, lambda),
+            Light::DiffuseAreaLight(l) => l.le(ray, lambda),
         }
     }
 
     fn preprocess(&mut self, scene_bounds: &Bounds3f) {
         match self {
             Light::Point(l) => l.preprocess(scene_bounds),
+            Light::DiffuseAreaLight(l) => l.preprocess(scene_bounds),
         }
     }
 }
@@ -198,7 +204,7 @@ impl LightBase {
 #[derive(Debug, Clone)]
 pub struct PointLight {
     base: LightBase,
-    i: DenselySampledSpectrum,
+    i: Rc<DenselySampledSpectrum>,
     scale: Float,
 }
 
@@ -210,7 +216,7 @@ impl PointLight {
         };
         PointLight {
             base,
-            i: DenselySampledSpectrum::new(&i),
+            i: Rc::new(DenselySampledSpectrum::new(&i)),
             scale,
         }
     }
@@ -254,7 +260,7 @@ impl LightI for PointLight {
     fn pdf_li(
         &self,
         _ctx: LightSampleContext,
-        _lambda: SampledWavelengths,
+        _wi: Vector3f,
         _allow_incomplete_pdf: bool,
     ) -> Float {
         // Due to delta distribution; won't randonly select an infinitesimal light source.
@@ -278,6 +284,122 @@ impl LightI for PointLight {
 
     fn preprocess(&mut self, _scene_bounds: &Bounds3f) {
         // Nothing to do!
+    }
+}
+
+/// The DiffuseAreaLight descripts an area light where emission at each point on the surface
+/// has a uniform directional distribution
+#[derive(Debug, Clone)]
+pub struct DiffuseAreaLight {
+    base: LightBase,
+    shape: Shape,
+    // TODO alpha: FloatTexture,
+    area: Float,
+    two_sided: bool,
+    l_emit: Rc<DenselySampledSpectrum>,
+    scale: Float,
+    // TODO image: Image,
+    // TODO image color space
+}
+
+impl DiffuseAreaLight {
+    pub fn new(
+        render_from_light: Transform,
+        le: Rc<Spectrum>,
+        scale: Float,
+        shape: Shape,
+        two_sided: bool,
+    ) -> DiffuseAreaLight {
+        let area = shape.area();
+        let base = LightBase {
+            light_type: LightType::Area,
+            render_from_light,
+        };
+        // TODO Here's an area where we should use lookup_spectrum() instead as we should cache similar
+        // densely sampled spectra.
+        DiffuseAreaLight {
+            base,
+            shape,
+            area,
+            two_sided,
+            l_emit: Rc::new(DenselySampledSpectrum::new(le.as_ref())),
+            scale,
+        }
+    }
+}
+
+impl LightI for DiffuseAreaLight {
+    fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        // TODO account for image here
+        let l = self.l_emit.sample(lambda) * self.scale;
+        let double = if self.two_sided { 2.0 } else { 1.0 };
+        PI_F * double * self.area * l
+    }
+
+    fn light_type(&self) -> LightType {
+        self.base.light_type
+    }
+
+    fn sample_li(
+        &self,
+        ctx: LightSampleContext,
+        u: Point2f,
+        lambda: SampledWavelengths,
+        _allow_incomplete_pdf: bool,
+    ) -> Option<LightLiSample> {
+        let shape_ctx = ShapeSampleContext::new(ctx.pi, ctx.n, ctx.ns, 0.0);
+        let ss = self.shape.sample_with_context(&shape_ctx, u);
+        if ss.is_none() {
+            return None;
+        }
+        let ss = ss.unwrap();
+        if ss.pdf == 0.0 || (ss.intr.p() - ctx.p()).length_squared() == 0.0 {
+            return None;
+        }
+        debug_assert!(!ss.pdf.is_nan());
+        // TODO set the medium interface of ss.
+
+        // TODO check against the alpha texture with alpha_masked().
+
+        // Return LightLiSample for the sampled point on the shape.
+        let wi = (ss.intr.p() - ctx.p()).normalize();
+        let le = self.l(ss.intr.p(), ss.intr.n, ss.intr.uv, -wi, &lambda);
+        if le.is_zero() {
+            return None;
+        }
+        Some(LightLiSample::new(le, wi, ss.pdf, ss.intr))
+    }
+
+    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, _allow_incomplete_pdf: bool) -> Float {
+        let shape_ctx = ShapeSampleContext::new(ctx.pi, ctx.n, ctx.ns, 0.0);
+        self.shape.pdf_with_context(&shape_ctx, wi)
+    }
+
+    fn l(
+        &self,
+        _p: Point3f,
+        n: Normal3f,
+        _uv: Point2f,
+        w: Vector3f,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
+        // Check for zero emitted radiance from point on area light
+        if !self.two_sided && n.dot_vector(&w) < 0.0 {
+            return SampledSpectrum::from_const(0.0);
+        }
+        // TODO Check alpha mask with alpha texture and UV.
+
+        // TODO If we add image textures, handle here.
+        self.scale * self.l_emit.sample(lambda)
+    }
+
+    fn le(&self, _ray: &Ray, _lambda: &SampledWavelengths) -> SampledSpectrum {
+        warn!("le() should only be called for infinite lights!");
+        SampledSpectrum::from_const(0.0)
+    }
+
+    fn preprocess(&mut self, scene_bounds: &Bounds3f) {
+        // Nothing to do here!
     }
 }
 

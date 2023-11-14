@@ -291,8 +291,7 @@ impl SurfaceInteraction {
         };
     }
 
-    /// If this surface interaction is for a light source, return the emitted radiance.
-    /// Else, return a zeroed SampledSpectrum.
+    /// Computes the emitted radiance at a surface point intersected by a ray.
     pub fn le(&self, w: Vector3f, lambda: &SampledWavelengths) -> SampledSpectrum {
         if let Some(area_light) = &self.area_light {
             area_light
