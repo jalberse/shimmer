@@ -537,6 +537,22 @@ pub fn inner_product<T: SpectrumI, G: SpectrumI>(a: &T, b: &G) -> Float {
     integral
 }
 
+pub fn spectrum_to_photometric(s: &Arc<Spectrum>) -> Float {
+    // TODO using Arc here because the illuminant is wrapped in Arc, required because
+    // of Lazy for CIE requiring thread safety. Could use the non-asynch version of Lazy...
+    // But we'll want to move to multithreading soon anyways... Just keep this for now I think.
+    let s_to_use = match s.as_ref() {
+        Spectrum::RgbIlluminantSpectrum(s) => &s.illuminant,
+        _ => &s,
+    };
+
+    let mut y = 0.0;
+    for lambda in LAMBDA_MIN as i32..=LAMBDA_MAX as i32 {
+        y += Spectrum::get_cie(CIE::Y).get(lambda as Float) * s_to_use.get(lambda as Float);
+    }
+    y
+}
+
 #[cfg(test)]
 mod tests {
     use float_cmp::assert_approx_eq;

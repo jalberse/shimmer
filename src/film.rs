@@ -1,4 +1,7 @@
-use std::ops::{AddAssign, Index, IndexMut, MulAssign};
+use std::{
+    ops::{AddAssign, Index, IndexMut, MulAssign},
+    rc::Rc,
+};
 
 use once_cell::sync::Lazy;
 
@@ -599,6 +602,16 @@ impl PixelSensor {
             result[2] += b3.get(lambda) * ref1.get(lambda) * illum.get(lambda);
         }
         result / g_integral
+    }
+}
+
+impl Default for PixelSensor {
+    fn default() -> Self {
+        let colorspace = RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB);
+        let iso = 100.0;
+        let exposure_time = 1.0;
+        let imaging_ratio = exposure_time * iso / 100.0;
+        Self::new(colorspace, &None, imaging_ratio)
     }
 }
 

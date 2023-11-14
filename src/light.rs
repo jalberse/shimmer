@@ -2,7 +2,7 @@
 // and implement them later as needed - but just a PointLight should be sufficient for now
 // to render early test scenes.
 
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use itertools::Diff;
 use log::warn;
@@ -296,7 +296,7 @@ pub struct DiffuseAreaLight {
     // TODO alpha: FloatTexture,
     area: Float,
     two_sided: bool,
-    l_emit: Rc<DenselySampledSpectrum>,
+    l_emit: Arc<DenselySampledSpectrum>,
     scale: Float,
     // TODO image: Image,
     // TODO image color space
@@ -305,7 +305,7 @@ pub struct DiffuseAreaLight {
 impl DiffuseAreaLight {
     pub fn new(
         render_from_light: Transform,
-        le: Rc<Spectrum>,
+        le: Arc<Spectrum>,
         scale: Float,
         shape: Shape,
         two_sided: bool,
@@ -322,7 +322,7 @@ impl DiffuseAreaLight {
             shape,
             area,
             two_sided,
-            l_emit: Rc::new(DenselySampledSpectrum::new(le.as_ref())),
+            l_emit: Arc::new(DenselySampledSpectrum::new(le.as_ref())),
             scale,
         }
     }

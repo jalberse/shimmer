@@ -68,9 +68,23 @@ pub struct GeometricPrimitive {
     shape: Shape,
     material: Rc<Material>,
     /// Stores the emissive properties if the shape is a light source
-    areaLight: Option<Rc<Light>>,
+    area_light: Option<Rc<Light>>,
     // TODO add alpha FloatTexture
     // TODO add medium_interface member
+}
+
+impl GeometricPrimitive {
+    pub fn new(
+        shape: Shape,
+        material: Rc<Material>,
+        area_light: Option<Rc<Light>>,
+    ) -> GeometricPrimitive {
+        GeometricPrimitive {
+            shape,
+            material,
+            area_light,
+        }
+    }
 }
 
 impl PrimitiveI for GeometricPrimitive {
@@ -84,7 +98,7 @@ impl PrimitiveI for GeometricPrimitive {
         // TODO test intersection against alpha texture if present
 
         si.intr
-            .set_intersection_properties(&self.material, &self.areaLight);
+            .set_intersection_properties(&self.material, &self.area_light);
         Some(si)
     }
 

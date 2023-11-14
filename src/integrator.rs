@@ -7,10 +7,8 @@ use crate::{
     camera::{Camera, CameraI},
     film::{FilmI, VisibleSurface},
     float::PI_F,
-    image::Image,
     image_metadata::ImageMetadata,
     light::{Light, LightI, LightType},
-    light_sampler::UniformLightSampler,
     options::Options,
     primitive::{Primitive, PrimitiveI},
     ray::{Ray, RayDifferential},
@@ -249,8 +247,6 @@ impl RandomWalkIntegrator {
             &visible_surface,
             camera_sample.filter_weight,
         );
-
-        todo!()
     }
 
     pub fn li(
