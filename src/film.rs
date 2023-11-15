@@ -1,7 +1,4 @@
-use std::{
-    ops::{AddAssign, Index, IndexMut, MulAssign},
-    rc::Rc,
-};
+use std::ops::{AddAssign, Index, IndexMut, MulAssign};
 
 use once_cell::sync::Lazy;
 
@@ -10,7 +7,7 @@ use crate::{
     color::{white_balance, RGB, XYZ},
     colorspace::RgbColorSpace,
     filter::{Filter, FilterI},
-    image::Image,
+    image::SimpleImage,
     image_metadata::ImageMetadata,
     interaction::SurfaceInteraction,
     math::linear_least_squares_3,
@@ -65,7 +62,7 @@ pub trait FilmI {
     /// Samples the range of wavelengths that the film's sensor responds to
     fn sample_wavelengths(&self, u: Float) -> SampledWavelengths;
 
-    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image;
+    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> SimpleImage;
 
     fn write_image(&self, metadata: &ImageMetadata, splat_scale: Float);
 
@@ -147,7 +144,7 @@ impl FilmI for Film {
         }
     }
 
-    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image {
+    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> SimpleImage {
         match self {
             Film::RgbFilm(f) => f.get_image(metadata, splat_scale),
         }
@@ -405,10 +402,10 @@ impl FilmI for RgbFilm {
 
     // TODO we can write the ImageMetadata into a # comment in PPM files. But maybe just don't for now,
     // and handle metadata when we get a "real" image format going.
-    fn get_image(&self, _metadata: &ImageMetadata, splat_scale: Float) -> Image {
+    fn get_image(&self, _metadata: &ImageMetadata, splat_scale: Float) -> SimpleImage {
         // TODO fills in image using get_pixel_rgb() for each pixel's value.
         // TODO can parallelize
-        let mut image = Image::new(self.pixel_bounds());
+        let mut image = SimpleImage::new(self.pixel_bounds());
 
         for x in self.pixel_bounds().min.x..self.pixel_bounds().max.x {
             for y in self.pixel_bounds().min.y..self.pixel_bounds().max.y {

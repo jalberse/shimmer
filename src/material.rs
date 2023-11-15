@@ -1,7 +1,7 @@
 use crate::{
     bsdf::BSDF,
     bxdf::{BxDF, DiffuseBxDF},
-    image::Image,
+    image::SimpleImage,
     interaction::SurfaceInteraction,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     texture::{FloatTexture, FloatTextureI, SpectrumTexture, SpectrumTextureI, TextureEvalContext},
@@ -33,7 +33,7 @@ pub trait MaterialI {
 
     // TODO This will use a differerent Image implementation that matches PBRT;
     // we will be returning None for any material we implement right now.
-    fn get_normal_map(&self) -> Option<Image>;
+    fn get_normal_map(&self) -> Option<SimpleImage>;
 
     fn get_bump_map(&self) -> Option<FloatTexture>;
 
@@ -82,7 +82,7 @@ impl MaterialI for Material {
         }
     }
 
-    fn get_normal_map(&self) -> Option<Image> {
+    fn get_normal_map(&self) -> Option<SimpleImage> {
         match self {
             Material::Diffuse(m) => m.get_normal_map(),
         }
@@ -142,7 +142,7 @@ impl MaterialI for DiffuseMaterial {
         tex_eval.can_evaluate(&[], &[&self.reflectance])
     }
 
-    fn get_normal_map(&self) -> Option<Image> {
+    fn get_normal_map(&self) -> Option<SimpleImage> {
         // TODO we should add this later.
         None
     }
