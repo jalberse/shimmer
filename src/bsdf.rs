@@ -45,15 +45,15 @@ impl BSDF {
         wo_render: Vector3f,
         wi_render: Vector3f,
         mode: TransportMode,
-    ) -> SampledSpectrum {
+    ) -> Option<SampledSpectrum> {
         let wi = self.render_to_local(wi_render);
         let wo = self.render_to_local(wo_render);
         if wo.z == 0.0 {
             // In the case that wo lies directly on the surface's tangent plane,
             // to avoid NaN propagation, return a zero-valued SampledSpectrum.
-            return SampledSpectrum::default();
+            return None;
         }
-        self.bxdf.f(wo, wi, mode)
+        Some(self.bxdf.f(wo, wi, mode))
     }
 
     pub fn sample_f(

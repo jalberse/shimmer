@@ -3,6 +3,7 @@ use std::rc::Rc;
 use crate::{
     aggregate::BvhAggregate,
     bounding_box::Bounds3f,
+    light::Light,
     material::Material,
     ray::Ray,
     shape::{Shape, ShapeI, ShapeIntersection},
@@ -30,6 +31,7 @@ pub enum Primitive {
     Simple(SimplePrimitive),
     Transformed(TransformedPrimitive),
     BvhAggregate(BvhAggregate),
+    Geometric(GeometricPrimitive),
 }
 
 impl PrimitiveI for Primitive {
@@ -38,6 +40,7 @@ impl PrimitiveI for Primitive {
             Primitive::Simple(p) => p.bounds(),
             Primitive::Transformed(p) => p.bounds(),
             Primitive::BvhAggregate(a) => a.bounds(),
+            Primitive::Geometric(p) => p.bounds(),
         }
     }
 
@@ -46,6 +49,7 @@ impl PrimitiveI for Primitive {
             Primitive::Simple(p) => p.intersect(ray, t_max),
             Primitive::Transformed(p) => p.intersect(ray, t_max),
             Primitive::BvhAggregate(a) => a.intersect(ray, t_max),
+            Primitive::Geometric(p) => p.intersect(ray, t_max),
         }
     }
 
@@ -54,12 +58,59 @@ impl PrimitiveI for Primitive {
             Primitive::Simple(p) => p.intersect_predicate(ray, t_max),
             Primitive::Transformed(p) => p.intersect_predicate(ray, t_max),
             Primitive::BvhAggregate(a) => a.intersect_predicate(ray, t_max),
+            Primitive::Geometric(p) => p.intersect_predicate(ray, t_max),
         }
     }
 }
 
+/// Stores a variety of properties that may be associated with a shape.
+pub struct GeometricPrimitive {
+    shape: Shape,
+    material: Rc<Material>,
+    /// Stores the emissive properties if the shape is a light source
+    area_light: Option<Rc<Light>>,
+    // TODO add alpha FloatTexture
+    // TODO add medium_interface member
+}
+
+impl GeometricPrimitive {
+    pub fn new(
+        shape: Shape,
+        material: Rc<Material>,
+        area_light: Option<Rc<Light>>,
+    ) -> GeometricPrimitive {
+        GeometricPrimitive {
+            shape,
+            material,
+            area_light,
+        }
+    }
+}
+
+impl PrimitiveI for GeometricPrimitive {
+    fn bounds(&self) -> Bounds3f {
+        self.shape.bounds()
+    }
+
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
+        let mut si = self.shape.intersect(ray, t_max)?;
+        debug_assert!(si.t_hit < 1.001 * t_max);
+        // TODO test intersection against alpha texture if present
+
+        si.intr
+            .set_intersection_properties(&self.material, &self.area_light);
+        Some(si)
+    }
+
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
+        // TODO handle alpha. If no alpha, we can actually use shape.intersect_predicate().
+        self.intersect(ray, t_max).is_some()
+    }
+}
+
 /// A Primitive which simply adds material information to the surface interaction of
-/// the shape.
+/// the shape. Used if the extra information in a GeometricPrimitive (e.g. lights)
+/// are not needed for this shape.
 pub struct SimplePrimitive {
     pub shape: Shape,
     pub material: Rc<Material>,

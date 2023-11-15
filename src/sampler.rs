@@ -21,6 +21,7 @@ pub trait SamplerI {
     fn get_pixel_2d(&mut self) -> Point2f;
 }
 
+#[derive(Debug, Clone)]
 pub enum Sampler {
     Independent(IndependentSampler),
 }
@@ -57,6 +58,7 @@ impl SamplerI for Sampler {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct IndependentSampler {
     /// Store seed for determinism in start_pixel_sample().
     seed: u64,

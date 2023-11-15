@@ -86,8 +86,8 @@ impl FilterI for BoxFilter {
 }
 
 pub struct FilterSample {
-    p: Point2f,
-    weight: Float,
+    pub p: Point2f,
+    pub weight: Float,
 }
 
 // TODO FilterSampler, which is used in specific Filters. But don't implement until we need it.

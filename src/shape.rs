@@ -69,6 +69,7 @@ pub trait ShapeI {
 
 // TODO consider using enum_dispatch or equivalent; I'm doing this explicitly because I
 // am doing write-ups comparing Rust and C++, so "raw rust" can be helpful.
+#[derive(Debug, Clone)]
 pub enum Shape {
     Sphere(Sphere),
     // TODO expand to other shapes - notably Triangle.
@@ -193,6 +194,7 @@ impl ShapeSampleContext {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Sphere {
     radius: Float,
     /// Minimum z value; can "cut off" the bottom of the sphere if < radius.

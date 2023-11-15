@@ -32,7 +32,7 @@ pub trait CameraI {
         lambda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential>;
 
-    fn film(&self) -> &Film;
+    fn get_film(&mut self) -> &mut Film;
 
     /// Maps a uniform random sample u [0, 1) to a time when the camera shutter is open.
     fn sample_time(&self, u: Float) -> Float;
@@ -77,9 +77,9 @@ impl CameraI for Camera {
         }
     }
 
-    fn film(&self) -> &Film {
+    fn get_film(&mut self) -> &mut Film {
         match self {
-            Camera::Orthographic(c) => c.film(),
+            Camera::Orthographic(c) => c.get_film(),
         }
     }
 
@@ -321,8 +321,8 @@ impl CameraRay {
 }
 
 pub struct CameraRayDifferential {
-    ray: RayDifferential,
-    weight: SampledSpectrum,
+    pub ray: RayDifferential,
+    pub weight: SampledSpectrum,
 }
 
 impl CameraRayDifferential {
@@ -340,10 +340,10 @@ impl CameraRayDifferential {
 
 #[derive(Debug, Copy, Clone)]
 pub struct CameraSample {
-    p_film: Point2f,
-    p_lens: Point2f,
-    time: Float,
-    filter_weight: Float,
+    pub p_film: Point2f,
+    pub p_lens: Point2f,
+    pub time: Float,
+    pub filter_weight: Float,
 }
 
 pub struct CameraTransform {
@@ -601,8 +601,8 @@ impl CameraI for OrthographicCamera {
         Some(CameraRayDifferential::new(rd))
     }
 
-    fn film(&self) -> &Film {
-        &self.projective_base.camera_base.film
+    fn get_film(&mut self) -> &mut Film {
+        &mut self.projective_base.camera_base.film
     }
 
     fn sample_time(&self, u: Float) -> Float {

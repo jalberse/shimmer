@@ -1,4 +1,7 @@
-use std::ops::{AddAssign, Index, IndexMut, MulAssign};
+use std::{
+    ops::{AddAssign, Index, IndexMut, MulAssign},
+    rc::Rc,
+};
 
 use once_cell::sync::Lazy;
 
@@ -602,6 +605,16 @@ impl PixelSensor {
     }
 }
 
+impl Default for PixelSensor {
+    fn default() -> Self {
+        let colorspace = RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB);
+        let iso = 100.0;
+        let exposure_time = 1.0;
+        let imaging_ratio = exposure_time * iso / 100.0;
+        Self::new(colorspace, &None, imaging_ratio)
+    }
+}
+
 // TODO I don't think I plan to implement anything but RgbFilm for quite some time,
 // which doesn't use VisibleSurface. I shouldn't have implemented it in the first place
 // since it won't get used - so maybe delete it now until we'll implement the GBufferFilm?
@@ -629,6 +642,22 @@ pub struct VisibleSurface {
     // intialized, but why can't we only initialzie in a valid state? They probably have a reason,
     // but if we architect differently then we might not need this.
     set: bool,
+}
+
+impl Default for VisibleSurface {
+    fn default() -> Self {
+        Self {
+            p: Default::default(),
+            n: Default::default(),
+            ns: Default::default(),
+            uv: Default::default(),
+            time: Default::default(),
+            dpdx: Default::default(),
+            dpdy: Default::default(),
+            albedo: Default::default(),
+            set: Default::default(),
+        }
+    }
 }
 
 impl VisibleSurface {

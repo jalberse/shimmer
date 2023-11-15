@@ -1,52 +1,110 @@
-use rand::{distributions::Uniform, prelude::Distribution, rngs::StdRng, SeedableRng};
+use std::{rc::Rc, sync::Arc};
+
 use shimmer::{
-    bounding_box::Bounds2i,
-    color::RGB,
+    aggregate::BvhAggregate,
+    bounding_box::{Bounds2f, Bounds2i},
+    camera::{Camera, CameraTransform, OrthographicCamera},
     colorspace::RgbColorSpace,
-    film::{FilmI, PixelSensor, RgbFilm},
+    film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
-    image_metadata::ImageMetadata,
-    spectra::spectrum::RgbAlbedoSpectrum,
-    spectra::{sampled_wavelengths::SampledWavelengths, spectrum::SpectrumI},
-    vecmath::{Point2i, Tuple2, Vector2f},
+    integrator::{self, IntegratorI, RandomWalkIntegrator},
+    light::{DiffuseAreaLight, Light},
+    material::{DiffuseMaterial, Material},
+    options::Options,
+    primitive::{GeometricPrimitive, Primitive},
+    sampler::{IndependentSampler, Sampler},
+    shape::{Shape, Sphere},
+    spectra::{spectrum::spectrum_to_photometric, ConstantSpectrum, Spectrum},
+    texture::{SpectrumConstantTexture, SpectrumTexture},
+    transform::Transform,
+    vecmath::{Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f, Vector3f},
     Float,
 };
 
 fn main() {
-    let cs = RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB);
-    let sensor = PixelSensor::new(cs, &None, 1.0);
-    let mut film = RgbFilm::new(
-        Point2i::new(720, 720),
-        Bounds2i::new(Point2i::ZERO, Point2i::new(720, 720)),
-        Filter::BoxFilter(BoxFilter::new(Vector2f::ONE)),
-        0.1,
-        sensor,
-        "NoFilename",
-        cs.clone(),
+    // TODO I'd like to set up a simple scene: just two spheres, one with a diffuse material (in a SimplePrimitive)
+    // and one with an emissive light (in a GeometricPrimitive).
+    // They'll be side by side and in view of the camera. We should be able to render that.
+    // TODO PBRT uses a DiffuseAreaLight for this type of test in integrators_test.cpp.
+    //   So I think I should implement that variant first.
+    //   The DiffuseAreaLight has an image OPTIONALLY, so we can just implement the not-image case for now.
+
+    // Let's create a simple scene with a single sphere at the origin emitting light, with nothing else.
+    let radius = 0.1;
+    let sphere = Shape::Sphere(Sphere::new(
+        Transform::default(),
+        Transform::default(),
+        false,
+        radius,
+        -radius,
+        radius,
+        360.0,
+    ));
+
+    let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
+    let scale = 0.5 / spectrum_to_photometric(&le);
+    let area_light = Light::DiffuseAreaLight(DiffuseAreaLight::new(
+        Transform::default(),
+        le,
+        scale,
+        sphere.clone(),
+        false,
+    ));
+    let lights = vec![area_light.clone()];
+
+    let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+    let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+
+    let sphere_light_primitive =
+        GeometricPrimitive::new(sphere, material, Some(Rc::new(area_light)));
+    let sphere_light_primitive = Primitive::Geometric(sphere_light_primitive);
+    let prims = vec![Rc::new(sphere_light_primitive)];
+
+    let bvh = Primitive::BvhAggregate(BvhAggregate::new(
+        prims,
+        1,
+        shimmer::aggregate::SplitMethod::Middle,
+    ));
+
+    let sampler = Sampler::Independent(IndependentSampler::new(0, 256));
+    let full_resolution = Point2i::new(100, 100);
+    let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
+    // TODO I think this shows issue with colorspace - we don't want to clone the named colorspace, really.
+    // But I also don't want to pass around a static lifetime to the named ones.
+    // I guess color_sppace could take the NamedColorSpace enum instead and fetch it on demand instead of holding it?
+    //   If we every wanted a different colorspace we could have an Enum holding either a NamedColorSpace OR a
+    //   pointer to a colorspace or something...
+    let film = RgbFilm::new(
+        full_resolution,
+        Bounds2i::new(Point2i::new(0, 0), full_resolution),
+        filter,
         1.0,
+        PixelSensor::default(),
+        "NoFilename",
+        RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
+        Float::INFINITY,
         false,
     );
-    let mut rng = StdRng::seed_from_u64(0);
-    let between = Uniform::from(0.0..1.0);
-    let num_samples = 1000;
-    for x in film.pixel_bounds().min.x..film.pixel_bounds().max.x {
-        for y in film.pixel_bounds().min.y..film.pixel_bounds().max.y {
-            let r = x as Float / film.pixel_bounds().width() as Float;
-            let b = y as Float / film.pixel_bounds().height() as Float;
-            let g = 0.0;
-            let rgb = RGB::new(r, g, b);
-            let albedo_spectrum = RgbAlbedoSpectrum::new(&cs, &rgb);
-            for _ in 0..num_samples {
-                let p = Point2i::new(x, y);
-                let u = between.sample(&mut rng);
-                let sampled_wavelengths = SampledWavelengths::sample_uniform(u);
-                let sampled_spectrum = albedo_spectrum.sample(&sampled_wavelengths);
-                film.add_sample(&p, &sampled_spectrum, &sampled_wavelengths, &None, 1.0);
-            }
-        }
-    }
+    let options = Options::default();
+    let camera_transform = Transform::look_at(
+        &Point3f::new(0.0, 0.0, -5.0),
+        &Point3f::new(0.0, 0.0, 0.5),
+        &Vector3f::Y,
+    );
+    let camera = Camera::Orthographic(OrthographicCamera::new(
+        CameraTransform::new(&camera_transform, &options),
+        0.0,
+        1.0,
+        Film::RgbFilm(film),
+        None,
+        0.0,
+        5.0,
+        Bounds2f::new(Point2f::new(-0.1, -0.1), Point2f::new(0.1, 0.1)),
+    ));
 
-    let splat_scale = 1.0;
-    let metadata = ImageMetadata::new();
-    film.write_image(&metadata, splat_scale);
+    let mut integrator = RandomWalkIntegrator::new(bvh, lights, camera, sampler, 8);
+
+    // Note this is just going to stdout right now.
+    integrator.render(&options);
 }

@@ -1,6 +1,10 @@
 use crate::{
+    float::{next_float_down, next_float_up},
     medium::Medium,
-    vecmath::{HasNan, Point3f, Vector3f},
+    vecmath::{
+        normal::Normal3, point::Point3fi, vector::Vector3, HasNan, Normal3f, Point3f, Tuple3,
+        Vector3f,
+    },
     Float,
 };
 
@@ -43,6 +47,27 @@ impl Ray {
             time,
             medium: medium,
         }
+    }
+
+    pub fn offset_ray_origin(pi: Point3fi, n: Normal3f, w: Vector3f) -> Point3f {
+        // Find vector offset to corner of error bounds and compute initial p0
+        let d = n.abs().dot_vector(&pi.error());
+        let mut offset = d * Vector3f::from(n);
+        if w.dot_normal(&n) < 0.0 {
+            offset = -offset;
+        }
+        let mut po = Point3f::from(pi) + offset;
+
+        // Round offset point po away from p
+        for i in 0..3 {
+            if offset[i] > 0.0 {
+                po[i] = next_float_up(po[i]);
+            } else if offset[i] < 0.0 {
+                po[i] = next_float_down(po[i])
+            }
+        }
+
+        po
     }
 }
 

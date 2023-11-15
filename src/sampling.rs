@@ -1,7 +1,11 @@
 use crate::{
+    camera::CameraSample,
+    filter::{Filter, FilterI},
     float::{next_float_down, Float, PI_F},
     math::{lerp, safe_sqrt, INV_2PI, INV_PI, PI_OVER_2, PI_OVER_4},
-    vecmath::{Point2f, Tuple2, Vector2f, Vector3f},
+    options::Options,
+    sampler::{Sampler, SamplerI},
+    vecmath::{Point2f, Point2i, Tuple2, Vector2f, Vector3f},
 };
 
 // See PBRT v4 2.14
@@ -157,7 +161,31 @@ pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
     r * Point2f::new(Float::cos(theta), Float::sin(theta))
 }
 
-// TODO get_camera_sample() pg 516; need to implement the Sampler interface/enum first.
+pub fn get_camera_sample<T: SamplerI>(
+    sampler: &mut T,
+    p_pixel: Point2i,
+    filter: &Filter,
+    options: &Options,
+) -> CameraSample {
+    let filter_sample = filter.sample(sampler.get_pixel_2d());
+    if options.disable_pixel_jitter {
+        CameraSample {
+            p_film: Point2f::from(p_pixel) + Vector2f::new(0.5, 0.5),
+            p_lens: Point2f::new(0.5, 0.5),
+            time: 0.5,
+            filter_weight: 1.0,
+        }
+    } else {
+        CameraSample {
+            p_film: Point2f::from(p_pixel)
+                + Vector2f::from(filter_sample.p)
+                + Vector2f::new(0.5, 0.5),
+            p_lens: sampler.get_2d(),
+            time: sampler.get_1d(),
+            filter_weight: filter_sample.weight,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
