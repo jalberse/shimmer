@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use core::fmt;
 use std::{
     collections::HashMap,
@@ -237,3 +238,33 @@ impl Default for ImageMetadata {
 }
 
 // TODO ImageAndMetadata struct
+
+// PAPERDOC - PBRT rolls its own `InlinedVector` class for a vector that can grow up to N in size.
+// In Rust, it's trivial for me to find the arrayvec crate and add it to my project.
+// Obviously libraries exist for C++, but they tend to be more tedious to add to the project -
+// I think that people often roll their own if there's not something in boost, unless it's truly a large
+// library/dependency. This can lead to more bugs and less time doing useful development.
+// I have no data to back this up. This is vibes only for now.
+
+struct ImageChannelDesc {
+    offset: ArrayVec<i32, 4>,
+}
+
+impl ImageChannelDesc {
+    pub fn is_empty(&self) -> bool {
+        self.size() == 0
+    }
+
+    pub fn size(&self) -> usize {
+        self.offset.len()
+    }
+
+    pub fn is_identity(&self) -> bool {
+        for i in 0..self.offset.len() {
+            if self.offset[i] != i as i32 {
+                return false;
+            }
+        }
+        true
+    }
+}
