@@ -3,6 +3,7 @@ use core::fmt;
 use std::{
     collections::HashMap,
     io::{self, Write},
+    ops::Index,
 };
 
 use crate::{
@@ -266,5 +267,51 @@ impl ImageChannelDesc {
             }
         }
         true
+    }
+}
+
+struct ImageChannelValues {
+    values: ArrayVec<Float, 4>,
+}
+
+impl ImageChannelValues {
+    pub fn new(size: usize) -> Self {
+        Self {
+            values: ArrayVec::new(),
+        }
+    }
+
+    pub fn max_value(&self) -> Float {
+        *self
+            .values
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).expect("Unexpected NaN!"))
+            .expect("Tried to find the max value of an empty vector")
+    }
+
+    pub fn average(&self) -> Float {
+        self.values.iter().sum::<Float>() / self.values.len() as Float
+    }
+}
+
+impl Index<usize> for ImageChannelValues {
+    type Output = Float;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.values[index]
+    }
+}
+
+impl From<ImageChannelValues> for Float {
+    fn from(value: ImageChannelValues) -> Self {
+        debug_assert!(value.values.len() == 1);
+        value[0]
+    }
+}
+
+impl From<ImageChannelValues> for [Float; 3] {
+    fn from(value: ImageChannelValues) -> Self {
+        debug_assert!(value.values.len() == 3);
+        [value[0], value[1], value[2]]
     }
 }
