@@ -1,8 +1,12 @@
 use core::fmt;
-use std::io::{self, Write};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 use crate::{
-    bounding_box::Bounds2i, color::RGB, float::Float, math::lerp, vec2d::Vec2d, vecmath::Point2i,
+    bounding_box::Bounds2i, color::RGB, colorspace::RgbColorSpace, float::Float, math::lerp,
+    square_matrix::SquareMatrix, vec2d::Vec2d, vecmath::Point2i,
 };
 
 // TODO We currently implement Image as a simple PPM file, which really isn't the best for accurate colors
@@ -198,3 +202,38 @@ pub fn remap_pixel_coords(p: &mut Point2i, resolution: Point2i, wrap_mode: WrapM
     }
     true
 }
+
+// TODO Note we had a different .rs file with image_metadata.
+//   I think we can just delete that, replacing it with this.
+pub struct ImageMetadata {
+    pub render_time_seconds: Option<Float>,
+    pub camera_from_world: Option<SquareMatrix<4>>,
+    pub ndc_from_world: Option<SquareMatrix<4>>,
+    pub pixel_bounds: Option<Bounds2i>,
+    pub full_resolution: Option<Point2i>,
+    pub samples_per_pixel: Option<i32>,
+    pub mse: Option<Float>,
+    // TODO this could be a pointer to a colorspace
+    pub color_space: Option<RgbColorSpace>,
+    pub strings: HashMap<String, String>,
+    pub string_ves: HashMap<String, Vec<String>>,
+}
+
+impl Default for ImageMetadata {
+    fn default() -> Self {
+        Self {
+            render_time_seconds: None,
+            camera_from_world: None,
+            ndc_from_world: None,
+            pixel_bounds: None,
+            full_resolution: None,
+            samples_per_pixel: None,
+            mse: None,
+            color_space: None,
+            strings: Default::default(),
+            string_ves: Default::default(),
+        }
+    }
+}
+
+// TODO ImageAndMetadata struct
