@@ -424,6 +424,7 @@ pub trait ColorEncodingI {
     fn to_float_linear(&self, v: Float) -> Float;
 }
 
+#[derive(Debug, Clone)]
 pub enum ColorEncoding {
     Linear(LinearColorEncoding),
     SRGB(SRgbColorEncoding),
@@ -456,6 +457,7 @@ impl ColorEncodingI for ColorEncoding {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct LinearColorEncoding {}
 
 impl ColorEncodingI for LinearColorEncoding {
@@ -478,6 +480,7 @@ impl ColorEncodingI for LinearColorEncoding {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SRgbColorEncoding {}
 
 impl ColorEncodingI for SRgbColorEncoding {
@@ -500,6 +503,7 @@ impl ColorEncodingI for SRgbColorEncoding {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct GammaColorEncoding {
     gamma: Float,
     apply_lut: [Float; 256],

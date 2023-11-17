@@ -371,7 +371,7 @@ impl Image {
         encoding: Option<ColorEncoding>,
     ) -> Image {
         // TODO We could improve this API by splitting into fixed-point and floating-point versions,
-        // with only the former taking an encoding.
+        // with only the former taking an encoding. That would remove the need for checks...
 
         let mut image = Image {
             format,
@@ -741,7 +741,7 @@ mod tests {
             super::PixelFormat::U256,
             Point2i::new(4, 8),
             &["Y".to_owned()],
-            Some(encoding),
+            Some(encoding.clone()),
         );
         assert_eq!(y8.n_channels(), 1);
         assert_eq!(
@@ -771,6 +771,42 @@ mod tests {
         assert_eq!(
             y32.bytes_used(),
             (4 * y32.resolution()[0] * y32.resolution()[1]) as usize
+        );
+
+        let rgb8 = Image::new(
+            crate::image::PixelFormat::U256,
+            Point2i { x: 4, y: 8 },
+            &["R".to_owned(), "G".to_owned(), "B".to_owned()],
+            Some(encoding),
+        );
+        assert_eq!(rgb8.n_channels(), 3);
+        assert_eq!(
+            rgb8.bytes_used(),
+            (3 * rgb8.resolution()[0] * rgb8.resolution()[1]) as usize
+        );
+
+        let rgb16 = Image::new(
+            crate::image::PixelFormat::Half,
+            Point2i { x: 4, y: 8 },
+            &["R".to_owned(), "G".to_owned(), "B".to_owned()],
+            None,
+        );
+        assert_eq!(rgb16.n_channels(), 3);
+        assert_eq!(
+            rgb16.bytes_used(),
+            (2 * 3 * rgb16.resolution()[0] * rgb16.resolution()[1]) as usize
+        );
+
+        let rgb32 = Image::new(
+            crate::image::PixelFormat::Float,
+            Point2i { x: 4, y: 8 },
+            &["R".to_owned(), "G".to_owned(), "B".to_owned()],
+            None,
+        );
+        assert_eq!(rgb32.n_channels(), 3);
+        assert_eq!(
+            rgb32.bytes_used(),
+            (4 * 3 * rgb32.resolution()[0] * rgb32.resolution()[1]) as usize
         );
     }
 }
