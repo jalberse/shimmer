@@ -77,6 +77,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fast_polynomial"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "831e16abe0108eef0005da4a921664c9c15707301148c30ecfc5c9ae4b3fdeda"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "float-cmp"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -266,6 +275,7 @@ dependencies = [
  "bitflags",
  "bumpalo",
  "env_logger",
+ "fast_polynomial",
  "float-cmp",
  "float_next_after",
  "itertools",

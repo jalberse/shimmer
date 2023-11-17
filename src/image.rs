@@ -315,3 +315,10 @@ impl From<ImageChannelValues> for [Float; 3] {
         [value[0], value[1], value[2]]
     }
 }
+
+pub struct Image {
+    format: PixelFormat,
+    resolution: Point2i,
+    channel_names: Vec<String>,
+    // TODO ColorEncoding. We'll want an Enum. They use a TaggedPointer.
+}
