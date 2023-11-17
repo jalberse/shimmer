@@ -4,12 +4,12 @@ use half::f16;
 use std::{
     collections::HashMap,
     io::{self, Write},
-    ops::Index,
+    ops::{Index, IndexMut},
 };
 
 use crate::{
     bounding_box::Bounds2i,
-    color::{ColorEncoding, ColorEncodingI, RGB},
+    color::{ColorEncoding, ColorEncodingI, LinearColorEncoding, RGB},
     colorspace::RgbColorSpace,
     float::Float,
     math::lerp,
@@ -245,7 +245,10 @@ impl Default for ImageMetadata {
     }
 }
 
-// TODO ImageAndMetadata struct
+pub struct ImageAndMetadata {
+    pub image: Image,
+    pub metadata: ImageMetadata,
+}
 
 // PAPERDOC - PBRT rolls its own `InlinedVector` class for a vector that can grow up to N in size.
 // In Rust, it's trivial for me to find the arrayvec crate and add it to my project.
@@ -254,8 +257,16 @@ impl Default for ImageMetadata {
 // library/dependency. This can lead to more bugs and less time doing useful development.
 // I have no data to back this up. This is vibes only for now.
 
-struct ImageChannelDesc {
+pub struct ImageChannelDesc {
     offset: ArrayVec<i32, 4>,
+}
+
+impl Default for ImageChannelDesc {
+    fn default() -> Self {
+        Self {
+            offset: Default::default(),
+        }
+    }
 }
 
 impl ImageChannelDesc {
@@ -277,8 +288,16 @@ impl ImageChannelDesc {
     }
 }
 
-struct ImageChannelValues {
-    values: ArrayVec<Float, 4>,
+pub struct ImageChannelValues {
+    pub values: ArrayVec<Float, 4>,
+}
+
+impl Default for ImageChannelValues {
+    fn default() -> Self {
+        Self {
+            values: Default::default(),
+        }
+    }
 }
 
 impl ImageChannelValues {
@@ -309,6 +328,12 @@ impl Index<usize> for ImageChannelValues {
     }
 }
 
+impl IndexMut<usize> for ImageChannelValues {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.values[index]
+    }
+}
+
 impl From<ImageChannelValues> for Float {
     fn from(value: ImageChannelValues) -> Self {
         debug_assert!(value.values.len() == 1);
@@ -329,7 +354,9 @@ pub struct Image {
     format: PixelFormat,
     resolution: Point2i,
     channel_names: Vec<String>,
-    color_encoding: ColorEncoding,
+    /// For images with fixed-precision (non-floating-point) pixel values, a ColorEncoding is specified.
+    /// This is for e.g. PNG images; floating point formats like EXR will not use this.
+    color_encoding: Option<ColorEncoding>,
     // Which one of p8, p16, or p32 is used depends on the PixelFormat.
     p8: Vec<u8>,
     p16: Vec<f16>,
@@ -337,6 +364,51 @@ pub struct Image {
 }
 
 impl Image {
+    pub fn new_p8(
+        &self,
+        p8: Vec<u8>,
+        resolution: Point2i,
+        channels: &[String],
+        encoding: ColorEncoding,
+    ) -> Image {
+        debug_assert!(p8.len() as i32 == channels.len() as i32 * resolution[0] * resolution[1]);
+        Image {
+            format: PixelFormat::U256,
+            resolution,
+            channel_names: channels.to_vec(),
+            color_encoding: Some(encoding),
+            p8,
+            p16: Default::default(),
+            p32: Default::default(),
+        }
+    }
+
+    pub fn new_p16(p16: Vec<f16>, resolution: Point2i, channels: &[String]) -> Image {
+        debug_assert!(p16.len() as i32 == channels.len() as i32 * resolution[0] * resolution[1]);
+        Image {
+            format: PixelFormat::Half,
+            resolution,
+            channel_names: channels.to_vec(),
+            color_encoding: None,
+            p8: Default::default(),
+            p16,
+            p32: Default::default(),
+        }
+    }
+
+    pub fn new_p32(p32: Vec<f32>, resolution: Point2i, channels: &[String]) -> Image {
+        debug_assert!(p32.len() as i32 == channels.len() as i32 * resolution[0] * resolution[1]);
+        Image {
+            format: PixelFormat::Half,
+            resolution,
+            channel_names: channels.to_vec(),
+            color_encoding: None,
+            p8: Default::default(),
+            p16: Default::default(),
+            p32,
+        }
+    }
+
     pub fn format(&self) -> PixelFormat {
         self.format
     }
@@ -353,7 +425,7 @@ impl Image {
         self.channel_names.clone()
     }
 
-    pub fn encoding(&self) -> &ColorEncoding {
+    pub fn encoding(&self) -> &Option<ColorEncoding> {
         &self.color_encoding
     }
 
@@ -387,6 +459,8 @@ impl Image {
             PixelFormat::U256 => {
                 let mut r = [0.0];
                 self.color_encoding
+                    .as_ref()
+                    .expect("Non-floating point images need encoding")
                     .to_linear(&[self.p8[self.pixel_offset(p) + c]], &mut r);
                 return r[0];
             }
@@ -395,6 +469,114 @@ impl Image {
             }
             PixelFormat::Float => return self.p32[self.pixel_offset(p) + c],
         }
+    }
+
+    pub fn get_channels(&self, p: Point2i) -> ImageChannelValues {
+        self.get_channels_wrapped(p, WrapMode::Clamp.into())
+    }
+
+    pub fn get_channels_wrapped(&self, p: Point2i, wrap_mode: WrapMode2D) -> ImageChannelValues {
+        let mut cv = ImageChannelValues::default();
+        let mut p = p;
+        if !remap_pixel_coords(&mut p, self.resolution, wrap_mode) {
+            return cv;
+        }
+        let pixel_offset = self.pixel_offset(p);
+        match self.format {
+            PixelFormat::U256 => self
+                .color_encoding
+                .as_ref()
+                .expect("Fixed point images should have an encoding")
+                .to_linear(
+                    &self.p8[pixel_offset..pixel_offset + self.n_channels()],
+                    &mut cv.values,
+                ),
+            PixelFormat::Half => {
+                for i in 0..self.n_channels() {
+                    cv[i] = self.p16[pixel_offset + i].to_f32();
+                }
+            }
+            PixelFormat::Float => {
+                for i in 0..self.n_channels() {
+                    cv[i] = self.p32[pixel_offset + i];
+                }
+            }
+        }
+        cv
+    }
+
+    pub fn get_channels_from_desc(
+        &self,
+        p: Point2i,
+        desc: &ImageChannelDesc,
+    ) -> ImageChannelValues {
+        self.get_channels_from_desc_wrapped(p, desc, WrapMode::Clamp.into())
+    }
+
+    pub fn get_channels_from_desc_wrapped(
+        &self,
+        p: Point2i,
+        desc: &ImageChannelDesc,
+        wrap_mode: WrapMode2D,
+    ) -> ImageChannelValues {
+        let mut cv = ImageChannelValues::new(desc.offset.len());
+        let mut p = p;
+        if !remap_pixel_coords(&mut p, self.resolution, wrap_mode) {
+            return cv;
+        }
+
+        let pixel_offset = self.pixel_offset(p);
+        match self.format {
+            PixelFormat::U256 => {
+                for i in 0..desc.offset.len() {
+                    let index = pixel_offset + desc.offset[i] as usize;
+                    self.color_encoding
+                        .as_ref()
+                        .expect("Expected color encoding")
+                        .to_linear(&self.p8[index..index + 1], &mut cv.values[i..i + 1]);
+                }
+            }
+            PixelFormat::Half => {
+                for i in 0..desc.offset.len() {
+                    let index = pixel_offset + desc.offset[i] as usize;
+                    cv[i] = self.p16[index].to_f32();
+                }
+            }
+            PixelFormat::Float => {
+                for i in 0..desc.offset.len() {
+                    let index = pixel_offset + desc.offset[i] as usize;
+                    cv[i] = self.p32[index];
+                }
+            }
+        }
+
+        cv
+    }
+
+    pub fn get_channel_desc(&self, requested_channels: &[String]) -> ImageChannelDesc {
+        let mut offset = ArrayVec::<i32, 4>::new();
+        for i in 0..requested_channels.len() {
+            let mut j = 0;
+            while j < self.channel_names.len() {
+                if requested_channels[i] == self.channel_names[j] {
+                    offset[i] = j as i32;
+                    break;
+                }
+                j += 1;
+            }
+            if j == self.channel_names.len() {
+                return ImageChannelDesc::default();
+            }
+        }
+        ImageChannelDesc { offset }
+    }
+
+    pub fn all_channels_desc(&self) -> ImageChannelDesc {
+        let mut offset = ArrayVec::<i32, 4>::new();
+        for i in 0..self.n_channels() {
+            offset[i] = i as i32;
+        }
+        ImageChannelDesc { offset }
     }
 
     pub fn lookup_nearest_channel(&self, p: Point2f, c: usize) -> Float {
@@ -449,4 +631,51 @@ impl Image {
             + (1.0 - dx) * dy * v[2]
             + dx * dy * v[3]
     }
+
+    pub fn set_channel(&mut self, p: Point2i, c: usize, value: Float) {
+        let value = if value.is_nan() { 0.0 } else { value };
+
+        let index = self.pixel_offset(p) + c;
+        match self.format {
+            PixelFormat::U256 => self
+                .color_encoding
+                .as_ref()
+                .expect("Non-floating-point images need encoding")
+                .from_linear(&[value], &mut self.p8[index..index + 1]),
+            PixelFormat::Half => self.p16[index] = f16::from_f32(value),
+            PixelFormat::Float => self.p32[index] = value,
+        }
+    }
+
+    pub fn set_channels(&mut self, p: Point2i, values: &ImageChannelValues) {
+        debug_assert!(values.values.len() == self.n_channels());
+        for i in 0..values.values.len() {
+            self.set_channel(p, i, values[i]);
+        }
+    }
+
+    pub fn set_channels_slice(&mut self, p: Point2i, values: &[Float]) {
+        debug_assert!(values.len() == self.n_channels());
+        for i in 0..values.len() {
+            self.set_channel(p, i, values[i]);
+        }
+    }
+
+    // TODO We want to read and write exr. Don't bother with other formats right now. Use the exr crate and your brain.
 }
+
+impl Default for Image {
+    fn default() -> Self {
+        Self {
+            format: PixelFormat::U256,
+            resolution: Point2i { x: 0, y: 0 },
+            channel_names: Default::default(),
+            color_encoding: None,
+            p8: Default::default(),
+            p16: Default::default(),
+            p32: Default::default(),
+        }
+    }
+}
+
+// TODO Image tests; can copy PBRT's tests.
