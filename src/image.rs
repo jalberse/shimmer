@@ -414,4 +414,39 @@ impl Image {
         );
         self.get_channel_wrapped(pi, c, wrap_mode)
     }
+
+    pub fn bilerp_channel(&self, p: Point2f, c: usize) -> Float {
+        self.bilerp_channel_wrapped(p, c, WrapMode::Clamp.into())
+    }
+
+    /// Uses bilinear interpolation between four image pixels to compute the channel value,
+    /// equivalent to filtering witha  pixel-wide triangle filter.
+    pub fn bilerp_channel_wrapped(&self, p: Point2f, c: usize, wrap_mode: WrapMode2D) -> Float {
+        // Compute discrete pixel coordinates and offsetrs for p
+        let x = p[0] * self.resolution.x as Float - 0.5;
+        let y = p[1] * self.resolution.y as Float - 0.5;
+        let xi = x.floor() as i32;
+        let yi = y.floor() as i32;
+        let dx = x - xi as Float;
+        let dy = y - yi as Float;
+
+        // Load pixel channel values and return bilinearly interpolated value
+        let v: [Float; 4] = [
+            self.get_channel_wrapped(Point2i { x: xi, y: yi }, c, wrap_mode),
+            self.get_channel_wrapped(Point2i { x: xi + 1, y: yi }, c, wrap_mode),
+            self.get_channel_wrapped(Point2i { x: xi, y: yi + 1 }, c, wrap_mode),
+            self.get_channel_wrapped(
+                Point2i {
+                    x: xi + 1,
+                    y: yi + 1,
+                },
+                c,
+                wrap_mode,
+            ),
+        ];
+        (1.0 - dx) * (1.0 - dy) * v[0]
+            + dx * (1.0 - dy) * v[1]
+            + (1.0 - dx) * dy * v[2]
+            + dx * dy * v[3]
+    }
 }
