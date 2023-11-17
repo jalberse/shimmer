@@ -1,5 +1,6 @@
 use arrayvec::ArrayVec;
 use core::fmt;
+use half::f16;
 use std::{
     collections::HashMap,
     io::{self, Write},
@@ -7,8 +8,14 @@ use std::{
 };
 
 use crate::{
-    bounding_box::Bounds2i, color::RGB, colorspace::RgbColorSpace, float::Float, math::lerp,
-    square_matrix::SquareMatrix, vec2d::Vec2d, vecmath::Point2i,
+    bounding_box::Bounds2i,
+    color::{ColorEncoding, ColorEncodingI, RGB},
+    colorspace::RgbColorSpace,
+    float::Float,
+    math::lerp,
+    square_matrix::SquareMatrix,
+    vec2d::Vec2d,
+    vecmath::{Point2f, Point2i, Tuple2},
 };
 
 // TODO We currently implement Image as a simple PPM file, which really isn't the best for accurate colors
@@ -316,9 +323,95 @@ impl From<ImageChannelValues> for [Float; 3] {
     }
 }
 
+/// Stores a 2D array of pixel values where each pixel stores
+/// a fixed unmber of scalar-valued channels (e.g. RGB is three channels).
 pub struct Image {
     format: PixelFormat,
     resolution: Point2i,
     channel_names: Vec<String>,
-    // TODO ColorEncoding. We'll want an Enum. They use a TaggedPointer.
+    color_encoding: ColorEncoding,
+    // Which one of p8, p16, or p32 is used depends on the PixelFormat.
+    p8: Vec<u8>,
+    p16: Vec<f16>,
+    p32: Vec<f32>,
+}
+
+impl Image {
+    pub fn format(&self) -> PixelFormat {
+        self.format
+    }
+
+    pub fn resolution(&self) -> Point2i {
+        self.resolution
+    }
+
+    pub fn n_channels(&self) -> usize {
+        self.channel_names.len()
+    }
+
+    pub fn channel_names(&self) -> Vec<String> {
+        self.channel_names.clone()
+    }
+
+    pub fn encoding(&self) -> &ColorEncoding {
+        &self.color_encoding
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.resolution.x > 0 && self.resolution.y < 0
+    }
+
+    /// Returns the offset intot he pixel value array for given integer
+    /// pixel coordinates.
+    pub fn pixel_offset(&self, p: Point2i) -> usize {
+        debug_assert!(Bounds2i::new(Point2i { x: 0, y: 0 }, self.resolution).inside_exclusive(&p));
+        (self.n_channels() as i32 * (p.y * self.resolution.x + p.x)) as usize
+    }
+
+    pub fn get_channel(&self, p: Point2i, c: usize) -> Float {
+        self.get_channel_wrapped(p, c, WrapMode::Clamp.into())
+    }
+
+    /// Returns the floating point value for a single image channel,
+    /// taking care of both addressing pixels and converting the in-memory value to a float.
+    /// It is the caller's responsibility to track what is being stored in each channel.
+    pub fn get_channel_wrapped(&self, p: Point2i, c: usize, wrap_mode: WrapMode2D) -> Float {
+        // Remap provided pixel coordinates before reading the channel
+        let mut p = p;
+        if !remap_pixel_coords(&mut p, self.resolution, wrap_mode) {
+            // If WrapMode::black is used and the coordinates are out of bounds, return 0.
+            return 0.0;
+        }
+
+        match self.format {
+            PixelFormat::U256 => {
+                let mut r = [0.0];
+                self.color_encoding
+                    .to_linear(&[self.p8[self.pixel_offset(p) + c]], &mut r);
+                return r[0];
+            }
+            PixelFormat::Half => {
+                return self.p16[self.pixel_offset(p) + c].into();
+            }
+            PixelFormat::Float => return self.p32[self.pixel_offset(p) + c],
+        }
+    }
+
+    pub fn lookup_nearest_channel(&self, p: Point2f, c: usize) -> Float {
+        self.lookup_nearest_channel_wrapped(p, c, WrapMode::Clamp.into())
+    }
+
+    /// Returns the specified channel for a pizel sample nearest the provided coordinate w.r.t. [0,1]^2.
+    pub fn lookup_nearest_channel_wrapped(
+        &self,
+        p: Point2f,
+        c: usize,
+        wrap_mode: WrapMode2D,
+    ) -> Float {
+        let pi = Point2i::new(
+            (p.x * self.resolution.x as Float) as i32,
+            (p.y * self.resolution.y as Float) as i32,
+        );
+        self.get_channel_wrapped(pi, c, wrap_mode)
+    }
 }
