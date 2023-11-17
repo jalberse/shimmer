@@ -364,8 +364,50 @@ pub struct Image {
 }
 
 impl Image {
+    pub fn new(
+        format: PixelFormat,
+        resolution: Point2i,
+        channels: &[String],
+        encoding: Option<ColorEncoding>,
+    ) -> Image {
+        // TODO We could improve this API by splitting into fixed-point and floating-point versions,
+        // with only the former taking an encoding.
+
+        let mut image = Image {
+            format,
+            resolution,
+            channel_names: channels.to_vec(),
+            color_encoding: encoding,
+            p8: Default::default(),
+            p16: Default::default(),
+            p32: Default::default(),
+        };
+
+        if format.is_8bit() {
+            image.p8.resize(
+                image.n_channels() * resolution[0] as usize * resolution[1] as usize,
+                0,
+            );
+            debug_assert!(image.color_encoding.is_some());
+        } else if format.is_16bit() {
+            image.p16.resize(
+                image.n_channels() * resolution[0] as usize * resolution[1] as usize,
+                f16::from_f32(0.0),
+            );
+            debug_assert!(image.color_encoding.is_none());
+        } else if format.is_32bit() {
+            image.p32.resize(
+                image.n_channels() * resolution[0] as usize * resolution[1] as usize,
+                0.0,
+            );
+            debug_assert!(image.color_encoding.is_none());
+        } else {
+            panic!("Unsupported image format in Image::new()")
+        }
+        image
+    }
+
     pub fn new_p8(
-        &self,
         p8: Vec<u8>,
         resolution: Point2i,
         channels: &[String],
@@ -431,6 +473,10 @@ impl Image {
 
     pub fn is_empty(&self) -> bool {
         self.resolution.x > 0 && self.resolution.y < 0
+    }
+
+    pub fn bytes_used(&self) -> usize {
+        self.p8.len() + 2 * self.p16.len() + 4 * self.p32.len()
     }
 
     /// Returns the offset intot he pixel value array for given integer
@@ -679,3 +725,52 @@ impl Default for Image {
 }
 
 // TODO Image tests; can copy PBRT's tests.
+#[cfg(test)]
+mod tests {
+    use crate::{
+        color::{ColorEncoding, LinearColorEncoding},
+        vecmath::{Point2i, Tuple2},
+    };
+
+    use super::Image;
+
+    #[test]
+    fn image_basics() {
+        let encoding = ColorEncoding::Linear(LinearColorEncoding {});
+        let y8 = Image::new(
+            super::PixelFormat::U256,
+            Point2i::new(4, 8),
+            &["Y".to_owned()],
+            Some(encoding),
+        );
+        assert_eq!(y8.n_channels(), 1);
+        assert_eq!(
+            y8.bytes_used(),
+            (y8.resolution()[0] * y8.resolution()[1]) as usize
+        );
+
+        let y16 = Image::new(
+            super::PixelFormat::Half,
+            Point2i::new(4, 8),
+            &["Y".to_owned()],
+            None,
+        );
+        assert_eq!(y16.n_channels(), 1);
+        assert_eq!(
+            y16.bytes_used(),
+            (2 * y16.resolution()[0] * y16.resolution()[1]) as usize
+        );
+
+        let y32 = Image::new(
+            super::PixelFormat::Float,
+            Point2i::new(4, 8),
+            &["Y".to_owned()],
+            None,
+        );
+        assert_eq!(y32.n_channels(), 1);
+        assert_eq!(
+            y32.bytes_used(),
+            (4 * y32.resolution()[0] * y32.resolution()[1]) as usize
+        );
+    }
+}
