@@ -63,11 +63,6 @@ fn main() {
     let sampler = Sampler::Independent(IndependentSampler::new(0, 256));
     let full_resolution = Point2i::new(100, 100);
     let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
-    // TODO I think this shows issue with colorspace - we don't want to clone the named colorspace, really.
-    // But I also don't want to pass around a static lifetime to the named ones.
-    // I guess color_sppace could take the NamedColorSpace enum instead and fetch it on demand instead of holding it?
-    //   If we every wanted a different colorspace we could have an Enum holding either a NamedColorSpace OR a
-    //   pointer to a colorspace or something...
     let film = RgbFilm::new(
         full_resolution,
         Bounds2i::new(Point2i::new(0, 0), full_resolution),
