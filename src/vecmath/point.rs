@@ -925,7 +925,9 @@ impl_op_ex_commutative!(*|p: &Point3f, s: Float| -> Point3f {
     Point3f::new(p.x * s, p.y * s, p.z * s)
 });
 impl_op_ex!(/ |p: &Point3f, s: Float| -> Point3f {
-    Point3f::new(p.x / s, p.y / s, p.z / s) });
+    debug_assert!(s != 0.0);
+    Point3f::new(p.x / s, p.y / s, p.z / s)
+});
 impl_op_ex!(*= |p: &mut Point3f, s: Float| {
     p.x *= s;
     p.y *= s;

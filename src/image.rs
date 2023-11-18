@@ -26,46 +26,6 @@ const HOST_LITTLE_ENDIAN: bool = true;
 #[cfg(target_endian = "big")]
 const HOST_LITTLE_ENDIAN: bool = false;
 
-// TODO We currently implement Image as a simple PPM file, which really isn't the best for accurate colors
-//  given only 8 bits for each channel. But it's simple, which is why I'm using it during development.
-//  We should later follow PBRT's image architecture to support OpenEXR.
-// TODO We also only support writing to stdout right now, so filenames aren't really used.
-#[derive(Debug)]
-pub struct SimpleImage {
-    pub data: Vec2d<RGB>,
-}
-
-impl SimpleImage {
-    pub fn new(bounds: Bounds2i) -> SimpleImage {
-        let data = Vec2d::from_bounds(bounds);
-        SimpleImage { data }
-    }
-
-    pub fn write(&self) {
-        let stdout = io::stdout();
-        let mut buf_writer = io::BufWriter::new(stdout);
-        write!(
-            buf_writer,
-            "P3\n{} {}\n255\n",
-            self.data.extent().width(),
-            self.data.extent().height()
-        )
-        .expect("Unable to write header!");
-
-        for y in (0..self.data.extent().height()).rev() {
-            for x in 0..self.data.extent().width() {
-                let color = self.data.get_xy(x, y);
-                let r = lerp(color.r, &0.0, &255.0) as i32;
-                let g = lerp(color.g, &0.0, &255.0) as i32;
-                let b = lerp(color.b, &0.0, &255.0) as i32;
-                write!(buf_writer, "{} {} {}\n", r, g, b).expect("Unable to write color!");
-            }
-        }
-
-        buf_writer.flush().unwrap();
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PixelFormat {
     U256,
@@ -723,12 +683,12 @@ impl Image {
 
         if has_extension(filename, "pfm") {
             return self.write_pfm(filename, metadata);
+        } else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Invalid file extension!",
+            ));
         }
-
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Error writing file; possibly invalid filename.",
-        ))
     }
 
     // TODO write_exr().
@@ -736,8 +696,10 @@ impl Image {
     /// Writes the PFM file format.
     /// https://netpbm.sourceforge.net/doc/pfm.html
     fn write_pfm(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
-        let mut file = File::create(filename)?;
+        let file = File::create(filename)?;
 
+        // TODO We're hitting this error - why? I thought we clearly made 3 channels for RGB in film?
+        //   Debug this. But first, we need to get through debug assertion fails when debug main().
         if !self.n_channels() != 3 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,

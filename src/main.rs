@@ -7,7 +7,7 @@ use shimmer::{
     colorspace::RgbColorSpace,
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
-    integrator::{self, IntegratorI, RandomWalkIntegrator},
+    integrator::{IntegratorI, RandomWalkIntegrator},
     light::{DiffuseAreaLight, Light},
     material::{DiffuseMaterial, Material},
     options::Options,
@@ -35,7 +35,7 @@ fn main() {
     ));
 
     let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
-    let scale = 0.5 / spectrum_to_photometric(&le);
+    let scale = 1.0 / spectrum_to_photometric(&le);
     let area_light = Light::DiffuseAreaLight(DiffuseAreaLight::new(
         Transform::default(),
         le,
@@ -74,7 +74,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "NoFilename",
+        "test_new_image.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
