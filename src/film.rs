@@ -400,8 +400,6 @@ impl FilmI for RgbFilm {
     }
 
     fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image {
-        // TODO Rewrite for the new Image struct.
-
         // Note that we do not support writing to 8-bit images such as PNG.
         // Only floating-point precision formats such as EXR or PFM are
         // supported for writing.

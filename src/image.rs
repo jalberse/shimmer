@@ -698,9 +698,7 @@ impl Image {
     fn write_pfm(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
         let file = File::create(filename)?;
 
-        // TODO We're hitting this error - why? I thought we clearly made 3 channels for RGB in film?
-        //   Debug this. But first, we need to get through debug assertion fails when debug main().
-        if !self.n_channels() != 3 {
+        if self.n_channels() != 3 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Only 3-channel images are supported by PFM",
@@ -715,6 +713,8 @@ impl Image {
         let scale = if HOST_LITTLE_ENDIAN { -1.0 } else { 1.0 };
         write!(buf, "{}\n", scale)?;
 
+        let mut scanline: Vec<f32> = vec![0.0; 3 * self.resolution.x as usize];
+
         // Write the data from bottom left to upper right.
         // The raster is a sequence of pixels, packed one after another, with no
         // delimiters of any kind. They are grouped by row, with the pixels in each
@@ -722,9 +722,18 @@ impl Image {
         for y in (0..self.resolution.y).rev() {
             for x in 0..self.resolution.x {
                 for c in 0..3 {
-                    write!(buf, "{}", self.get_channel(Point2i { x, y }, c))?;
+                    // Cast to f32 in case Float is typedefed as f64.
+                    scanline[(3 * x + c) as usize] =
+                        self.get_channel(Point2i { x, y }, c as usize) as f32;
                 }
             }
+            let scan_bytes = unsafe {
+                std::slice::from_raw_parts(
+                    scanline.as_ptr() as *const u8,
+                    scanline.len() * std::mem::size_of::<f32>(),
+                )
+            };
+            buf.write(scan_bytes)?;
         }
 
         buf.flush()?;

@@ -227,7 +227,11 @@ impl Transform {
         let u = ref1 - from;
         let v = ref1 - to;
 
-        let mut r = SquareMatrix::<4>::zero();
+        // PAPERDOC - I encountered a bug here because it was unclear in PBRTv4's source
+        // that `r` is initialized to the identity matrix, as C++'s implicit default-initialization
+        // doesn't make the behavior immediately apparent. Rust is designed to be more  explicit,
+        // which can avoid such bugs.
+        let mut r = SquareMatrix::<4>::identity();
         for i in 0..3 {
             for j in 0..3 {
                 let kronecker = if i == j { 1.0 } else { 0.0 };
