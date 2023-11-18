@@ -5,7 +5,7 @@ use crate::{
     vecmath::{Normal3f, Point2f, Point3f, Vector3f},
 };
 
-struct TriangleMesh {
+pub struct TriangleMesh {
     pub n_triangles: usize,
     pub n_vertices: usize,
     pub vertex_indices: Vec<usize>,
