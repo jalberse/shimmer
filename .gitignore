@@ -1,3 +1,5 @@
 /target
 /coverage
 *.ppm
+*.pfm
+*.exr
