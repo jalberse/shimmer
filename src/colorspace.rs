@@ -77,7 +77,7 @@ impl RgbColorSpace {
         }
     }
 
-    pub fn get_named(cs: NamedColorSpace) -> &'static RgbColorSpace {
+    pub fn get_named(cs: NamedColorSpace) -> &'static Arc<RgbColorSpace> {
         match cs {
             NamedColorSpace::SRGB => Lazy::force(&SRGB),
             NamedColorSpace::REC2020 => Lazy::force(&REC_2020),
@@ -106,44 +106,40 @@ impl RgbColorSpace {
     }
 }
 
-// TODO We currently don't support DCI_P3, but PBRTv4 does. The reason is because
-// rgb2spec-rs, which we use for the rgb-to-spectra table generation, doesn't
-// support DCI_P3. We should add support for it sometime in the future.
-
 pub enum NamedColorSpace {
     SRGB,
     REC2020,
     ACES2065_1,
 }
 
-pub static SRGB: Lazy<RgbColorSpace> = Lazy::new(|| {
-    RgbColorSpace::new(
+pub static SRGB: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
+    Arc::new(RgbColorSpace::new(
         Point2f::new(0.64, 0.33),
         Point2f::new(0.3, 0.6),
         Point2f::new(0.15, 0.06),
         Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::StdIllumD65),
         Gamut::SRGB,
-    )
+    ))
 });
 
-pub static REC_2020: Lazy<RgbColorSpace> = Lazy::new(|| {
-    RgbColorSpace::new(
+pub static REC_2020: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
+    Arc::new(RgbColorSpace::new(
         Point2f::new(0.708, 0.292),
         Point2f::new(0.170, 0.797),
         Point2f::new(0.131, 0.046),
         Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::StdIllumD65),
         Gamut::Rec2020,
-    )
+    ))
 });
 
-pub static ACES2065_1: Lazy<RgbColorSpace> = Lazy::new(|| {
-    RgbColorSpace::new(
+pub static ACES2065_1: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
+    Arc::new(RgbColorSpace::new(
         Point2f::new(0.7347, 0.2653),
         Point2f::new(0.0, 1.0),
         Point2f::new(0.0001, -0.077),
         Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::IllumAcesD60),
         Gamut::Aces2065_1,
-    )
+    ))
 });
 
 // TODO pg 186, lookup color space fn?

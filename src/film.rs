@@ -1,4 +1,7 @@
-use std::ops::{AddAssign, Index, IndexMut, MulAssign};
+use std::{
+    ops::{AddAssign, Index, IndexMut, MulAssign},
+    sync::Arc,
+};
 
 use once_cell::sync::Lazy;
 
@@ -238,8 +241,7 @@ impl FilmBase {
 #[derive(Debug)]
 pub struct RgbFilm {
     base: FilmBase,
-    // TODO this might need to become an Rc, or an Arc.
-    color_space: RgbColorSpace,
+    color_space: Arc<RgbColorSpace>,
     max_component_value: Float,
     // Controls the floating-point precision of the output image
     write_fp16: bool,
@@ -270,7 +272,7 @@ impl RgbFilm {
         diagonal: Float,
         sensor: PixelSensor,
         filename: &str,
-        color_space: RgbColorSpace,
+        color_space: Arc<RgbColorSpace>,
         max_component_value: Float,
         write_fp16: bool,
     ) -> RgbFilm {

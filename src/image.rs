@@ -6,6 +6,7 @@ use std::{
     fs::File,
     io::{self, BufWriter, Write},
     ops::{Index, IndexMut},
+    sync::Arc,
 };
 
 use crate::{
@@ -190,8 +191,7 @@ pub struct ImageMetadata {
     pub full_resolution: Option<Point2i>,
     pub samples_per_pixel: Option<i32>,
     pub mse: Option<Float>,
-    // TODO this could be a pointer to a colorspace
-    pub color_space: Option<RgbColorSpace>,
+    pub color_space: Option<Arc<RgbColorSpace>>,
     pub strings: HashMap<String, String>,
     pub string_ves: HashMap<String, Vec<String>>,
 }
