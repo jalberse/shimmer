@@ -1,7 +1,4 @@
-use std::{
-    ops::{AddAssign, Index, IndexMut, MulAssign},
-    rc::Rc,
-};
+use std::ops::{AddAssign, Index, IndexMut, MulAssign};
 
 use once_cell::sync::Lazy;
 
@@ -10,8 +7,7 @@ use crate::{
     color::{white_balance, RGB, XYZ},
     colorspace::RgbColorSpace,
     filter::{Filter, FilterI},
-    image::Image,
-    image_metadata::ImageMetadata,
+    image::{Image, ImageMetadata, PixelFormat},
     interaction::SurfaceInteraction,
     math::linear_least_squares_3,
     spectra::{
@@ -65,9 +61,9 @@ pub trait FilmI {
     /// Samples the range of wavelengths that the film's sensor responds to
     fn sample_wavelengths(&self, u: Float) -> SampledWavelengths;
 
-    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image;
+    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image;
 
-    fn write_image(&self, metadata: &ImageMetadata, splat_scale: Float);
+    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()>;
 
     /// Gets the RGB value that results for the given spectral radiance samples from
     /// applying the PixelSensor's model, performing white balancing, and then
@@ -147,13 +143,13 @@ impl FilmI for Film {
         }
     }
 
-    fn get_image(&self, metadata: &ImageMetadata, splat_scale: Float) -> Image {
+    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image {
         match self {
             Film::RgbFilm(f) => f.get_image(metadata, splat_scale),
         }
     }
 
-    fn write_image(&self, metadata: &ImageMetadata, splat_scale: Float) {
+    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()> {
         match self {
             Film::RgbFilm(f) => f.write_image(metadata, splat_scale),
         }
@@ -403,30 +399,72 @@ impl FilmI for RgbFilm {
         self.base.sample_wavelengths(u)
     }
 
-    // TODO we can write the ImageMetadata into a # comment in PPM files. But maybe just don't for now,
-    // and handle metadata when we get a "real" image format going.
-    fn get_image(&self, _metadata: &ImageMetadata, splat_scale: Float) -> Image {
-        // TODO fills in image using get_pixel_rgb() for each pixel's value.
-        // TODO can parallelize
-        let mut image = Image::new(self.pixel_bounds());
+    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image {
+        // Note that we do not support writing to 8-bit images such as PNG.
+        // Only floating-point precision formats such as EXR or PFM are
+        // supported for writing.
+        // We support reading fixed precision image file formats for input data,
+        // but not output data, as fixed precision formats are not a good choice
+        // for spectral rendering.
+        let format = if self.write_fp16 {
+            PixelFormat::Half
+        } else {
+            PixelFormat::Float
+        };
 
+        let mut image = Image::new(
+            format,
+            self.pixel_bounds().diagonal().into(),
+            &["R".to_owned(), "G".to_owned(), "B".to_owned()],
+            None,
+        );
+
+        // TODO This can be parallelized.
+        let max_f16 = 65504.0;
         for x in self.pixel_bounds().min.x..self.pixel_bounds().max.x {
             for y in self.pixel_bounds().min.y..self.pixel_bounds().max.y {
                 let p = Point2i::new(x, y);
-                let rgb = self.get_pixel_rgb(&p, splat_scale);
-                let offset = Point2i::new(
+                let mut rgb = self.get_pixel_rgb(&p, splat_scale);
+
+                debug_assert!(!rgb.has_nan());
+
+                // Clamp if necessary for f16 precision
+                if self.write_fp16
+                    && [rgb.r, rgb.g, rgb.b]
+                        .iter()
+                        .fold(Float::NEG_INFINITY, |a, b| Float::max(a, *b))
+                        > max_f16
+                {
+                    if rgb.r > max_f16 {
+                        rgb.r = max_f16;
+                    }
+                    if rgb.g > max_f16 {
+                        rgb.r = max_f16;
+                    }
+                    if rgb.b > max_f16 {
+                        rgb.b = max_f16;
+                    }
+                }
+
+                let p_offset = Point2i::new(
                     p.x - self.pixel_bounds().min.x,
                     p.y - self.pixel_bounds().min.y,
                 );
-                image.data.set(offset, rgb);
+                image.set_channels_slice(p_offset, &[rgb[0], rgb[1], rgb[2]]);
             }
         }
+
+        metadata.pixel_bounds = Some(self.pixel_bounds());
+        metadata.full_resolution = Some(self.full_resolution());
+        metadata.color_space = Some(self.color_space.clone());
+
         image
     }
 
-    fn write_image(&self, _metadata: &ImageMetadata, splat_scale: Float) {
-        let image = self.get_image(_metadata, splat_scale);
-        image.write();
+    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()> {
+        let image = self.get_image(metadata, splat_scale);
+        image.write(self.get_filename(), metadata)?;
+        Ok(())
     }
 
     fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> RGB {

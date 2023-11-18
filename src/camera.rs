@@ -6,7 +6,7 @@
 use crate::{
     bounding_box::Bounds2f,
     film::{Film, FilmI},
-    image_metadata::ImageMetadata,
+    image::ImageMetadata,
     math::lerp,
     medium::Medium,
     options::{Options, RenderingCoordinateSystem},

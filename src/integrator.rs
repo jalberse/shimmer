@@ -7,7 +7,7 @@ use crate::{
     camera::{Camera, CameraI},
     film::{FilmI, VisibleSurface},
     float::PI_F,
-    image_metadata::ImageMetadata,
+    image::ImageMetadata,
     light::{Light, LightI, LightType},
     options::Options,
     primitive::{Primitive, PrimitiveI},
@@ -139,11 +139,12 @@ impl IntegratorI for RandomWalkIntegrator {
             // If we've reached the samples per pixel limit, write out the image.
             // TODO optionally write the current image to the disk as well
             if wave_start == spp {
-                let metadata = ImageMetadata::new();
+                let mut metadata = ImageMetadata::default();
                 // TODO populate metadata here!
                 self.camera
                     .get_film()
-                    .write_image(&metadata, 1.0 / wave_start as Float);
+                    .write_image(&mut metadata, 1.0 / wave_start as Float)
+                    .unwrap();
             }
         }
     }

@@ -283,11 +283,6 @@ fn two_sum(a: Float, b: Float) -> CompensatedFloat {
     CompensatedFloat::new(s, err)
 }
 
-pub fn evaluate_polynomial(t: Float, c: &[Float]) -> Float {
-    // TODO Consider using FMA as PBRT does. I previous did that but was getting the wrong answer; we'll go with KISS for now.
-    t * t * c[0] + t * c[1] + c[2]
-}
-
 pub fn find_interval(size: usize, pred: impl Fn(usize) -> bool) -> usize {
     let mut first = 1;
     let mut last = size as i32 - 2;
@@ -347,6 +342,7 @@ pub fn linear_least_squares_helper<const N: usize, const ROWS: usize>(
 mod tests {
     use super::DifferenceOfProducts;
     use crate::Float;
+    use fast_polynomial::poly;
 
     #[test]
     fn lerp() {
@@ -366,5 +362,14 @@ mod tests {
         let c = 5.0;
         let d = 5.0;
         assert_eq!(75.0, Float::difference_of_products(a, b, c, d));
+    }
+
+    #[test]
+    fn test_evaluate_polynomial() {
+        // Note that poly takes the coefficients in an order you might not expect.
+        // 1 + 2 * x + 3 * x
+        let c = [1.0, 2.0, 3.0];
+        // 1 * 2^0 + 2 * 2^1 + 3 * 2^2
+        assert_eq!(17.0, poly(2.0, &c));
     }
 }

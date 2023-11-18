@@ -216,9 +216,9 @@ impl Transform {
         // allows for easy const correctness where PBRTv4 does not allow const.
         // In C++, a common pattern to maintain const correctness here is to define and call a lambda inline,
         // which is overcomplicated syntax.
-        let ref1: Vector3f = if from.x.abs() < 0.72 && to.x < 0.72 {
+        let ref1: Vector3f = if from.x.abs() < 0.72 && to.x.abs() < 0.72 {
             Vector3f::X
-        } else if from.y < 0.72 && to.y < 0.72 {
+        } else if from.y.abs() < 0.72 && to.y.abs() < 0.72 {
             Vector3f::Y
         } else {
             Vector3f::Z
@@ -227,7 +227,11 @@ impl Transform {
         let u = ref1 - from;
         let v = ref1 - to;
 
-        let mut r = SquareMatrix::<4>::zero();
+        // PAPERDOC - I encountered a bug here because it was unclear in PBRTv4's source
+        // that `r` is initialized to the identity matrix, as C++'s implicit default-initialization
+        // doesn't make the behavior immediately apparent. Rust is designed to be more  explicit,
+        // which can avoid such bugs.
+        let mut r = SquareMatrix::<4>::identity();
         for i in 0..3 {
             for j in 0..3 {
                 let kronecker = if i == j { 1.0 } else { 0.0 };
@@ -730,14 +734,26 @@ impl InverseTransformable for RayDifferential {
 
 /// Helper function to share transform and inverse transform implementation.
 fn apply_point_helper(m: &SquareMatrix<4>, p: &Point3f) -> Point3f {
+    // Implicitly converts to the homogeneous column vector [x y z 1]^T.
+    // Transforms by multiplying that vector with the transformation matrix.
     let xp = m[0][0] * p.x() + m[0][1] * p.y() + m[0][2] * p.z() + m[0][3];
     let yp = m[1][0] * p.x() + m[1][1] * p.y() + m[1][2] * p.z() + m[1][3];
     let zp = m[2][0] * p.x() + m[2][1] * p.y() + m[2][2] * p.z() + m[2][3];
     let wp = m[3][0] * p.x() + m[3][1] * p.y() + m[3][2] * p.z() + m[3][3];
+    // ... and then converts back to the nonhomogeneous point representation by dividing by wp.
     if wp == 1.0 {
+        // For efficiency, skips division if the weight is 1.
         Point3f::new(xp, yp, zp)
     } else {
-        debug_assert!(wp != 0.0);
+        // TODO We fail an assertion (now within the division, as PBRT does)
+        //   for wp != 0. So... Why do we get this, and they don't?
+        //   Well, our m[3] is all 0'd out, so wp is actually always zero (at least, for that matrix).
+        //   Am I constructing m wrong?
+        //   The very first time this is reached, we get the error.
+        //  I mean, I have tests for point transforms and they do fine?
+        // Hm yeah, well, the last column should *really* not be 0'd out - I would expect [0 0 0 1].
+        //  Am I getting it zero'd from the composition of matrices?
+        // ugh I guess look into this tomorrow.
         Point3f::new(xp, yp, zp) / wp
     }
 }
@@ -904,6 +920,4 @@ mod tests {
         let to_new = r.apply(&from);
         assert_eq!(to, to_new);
     }
-
-    // TODO test rotations inverse
 }

@@ -31,8 +31,6 @@ pub trait MaterialI {
 
     fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool;
 
-    // TODO This will use a differerent Image implementation that matches PBRT;
-    // we will be returning None for any material we implement right now.
     fn get_normal_map(&self) -> Option<Image>;
 
     fn get_bump_map(&self) -> Option<FloatTexture>;

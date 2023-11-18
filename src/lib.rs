@@ -14,7 +14,6 @@ pub mod filter;
 pub mod float;
 pub mod frame;
 pub mod image;
-pub mod image_metadata;
 pub mod integrator;
 pub mod interaction;
 pub mod interval;
@@ -36,6 +35,7 @@ pub mod sphere;
 pub mod square_matrix;
 pub mod texture;
 pub mod transform;
+mod util;
 pub mod vec2d;
 pub mod vecmath;
 

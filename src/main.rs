@@ -7,7 +7,7 @@ use shimmer::{
     colorspace::RgbColorSpace,
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
-    integrator::{self, IntegratorI, RandomWalkIntegrator},
+    integrator::{IntegratorI, RandomWalkIntegrator},
     light::{DiffuseAreaLight, Light},
     material::{DiffuseMaterial, Material},
     options::Options,
@@ -22,13 +22,6 @@ use shimmer::{
 };
 
 fn main() {
-    // TODO I'd like to set up a simple scene: just two spheres, one with a diffuse material (in a SimplePrimitive)
-    // and one with an emissive light (in a GeometricPrimitive).
-    // They'll be side by side and in view of the camera. We should be able to render that.
-    // TODO PBRT uses a DiffuseAreaLight for this type of test in integrators_test.cpp.
-    //   So I think I should implement that variant first.
-    //   The DiffuseAreaLight has an image OPTIONALLY, so we can just implement the not-image case for now.
-
     // Let's create a simple scene with a single sphere at the origin emitting light, with nothing else.
     let radius = 0.1;
     let sphere = Shape::Sphere(Sphere::new(
@@ -42,7 +35,7 @@ fn main() {
     ));
 
     let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
-    let scale = 0.5 / spectrum_to_photometric(&le);
+    let scale = 1.0 / spectrum_to_photometric(&le);
     let area_light = Light::DiffuseAreaLight(DiffuseAreaLight::new(
         Transform::default(),
         le,
@@ -81,7 +74,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "NoFilename",
+        "test_new_image.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,

@@ -24,6 +24,10 @@ pub struct SquareMatrix<const N: usize> {
 }
 
 impl<const N: usize> SquareMatrix<N> {
+    pub fn identity() -> Self {
+        Self::default()
+    }
+
     pub const fn new(m: [[Float; N]; N]) -> Self {
         Self { m }
     }
@@ -128,6 +132,7 @@ impl<const N: usize> SquareMatrix<N> {
 }
 
 impl<const N: usize> Default for SquareMatrix<N> {
+    /// The identity matrix
     fn default() -> Self {
         let mut m: [[Float; N]; N] = [[0.0; N]; N];
         for i in 0..N {
