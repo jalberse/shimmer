@@ -20,7 +20,6 @@ use crate::{
     },
     Float,
 };
-use log::warn;
 
 /// The Shape interface provides basic geometric properties of the primitive,
 /// such as its surface area and its ray intersection routine. The non-geometric

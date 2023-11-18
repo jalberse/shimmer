@@ -1,7 +1,9 @@
 use super::vecmath::point::Point3;
 
-// TODO I used this for finding the bounding sphere of a Bounding Box, but I think that
-// we should replace that use case with shape::Sphere instead.
+/// This is a simple Sphere which just encapsulates the center and the radius;
+/// this is not to be confused with shape::Sphere which encapsulates additional
+/// functionality like ray intersection. This class is mostly useful for e.g.
+/// bounding spheres that don't need that extra information or routines.
 pub struct Sphere<C, T> {
     pub center: C,
     pub radius: T,
