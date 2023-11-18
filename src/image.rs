@@ -3,20 +3,28 @@ use core::fmt;
 use half::f16;
 use std::{
     collections::HashMap,
-    io::{self, Write},
+    fs::File,
+    io::{self, BufWriter, Write},
     ops::{Index, IndexMut},
 };
 
 use crate::{
     bounding_box::Bounds2i,
-    color::{ColorEncoding, ColorEncodingI, LinearColorEncoding, RGB},
+    color::{ColorEncoding, ColorEncodingI, RGB},
     colorspace::RgbColorSpace,
     float::Float,
     math::lerp,
     square_matrix::SquareMatrix,
+    util::has_extension,
     vec2d::Vec2d,
     vecmath::{Point2f, Point2i, Tuple2},
 };
+
+#[cfg(target_endian = "little")]
+const HOST_LITTLE_ENDIAN: bool = true;
+
+#[cfg(target_endian = "big")]
+const HOST_LITTLE_ENDIAN: bool = false;
 
 // TODO We currently implement Image as a simple PPM file, which really isn't the best for accurate colors
 //  given only 8 bits for each channel. But it's simple, which is why I'm using it during development.
@@ -707,7 +715,60 @@ impl Image {
         }
     }
 
-    // TODO We want to read and write exr. Don't bother with other formats right now. Use the exr crate and your brain.
+    pub fn write(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
+        // TODO There's additional logic we'll need here with other filetypes, but
+        // this should be "OK" for writing PFM files.
+
+        // TODO Add exr support.
+
+        if has_extension(filename, "pfm") {
+            return self.write_pfm(filename, metadata);
+        }
+
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Error writing file; possibly invalid filename.",
+        ))
+    }
+
+    // TODO write_exr().
+
+    /// Writes the PFM file format.
+    /// https://netpbm.sourceforge.net/doc/pfm.html
+    fn write_pfm(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
+        let mut file = File::create(filename)?;
+
+        if !self.n_channels() != 3 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Only 3-channel images are supported by PFM",
+            ));
+        }
+
+        let mut buf = BufWriter::new(file);
+
+        write!(buf, "PF\n")?;
+        write!(buf, "{} {}\n", self.resolution.x, self.resolution.y)?;
+        // Write the scale, which encodes endianness.
+        let scale = if HOST_LITTLE_ENDIAN { -1.0 } else { 1.0 };
+        write!(buf, "{}\n", scale)?;
+
+        // Write the data from bottom left to upper right.
+        // The raster is a sequence of pixels, packed one after another, with no
+        // delimiters of any kind. They are grouped by row, with the pixels in each
+        // row ordered left to right and the rows ordered bottom to top.
+        for y in (0..self.resolution.y).rev() {
+            for x in 0..self.resolution.x {
+                for c in 0..3 {
+                    write!(buf, "{}", self.get_channel(Point2i { x, y }, c))?;
+                }
+            }
+        }
+
+        buf.flush()?;
+
+        Ok(())
+    }
 }
 
 impl Default for Image {
