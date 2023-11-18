@@ -1,5 +1,3 @@
-// TODO We will need to implement PrimitiveI, but we can implement the Shape interface first.
-
 use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
@@ -609,7 +607,7 @@ impl ShapeI for Sphere {
 mod tests {
     use crate::{
         ray::Ray,
-        shape::{ShapeI, Sphere},
+        shape::shape::{ShapeI, Sphere},
         transform::Transform,
         vecmath::{Point3f, Tuple3, Vector3f},
         Float,
