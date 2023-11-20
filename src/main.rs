@@ -13,7 +13,7 @@ use shimmer::{
     options::Options,
     primitive::{GeometricPrimitive, Primitive},
     sampler::{IndependentSampler, Sampler},
-    shape::{Shape, Sphere},
+    shape::{sphere::Sphere, Shape},
     spectra::{spectrum::spectrum_to_photometric, ConstantSpectrum, Spectrum},
     texture::{SpectrumConstantTexture, SpectrumTexture},
     transform::Transform,

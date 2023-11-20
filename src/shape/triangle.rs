@@ -4,11 +4,13 @@ use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
     float::gamma,
-    math::DifferenceOfProducts,
+    interaction::SurfaceInteraction,
+    math::{difference_of_products_float_vec, DifferenceOfProducts},
     ray::Ray,
+    shape::ShapeIntersection,
     vecmath::{
-        spherical::spherical_triangle_area, vector::Vector3, Length, Normalize, Point3f, Tuple3,
-        Vector3f,
+        spherical::spherical_triangle_area, vector::Vector3, Length, Normalize, Point2f, Point3f,
+        Tuple3, Vector3f,
     },
     Float,
 };
@@ -186,6 +188,54 @@ impl Triangle {
 
         Some(TriangleIntersection { b0, b1, b2, t })
     }
+
+    // TODO If/when we move to GPU, this will likely need to change to accomodate; see PBRT.
+    fn interaction_from_intersection(
+        &self,
+        ti: TriangleIntersection,
+        time: Float,
+        wo: Vector3f,
+    ) -> SurfaceInteraction {
+        let (p0, p1, p2) = self.get_points();
+
+        // Compute triangle partial derivatives.
+        // Compute deltas and matrix determinant for triangle partial derivatives.
+        // Get triangle texture coordinates in uv array.
+        let uv = if self.mesh.uv.is_empty() {
+            [Point2f::ZERO, Point2f::X, Point2f::ONE]
+        } else {
+            let v = self.mesh.vertex_indices[3 * self.tri_index as usize];
+            [self.mesh.uv[v], self.mesh.uv[v + 1], self.mesh.uv[v + 2]]
+        };
+        let duv02 = uv[0] - uv[2];
+        let duv12 = uv[1] - uv[2];
+        let dp02 = p0 - p2;
+        let dp12 = p1 - p2;
+        let determinant = Float::difference_of_products(duv02[0], duv12[1], duv02[1], duv12[0]);
+
+        let degenerate_uv = determinant.abs() < 1e-9;
+        let (dpdu, dpdv) = if !degenerate_uv {
+            // Compute triangle dpdu and dpdv via matrix inversion
+            let inv_det = 1.0 / determinant;
+            let dpdu = difference_of_products_float_vec(duv12[1], dp02, duv02[1], dp12) * inv_det;
+            let dpdv = difference_of_products_float_vec(duv02[0], dp12, duv12[0], dp02) * inv_det;
+            (dpdu, dpdv)
+        } else {
+            (Vector3f::ZERO, Vector3f::ZERO)
+        };
+        // Handle degenerate triaangle uv parameterization or partial derivatives
+        if degenerate_uv || dpdu.cross(&dpdv).length_squared() == 0.0 {
+            let mut ng = (p2 - p0).cross(&(p1 - p0));
+            if ng.length_squared() == 0.0 {
+                // TODO We need to be able to use a Vector3<f64>. Need to make Vector3f generic.
+                // ng = Vector3f::from(
+                //     Vector3::<f64>::from(p2 - p0).cross(Vector3::<f64>::from(p1 - p0)),
+                // );
+            }
+        }
+
+        todo!()
+    }
 }
 
 impl ShapeI for Triangle {
@@ -211,11 +261,17 @@ impl ShapeI for Triangle {
     }
 
     fn intersect(&self, ray: &crate::ray::Ray, t_max: Float) -> Option<super::ShapeIntersection> {
-        todo!()
+        let (p0, p1, p2) = self.get_points();
+        let tri_isect = Triangle::intersect_triangle(ray, t_max, p0, p1, p2)?;
+        let t_hit = tri_isect.t;
+        let intr = self.interaction_from_intersection(tri_isect, ray.time, -ray.d);
+        Some(ShapeIntersection { intr, t_hit })
     }
 
     fn intersect_predicate(&self, ray: &crate::ray::Ray, t_max: Float) -> bool {
-        todo!()
+        let (p0, p1, p2) = self.get_points();
+        let tri_isect = Triangle::intersect_triangle(ray, t_max, p0, p1, p2);
+        tri_isect.is_some()
     }
 
     fn area(&self) -> Float {
@@ -249,8 +305,10 @@ impl ShapeI for Triangle {
 }
 
 pub struct TriangleIntersection {
+    // Barycentric coordinates of the intersection
     b0: Float,
     b1: Float,
     b2: Float,
+    /// The t value along the ray the intersection occured
     t: Float,
 }

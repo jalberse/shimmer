@@ -5,6 +5,7 @@ use crate::{
     float::{Float, PI_F},
     interval::Interval,
     square_matrix::{Invertible, SquareMatrix},
+    vecmath::Vector3f,
 };
 
 pub const INV_PI: Float = 0.31830988618379067154;
@@ -179,6 +180,13 @@ impl DifferenceOfProducts for i32 {
     fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
         a * b + c * d
     }
+}
+
+pub fn difference_of_products_float_vec(a: Float, b: Vector3f, c: Float, d: Vector3f) -> Vector3f {
+    let cd = c * d;
+    let difference = a * b + cd;
+    let error = -c * d + cd;
+    difference + error
 }
 
 pub trait IsNeg {

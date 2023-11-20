@@ -541,7 +541,7 @@ mod tests {
         material::{DiffuseMaterial, Material},
         primitive::{Primitive, PrimitiveI, SimplePrimitive},
         ray::Ray,
-        shape::{Shape, Sphere},
+        shape::{sphere::Sphere, Shape},
         spectra::{ConstantSpectrum, Spectrum},
         texture::SpectrumConstantTexture,
         transform::Transform,
