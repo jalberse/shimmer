@@ -23,45 +23,79 @@ use shimmer::{
 
 fn main() {
     // Let's create a simple scene with a single sphere at the origin emitting light, with nothing else.
-    let radius = 0.1;
-    let sphere = Shape::Sphere(Sphere::new(
-        Transform::default(),
-        Transform::default(),
-        false,
-        radius,
-        -radius,
-        radius,
-        360.0,
-    ));
+    let (light_prim, sphere_area_light) = {
+        let object_from_render = Transform::translate(Vector3f {
+            x: 0.0,
+            y: 0.4,
+            z: 0.0,
+        });
+        let light_radius = 0.33;
+        let sphere = Shape::Sphere(Sphere::new(
+            object_from_render.inverse(),
+            object_from_render,
+            false,
+            light_radius,
+            -light_radius,
+            light_radius,
+            360.0,
+        ));
 
-    let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
-    let scale = 1.0 / spectrum_to_photometric(&le);
-    let area_light = Light::DiffuseAreaLight(DiffuseAreaLight::new(
-        Transform::default(),
-        le,
-        scale,
-        sphere.clone(),
-        false,
-    ));
-    let lights = vec![area_light.clone()];
+        let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
+        let scale = 1.0 / spectrum_to_photometric(&le);
+        let area_light = Light::DiffuseAreaLight(DiffuseAreaLight::new(
+            Transform::default(),
+            le,
+            scale,
+            sphere.clone(),
+            false,
+        ));
 
-    let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
-    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-    let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
-    let sphere_light_primitive =
-        GeometricPrimitive::new(sphere, material, Some(Rc::new(area_light)));
-    let sphere_light_primitive = Primitive::Geometric(sphere_light_primitive);
-    let prims = vec![Rc::new(sphere_light_primitive)];
+        let sphere_light_primitive =
+            GeometricPrimitive::new(sphere, material, Some(Rc::new(area_light.clone())));
+        (Primitive::Geometric(sphere_light_primitive), area_light)
+    };
 
+    // A diffuse sphere to be lit by the light.
+    let sphere_prim = {
+        let object_from_render = Transform::translate(Vector3f {
+            x: 0.0,
+            y: -0.4,
+            z: -0.5,
+        });
+        let radius = 0.33;
+        let sphere = Shape::Sphere(Sphere::new(
+            object_from_render.inverse(),
+            object_from_render,
+            false,
+            radius,
+            -radius,
+            radius,
+            360.0,
+        ));
+
+        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let sphere_primitive =
+            Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
+        sphere_primitive
+    };
+
+    // Assemble primitives, lights for the scene
+    let lights = vec![sphere_area_light];
+    let prims = vec![Rc::new(light_prim), Rc::new(sphere_prim)];
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
         1,
         shimmer::aggregate::SplitMethod::Middle,
     ));
 
-    let sampler = Sampler::Independent(IndependentSampler::new(0, 256));
-    let full_resolution = Point2i::new(100, 100);
+    let sampler = Sampler::Independent(IndependentSampler::new(0, 1000));
+    let full_resolution = Point2i::new(500, 500);
     let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
     let film = RgbFilm::new(
         full_resolution,
@@ -69,7 +103,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_new_image.pfm",
+        "test_diffuse_neg_half_z.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -88,7 +122,7 @@ fn main() {
         None,
         0.0,
         5.0,
-        Bounds2f::new(Point2f::new(-0.1, -0.1), Point2f::new(0.1, 0.1)),
+        Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
     ));
 
     let mut integrator = RandomWalkIntegrator::new(bvh, lights, camera, sampler, 8);
