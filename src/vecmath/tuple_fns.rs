@@ -1,10 +1,7 @@
 //! A set of functions which help us implement the tuple traits for various types,
 //! but that we don't want exposed external to the vecmath module.
 
-use std::{
-    ops::{Add, Mul, Neg, Sub},
-    process::Output,
-};
+use std::ops::{Add, Neg, Sub};
 
 use crate::{
     float::PI_F,

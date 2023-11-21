@@ -4,13 +4,13 @@ use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
     float::gamma,
-    interaction::SurfaceInteraction,
+    interaction::{Interaction, SurfaceInteraction},
     math::{difference_of_products_float_vec, DifferenceOfProducts},
     ray::Ray,
     shape::ShapeIntersection,
     vecmath::{
-        spherical::spherical_triangle_area, vector::Vector3, Length, Normalize, Point2f, Point3f,
-        Tuple3, Vector3f,
+        normal::Normal3, point::Point3fi, spherical::spherical_triangle_area, vector::Vector3,
+        Length, Normal3f, Normalize, Point2f, Point3f, Tuple3, Vector2f, Vector3f,
     },
     Float,
 };
@@ -197,6 +197,7 @@ impl Triangle {
         wo: Vector3f,
     ) -> SurfaceInteraction {
         let (p0, p1, p2) = self.get_points();
+        let v = self.mesh.vertex_indices[3 * self.tri_index as usize];
 
         // Compute triangle partial derivatives.
         // Compute deltas and matrix determinant for triangle partial derivatives.
@@ -204,7 +205,6 @@ impl Triangle {
         let uv = if self.mesh.uv.is_empty() {
             [Point2f::ZERO, Point2f::X, Point2f::ONE]
         } else {
-            let v = self.mesh.vertex_indices[3 * self.tri_index as usize];
             [self.mesh.uv[v], self.mesh.uv[v + 1], self.mesh.uv[v + 2]]
         };
         let duv02 = uv[0] - uv[2];
@@ -224,17 +224,171 @@ impl Triangle {
             (Vector3f::ZERO, Vector3f::ZERO)
         };
         // Handle degenerate triaangle uv parameterization or partial derivatives
-        if degenerate_uv || dpdu.cross(&dpdv).length_squared() == 0.0 {
+        let (dpdu, dpdv) = if degenerate_uv || dpdu.cross(&dpdv).length_squared() == 0.0 {
             let mut ng = (p2 - p0).cross(&(p1 - p0));
             if ng.length_squared() == 0.0 {
-                // TODO We need to be able to use a Vector3<f64>. Need to make Vector3f generic.
-                // ng = Vector3f::from(
-                //     Vector3::<f64>::from(p2 - p0).cross(Vector3::<f64>::from(p1 - p0)),
-                // );
+                // TODO This could be better if we made Vector3 more generic s.t. we could just say Vector3<f64>
+                // and call its cross implementation.
+                // Retry with double precision
+                let v1 = p2 - p0;
+                let v2 = p1 - p0;
+                ng = Vector3f {
+                    x: f64::difference_of_products(
+                        v1.y() as f64,
+                        v2.z() as f64,
+                        v1.z() as f64,
+                        v2.y() as f64,
+                    ) as Float,
+                    y: f64::difference_of_products(
+                        v1.z() as f64,
+                        v2.x() as f64,
+                        v1.x() as f64,
+                        v2.z() as f64,
+                    ) as Float,
+                    z: f64::difference_of_products(
+                        v1.x() as f64,
+                        v2.y() as f64,
+                        v1.y() as f64,
+                        v2.x() as f64,
+                    ) as Float,
+                };
+                debug_assert_ne!(ng.length_squared(), 0.0);
             }
+            ng.normalize().coordinate_system()
+        } else {
+            (dpdu, dpdv)
+        };
+
+        // Interpolate uv parametric coordiantes and hit point.
+        let p_hit: Point3f = ti.b0 * p0 + ti.b1 * Vector3f::from(p1) + ti.b2 * Vector3f::from(p2);
+        let uv_hit: Point2f =
+            ti.b0 * uv[0] + ti.b1 * Vector2f::from(uv[1]) + ti.b2 * Vector2f::from(uv[2]);
+
+        let flip_normal = self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness;
+
+        // Compute error bounds for triangle intersection
+        let p_abs_sum = (ti.b0 * p0).abs()
+            + Vector3f::from((ti.b1 * p1).abs())
+            + Vector3f::from((ti.b2 * p2).abs());
+        let p_error = gamma(7) * Vector3f::from(p_abs_sum);
+
+        let mut isect = SurfaceInteraction::new(
+            Point3fi::from_value_and_error(p_hit, p_error),
+            uv_hit,
+            wo,
+            dpdu,
+            dpdv,
+            Normal3f::ZERO,
+            Normal3f::ZERO,
+            time,
+            flip_normal,
+        );
+
+        isect.face_index = if self.mesh.face_indices.is_empty() {
+            0
+        } else {
+            self.mesh.face_indices[self.tri_index as usize] as i32
+        };
+
+        // Set final surface normal and shading geometry for triangle
+        // Override seruface normal in isect for triangle
+        isect.shading.n = dp02.cross(&dp12).normalize().into();
+        isect.interaction.n = isect.shading.n;
+        if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
+            isect.shading.n = -isect.shading.n;
+            isect.interaction.n = -isect.interaction.n;
         }
 
-        todo!()
+        if !self.mesh.n.is_empty() || !self.mesh.s.is_empty() {
+            // Initialize triangle shading geometry
+            let ns = if self.mesh.n.is_empty() {
+                isect.interaction.n
+            } else {
+                let n = ti.b0 * self.mesh.n[v]
+                    + ti.b1 * self.mesh.n[v + 1]
+                    + ti.b2 * self.mesh.n[v + 2];
+                if n.length_squared() > 0.0 {
+                    n.normalize()
+                } else {
+                    isect.interaction.n
+                }
+            };
+
+            // Compute shading tangent ss for triangle
+            let ss = if self.mesh.s.is_empty() {
+                isect.dpdu
+            } else {
+                let s = ti.b0 * self.mesh.s[v]
+                    + ti.b1 * self.mesh.s[v + 1]
+                    + ti.b2 * self.mesh.s[v + 2];
+                if s.length_squared() == 0.0 {
+                    isect.dpdu
+                } else {
+                    s
+                }
+            };
+
+            // Compute shading bitangent ts for triangle and adjust ss
+            let ts = ns.cross(&ss);
+            let (ss, ts) = if ts.length_squared() > 0.0 {
+                (ts.cross_normal(&ns), ts)
+            } else {
+                Vector3f::from(ns).coordinate_system()
+            };
+
+            // Compute dndu and dndv for triangle shading geometry
+            let (dndu, dndv) = if self.mesh.n.is_empty() {
+                (Normal3f::ZERO, Normal3f::ZERO)
+            } else {
+                // Compute deltas for triangle partial derivatives of normal
+                let duv02 = uv[0] - uv[2];
+                let duv12 = uv[1] - uv[2];
+
+                let determinant =
+                    Float::difference_of_products(duv02[0], duv12[1], duv02[1], duv12[0]);
+                let degenerate_uv = determinant.abs() < 1e-9;
+                if degenerate_uv {
+                    // We can still compute dndu and dndv, with respect to the
+                    // same arbitrary coordinate system we use to compute dpdu
+                    // and dpdv when this happens. It's important to do this
+                    // (rather than giving up) so that ray differentials for
+                    // rays reflected from triangles with degenerate
+                    // parameterizations are still reasonable.
+                    let dn = Vector3f::from(self.mesh.n[v + 2] - self.mesh.n[v])
+                        .cross(&Vector3f::from(self.mesh.n[v + 1] - self.mesh.n[v]));
+                    if dn.length_squared() == 0.0 {
+                        (Normal3f::ZERO, Normal3f::ZERO)
+                    } else {
+                        let (dnu, dnv) = dn.coordinate_system();
+                        (dnu.into(), dnv.into())
+                    }
+                } else {
+                    let inv_det = 1.0 / determinant;
+                    let dn1 = self.mesh.n[v] - self.mesh.n[v + 2];
+                    let dn2 = self.mesh.n[v + 1] - self.mesh.n[v + 2];
+                    (
+                        (difference_of_products_float_vec(
+                            duv12[1],
+                            dn1.into(),
+                            duv02[1],
+                            dn2.into(),
+                        ) * inv_det)
+                            .into(),
+                        (difference_of_products_float_vec(
+                            duv02[0],
+                            dn2.into(),
+                            duv12[0],
+                            dn1.into(),
+                        ) * inv_det)
+                            .into(),
+                    )
+                }
+            };
+
+            isect.set_shading_geometry(ns, ss, ts, dndu, dndv, true)
+        }
+
+        isect
     }
 }
 

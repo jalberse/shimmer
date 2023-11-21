@@ -155,19 +155,36 @@ pub trait DifferenceOfProducts {
     fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self;
 }
 
-impl DifferenceOfProducts for Float {
+impl DifferenceOfProducts for f32 {
     /// Computes a * b - c * d using an error-free transformation (EFT) method.
     /// See PBRT B.2.9.
-    fn difference_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
+    fn difference_of_products(a: f32, b: f32, c: f32, d: f32) -> f32 {
         let cd = c * d;
-        let difference = Float::mul_add(a, b, -cd);
-        let error = Float::mul_add(-c, d, cd);
+        let difference = f32::mul_add(a, b, -cd);
+        let error = f32::mul_add(-c, d, cd);
         difference + error
     }
 
     /// Computes a * b + c * d using an error-free transformation (EFT) method.
     /// See PBRT B.2.9.
-    fn sum_of_products(a: Float, b: Float, c: Float, d: Float) -> Float {
+    fn sum_of_products(a: f32, b: f32, c: f32, d: f32) -> f32 {
+        Self::difference_of_products(a, b, -c, d)
+    }
+}
+
+impl DifferenceOfProducts for f64 {
+    /// Computes a * b - c * d using an error-free transformation (EFT) method.
+    /// See PBRT B.2.9.
+    fn difference_of_products(a: f64, b: f64, c: f64, d: f64) -> f64 {
+        let cd = c * d;
+        let difference = f64::mul_add(a, b, -cd);
+        let error = f64::mul_add(-c, d, cd);
+        difference + error
+    }
+
+    /// Computes a * b + c * d using an error-free transformation (EFT) method.
+    /// See PBRT B.2.9.
+    fn sum_of_products(a: f64, b: f64, c: f64, d: f64) -> f64 {
         Self::difference_of_products(a, b, -c, d)
     }
 }

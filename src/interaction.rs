@@ -12,8 +12,8 @@ use crate::{
     sampler::{Sampler, SamplerI},
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     vecmath::{
-        normal::Normal3, point::Point3fi, vector::Vector3, Normal3f, Normalize, Point2f, Point3f,
-        Vector3f,
+        normal::Normal3, point::Point3fi, vector::Vector3, Length, Normal3f, Normalize, Point2f,
+        Point3f, Vector3f,
     },
     Float,
 };
@@ -299,6 +299,34 @@ impl SurfaceInteraction {
                 .l(self.p(), self.interaction.n, self.interaction.uv, w, lambda)
         } else {
             SampledSpectrum::from_const(0.0)
+        }
+    }
+
+    pub fn set_shading_geometry(
+        &mut self,
+        ns: Normal3f,
+        dpdus: Vector3f,
+        dpdvs: Vector3f,
+        dndus: Normal3f,
+        dndvs: Normal3f,
+        orientation_is_authoritative: bool,
+    ) {
+        self.shading.n = ns;
+        debug_assert_ne!(self.shading.n, Normal3f::ZERO);
+        if orientation_is_authoritative {
+            self.interaction.n = self.interaction.n.face_forward(&self.shading.n);
+        } else {
+            self.shading.n = self.shading.n.face_forward(&self.interaction.n);
+        }
+
+        self.shading.dpdu = dpdus;
+        self.shading.dpdv = dpdvs;
+        self.shading.dndu = dndus;
+        self.shading.dndv = dndvs;
+        while self.shading.dpdu.length_squared() > 1e16 || self.shading.dpdv.length_squared() > 1e16
+        {
+            self.shading.dpdu /= 1e8;
+            self.shading.dpdv /= 1e8;
         }
     }
 }
