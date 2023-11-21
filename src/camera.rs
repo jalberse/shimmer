@@ -340,9 +340,14 @@ impl CameraRayDifferential {
 
 #[derive(Debug, Copy, Clone)]
 pub struct CameraSample {
+    /// The point on the film to which the generated ray should carry radiance
     pub p_film: Point2f,
+    /// The point on the lens through which the ray passes, for cameras which include the notion of lenses.
     pub p_lens: Point2f,
+    /// The time at which the ray should sample the scene
     pub time: Float,
+    /// Additional scale factor for when the ray for this camera sample is stored by the film; it accounts
+    /// for the reconstruction filter used to filter image samples at each pixel.
     pub filter_weight: Float,
 }
 
