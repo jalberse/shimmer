@@ -25,6 +25,7 @@ bumpalo = "3.14.0"
 arrayvec = "0.7.4"
 fast_polynomial = "0.1.0"
 half = "2.2.1"
+pdqselect = "0.1.1"
 
 [dev-dependencies]
 float_next_after = "1.0.0"

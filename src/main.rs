@@ -1,5 +1,6 @@
 use std::{rc::Rc, sync::Arc};
 
+use rand::Rng;
 use shimmer::{
     aggregate::BvhAggregate,
     bounding_box::{Bounds2f, Bounds2i},
@@ -22,72 +23,84 @@ use shimmer::{
 };
 
 fn main() {
-    // Let's create a simple scene with a single sphere at the origin emitting light, with nothing else.
-    let (light_prim, sphere_area_light) = {
-        let object_from_render = Transform::translate(Vector3f {
-            x: 0.0,
-            y: 0.4,
-            z: 0.0,
-        });
-        let light_radius = 0.33;
-        let sphere = Shape::Sphere(Sphere::new(
-            object_from_render.inverse(),
-            object_from_render,
-            false,
-            light_radius,
-            -light_radius,
-            light_radius,
-            360.0,
-        ));
+    let mut rng = rand::thread_rng();
 
-        let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
-        let scale = 1.0 / spectrum_to_photometric(&le);
-        let area_light = Light::DiffuseAreaLight(DiffuseAreaLight::new(
-            Transform::default(),
-            le,
-            scale,
-            sphere.clone(),
-            false,
-        ));
+    // Create some random lights
+    let (mut light_prims, lights) = {
+        let mut light_prims = Vec::new();
+        let mut lights = Vec::new();
+        for _ in 0..10 {
+            let object_from_render = Transform::translate(Vector3f {
+                x: rng.gen_range(-0.8..0.8),
+                y: rng.gen_range(-0.8..0.8),
+                z: rng.gen_range(-0.8..0.8),
+            });
+            let light_radius = rng.gen_range(0.2..0.35);
+            let sphere = Shape::Sphere(Sphere::new(
+                object_from_render.inverse(),
+                object_from_render,
+                false,
+                light_radius,
+                -light_radius,
+                light_radius,
+                360.0,
+            ));
 
-        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
-        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
+            let scale = 1.0 / spectrum_to_photometric(&le);
+            let area_light = Light::DiffuseAreaLight(DiffuseAreaLight::new(
+                Transform::default(),
+                le,
+                scale,
+                sphere.clone(),
+                false,
+            ));
+            lights.push(area_light.clone());
 
-        let sphere_light_primitive =
-            GeometricPrimitive::new(sphere, material, Some(Rc::new(area_light.clone())));
-        (Primitive::Geometric(sphere_light_primitive), area_light)
+            let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+            let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+            let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+
+            let sphere_light_primitive =
+                GeometricPrimitive::new(sphere, material, Some(Rc::new(area_light)));
+            light_prims.push(Rc::new(Primitive::Geometric(sphere_light_primitive)));
+        }
+        (light_prims, lights)
     };
 
     // A diffuse sphere to be lit by the light.
-    let sphere_prim = {
-        let object_from_render = Transform::translate(Vector3f {
-            x: 0.0,
-            y: -0.4,
-            z: -0.5,
-        });
-        let radius = 0.33;
-        let sphere = Shape::Sphere(Sphere::new(
-            object_from_render.inverse(),
-            object_from_render,
-            false,
-            radius,
-            -radius,
-            radius,
-            360.0,
-        ));
+    let mut sphere_prims = {
+        let mut sphere_prims = Vec::new();
+        for _ in 0..10 {
+            let object_from_render = Transform::translate(Vector3f {
+                x: rng.gen_range(-0.8..0.8),
+                y: rng.gen_range(-0.8..0.8),
+                z: rng.gen_range(-0.8..0.8),
+            });
+            let radius = rng.gen_range(0.1..0.3);
+            let sphere = Shape::Sphere(Sphere::new(
+                object_from_render.inverse(),
+                object_from_render,
+                false,
+                radius,
+                -radius,
+                radius,
+                360.0,
+            ));
 
-        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
-        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
-        let sphere_primitive =
-            Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
-        sphere_primitive
+            let cs = Spectrum::Constant(ConstantSpectrum::new(0.6));
+            let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+            let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let sphere_primitive =
+                Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
+            sphere_prims.push(Rc::new(sphere_primitive));
+        }
+        sphere_prims
     };
 
-    // Assemble primitives, lights for the scene
-    let lights = vec![sphere_area_light];
-    let prims = vec![Rc::new(light_prim), Rc::new(sphere_prim)];
+    let mut prims = Vec::new();
+    prims.append(&mut light_prims);
+    prims.append(&mut sphere_prims);
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
         1,
@@ -103,7 +116,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_diffuse_neg_half_z.pfm",
+        "test_higher_diffuse_value.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -111,7 +124,7 @@ fn main() {
     let options = Options::default();
     let camera_transform = Transform::look_at(
         &Point3f::new(0.0, 0.0, -5.0),
-        &Point3f::new(0.0, 0.0, 0.5),
+        &Point3f::new(0.0, 0.0, 0.0),
         &Vector3f::Y,
     );
     let camera = Camera::Orthographic(OrthographicCamera::new(
