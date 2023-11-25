@@ -19,10 +19,17 @@ use crate::{
 };
 
 pub struct Interaction {
+    /// The point the interaction is at
     pub pi: Point3fi,
+    /// The time of the interaction
     pub time: Float,
+    /// For interactions that lie along a ray, the negative ray direction is stored in wo.
+    /// wo is used to match the notation for the outgoing direction when computing lighting at points.
+    /// For interactions where the notion of an outgoing direction doesn't apply, wo is (0, 0, 0).
     pub wo: Vector3f,
+    // For interactions on surfaces, the surface normal at the point
     pub n: Normal3f,
+    /// The UV of the interaction, if applicable; (0, 0) otherwise.
     pub uv: Point2f,
     // TODO Medium, MediumInterface. But omitting for now for simplicity.
 }
