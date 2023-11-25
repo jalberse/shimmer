@@ -187,6 +187,19 @@ pub fn get_camera_sample<T: SamplerI>(
     }
 }
 
+pub fn sample_uniform_triangle(u: Point2f) -> (Float, Float, Float) {
+    let (b0, b1) = if u[0] < u[1] {
+        let b0 = u[0] / 2.0;
+        let b1 = u[1] - b0;
+        (b0, b1)
+    } else {
+        let b1 = u[1] / 2.0;
+        let b0 = u[0] - b1;
+        (b0, b1)
+    };
+    (b0, b1, 1.0 - b1 - b0)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::sampling::visible_wavelengths_pdf;
