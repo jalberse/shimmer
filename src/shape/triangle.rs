@@ -7,10 +7,16 @@ use crate::{
     interaction::{Interaction, SurfaceInteraction},
     math::{difference_of_products_float_vec, DifferenceOfProducts},
     ray::Ray,
-    sampling::sample_uniform_triangle,
+    sampling::{
+        bilinear_pdf, invert_spherical_triangle_sample, sample_bilinear, sample_spherical_triangle,
+        sample_uniform_triangle,
+    },
     shape::ShapeIntersection,
     vecmath::{
-        normal::Normal3, point::Point3fi, spherical::spherical_triangle_area, vector::Vector3,
+        normal::Normal3,
+        point::{Point3, Point3fi},
+        spherical::spherical_triangle_area,
+        vector::Vector3,
         Length, Normal3f, Normalize, Point2f, Point3f, Tuple3, Vector2f, Vector3f,
     },
     Float,
@@ -490,7 +496,98 @@ impl ShapeI for Triangle {
         ctx: &super::ShapeSampleContext,
         u: crate::vecmath::Point2f,
     ) -> Option<super::ShapeSample> {
-        todo!()
+        let solid_angle = self.solid_angle(ctx.p());
+        if solid_angle < Self::MIN_SPHERICAL_SAMPLE_AREA
+            || solid_angle > Self::MAX_SPHERICAL_SAMPLE_AREA
+        {
+            // Sample shape by area and compute incident direction wi.
+            let ss = self.sample(u);
+            debug_assert!(ss.is_some());
+            let mut ss = ss.expect("Expected sample to succeed");
+            ss.intr.time = ctx.time;
+            let wi = ss.intr.p() - ctx.p();
+            if wi.length_squared() == 0.0 {
+                return None;
+            }
+            let wi = wi.normalize();
+
+            // Convert area sampling pdf in ss to solid angle measure.
+            ss.pdf /= ss.intr.n.abs_dot_vector(&(-wi)) / ctx.p().distance_squared(&ss.intr.p());
+            if ss.pdf.is_infinite() {
+                return None;
+            }
+            return Some(ss);
+        }
+
+        let (p0, p1, p2) = self.get_points();
+        let v = self.get_vertex_index();
+
+        // Sample spherical triangle from reference point
+        // Apply warp product sampling for cosine factor at reference point
+        let pdf = if ctx.ns != Normal3f::ZERO {
+            // COmpute cos theta-based weights w at sample domain corners
+            let rp = ctx.p();
+            let wi = [
+                (p0 - rp).normalize(),
+                (p1 - rp).normalize(),
+                (p2 - rp).normalize(),
+            ];
+            let w = [
+                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[1])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[1])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[0])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[2])),
+            ];
+            let u = sample_bilinear(u, &w);
+            debug_assert!(u[0] >= 0.0 && u[0] <= 1.0 && u[1] >= 0.0 && u[1] <= 1.0);
+            bilinear_pdf(u, &w)
+        } else {
+            1.0
+        };
+
+        let (b, tri_pdf) = sample_spherical_triangle(&[p0, p1, p2], ctx.p(), u);
+        if tri_pdf == 0.0 {
+            return None;
+        }
+        let pdf = pdf * tri_pdf;
+
+        // Compute error bounds p_error for sampled point on triangle.
+        let p_abs_sum =
+            (b[0] * p0).abs() + (b[1] * p1).abs().into() + ((1.0 - b[0] - b[1]) * p2).abs().into();
+        let p_error: Vector3f = (gamma(6) * p_abs_sum).into();
+
+        // Return ShapeSample for solid angle smapled point on triangle.
+        let p = b[0] * p0 + (b[1] * p1).into() + (b[2] * p2).into();
+        // Compute surface normal for sampled point on triangle
+        let n: Normal3f = (p1 - p0).cross(&(p2 - p0)).normalize().into();
+        let n = if self.mesh.n.is_empty() {
+            n * -1.0
+        } else {
+            let ns = b[0] * self.mesh.n[v] + b[1] * self.mesh.n[v + 1] + b[2] * self.mesh.n[v + 2];
+            n.face_forward(&ns)
+        };
+
+        // Compute (u,v) for sampled point on triangle.
+        // Get triangle texture coordinates in uv array.
+        let uv = if self.mesh.uv.is_empty() {
+            [Point2f::ZERO, Point2f::X, Point2f::ONE]
+        } else {
+            [self.mesh.uv[v], self.mesh.uv[v + 1], self.mesh.uv[v + 2]]
+        };
+
+        let uv_sample: Point2f =
+            b[0] * uv[0] + Vector2f::from(b[1] * uv[1]) + Vector2f::from(b[2] * uv[2]);
+
+        Some(ShapeSample {
+            intr: Interaction::new(
+                Point3fi::from_value_and_error(p, p_error),
+                n,
+                uv_sample,
+                Default::default(),
+                ctx.time,
+            ),
+            pdf,
+        })
     }
 
     fn pdf_with_context(
@@ -498,7 +595,50 @@ impl ShapeI for Triangle {
         ctx: &super::ShapeSampleContext,
         wi: crate::vecmath::Vector3f,
     ) -> Float {
-        todo!()
+        let solid_angle = self.solid_angle(ctx.p());
+        // Return PDF based on uniform area sampling for challenging triangles
+        if solid_angle < Self::MIN_SPHERICAL_SAMPLE_AREA
+            || solid_angle > Self::MAX_SPHERICAL_SAMPLE_AREA
+        {
+            // Intersect sample ray with shape geometry
+            let ray = ctx.spawn_ray(wi);
+            let isect = self.intersect(&ray, Float::INFINITY);
+            if isect.is_none() {
+                return 0.0;
+            }
+            let isect = isect.unwrap();
+
+            // Compute PDF in solid angle measure from shape intersection point
+            let pdf = (1.0 / self.area())
+                / (isect.intr.interaction.n.abs_dot_vector(&-wi)
+                    / ctx.p().distance_squared(&isect.intr.p()));
+            if pdf.is_infinite() {
+                return 0.0;
+            }
+            return pdf;
+        }
+        let mut pdf = 1.0 / solid_angle;
+        // Adjust PDF for warp product sampling of triangle cos theta factor
+        if ctx.ns != Normal3f::ZERO {
+            let (p0, p1, p2) = self.get_points();
+            let u = invert_spherical_triangle_sample(&[p0, p1, p2], ctx.p(), wi);
+            // Compute cos theta based weights w at sample domain corners
+            let rp = ctx.p();
+            let wi = [
+                (p0 - rp).normalize(),
+                (p1 - rp).normalize(),
+                (p2 - rp).normalize(),
+            ];
+            let w = [
+                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[1])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[1])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[0])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[2])),
+            ];
+            pdf *= bilinear_pdf(u, &w);
+        }
+
+        pdf
     }
 }
 
