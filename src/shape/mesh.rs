@@ -5,6 +5,7 @@ use crate::{
     vecmath::{Normal3f, Point2f, Point3f, Vector3f},
 };
 
+#[derive(Debug, Clone)]
 pub struct TriangleMesh {
     pub n_triangles: usize,
     pub n_vertices: usize,

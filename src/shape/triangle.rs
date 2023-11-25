@@ -22,9 +22,9 @@ use crate::{
     Float,
 };
 
-use super::{ShapeI, ShapeSample, TriangleMesh};
+use super::{Shape, ShapeI, ShapeSample, TriangleMesh};
 
-///
+#[derive(Debug, Clone)]
 pub struct Triangle {
     // TODO Consider following PBRT and only storing an offset into a vector of meshes;
     // that could save on space. But maintaining that "global" list of meshes
@@ -36,6 +36,14 @@ pub struct Triangle {
 impl Triangle {
     const MIN_SPHERICAL_SAMPLE_AREA: Float = 3e-4;
     const MAX_SPHERICAL_SAMPLE_AREA: Float = 6.22;
+
+    pub fn create_triangles(mesh: Arc<TriangleMesh>) -> Vec<Shape> {
+        let mut tris = Vec::with_capacity(mesh.n_triangles);
+        for i in 0..mesh.n_triangles {
+            tris.push(Shape::Triangle(Triangle::new(mesh.clone(), i as i32)));
+        }
+        tris
+    }
 
     pub fn new(mesh: Arc<TriangleMesh>, tri_index: i32) -> Triangle {
         Triangle { mesh, tri_index }

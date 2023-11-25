@@ -19,7 +19,7 @@ use crate::{
     Float,
 };
 
-use super::sphere::Sphere;
+use super::{sphere::Sphere, Triangle};
 
 /// The Shape interface provides basic geometric properties of the primitive,
 /// such as its surface area and its ray intersection routine. The non-geometric
@@ -71,61 +71,70 @@ pub trait ShapeI {
 #[derive(Debug, Clone)]
 pub enum Shape {
     Sphere(Sphere),
-    // TODO expand to other shapes - notably Triangle.
+    Triangle(Triangle),
 }
 
 impl ShapeI for Shape {
     fn bounds(&self) -> Bounds3f {
         match self {
             Shape::Sphere(s) => s.bounds(),
+            Shape::Triangle(t) => t.bounds(),
         }
     }
 
     fn normal_bounds(&self) -> DirectionCone {
         match self {
             Shape::Sphere(s) => s.normal_bounds(),
+            Shape::Triangle(t) => t.normal_bounds(),
         }
     }
 
     fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
         match self {
             Shape::Sphere(s) => s.intersect(ray, t_max),
+            Shape::Triangle(t) => t.intersect(ray, t_max),
         }
     }
 
     fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         match self {
             Shape::Sphere(s) => s.intersect_predicate(ray, t_max),
+            Shape::Triangle(t) => self.intersect_predicate(ray, t_max),
         }
     }
 
     fn area(&self) -> Float {
         match self {
             Shape::Sphere(s) => s.area(),
+            Shape::Triangle(t) => t.area(),
         }
     }
 
     fn sample(&self, u: Point2f) -> Option<ShapeSample> {
         match self {
             Shape::Sphere(s) => s.sample(u),
+            Shape::Triangle(t) => t.sample(u),
         }
     }
 
     fn pdf(&self, interaction: &Interaction) -> Float {
         match self {
             Shape::Sphere(s) => s.pdf(interaction),
+            Shape::Triangle(t) => t.pdf(interaction),
         }
     }
 
     fn sample_with_context(&self, ctx: &ShapeSampleContext, u: Point2f) -> Option<ShapeSample> {
         match self {
             Shape::Sphere(s) => s.sample_with_context(ctx, u),
+            Shape::Triangle(t) => t.sample_with_context(ctx, u),
         }
     }
 
     fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vector3f) -> Float {
         match self {
             Shape::Sphere(s) => s.pdf_with_context(ctx, wi),
+            Shape::Triangle(t) => t.pdf_with_context(ctx, wi),
         }
     }
 }
