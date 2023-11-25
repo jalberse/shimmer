@@ -7,6 +7,7 @@ use crate::{
     interaction::{Interaction, SurfaceInteraction},
     math::{difference_of_products_float_vec, DifferenceOfProducts},
     ray::Ray,
+    sampling::sample_uniform_triangle,
     shape::ShapeIntersection,
     vecmath::{
         normal::Normal3, point::Point3fi, spherical::spherical_triangle_area, vector::Vector3,
@@ -15,7 +16,7 @@ use crate::{
     Float,
 };
 
-use super::{ShapeI, TriangleMesh};
+use super::{ShapeI, ShapeSample, TriangleMesh};
 
 ///
 pub struct Triangle {
@@ -433,12 +434,51 @@ impl ShapeI for Triangle {
         0.5 * (p1 - p0).cross(&(p2 - p0)).length()
     }
 
-    fn sample(&self, u: crate::vecmath::Point2f) -> Option<super::ShapeSample> {
-        todo!()
+    fn sample(&self, u: crate::vecmath::Point2f) -> Option<ShapeSample> {
+        let (p0, p1, p2) = self.get_points();
+        let v = self.mesh.vertex_indices[3 * self.tri_index as usize];
+
+        // Sample point on triangle uniformly by area
+        let (b0, b1, b2) = sample_uniform_triangle(u);
+        let p = b0 * p0 + (b1 * p1).into() + (b2 * p2).into();
+
+        // Compute surface normal for sampled point on triangle.
+        let n: Normal3f = (p1 - p0).cross(&(p2 - p0)).normalize().into();
+        let n = if self.mesh.n.is_empty() {
+            n * -1.0
+        } else {
+            let ns: Normal3f =
+                b0 * self.mesh.n[v] + b1 * self.mesh.n[v + 1] + b2 * self.mesh.n[v + 2];
+            n.face_forward(&ns)
+        };
+
+        // Compute (u,v) for sampled point on triangle.
+        let (uv0, uv1, uv2) = if self.mesh.uv.is_empty() {
+            (Point2f::ZERO, Point2f::X, Point2f::Y)
+        } else {
+            (self.mesh.uv[v], self.mesh.uv[v + 1], self.mesh.uv[v + 2])
+        };
+
+        let uv_sample: Point2f = b0 * uv0 + Vector2f::from(b1 * uv1) + Vector2f::from(b2 * uv2);
+
+        // Compute error bounds for sampled point on triangle.
+        let p_abs_sum = (b0 * p0).abs() + (b1 * p1).abs().into() + (b2 * p2).abs().into();
+        let p_error: Vector3f = (gamma(6) * p_abs_sum).into();
+
+        Some(ShapeSample {
+            intr: Interaction::new(
+                Point3fi::from_value_and_error(p, p_error),
+                n,
+                uv_sample,
+                Default::default(),
+                Default::default(),
+            ),
+            pdf: 1.0 / self.area(),
+        })
     }
 
-    fn pdf(&self, interaction: &crate::interaction::Interaction) -> Float {
-        todo!()
+    fn pdf(&self, _interaction: &crate::interaction::Interaction) -> Float {
+        1.0 / self.area()
     }
 
     fn sample_with_context(
