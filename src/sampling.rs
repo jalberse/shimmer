@@ -258,7 +258,7 @@ pub fn sample_spherical_triangle(v: &[Point3f; 3], p: Point3f, u: Point2f) -> ([
     // Find angles alpha, beta, and gamma at spherical triangle vertices
     let alpha = n_ab.angle_between(&-n_ca);
     let beta = n_bc.angle_between(&-n_ab);
-    let gamma = n_ca.angle_between(&n_bc);
+    let gamma = n_ca.angle_between(&-n_bc);
 
     // Uniformly sample triangle area A to compute A'.
     let a_pi = alpha + beta + gamma;
@@ -315,6 +315,68 @@ pub fn sample_spherical_triangle(v: &[Point3f; 3], p: Point3f, u: Point2f) -> ([
         (b1, b2)
     };
     ([1.0 - b1 - b2, b1, b2], pdf)
+}
+
+pub fn invert_spherical_triangle_sample(v: &[Point3f; 3], p: Point3f, w: Vector3f) -> Point2f {
+    // Compute vectors a, b, and c to spherical triangle vertices
+    let a = v[0] - p;
+    let b = v[1] - p;
+    let c = v[2] - p;
+    debug_assert!(a.length_squared() > 0.0);
+    debug_assert!(b.length_squared() > 0.0);
+    debug_assert!(c.length_squared() > 0.0);
+
+    let a = a.normalize();
+    let b = b.normalize();
+    let c = c.normalize();
+
+    // Compute normalized cross products of all direction pairs.
+    let n_ab = a.cross(&b);
+    let n_bc = b.cross(&c);
+    let n_ca = c.cross(&a);
+    if n_ab.length_squared() == 0.0 || n_bc.length_squared() == 0.0 || n_ca.length_squared() == 0.0
+    {
+        // TODO Consider using an Option return type instead.
+        return Point2f::ZERO;
+    }
+
+    let n_ab = n_ab.normalize();
+    let n_bc = n_bc.normalize();
+    let n_ca = n_ca.normalize();
+
+    // Find angles alpha, beta, and gamma at spherical triangle vertices
+    let alpha = n_ab.angle_between(&-n_ca);
+    let beta = n_bc.angle_between(&-n_ab);
+    let gamma = n_ca.angle_between(&-n_bc);
+
+    // Find vertex c' along ac arc for w
+    let cp = b.cross(&w).cross(&c.cross(&a)).normalize();
+    let cp = if cp.dot(&(a + c)) < 0.0 { -cp } else { cp };
+
+    // Invert uniform area sampling to find u0
+    // 0.1 degrees
+    let u0 = if a.dot(&cp) > 0.99999847691 {
+        0.0
+    } else {
+        // Compute area a' of subtriangle
+        let n_cpb = cp.cross(&b);
+        let n_acp = a.cross(&cp);
+        // TODO check rare
+        if n_cpb.length_squared() == 0.0 || n_acp.length_squared() == 0.0 {
+            return Point2f::new(0.5, 0.5);
+        }
+        let n_cpb = n_cpb.normalize();
+        let n_acp = n_acp.normalize();
+        let ap = alpha + n_ab.angle_between(&n_cpb) + n_acp.angle_between(&-n_cpb) - PI_F;
+
+        // Compute sample u0 that gives area a'.
+        let area = alpha + beta + gamma - PI_F;
+        ap / area
+    };
+
+    // Invert arc sampling to find u1 and return result.
+    let u1 = (1.0 - w.dot(&b)) / (1.0 - cp.dot(&b));
+    Point2f::new(u0.clamp(0.0, 1.0), u1.clamp(0.0, 1.0))
 }
 
 #[cfg(test)]
