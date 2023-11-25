@@ -40,11 +40,15 @@ impl Triangle {
     }
 
     fn get_points(&self) -> (Point3f, Point3f, Point3f) {
-        let v = self.mesh.vertex_indices[3 * self.tri_index as usize];
+        let v = self.get_vertex_index();
         let p0 = self.mesh.p[v];
         let p1 = self.mesh.p[v + 1];
         let p2 = self.mesh.p[v + 2];
         (p0, p1, p2)
+    }
+
+    fn get_vertex_index(&self) -> usize {
+        self.mesh.vertex_indices[3 * self.tri_index as usize]
     }
 
     /// Calculates the solid angle that the triangle subtends from p.
@@ -198,7 +202,7 @@ impl Triangle {
         wo: Vector3f,
     ) -> SurfaceInteraction {
         let (p0, p1, p2) = self.get_points();
-        let v = self.mesh.vertex_indices[3 * self.tri_index as usize];
+        let v = self.get_vertex_index();
 
         // Compute triangle partial derivatives.
         // Compute deltas and matrix determinant for triangle partial derivatives.
@@ -400,7 +404,7 @@ impl ShapeI for Triangle {
     }
 
     fn normal_bounds(&self) -> crate::direction_cone::DirectionCone {
-        let v = self.mesh.vertex_indices[3 * self.tri_index as usize];
+        let v = self.get_vertex_index();
         let (p0, p1, p2) = self.get_points();
         let n = (p1 - p0).cross(&(p2 - p0)).normalize();
         // Ensure correct orientation of geometric normal for normal bounds
@@ -436,7 +440,7 @@ impl ShapeI for Triangle {
 
     fn sample(&self, u: crate::vecmath::Point2f) -> Option<ShapeSample> {
         let (p0, p1, p2) = self.get_points();
-        let v = self.mesh.vertex_indices[3 * self.tri_index as usize];
+        let v = self.get_vertex_index();
 
         // Sample point on triangle uniformly by area
         let (b0, b1, b2) = sample_uniform_triangle(u);
