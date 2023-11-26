@@ -99,7 +99,7 @@ impl ShapeI for Shape {
     fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         match self {
             Shape::Sphere(s) => s.intersect_predicate(ray, t_max),
-            Shape::Triangle(t) => self.intersect_predicate(ray, t_max),
+            Shape::Triangle(t) => t.intersect_predicate(ray, t_max),
         }
     }
 
