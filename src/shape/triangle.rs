@@ -54,15 +54,18 @@ impl Triangle {
     }
 
     fn get_points(&self) -> (Point3f, Point3f, Point3f) {
-        let v = self.get_vertex_index();
-        let p0 = self.mesh.p[v];
-        let p1 = self.mesh.p[v + 1];
-        let p2 = self.mesh.p[v + 2];
+        let v = self.get_vertex_indices();
+        let p0 = self.mesh.p[v[0]];
+        let p1 = self.mesh.p[v[1]];
+        let p2 = self.mesh.p[v[2]];
         (p0, p1, p2)
     }
 
-    fn get_vertex_index(&self) -> usize {
-        self.mesh.vertex_indices[3 * self.tri_index as usize]
+    // TODO oh alright, my bug is that I'm getting v as the first vertex index, but they're not
+    // necessarily consecutive.
+    fn get_vertex_indices(&self) -> &[usize] {
+        &self.mesh.vertex_indices
+            [(3 * self.tri_index as usize)..((3 * self.tri_index as usize) + 3)]
     }
 
     /// Calculates the solid angle that the triangle subtends from p.
@@ -216,7 +219,7 @@ impl Triangle {
         wo: Vector3f,
     ) -> SurfaceInteraction {
         let (p0, p1, p2) = self.get_points();
-        let v = self.get_vertex_index();
+        let v = self.get_vertex_indices();
 
         // Compute triangle partial derivatives.
         // Compute deltas and matrix determinant for triangle partial derivatives.
@@ -224,7 +227,7 @@ impl Triangle {
         let uv = if self.mesh.uv.is_empty() {
             [Point2f::ZERO, Point2f::X, Point2f::ONE]
         } else {
-            [self.mesh.uv[v], self.mesh.uv[v + 1], self.mesh.uv[v + 2]]
+            [self.mesh.uv[v[0]], self.mesh.uv[v[1]], self.mesh.uv[v[2]]]
         };
         let duv02 = uv[0] - uv[2];
         let duv12 = uv[1] - uv[2];
@@ -323,9 +326,9 @@ impl Triangle {
             let ns = if self.mesh.n.is_empty() {
                 isect.interaction.n
             } else {
-                let n = ti.b0 * self.mesh.n[v]
-                    + ti.b1 * self.mesh.n[v + 1]
-                    + ti.b2 * self.mesh.n[v + 2];
+                let n = ti.b0 * self.mesh.n[v[0]]
+                    + ti.b1 * self.mesh.n[v[1]]
+                    + ti.b2 * self.mesh.n[v[2]];
                 if n.length_squared() > 0.0 {
                     n.normalize()
                 } else {
@@ -337,9 +340,9 @@ impl Triangle {
             let ss = if self.mesh.s.is_empty() {
                 isect.dpdu
             } else {
-                let s = ti.b0 * self.mesh.s[v]
-                    + ti.b1 * self.mesh.s[v + 1]
-                    + ti.b2 * self.mesh.s[v + 2];
+                let s = ti.b0 * self.mesh.s[v[0]]
+                    + ti.b1 * self.mesh.s[v[1]]
+                    + ti.b2 * self.mesh.s[v[2]];
                 if s.length_squared() == 0.0 {
                     isect.dpdu
                 } else {
@@ -373,8 +376,8 @@ impl Triangle {
                     // (rather than giving up) so that ray differentials for
                     // rays reflected from triangles with degenerate
                     // parameterizations are still reasonable.
-                    let dn = Vector3f::from(self.mesh.n[v + 2] - self.mesh.n[v])
-                        .cross(&Vector3f::from(self.mesh.n[v + 1] - self.mesh.n[v]));
+                    let dn = Vector3f::from(self.mesh.n[v[2]] - self.mesh.n[v[0]])
+                        .cross(&Vector3f::from(self.mesh.n[v[1]] - self.mesh.n[v[0]]));
                     if dn.length_squared() == 0.0 {
                         (Normal3f::ZERO, Normal3f::ZERO)
                     } else {
@@ -383,8 +386,8 @@ impl Triangle {
                     }
                 } else {
                     let inv_det = 1.0 / determinant;
-                    let dn1 = self.mesh.n[v] - self.mesh.n[v + 2];
-                    let dn2 = self.mesh.n[v + 1] - self.mesh.n[v + 2];
+                    let dn1 = self.mesh.n[v[0]] - self.mesh.n[v[2]];
+                    let dn2 = self.mesh.n[v[1]] - self.mesh.n[v[2]];
                     (
                         (difference_of_products_float_vec(
                             duv12[1],
@@ -418,12 +421,12 @@ impl ShapeI for Triangle {
     }
 
     fn normal_bounds(&self) -> crate::direction_cone::DirectionCone {
-        let v = self.get_vertex_index();
+        let v = self.get_vertex_indices();
         let (p0, p1, p2) = self.get_points();
         let n = (p1 - p0).cross(&(p2 - p0)).normalize();
         // Ensure correct orientation of geometric normal for normal bounds
         let n = if !self.mesh.n.is_empty() {
-            let ns = self.mesh.n[v] + self.mesh.n[v + 1] + self.mesh.n[v + 2];
+            let ns = self.mesh.n[v[0]] + self.mesh.n[v[1]] + self.mesh.n[v[2]];
             n.face_forward_n(&ns)
         } else if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
             -n
@@ -454,7 +457,7 @@ impl ShapeI for Triangle {
 
     fn sample(&self, u: crate::vecmath::Point2f) -> Option<ShapeSample> {
         let (p0, p1, p2) = self.get_points();
-        let v = self.get_vertex_index();
+        let v = self.get_vertex_indices();
 
         // Sample point on triangle uniformly by area
         let (b0, b1, b2) = sample_uniform_triangle(u);
@@ -466,7 +469,7 @@ impl ShapeI for Triangle {
             n * -1.0
         } else {
             let ns: Normal3f =
-                b0 * self.mesh.n[v] + b1 * self.mesh.n[v + 1] + b2 * self.mesh.n[v + 2];
+                b0 * self.mesh.n[v[0]] + b1 * self.mesh.n[v[1]] + b2 * self.mesh.n[v[2]];
             n.face_forward(&ns)
         };
 
@@ -474,7 +477,7 @@ impl ShapeI for Triangle {
         let (uv0, uv1, uv2) = if self.mesh.uv.is_empty() {
             (Point2f::ZERO, Point2f::X, Point2f::Y)
         } else {
-            (self.mesh.uv[v], self.mesh.uv[v + 1], self.mesh.uv[v + 2])
+            (self.mesh.uv[v[0]], self.mesh.uv[v[1]], self.mesh.uv[v[2]])
         };
 
         let uv_sample: Point2f = b0 * uv0 + Vector2f::from(b1 * uv1) + Vector2f::from(b2 * uv2);
@@ -528,7 +531,7 @@ impl ShapeI for Triangle {
         }
 
         let (p0, p1, p2) = self.get_points();
-        let v = self.get_vertex_index();
+        let v = self.get_vertex_indices();
 
         // Sample spherical triangle from reference point
         // Apply warp product sampling for cosine factor at reference point
@@ -571,7 +574,7 @@ impl ShapeI for Triangle {
         let n = if self.mesh.n.is_empty() {
             n * -1.0
         } else {
-            let ns = b[0] * self.mesh.n[v] + b[1] * self.mesh.n[v + 1] + b[2] * self.mesh.n[v + 2];
+            let ns = b[0] * self.mesh.n[v[0]] + b[1] * self.mesh.n[v[1]] + b[2] * self.mesh.n[v[2]];
             n.face_forward(&ns)
         };
 
@@ -580,7 +583,7 @@ impl ShapeI for Triangle {
         let uv = if self.mesh.uv.is_empty() {
             [Point2f::ZERO, Point2f::X, Point2f::ONE]
         } else {
-            [self.mesh.uv[v], self.mesh.uv[v + 1], self.mesh.uv[v + 2]]
+            [self.mesh.uv[v[0]], self.mesh.uv[v[1]], self.mesh.uv[v[2]]]
         };
 
         let uv_sample: Point2f =

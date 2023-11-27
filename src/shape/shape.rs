@@ -1,21 +1,9 @@
 use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
-    float::{gamma, PI_F},
-    frame::Frame,
     interaction::{Interaction, SurfaceInteraction},
-    interval::Interval,
-    math::DifferenceOfProducts,
-    math::{radians, safe_acos, safe_sqrt, Sqrt},
     ray::Ray,
-    sampling::sample_uniform_sphere,
-    transform::Transform,
-    vecmath::{
-        normal::Normal3,
-        point::{Point3, Point3fi},
-        vector::{Vector3, Vector3fi},
-        Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f,
-    },
+    vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},
     Float,
 };
 

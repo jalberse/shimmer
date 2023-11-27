@@ -6,6 +6,10 @@ authors = ["John Alberse"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# This should be removed when not doing active development; but I need it for profiling!
+[profile.release] 
+debug = true
+
 [features]
 default = []
 
