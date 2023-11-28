@@ -112,6 +112,7 @@ impl IntegratorI for RandomWalkIntegrator {
             // That could mean that our parallel iterations can become a map() to generate some new data,
             // and then we apply that to the film rather than applying to the film within evaluate_pixel_sample(),
             // similar to my previous ray tracer. This might be more "Rusty".
+            // It might be okay to extract
 
             tiles.par_iter().for_each(|tile| {
                 // TODO Be wary of allocating anything on the scratchbuffer that uses the
@@ -311,7 +312,7 @@ impl RandomWalkIntegrator {
             // TODO Scale camera ray differentials absed on image sampling rate.
             let ray_diff_scale = Float::max(
                 0.125,
-                1.0 / Float::sqrt(self.sampler_prototype.samples_per_pixel() as Float),
+                1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
             );
             if !options.disable_pixel_jitter {
                 camera_ray.ray.scale_differentials(ray_diff_scale);
