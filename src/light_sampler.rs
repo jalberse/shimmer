@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::{
     light::{Light, LightSampleContext},
@@ -22,7 +22,7 @@ pub trait LightSamplerI {
 }
 
 pub struct SampledLight {
-    pub light: Rc<Light>,
+    pub light: Arc<Light>,
     /// Discrete probability for this light to be sampled
     p: Float,
 }
@@ -61,7 +61,7 @@ impl LightSamplerI for LightSampler {
 /// Simplest possible light sampler; samples all lights with uniform probability.
 /// In practice, other light samplers should be used.
 pub struct UniformLightSampler {
-    lights: Vec<Rc<Light>>,
+    lights: Vec<Arc<Light>>,
 }
 
 impl LightSamplerI for UniformLightSampler {

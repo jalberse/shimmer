@@ -45,7 +45,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_side_by_side.pfm",
+        "test_tiled_rayon.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -76,7 +76,7 @@ fn main() {
 
 // Two triangular meshes representing rough spheres side-by-side.
 // The vertices also have slight offsets from the radius.
-fn get_triangular_mesh_test_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
+fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
     // TODO This triangulated mesh has a bug where the endcap is missing
     // But it's really not that important, I don't think it's just a bug with this
     // mesh generation code.
@@ -159,13 +159,13 @@ fn get_triangular_mesh_test_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
 
     let cs = Spectrum::Constant(ConstantSpectrum::new(0.7));
     let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-    let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
     let tris = Triangle::create_triangles(mesh);
     let mut prims = tris
         .into_iter()
         .map(|t| {
-            Rc::new(Primitive::Geometric(GeometricPrimitive::new(
+            Arc::new(Primitive::Geometric(GeometricPrimitive::new(
                 t,
                 material.clone(),
                 None,
@@ -197,14 +197,14 @@ fn get_triangular_mesh_test_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
         .into_iter()
         .map(|t| {
             // TODO Is this the right transform for thise?
-            let area_light = Some(Rc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
+            let area_light = Some(Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
                 light_location.inverse(),
                 le.clone(),
                 scale,
                 t.clone(),
                 false,
             ))));
-            Rc::new(Primitive::Geometric(GeometricPrimitive::new(
+            Arc::new(Primitive::Geometric(GeometricPrimitive::new(
                 t,
                 material.clone(),
                 area_light,
@@ -220,7 +220,7 @@ fn get_triangular_mesh_test_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
     (prims, lights)
 }
 
-fn get_random_sphere_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
+fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
     let mut rng = rand::thread_rng();
     // Create some random lights
     let (mut light_prims, lights) = {
@@ -258,11 +258,11 @@ fn get_random_sphere_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
 
             let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-            let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
             let sphere_light_primitive =
-                GeometricPrimitive::new(sphere, material, Some(Rc::new(area_light)));
-            light_prims.push(Rc::new(Primitive::Geometric(sphere_light_primitive)));
+                GeometricPrimitive::new(sphere, material, Some(Arc::new(area_light)));
+            light_prims.push(Arc::new(Primitive::Geometric(sphere_light_primitive)));
         }
         (light_prims, lights)
     };
@@ -289,10 +289,10 @@ fn get_random_sphere_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
 
             let cs = Spectrum::Constant(ConstantSpectrum::new(0.6));
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-            let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
             let sphere_primitive =
                 Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
-            sphere_prims.push(Rc::new(sphere_primitive));
+            sphere_prims.push(Arc::new(sphere_primitive));
         }
         sphere_prims
     };

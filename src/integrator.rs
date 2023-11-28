@@ -1,9 +1,14 @@
-use std::rc::Rc;
+use std::cell::RefCell;
+use std::sync::Arc;
 
 use bumpalo::Bump;
+use indicatif::ParallelProgressIterator;
 use itertools::Itertools;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use thread_local::ThreadLocal;
 
 use crate::{
+    bounding_box::Bounds2i,
     camera::{Camera, CameraI},
     film::{FilmI, VisibleSurface},
     float::PI_F,
@@ -30,9 +35,9 @@ pub trait IntegratorI {
 pub struct IntegratorBase {
     aggregate: Primitive,
     /// Contains both finite and infinite lights
-    lights: Vec<Rc<Light>>,
+    lights: Vec<Arc<Light>>,
     /// Stores an additional copy of any infinite lights in their own vector.
-    infinite_lights: Vec<Rc<Light>>,
+    infinite_lights: Vec<Arc<Light>>,
 }
 
 impl IntegratorBase {
@@ -44,7 +49,7 @@ impl IntegratorBase {
         for light in &mut lights {
             light.preprocess(&scene_bounds);
         }
-        let lights = lights.into_iter().map(|l| Rc::new(l)).collect_vec();
+        let lights = lights.into_iter().map(|l| Arc::new(l)).collect_vec();
         for light in &lights {
             if light.light_type() == LightType::Infinite {
                 infinite_lights.push(light.clone());
@@ -79,58 +84,83 @@ impl IntegratorBase {
 pub struct RandomWalkIntegrator {
     base: IntegratorBase,
     camera: Camera,
-    // This is named sampler_prototype because we will clone individual samplers
-    // for each thread.
+    // This is named sampler_prototype because we will clone individual samplers from it for each thread.
     sampler_prototype: Sampler,
-
     max_depth: i32,
 }
 
 impl IntegratorI for RandomWalkIntegrator {
     fn render(&mut self, options: &Options) {
-        // TODO Be wary of allocating anything on this that uses the heap top avoid memory leaks;
-        //   it doesn't call their drop()!
-        // TODO When we implement multi-threading, we'll want this to be one per thread.
-        let mut scratch_buffer = Bump::with_capacity(256);
-
         let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
-        // TODO init a progress reporter. Reference my old ray tracer.
 
         let mut wave_start = 0;
         let mut wave_end = 1;
         let mut next_wave_size = 1;
 
-        // TODO We'll need to have a sampler for each thread; as with a few other variables.
-        let mut sampler = self.sampler_prototype.clone();
-
         // TODO record pixel statistics option and other things PBRT handles here.
         // Not necessary for just getting a rendered image though.
 
+        let tiles = Tile::tile(pixel_bounds, 8, 8);
+
+        let scratch_buffer_tl = ThreadLocal::new();
+        let sampler_tl = ThreadLocal::new();
         // Render in waves until the samples per pixel limit is reached.
         while wave_start < spp {
-            // TODO We won't divide into tiles right now, but we should later.
-            //  We'll just go pixel by pixel to start, in waves.
-            for x in pixel_bounds.min.x..pixel_bounds.max.x {
-                for y in pixel_bounds.min.y..pixel_bounds.max.y {
-                    let p_pixel = Point2i::new(x, y);
-                    for sample_index in wave_start..wave_end {
-                        self.sampler_prototype
-                            .start_pixel_sample(p_pixel, sample_index, 0);
-                        self.evaluate_pixel_sample(
-                            p_pixel,
-                            sample_index,
-                            &mut sampler,
-                            &mut scratch_buffer,
-                            options,
-                        );
-                        // Note that this does not call drop() on anything allocated in
-                        // the scratch buffer. If we allocate anything on the heap, we gotta clean
-                        // that ourselves. This is where memory leaks can happen!
-                        scratch_buffer.reset();
+            let film_samples: Vec<Vec<FilmSample>> = tiles
+                .par_iter()
+                .progress()
+                .map(|tile| -> Vec<FilmSample> {
+                    // TODO Be wary of allocating anything on the scratchbuffer that uses the
+                    // heap to avoid memory leaks; it doesn't call their drop().
+
+                    let mut samples = Vec::with_capacity(
+                        (tile.bounds.width() * tile.bounds.height() * wave_end - wave_start)
+                            as usize,
+                    );
+
+                    // Initialize or get thread-local objects.
+                    let scratch_buffer =
+                        scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(256)));
+                    let sampler =
+                        sampler_tl.get_or(|| RefCell::new(self.sampler_prototype.clone()));
+
+                    for x in tile.bounds.min.x..tile.bounds.max.x {
+                        for y in tile.bounds.min.y..tile.bounds.max.y {
+                            let p_pixel = Point2i::new(x, y);
+                            for sample_index in wave_start..wave_end {
+                                sampler
+                                    .borrow_mut()
+                                    .start_pixel_sample(p_pixel, sample_index, 0);
+                                let film_sample = self.evaluate_pixel_sample(
+                                    &self.camera,
+                                    p_pixel,
+                                    sample_index,
+                                    &mut sampler.borrow_mut(),
+                                    &mut scratch_buffer.borrow_mut(),
+                                    options,
+                                );
+                                samples.push(film_sample);
+                                // Note that this does not call drop() on anything allocated in
+                                // the scratch buffer. If we allocate anything on the heap, we gotta clean
+                                // that ourselves. This is where memory leaks can happen!
+                                scratch_buffer.borrow_mut().reset();
+                            }
+                        }
                     }
-                }
-            }
+                    samples
+                })
+                .collect();
+            let samples: Vec<FilmSample> = film_samples.into_iter().flatten().collect();
+            samples.into_iter().for_each(|s| {
+                self.camera.get_film().add_sample(
+                    &s.p_film,
+                    &s.l,
+                    &s.lambda,
+                    &s.visible_surface,
+                    s.weight,
+                )
+            });
 
             wave_start = wave_end;
             wave_end = i32::min(spp, wave_end + next_wave_size);
@@ -150,6 +180,109 @@ impl IntegratorI for RandomWalkIntegrator {
     }
 }
 
+struct Tile {
+    bounds: Bounds2i,
+}
+
+impl Tile {
+    /// Returns a list of Tiles covering the image.
+    ///
+    /// The tiles are returned in a flattened Vec in row-major order.
+    /// If the image cannot be perfectly divided by the tile width or height,
+    /// then smaller tiles are created to fill the remainder of the image width or height.
+    /// It's recommended to pick a tiling size that fits into the image resolution well.
+    /// Note that 8x8 is a reasonable tile size and 8 evenly divides common resolution
+    /// sizes like 1920, 1080, 720, etc.
+    ///
+    /// * `pixel_bounds` - The pixel bounds of the image.
+    /// * `tile_width` - Width of each tile, in pixels.
+    /// * `tile_height` - Height of each tile, in pixels.
+    pub fn tile(pixel_bounds: Bounds2i, tile_width: i32, tile_height: i32) -> Vec<Tile> {
+        let image_width = pixel_bounds.width();
+        let image_height = pixel_bounds.height();
+        let num_horizontal_tiles = image_width / tile_width;
+        let remainder_horizontal_pixels = image_width % tile_width;
+        let num_vertical_tiles = image_height / tile_height;
+        let remainder_vertical_pixels = image_height % tile_height;
+
+        let mut tiles = Vec::with_capacity((num_horizontal_tiles * num_vertical_tiles) as usize);
+
+        for tile_y in 0..num_vertical_tiles {
+            for tile_x in 0..num_horizontal_tiles {
+                let tile_start_x = pixel_bounds.min.x + tile_x * tile_width;
+                let tile_start_y = pixel_bounds.min.y + tile_y * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + tile_width,
+                            y: tile_start_y + tile_height,
+                        },
+                    ),
+                });
+            }
+            // Add the rightmost row if necessary
+            if remainder_horizontal_pixels > 0 {
+                let tile_start_x = pixel_bounds.min.x + num_horizontal_tiles * tile_width;
+                let tile_start_y = pixel_bounds.min.y + tile_y * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + remainder_horizontal_pixels,
+                            y: tile_start_y + tile_height,
+                        },
+                    ),
+                });
+            }
+        }
+        // Add the bottom row if necessary
+        if remainder_vertical_pixels > 0 {
+            for tile_x in 0..num_horizontal_tiles {
+                let tile_start_x = pixel_bounds.min.x + tile_x * tile_width;
+                let tile_start_y = pixel_bounds.min.y + num_vertical_tiles * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + tile_width,
+                            y: tile_start_y + remainder_vertical_pixels,
+                        },
+                    ),
+                });
+            }
+        }
+        // Add the bottom-most, right-most Tile if necessary
+        if remainder_horizontal_pixels > 0 && remainder_vertical_pixels > 0 {
+            let tile_start_x = pixel_bounds.min.x + num_horizontal_tiles * tile_width;
+            let tile_start_y = pixel_bounds.min.y + num_vertical_tiles * tile_height;
+            tiles.push(Tile {
+                bounds: Bounds2i::new(
+                    Point2i {
+                        x: tile_start_x,
+                        y: tile_start_y,
+                    },
+                    Point2i {
+                        x: tile_start_x + remainder_horizontal_pixels,
+                        y: tile_start_y + remainder_vertical_pixels,
+                    },
+                ),
+            });
+        }
+
+        tiles
+    }
+}
+
 impl RandomWalkIntegrator {
     pub fn new(
         aggregate: Primitive,
@@ -166,30 +299,28 @@ impl RandomWalkIntegrator {
         }
     }
 
-    pub fn evaluate_pixel_sample(
-        &mut self,
+    fn evaluate_pixel_sample(
+        &self,
+        camera: &Camera,
         p_pixel: Point2i,
         sample_index: i32,
         sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
-    ) {
+    ) -> FilmSample {
         // Sample wavelengths for the ray
         let lu = if options.disable_wavelength_jitter {
             0.5
         } else {
-            self.sampler_prototype.get_1d()
+            sampler.get_1d()
         };
-        let lambda = self.camera.get_film().sample_wavelengths(lu);
+        let lambda = camera.get_film_const().sample_wavelengths(lu);
 
         // Initialize camera_sample for the current sample
-        let filter = self.camera.get_film().get_filter();
-        let camera_sample =
-            get_camera_sample(&mut self.sampler_prototype, p_pixel, filter, options);
+        let filter = camera.get_film_const().get_filter();
+        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
 
-        let camera_ray = self
-            .camera
-            .generate_ray_differential(&camera_sample, &lambda);
+        let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
 
         let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
             debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
@@ -198,7 +329,7 @@ impl RandomWalkIntegrator {
             // TODO Scale camera ray differentials absed on image sampling rate.
             let ray_diff_scale = Float::max(
                 0.125,
-                1.0 / Float::sqrt(self.sampler_prototype.samples_per_pixel() as Float),
+                1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
             );
             if !options.disable_pixel_jitter {
                 camera_ray.ray.scale_differentials(ray_diff_scale);
@@ -207,7 +338,7 @@ impl RandomWalkIntegrator {
             // TODO increment number of camera rays (I think that's just useful for logging though)
 
             // Evaluate radiance along the camera ray
-            let visible_surface = if self.camera.get_film().uses_visible_surface() {
+            let visible_surface = if camera.get_film_const().uses_visible_surface() {
                 Some(VisibleSurface::default())
             } else {
                 None
@@ -240,14 +371,13 @@ impl RandomWalkIntegrator {
             )
         };
 
-        // Add the camera ray's contribution to the image.
-        self.camera.get_film().add_sample(
-            &p_pixel,
-            &l,
-            &lambda,
-            &visible_surface,
-            camera_sample.filter_weight,
-        );
+        FilmSample {
+            p_film: p_pixel,
+            l,
+            lambda,
+            visible_surface,
+            weight: camera_sample.filter_weight,
+        }
     }
 
     pub fn li(
@@ -326,4 +456,12 @@ impl RandomWalkIntegrator {
         le + fcos * self.li_random_walk(&ray, lambda, sampler, depth + 1, scratch_buffer, options)
             / (1.0 / (4.0 * PI_F))
     }
+}
+
+struct FilmSample {
+    p_film: Point2i,
+    l: SampledSpectrum,
+    lambda: SampledWavelengths,
+    visible_surface: Option<VisibleSurface>,
+    weight: Float,
 }

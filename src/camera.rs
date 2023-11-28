@@ -34,6 +34,8 @@ pub trait CameraI {
 
     fn get_film(&mut self) -> &mut Film;
 
+    fn get_film_const(&self) -> &Film;
+
     /// Maps a uniform random sample u [0, 1) to a time when the camera shutter is open.
     fn sample_time(&self, u: Float) -> Float;
 
@@ -80,6 +82,12 @@ impl CameraI for Camera {
     fn get_film(&mut self) -> &mut Film {
         match self {
             Camera::Orthographic(c) => c.get_film(),
+        }
+    }
+
+    fn get_film_const(&self) -> &Film {
+        match self {
+            Camera::Orthographic(c) => c.get_film_const(),
         }
     }
 
@@ -608,6 +616,10 @@ impl CameraI for OrthographicCamera {
 
     fn get_film(&mut self) -> &mut Film {
         &mut self.projective_base.camera_base.film
+    }
+
+    fn get_film_const(&self) -> &Film {
+        &self.projective_base.camera_base.film
     }
 
     fn sample_time(&self, u: Float) -> Float {

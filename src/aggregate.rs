@@ -5,9 +5,9 @@
 // PBRT constructs with pointers first and then converts to a vec-based implementation.
 //   I could try to do the same I suppose, but I suspect we'll run into ownership issues.
 
-use std::{
-    rc::Rc,
-    sync::atomic::{AtomicUsize, Ordering},
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 
 use itertools::{partition, Itertools};
@@ -33,7 +33,7 @@ pub enum SplitMethod {
 
 pub struct BvhAggregate {
     max_prims_in_node: usize,
-    primitives: Vec<Rc<Primitive>>,
+    primitives: Vec<Arc<Primitive>>,
     split_method: SplitMethod,
     nodes: Vec<LinearBvhNode>,
 }
@@ -187,7 +187,7 @@ impl PrimitiveI for BvhAggregate {
 
 impl BvhAggregate {
     pub fn new(
-        mut primitives: Vec<Rc<Primitive>>,
+        mut primitives: Vec<Arc<Primitive>>,
         max_prims_in_node: usize,
         split_method: SplitMethod,
     ) -> BvhAggregate {
@@ -215,7 +215,7 @@ impl BvhAggregate {
         // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
         // OR, we can reorganize this code to build ordered_primitives as we go (and use with_capacity(primitives.len()))
         // rather than initializing a pre-allocated vec.
-        let mut ordered_primitives: Vec<Option<Rc<Primitive>>> = vec![None; primitives.len()];
+        let mut ordered_primitives: Vec<Option<Arc<Primitive>>> = vec![None; primitives.len()];
 
         // Keeps track of the number of nodes created; this makes it possible to allocate exactly
         // the right size Vec for the LinearBvhNodes list.
@@ -285,10 +285,10 @@ impl BvhAggregate {
     /// split_metho: The algorithm by which we split the primitives
     fn build_recursive(
         bvh_primitives: &mut [BvhPrimitive],
-        primitives: &Vec<Rc<Primitive>>,
+        primitives: &Vec<Arc<Primitive>>,
         total_nodes: &AtomicUsize,
         ordered_prims_offset: &AtomicUsize,
-        ordered_prims: &mut Vec<Option<Rc<Primitive>>>,
+        ordered_prims: &mut Vec<Option<Arc<Primitive>>>,
         split_method: SplitMethod,
     ) -> BvhBuildNode {
         debug_assert!(bvh_primitives.len() != 0);
@@ -543,7 +543,7 @@ impl BvhBuildNode {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{rc::Rc, sync::Arc};
 
     use float_cmp::assert_approx_eq;
 
@@ -574,8 +574,8 @@ mod tests {
         );
         let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
         let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
-        let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let prim = Arc::new(Primitive::Simple(SimplePrimitive {
             shape: Shape::Sphere(sphere),
             material,
         }));
@@ -602,8 +602,8 @@ mod tests {
         );
         let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
         let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
-        let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let prim = Arc::new(Primitive::Simple(SimplePrimitive {
             shape: Shape::Sphere(sphere),
             material,
         }));
@@ -626,7 +626,7 @@ mod tests {
 
     #[test]
     fn set_of_spheres() {
-        let mut prims: Vec<Rc<Primitive>> = Vec::new();
+        let mut prims: Vec<Arc<Primitive>> = Vec::new();
         for multiplier in [-3.5, 0.0, 5.0] {
             let radius = 1.0;
 
@@ -645,8 +645,8 @@ mod tests {
             let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
             let kd =
                 crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-            let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
-            let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let prim = Arc::new(Primitive::Simple(SimplePrimitive {
                 shape: Shape::Sphere(sphere),
                 material,
             }));

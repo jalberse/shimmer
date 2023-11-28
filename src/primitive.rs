@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use crate::{
     aggregate::BvhAggregate,
@@ -66,9 +66,9 @@ impl PrimitiveI for Primitive {
 /// Stores a variety of properties that may be associated with a shape.
 pub struct GeometricPrimitive {
     shape: Shape,
-    material: Rc<Material>,
+    material: Arc<Material>,
     /// Stores the emissive properties if the shape is a light source
-    area_light: Option<Rc<Light>>,
+    area_light: Option<Arc<Light>>,
     // TODO add alpha FloatTexture
     // TODO add medium_interface member
 }
@@ -76,8 +76,8 @@ pub struct GeometricPrimitive {
 impl GeometricPrimitive {
     pub fn new(
         shape: Shape,
-        material: Rc<Material>,
-        area_light: Option<Rc<Light>>,
+        material: Arc<Material>,
+        area_light: Option<Arc<Light>>,
     ) -> GeometricPrimitive {
         GeometricPrimitive {
             shape,
@@ -113,7 +113,7 @@ impl PrimitiveI for GeometricPrimitive {
 /// are not needed for this shape.
 pub struct SimplePrimitive {
     pub shape: Shape,
-    pub material: Rc<Material>,
+    pub material: Arc<Material>,
 }
 
 impl PrimitiveI for SimplePrimitive {
@@ -134,14 +134,14 @@ impl PrimitiveI for SimplePrimitive {
 
 /// Enables object instancing by wrapping a pointer to a shared primitive with a transform.
 pub struct TransformedPrimitive {
-    primitive: Rc<Primitive>,
+    primitive: Arc<Primitive>,
     // TODO We should cache this transform in a pool rather than store a unique one
     render_from_primitive: Transform,
 }
 
 impl TransformedPrimitive {
     pub fn new(
-        primitive: &Rc<Primitive>,
+        primitive: &Arc<Primitive>,
         render_from_primitive: Transform,
     ) -> TransformedPrimitive {
         TransformedPrimitive {
