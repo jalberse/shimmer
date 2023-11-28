@@ -24,11 +24,23 @@ use crate::{
 
 use super::{Shape, ShapeI, ShapeSample, TriangleMesh};
 
+// TODO Consider following PBRT and only storing an offset into a vector of meshes;
+// that could save on space. But maintaining that "global" list of meshes
+// is a bit of a design problem, so we'll go with a simple approach here instead.
+// TODO Idea from Dr Li - Consider that we could take PBRT's storage scheme further
+// and reduce the memory even further. If the meshes are stored in a contiguous vector,
+// then the mesh offset *and* the triangle offset might not necessarily be needed.
+// Rather than mesh_index + tri_index (pseudocode here), we could store the triangle's
+// position in memory directly (the sum)? Could this reduce the size further?
+// The idea is the mesh would have a vec that combines all the uv, points, normals, etc
+// and we store the offset into that vec directly (already including the "mesh index" base).
+// For the booleans, those could even be in the vec as well, which would repeat data but
+// allow us to only store the offset here which might be worth the trade-off.
+// It's not a fully formed solution but if we really want to reduce the size of this
+// struct, it could work.
+
 #[derive(Debug, Clone)]
 pub struct Triangle {
-    // TODO Consider following PBRT and only storing an offset into a vector of meshes;
-    // that could save on space. But maintaining that "global" list of meshes
-    // is a bit of a design problem, so we'll go with a simple approach here instead.
     mesh: Arc<TriangleMesh>,
     tri_index: i32,
 }
