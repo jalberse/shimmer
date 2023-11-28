@@ -2,9 +2,8 @@
 // and implement them later as needed - but just a PointLight should be sufficient for now
 // to render early test scenes.
 
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
-use itertools::Diff;
 use log::warn;
 
 use crate::{
@@ -17,7 +16,6 @@ use crate::{
         sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
         spectrum::SpectrumI, DenselySampledSpectrum, Spectrum,
     },
-    texture::FloatTexture,
     transform::Transform,
     vecmath::{
         normal::Normal3,
@@ -204,7 +202,7 @@ impl LightBase {
 #[derive(Debug, Clone)]
 pub struct PointLight {
     base: LightBase,
-    i: Rc<DenselySampledSpectrum>,
+    i: Arc<DenselySampledSpectrum>,
     scale: Float,
 }
 
@@ -216,7 +214,7 @@ impl PointLight {
         };
         PointLight {
             base,
-            i: Rc::new(DenselySampledSpectrum::new(&i)),
+            i: Arc::new(DenselySampledSpectrum::new(&i)),
             scale,
         }
     }

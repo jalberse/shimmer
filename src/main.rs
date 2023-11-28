@@ -45,7 +45,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_side_by_side.pfm",
+        "test_tiled_rayon.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -76,7 +76,7 @@ fn main() {
 
 // Two triangular meshes representing rough spheres side-by-side.
 // The vertices also have slight offsets from the radius.
-fn get_triangular_mesh_test_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
+fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
     // TODO This triangulated mesh has a bug where the endcap is missing
     // But it's really not that important, I don't think it's just a bug with this
     // mesh generation code.
@@ -220,7 +220,7 @@ fn get_triangular_mesh_test_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
     (prims, lights)
 }
 
-fn get_random_sphere_scene() -> (Vec<Rc<Primitive>>, Vec<Light>) {
+fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
     let mut rng = rand::thread_rng();
     // Create some random lights
     let (mut light_prims, lights) = {

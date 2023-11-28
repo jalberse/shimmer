@@ -1,9 +1,10 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use bumpalo::Bump;
-use indicatif::ParallelProgressIterator;
 use itertools::Itertools;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::prelude;
+use thread_local::ThreadLocal;
 
 use crate::{
     bounding_box::Bounds2i,
@@ -33,9 +34,9 @@ pub trait IntegratorI {
 pub struct IntegratorBase {
     aggregate: Primitive,
     /// Contains both finite and infinite lights
-    lights: Vec<Rc<Light>>,
+    lights: Vec<Arc<Light>>,
     /// Stores an additional copy of any infinite lights in their own vector.
-    infinite_lights: Vec<Rc<Light>>,
+    infinite_lights: Vec<Arc<Light>>,
 }
 
 impl IntegratorBase {
@@ -47,7 +48,7 @@ impl IntegratorBase {
         for light in &mut lights {
             light.preprocess(&scene_bounds);
         }
-        let lights = lights.into_iter().map(|l| Rc::new(l)).collect_vec();
+        let lights = lights.into_iter().map(|l| Arc::new(l)).collect_vec();
         for light in &lights {
             if light.light_type() == LightType::Infinite {
                 infinite_lights.push(light.clone());
@@ -82,51 +83,41 @@ impl IntegratorBase {
 pub struct RandomWalkIntegrator {
     base: IntegratorBase,
     camera: Camera,
-    // This is named sampler_prototype because we will clone individual samplers
-    // for each thread.
+    // This is named sampler_prototype because we will clone individual samplers from it for each thread.
     sampler_prototype: Sampler,
-
     max_depth: i32,
 }
 
 impl IntegratorI for RandomWalkIntegrator {
     fn render(&mut self, options: &Options) {
-        // TODO Be wary of allocating anything on this that uses the heap top avoid memory leaks;
-        //   it doesn't call their drop()!
-        // TODO When we implement multi-threading, we'll want this to be one per thread.
-        let mut scratch_buffer = Bump::with_capacity(256);
-
         let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
-        // TODO init a progress reporter. Reference my old ray tracer.
 
         let mut wave_start = 0;
         let mut wave_end = 1;
         let mut next_wave_size = 1;
 
-        // TODO We'll need to have a sampler for each thread; as with a few other variables.
-        let mut sampler = self.sampler_prototype.clone();
-
         // TODO record pixel statistics option and other things PBRT handles here.
         // Not necessary for just getting a rendered image though.
 
-        // TODO We may need to inform the "start pixel" etc based on the pixel bounds
-        let tiles = Tile::tile(pixel_bounds, 8, 8);
+        let mut tiles = Tile::tile(pixel_bounds, 8, 8);
 
+        // TODO Add a progress reporter. Reference my old ray tracer.
+        let scratch_buffer_tl = ThreadLocal::new();
+        let sampler_tl = ThreadLocal::new();
         // Render in waves until the samples per pixel limit is reached.
         while wave_start < spp {
             tiles.par_iter().for_each(|tile| {
-                // TODO actually, Tile should just be a Bounds2i.
-                // That encodes the width/height and start/end position and stuff just fine.
-                // But yeah I think we will absically just take the below loop, and do it per tile.
-                // And then we'll need to sort out all the types for concurrency and mutability and
-                // captures and stuff. Hopefully that all goes smoothly...
+                // TODO Be wary of allocating anything on the scratchbuffer that uses the
+                // heap to avoid memory leaks; it doesn't call their drop().
+                let mut scratch_buffer = scratch_buffer_tl.get_or(|| Bump::with_capacity(256));
+                let mut sampler = sampler_tl.get_or(|| self.sampler_prototype.clone());
+
                 for x in tile.bounds.min.x..tile.bounds.max.x {
                     for y in tile.bounds.min.y..tile.bounds.max.y {
                         let p_pixel = Point2i::new(x, y);
                         for sample_index in wave_start..wave_end {
-                            self.sampler_prototype
-                                .start_pixel_sample(p_pixel, sample_index, 0);
+                            sampler.start_pixel_sample(p_pixel, sample_index, 0);
                             self.evaluate_pixel_sample(
                                 p_pixel,
                                 sample_index,
@@ -142,29 +133,6 @@ impl IntegratorI for RandomWalkIntegrator {
                     }
                 }
             });
-
-            // TODO We won't divide into tiles right now, but we should later.
-            //  We'll just go pixel by pixel to start, in waves.
-            for x in pixel_bounds.min.x..pixel_bounds.max.x {
-                for y in pixel_bounds.min.y..pixel_bounds.max.y {
-                    let p_pixel = Point2i::new(x, y);
-                    for sample_index in wave_start..wave_end {
-                        self.sampler_prototype
-                            .start_pixel_sample(p_pixel, sample_index, 0);
-                        self.evaluate_pixel_sample(
-                            p_pixel,
-                            sample_index,
-                            &mut sampler,
-                            &mut scratch_buffer,
-                            options,
-                        );
-                        // Note that this does not call drop() on anything allocated in
-                        // the scratch buffer. If we allocate anything on the heap, we gotta clean
-                        // that ourselves. This is where memory leaks can happen!
-                        scratch_buffer.reset();
-                    }
-                }
-            }
 
             wave_start = wave_end;
             wave_end = i32::min(spp, wave_end + next_wave_size);
@@ -315,14 +283,13 @@ impl RandomWalkIntegrator {
         let lu = if options.disable_wavelength_jitter {
             0.5
         } else {
-            self.sampler_prototype.get_1d()
+            sampler.get_1d()
         };
         let lambda = self.camera.get_film().sample_wavelengths(lu);
 
         // Initialize camera_sample for the current sample
         let filter = self.camera.get_film().get_filter();
-        let camera_sample =
-            get_camera_sample(&mut self.sampler_prototype, p_pixel, filter, options);
+        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
 
         let camera_ray = self
             .camera

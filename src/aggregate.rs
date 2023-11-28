@@ -7,7 +7,10 @@
 
 use std::{
     rc::Rc,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 use itertools::{partition, Itertools};
@@ -33,7 +36,7 @@ pub enum SplitMethod {
 
 pub struct BvhAggregate {
     max_prims_in_node: usize,
-    primitives: Vec<Rc<Primitive>>,
+    primitives: Vec<Arc<Primitive>>,
     split_method: SplitMethod,
     nodes: Vec<LinearBvhNode>,
 }
@@ -187,7 +190,7 @@ impl PrimitiveI for BvhAggregate {
 
 impl BvhAggregate {
     pub fn new(
-        mut primitives: Vec<Rc<Primitive>>,
+        mut primitives: Vec<Arc<Primitive>>,
         max_prims_in_node: usize,
         split_method: SplitMethod,
     ) -> BvhAggregate {
@@ -215,7 +218,7 @@ impl BvhAggregate {
         // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element
         // OR, we can reorganize this code to build ordered_primitives as we go (and use with_capacity(primitives.len()))
         // rather than initializing a pre-allocated vec.
-        let mut ordered_primitives: Vec<Option<Rc<Primitive>>> = vec![None; primitives.len()];
+        let mut ordered_primitives: Vec<Option<Arc<Primitive>>> = vec![None; primitives.len()];
 
         // Keeps track of the number of nodes created; this makes it possible to allocate exactly
         // the right size Vec for the LinearBvhNodes list.
@@ -285,10 +288,10 @@ impl BvhAggregate {
     /// split_metho: The algorithm by which we split the primitives
     fn build_recursive(
         bvh_primitives: &mut [BvhPrimitive],
-        primitives: &Vec<Rc<Primitive>>,
+        primitives: &Vec<Arc<Primitive>>,
         total_nodes: &AtomicUsize,
         ordered_prims_offset: &AtomicUsize,
-        ordered_prims: &mut Vec<Option<Rc<Primitive>>>,
+        ordered_prims: &mut Vec<Option<Arc<Primitive>>>,
         split_method: SplitMethod,
     ) -> BvhBuildNode {
         debug_assert!(bvh_primitives.len() != 0);
@@ -626,7 +629,7 @@ mod tests {
 
     #[test]
     fn set_of_spheres() {
-        let mut prims: Vec<Rc<Primitive>> = Vec::new();
+        let mut prims: Vec<Arc<Primitive>> = Vec::new();
         for multiplier in [-3.5, 0.0, 5.0] {
             let radius = 1.0;
 

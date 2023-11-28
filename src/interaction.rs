@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::{
     bsdf::BSDF,
@@ -82,11 +82,11 @@ pub struct SurfaceInteraction {
     pub dndv: Normal3f,
     pub shading: SurfaceInteractionShading,
     pub face_index: i32,
-    pub material: Option<Rc<Material>>,
+    pub material: Option<Arc<Material>>,
     // TODO consider using just an Option<Light> if I make Light copyable.
     // Would require moving to cacheing DenselySampledSpectrum in Lights to avoid
     // a large/impossible copy.
-    pub area_light: Option<Rc<Light>>,
+    pub area_light: Option<Arc<Light>>,
     pub dpdx: Vector3f,
     pub dpdy: Vector3f,
     pub dudx: Float,
@@ -142,8 +142,8 @@ impl SurfaceInteraction {
     // TODO We'll also want to add the Medium information here, once we implement participating media. pg 398.
     pub fn set_intersection_properties(
         &mut self,
-        mtl: &Rc<Material>,
-        area_light: &Option<Rc<Light>>,
+        mtl: &Arc<Material>,
+        area_light: &Option<Arc<Light>>,
     ) {
         self.area_light = area_light.clone();
         self.material = Some(mtl.clone());
