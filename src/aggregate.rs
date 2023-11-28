@@ -21,11 +21,14 @@ use crate::{
     Float,
 };
 
+use pdqselect;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SplitMethod {
     // TODO Other split methods; Middle isn't very good, but simple for the first implementation.\
     // EqualCounts is the next simplest.
     Middle,
+    EqualCounts,
 }
 
 pub struct BvhAggregate {
@@ -339,9 +342,6 @@ impl BvhAggregate {
                 let split_index = match split_method {
                     SplitMethod::Middle => {
                         let pmid = (centroid_bounds.min[dim] + centroid_bounds.max[dim]) / 2.0;
-                        // TODO We want to partition bvh_primitives in place, which means we want
-                        // a mutable slice, and we also want to use iter_mut().partition_in_place() which
-                        // is nightly, or an equivalent...
                         let split_index =
                             partition(bvh_primitives.iter_mut(), |pi: &BvhPrimitive| {
                                 pi.centroid()[dim] < pmid
@@ -350,12 +350,23 @@ impl BvhAggregate {
                         if split_index == 0 || split_index == bvh_primitives.len() {
                             // If the primitives have large overlapping bounding boxes, this may
                             // fail to partition them; in which case, split by equal counts instead.
+                            let split_index = bvh_primitives.len() / 2;
+                            pdqselect::select_by(bvh_primitives, split_index, |a, b| {
+                                Float::partial_cmp(&a.centroid()[dim], &(b.centroid()[dim]))
+                                    .expect("Unexpected NaN")
+                            });
                             split_index
-                            // TODO Actually implement the EqualCounts case and do that here instead
-                            //  of returning split_index
                         } else {
                             split_index
                         }
+                    }
+                    SplitMethod::EqualCounts => {
+                        let split_index = bvh_primitives.len() / 2;
+                        pdqselect::select_by(bvh_primitives, split_index, |a, b| {
+                            Float::partial_cmp(&a.centroid()[dim], &(b.centroid()[dim]))
+                                .expect("Unexpected NaN")
+                        });
+                        split_index
                     }
                 };
 
@@ -541,7 +552,7 @@ mod tests {
         material::{DiffuseMaterial, Material},
         primitive::{Primitive, PrimitiveI, SimplePrimitive},
         ray::Ray,
-        shape::{Shape, Sphere},
+        shape::{sphere::Sphere, Shape},
         spectra::{ConstantSpectrum, Spectrum},
         texture::SpectrumConstantTexture,
         transform::Transform,

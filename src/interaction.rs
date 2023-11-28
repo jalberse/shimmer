@@ -12,17 +12,24 @@ use crate::{
     sampler::{Sampler, SamplerI},
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     vecmath::{
-        normal::Normal3, point::Point3fi, vector::Vector3, Normal3f, Normalize, Point2f, Point3f,
-        Vector3f,
+        normal::Normal3, point::Point3fi, vector::Vector3, Length, Normal3f, Normalize, Point2f,
+        Point3f, Vector3f,
     },
     Float,
 };
 
 pub struct Interaction {
+    /// The point the interaction is at
     pub pi: Point3fi,
+    /// The time of the interaction
     pub time: Float,
+    /// For interactions that lie along a ray, the negative ray direction is stored in wo.
+    /// wo is used to match the notation for the outgoing direction when computing lighting at points.
+    /// For interactions where the notion of an outgoing direction doesn't apply, wo is (0, 0, 0).
     pub wo: Vector3f,
+    // For interactions on surfaces, the surface normal at the point
     pub n: Normal3f,
+    /// The UV of the interaction, if applicable; (0, 0) otherwise.
     pub uv: Point2f,
     // TODO Medium, MediumInterface. But omitting for now for simplicity.
 }
@@ -299,6 +306,34 @@ impl SurfaceInteraction {
                 .l(self.p(), self.interaction.n, self.interaction.uv, w, lambda)
         } else {
             SampledSpectrum::from_const(0.0)
+        }
+    }
+
+    pub fn set_shading_geometry(
+        &mut self,
+        ns: Normal3f,
+        dpdus: Vector3f,
+        dpdvs: Vector3f,
+        dndus: Normal3f,
+        dndvs: Normal3f,
+        orientation_is_authoritative: bool,
+    ) {
+        self.shading.n = ns;
+        debug_assert_ne!(self.shading.n, Normal3f::ZERO);
+        if orientation_is_authoritative {
+            self.interaction.n = self.interaction.n.face_forward(&self.shading.n);
+        } else {
+            self.shading.n = self.shading.n.face_forward(&self.interaction.n);
+        }
+
+        self.shading.dpdu = dpdus;
+        self.shading.dpdv = dpdvs;
+        self.shading.dndu = dndus;
+        self.shading.dndv = dndvs;
+        while self.shading.dpdu.length_squared() > 1e16 || self.shading.dpdv.length_squared() > 1e16
+        {
+            self.shading.dpdu /= 1e8;
+            self.shading.dpdv /= 1e8;
         }
     }
 }

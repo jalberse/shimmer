@@ -6,6 +6,10 @@ authors = ["John Alberse"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# This should be removed when not doing active development; but I need it for profiling!
+[profile.release] 
+debug = true
+
 [features]
 default = []
 
@@ -25,6 +29,7 @@ bumpalo = "3.14.0"
 arrayvec = "0.7.4"
 fast_polynomial = "0.1.0"
 half = "2.2.1"
+pdqselect = "0.1.1"
 
 [dev-dependencies]
 float_next_after = "1.0.0"

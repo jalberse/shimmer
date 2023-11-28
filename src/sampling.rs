@@ -2,10 +2,12 @@ use crate::{
     camera::CameraSample,
     filter::{Filter, FilterI},
     float::{next_float_down, Float, PI_F},
-    math::{lerp, safe_sqrt, INV_2PI, INV_PI, PI_OVER_2, PI_OVER_4},
+    math::{lerp, safe_sqrt, DifferenceOfProducts, INV_2PI, INV_PI, PI_OVER_2, PI_OVER_4},
     options::Options,
-    sampler::{Sampler, SamplerI},
-    vecmath::{Point2f, Point2i, Tuple2, Vector2f, Vector3f},
+    sampler::SamplerI,
+    vecmath::{
+        vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Vector2f, Vector3f,
+    },
 };
 
 // See PBRT v4 2.14
@@ -185,6 +187,196 @@ pub fn get_camera_sample<T: SamplerI>(
             filter_weight: filter_sample.weight,
         }
     }
+}
+
+pub fn sample_uniform_triangle(u: Point2f) -> (Float, Float, Float) {
+    let (b0, b1) = if u[0] < u[1] {
+        let b0 = u[0] / 2.0;
+        let b1 = u[1] - b0;
+        (b0, b1)
+    } else {
+        let b1 = u[1] / 2.0;
+        let b0 = u[0] - b1;
+        (b0, b1)
+    };
+    (b0, b1, 1.0 - b1 - b0)
+}
+
+pub fn sample_bilinear(u: Point2f, w: &[Float]) -> Point2f {
+    debug_assert_eq!(4, w.len());
+    // Sample y for bilinear marginal distribution
+    let y = sample_linear(u[1], w[0] + w[1], w[2] + w[3]);
+    // Sample x for bilinear conditional distribution
+    let x = sample_linear(u[0], lerp(y, &w[0], &w[2]), lerp(y, &w[1], &w[3]));
+    Point2f { x, y }
+}
+
+pub fn bilinear_pdf(p: Point2f, w: &[Float]) -> Float {
+    debug_assert_eq!(4, w.len());
+    if p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 {
+        return 0.0;
+    }
+    if w[0] + w[1] + w[2] + w[3] == 0.0 {
+        return 1.0;
+    }
+    4.0 * ((1.0 - p[0]) * (1.0 - p[1]) * w[0]
+        + p[0] * (1.0 - p[1]) * w[1]
+        + (1.0 - p[0]) * p[1] * w[2]
+        + p[0] * p[1] * w[3])
+        / (w[0] + w[1] + w[2] + w[3])
+}
+
+/// Takes three triangle vertices v, a reference point p, and a uniform sample u.
+/// Returns the sampled point vertices and the PDF.
+pub fn sample_spherical_triangle(v: &[Point3f; 3], p: Point3f, u: Point2f) -> ([Float; 3], Float) {
+    // Compute vectors a, b, and c to spherical triangle vertices
+    let a = v[0] - p;
+    let b = v[1] - p;
+    let c = v[2] - p;
+    debug_assert!(a.length_squared() > 0.0);
+    debug_assert!(b.length_squared() > 0.0);
+    debug_assert!(c.length_squared() > 0.0);
+
+    let a = a.normalize();
+    let b = b.normalize();
+    let c = c.normalize();
+
+    // Compute normalized cross products of all direction pairs.
+    let n_ab = a.cross(&b);
+    let n_bc = b.cross(&c);
+    let n_ca = c.cross(&a);
+    if n_ab.length_squared() == 0.0 || n_bc.length_squared() == 0.0 || n_ca.length_squared() == 0.0
+    {
+        // TODO Consider using an Option return type instead.
+        return ([0.0, 0.0, 0.0], 0.0);
+    }
+
+    let n_ab = n_ab.normalize();
+    let n_bc = n_bc.normalize();
+    let n_ca = n_ca.normalize();
+
+    // Find angles alpha, beta, and gamma at spherical triangle vertices
+    let alpha = n_ab.angle_between(&-n_ca);
+    let beta = n_bc.angle_between(&-n_ab);
+    let gamma = n_ca.angle_between(&-n_bc);
+
+    // Uniformly sample triangle area A to compute A'.
+    let a_pi = alpha + beta + gamma;
+    let ap_pi = lerp(u[0], &PI_F, &a_pi);
+    let area = a_pi - PI_F;
+    let pdf = if area <= 0.0 { 0.0 } else { 1.0 / area };
+
+    // Find cos(beta) for point along b for sampled area.
+    let cos_alpha = Float::cos(alpha);
+    let sin_alpha = Float::sin(alpha);
+    let sin_phi = Float::sin(ap_pi) * cos_alpha - Float::cos(ap_pi) * sin_alpha;
+    let cos_phi = Float::cos(ap_pi) * cos_alpha + Float::sin(ap_pi) * sin_alpha;
+    let k1 = cos_phi + cos_alpha;
+    let k2 = sin_phi - sin_alpha * a.dot(&b);
+    let cos_bp = (k2 + (Float::difference_of_products(k2, cos_phi, k1, sin_phi)) * cos_alpha)
+        / (Float::sum_of_products(k2, sin_phi, k1, cos_phi) * sin_alpha);
+    // Happens if the triangle basically covers the entire hemisphere.
+    // We currently depend on calling code to detect this case, which is unfortunate.
+    debug_assert!(!cos_bp.is_nan());
+    let cos_bp = cos_bp.clamp(-1.0, 1.0);
+
+    // Sample c' along the arc between b' and a.
+    let sin_bp = safe_sqrt(1.0 - cos_bp * cos_bp);
+    let cp = cos_bp * a + sin_bp * c.gram_schmidt(&a).normalize();
+
+    // Compute sampled spherical triangle direction and return barycentrics.
+    let cos_theta = 1.0 - u[1] * (1.0 - cp.dot(&b));
+    let sin_theta = safe_sqrt(1.0 - cos_theta * cos_theta);
+    let w = cos_theta * b + sin_theta * cp.gram_schmidt(&b).normalize();
+
+    // Find barycentric coordinates for sampled direction w.
+    let e1 = v[1] - v[0];
+    let e2 = v[2] - v[0];
+    let s1 = w.cross(&e2);
+    let divisor = e1.dot(&e1);
+
+    // TODO Can we have some debug assert_rare()? It could be a good crate.
+    if divisor == 0.0 {
+        // This happens with triangles that cover (nearly) the whole hemisphere.
+        return ([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], pdf);
+    }
+
+    let inv_divisor = 1.0 / divisor;
+    let s = p - v[0];
+    let b1 = s.dot(&s1) * inv_divisor;
+    let b2 = w.dot(&s.cross(&e1)) * inv_divisor;
+
+    // Return clamped barycentrics for sampled direction
+    let b1 = b1.clamp(0.0, 1.0);
+    let b2 = b2.clamp(0.0, 1.0);
+    let (b1, b2) = if b1 + b2 > 1.0 {
+        (b1 / b1 + b2, b2 / b1 + b2)
+    } else {
+        (b1, b2)
+    };
+    ([1.0 - b1 - b2, b1, b2], pdf)
+}
+
+pub fn invert_spherical_triangle_sample(v: &[Point3f; 3], p: Point3f, w: Vector3f) -> Point2f {
+    // Compute vectors a, b, and c to spherical triangle vertices
+    let a = v[0] - p;
+    let b = v[1] - p;
+    let c = v[2] - p;
+    debug_assert!(a.length_squared() > 0.0);
+    debug_assert!(b.length_squared() > 0.0);
+    debug_assert!(c.length_squared() > 0.0);
+
+    let a = a.normalize();
+    let b = b.normalize();
+    let c = c.normalize();
+
+    // Compute normalized cross products of all direction pairs.
+    let n_ab = a.cross(&b);
+    let n_bc = b.cross(&c);
+    let n_ca = c.cross(&a);
+    if n_ab.length_squared() == 0.0 || n_bc.length_squared() == 0.0 || n_ca.length_squared() == 0.0
+    {
+        // TODO Consider using an Option return type instead.
+        return Point2f::ZERO;
+    }
+
+    let n_ab = n_ab.normalize();
+    let n_bc = n_bc.normalize();
+    let n_ca = n_ca.normalize();
+
+    // Find angles alpha, beta, and gamma at spherical triangle vertices
+    let alpha = n_ab.angle_between(&-n_ca);
+    let beta = n_bc.angle_between(&-n_ab);
+    let gamma = n_ca.angle_between(&-n_bc);
+
+    // Find vertex c' along ac arc for w
+    let cp = b.cross(&w).cross(&c.cross(&a)).normalize();
+    let cp = if cp.dot(&(a + c)) < 0.0 { -cp } else { cp };
+
+    // Invert uniform area sampling to find u0
+    // 0.1 degrees
+    let u0 = if a.dot(&cp) > 0.99999847691 {
+        0.0
+    } else {
+        // Compute area a' of subtriangle
+        let n_cpb = cp.cross(&b);
+        let n_acp = a.cross(&cp);
+        // TODO check rare
+        if n_cpb.length_squared() == 0.0 || n_acp.length_squared() == 0.0 {
+            return Point2f::new(0.5, 0.5);
+        }
+        let n_cpb = n_cpb.normalize();
+        let n_acp = n_acp.normalize();
+        let ap = alpha + n_ab.angle_between(&n_cpb) + n_acp.angle_between(&-n_cpb) - PI_F;
+
+        // Compute sample u0 that gives area a'.
+        let area = alpha + beta + gamma - PI_F;
+        ap / area
+    };
+
+    // Invert arc sampling to find u1 and return result.
+    let u1 = (1.0 - w.dot(&b)) / (1.0 - cp.dot(&b));
+    Point2f::new(u0.clamp(0.0, 1.0), u1.clamp(0.0, 1.0))
 }
 
 #[cfg(test)]
