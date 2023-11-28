@@ -121,7 +121,26 @@ impl IntegratorI for RandomWalkIntegrator {
                 // But yeah I think we will absically just take the below loop, and do it per tile.
                 // And then we'll need to sort out all the types for concurrency and mutability and
                 // captures and stuff. Hopefully that all goes smoothly...
-                todo!()
+                for x in tile.bounds.min.x..tile.bounds.max.x {
+                    for y in tile.bounds.min.y..tile.bounds.max.y {
+                        let p_pixel = Point2i::new(x, y);
+                        for sample_index in wave_start..wave_end {
+                            self.sampler_prototype
+                                .start_pixel_sample(p_pixel, sample_index, 0);
+                            self.evaluate_pixel_sample(
+                                p_pixel,
+                                sample_index,
+                                &mut sampler,
+                                &mut scratch_buffer,
+                                options,
+                            );
+                            // Note that this does not call drop() on anything allocated in
+                            // the scratch buffer. If we allocate anything on the heap, we gotta clean
+                            // that ourselves. This is where memory leaks can happen!
+                            scratch_buffer.reset();
+                        }
+                    }
+                }
             });
 
             // TODO We won't divide into tiles right now, but we should later.
@@ -166,26 +185,10 @@ impl IntegratorI for RandomWalkIntegrator {
 }
 
 struct Tile {
-    /// Width of the tile, in pixels.
-    width: usize,
-    /// Height of the tile, in pixels.
-    height: usize,
-    /// The first pixel X coordinate of this tile in the full image.
-    x_coord_start: usize,
-    /// The first pixel Y coordinate of this tile in the full image.
-    y_coord_start: usize,
+    bounds: Bounds2i,
 }
 
 impl Tile {
-    pub fn new(width: usize, height: usize, x_coord_start: usize, y_coord_start: usize) -> Tile {
-        Tile {
-            width,
-            height,
-            x_coord_start,
-            y_coord_start,
-        }
-    }
-
     /// Returns a list of Tiles covering the image.
     ///
     /// The tiles are returned in a flattened Vec in row-major order.
@@ -198,54 +201,86 @@ impl Tile {
     /// * `pixel_bounds` - The pixel bounds of the image.
     /// * `tile_width` - Width of each tile, in pixels.
     /// * `tile_height` - Height of each tile, in pixels.
-    pub fn tile(pixel_bounds: Bounds2i, tile_width: usize, tile_height: usize) -> Vec<Tile> {
-        let image_width = pixel_bounds.width() as usize;
-        let image_height = pixel_bounds.height() as usize;
+    pub fn tile(pixel_bounds: Bounds2i, tile_width: i32, tile_height: i32) -> Vec<Tile> {
+        let image_width = pixel_bounds.width();
+        let image_height = pixel_bounds.height();
         let num_horizontal_tiles = image_width / tile_width;
         let remainder_horizontal_pixels = image_width % tile_width;
         let num_vertical_tiles = image_height / tile_height;
         let remainder_vertical_pixels = image_height % tile_height;
 
-        let mut tiles = Vec::with_capacity(num_horizontal_tiles * num_vertical_tiles);
+        let mut tiles = Vec::with_capacity((num_horizontal_tiles * num_vertical_tiles) as usize);
 
         for tile_y in 0..num_vertical_tiles {
             for tile_x in 0..num_horizontal_tiles {
-                tiles.push(Tile::new(
-                    tile_width,
-                    tile_height,
-                    tile_x * tile_width + pixel_bounds.min.x as usize,
-                    tile_y * tile_height + pixel_bounds.min.y as usize,
-                ));
+                let tile_start_x = pixel_bounds.min.x + tile_x * tile_width;
+                let tile_start_y = pixel_bounds.min.y + tile_y * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + tile_width,
+                            y: tile_start_y + tile_height,
+                        },
+                    ),
+                });
             }
             // Add the rightmost row if necessary
             if remainder_horizontal_pixels > 0 {
-                tiles.push(Tile::new(
-                    remainder_horizontal_pixels,
-                    tile_height,
-                    num_horizontal_tiles * tile_width + pixel_bounds.min.x as usize,
-                    tile_y * tile_height + pixel_bounds.min.y as usize,
-                ));
+                let tile_start_x = pixel_bounds.min.x + num_horizontal_tiles * tile_width;
+                let tile_start_y = pixel_bounds.min.y + tile_y * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + remainder_horizontal_pixels,
+                            y: tile_start_y + tile_height,
+                        },
+                    ),
+                });
             }
         }
         // Add the bottom row if necessary
         if remainder_vertical_pixels > 0 {
             for tile_x in 0..num_horizontal_tiles {
-                tiles.push(Tile::new(
-                    tile_width,
-                    remainder_vertical_pixels,
-                    tile_x * tile_width + pixel_bounds.min.x as usize,
-                    num_vertical_tiles * tile_height + pixel_bounds.min.y as usize,
-                ));
+                let tile_start_x = pixel_bounds.min.x + tile_x * tile_width;
+                let tile_start_y = pixel_bounds.min.y + num_vertical_tiles * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + tile_width,
+                            y: tile_start_y + remainder_vertical_pixels,
+                        },
+                    ),
+                });
             }
         }
         // Add the bottom-most, right-most Tile if necessary
         if remainder_horizontal_pixels > 0 && remainder_vertical_pixels > 0 {
-            tiles.push(Tile::new(
-                remainder_horizontal_pixels,
-                remainder_vertical_pixels,
-                num_horizontal_tiles * tile_width + pixel_bounds.min.x as usize,
-                num_vertical_tiles * tile_height + pixel_bounds.min.y as usize,
-            ));
+            let tile_start_x = pixel_bounds.min.x + num_horizontal_tiles * tile_width;
+            let tile_start_y = pixel_bounds.min.y + num_vertical_tiles * tile_height;
+            tiles.push(Tile {
+                bounds: Bounds2i::new(
+                    Point2i {
+                        x: tile_start_x,
+                        y: tile_start_y,
+                    },
+                    Point2i {
+                        x: tile_start_x + remainder_horizontal_pixels,
+                        y: tile_start_y + remainder_vertical_pixels,
+                    },
+                ),
+            });
         }
 
         tiles
