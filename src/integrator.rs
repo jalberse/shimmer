@@ -1,9 +1,12 @@
 use std::rc::Rc;
 
 use bumpalo::Bump;
+use indicatif::ParallelProgressIterator;
 use itertools::Itertools;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
+    bounding_box::Bounds2i,
     camera::{Camera, CameraI},
     film::{FilmI, VisibleSurface},
     float::PI_F,
@@ -107,8 +110,20 @@ impl IntegratorI for RandomWalkIntegrator {
         // TODO record pixel statistics option and other things PBRT handles here.
         // Not necessary for just getting a rendered image though.
 
+        // TODO We may need to inform the "start pixel" etc based on the pixel bounds
+        let tiles = Tile::tile(pixel_bounds, 8, 8);
+
         // Render in waves until the samples per pixel limit is reached.
         while wave_start < spp {
+            tiles.par_iter().for_each(|tile| {
+                // TODO actually, Tile should just be a Bounds2i.
+                // That encodes the width/height and start/end position and stuff just fine.
+                // But yeah I think we will absically just take the below loop, and do it per tile.
+                // And then we'll need to sort out all the types for concurrency and mutability and
+                // captures and stuff. Hopefully that all goes smoothly...
+                todo!()
+            });
+
             // TODO We won't divide into tiles right now, but we should later.
             //  We'll just go pixel by pixel to start, in waves.
             for x in pixel_bounds.min.x..pixel_bounds.max.x {
@@ -147,6 +162,93 @@ impl IntegratorI for RandomWalkIntegrator {
                     .unwrap();
             }
         }
+    }
+}
+
+struct Tile {
+    /// Width of the tile, in pixels.
+    width: usize,
+    /// Height of the tile, in pixels.
+    height: usize,
+    /// The first pixel X coordinate of this tile in the full image.
+    x_coord_start: usize,
+    /// The first pixel Y coordinate of this tile in the full image.
+    y_coord_start: usize,
+}
+
+impl Tile {
+    pub fn new(width: usize, height: usize, x_coord_start: usize, y_coord_start: usize) -> Tile {
+        Tile {
+            width,
+            height,
+            x_coord_start,
+            y_coord_start,
+        }
+    }
+
+    /// Returns a list of Tiles covering the image.
+    ///
+    /// The tiles are returned in a flattened Vec in row-major order.
+    /// If the image cannot be perfectly divided by the tile width or height,
+    /// then smaller tiles are created to fill the remainder of the image width or height.
+    /// It's recommended to pick a tiling size that fits into the image resolution well.
+    /// Note that 8x8 is a reasonable tile size and 8 evenly divides common resolution
+    /// sizes like 1920, 1080, 720, etc.
+    ///
+    /// * `pixel_bounds` - The pixel bounds of the image.
+    /// * `tile_width` - Width of each tile, in pixels.
+    /// * `tile_height` - Height of each tile, in pixels.
+    pub fn tile(pixel_bounds: Bounds2i, tile_width: usize, tile_height: usize) -> Vec<Tile> {
+        let image_width = pixel_bounds.width() as usize;
+        let image_height = pixel_bounds.height() as usize;
+        let num_horizontal_tiles = image_width / tile_width;
+        let remainder_horizontal_pixels = image_width % tile_width;
+        let num_vertical_tiles = image_height / tile_height;
+        let remainder_vertical_pixels = image_height % tile_height;
+
+        let mut tiles = Vec::with_capacity(num_horizontal_tiles * num_vertical_tiles);
+
+        for tile_y in 0..num_vertical_tiles {
+            for tile_x in 0..num_horizontal_tiles {
+                tiles.push(Tile::new(
+                    tile_width,
+                    tile_height,
+                    tile_x * tile_width + pixel_bounds.min.x as usize,
+                    tile_y * tile_height + pixel_bounds.min.y as usize,
+                ));
+            }
+            // Add the rightmost row if necessary
+            if remainder_horizontal_pixels > 0 {
+                tiles.push(Tile::new(
+                    remainder_horizontal_pixels,
+                    tile_height,
+                    num_horizontal_tiles * tile_width + pixel_bounds.min.x as usize,
+                    tile_y * tile_height + pixel_bounds.min.y as usize,
+                ));
+            }
+        }
+        // Add the bottom row if necessary
+        if remainder_vertical_pixels > 0 {
+            for tile_x in 0..num_horizontal_tiles {
+                tiles.push(Tile::new(
+                    tile_width,
+                    remainder_vertical_pixels,
+                    tile_x * tile_width + pixel_bounds.min.x as usize,
+                    num_vertical_tiles * tile_height + pixel_bounds.min.y as usize,
+                ));
+            }
+        }
+        // Add the bottom-most, right-most Tile if necessary
+        if remainder_horizontal_pixels > 0 && remainder_vertical_pixels > 0 {
+            tiles.push(Tile::new(
+                remainder_horizontal_pixels,
+                remainder_vertical_pixels,
+                num_horizontal_tiles * tile_width + pixel_bounds.min.x as usize,
+                num_vertical_tiles * tile_height + pixel_bounds.min.y as usize,
+            ));
+        }
+
+        tiles
     }
 }
 
