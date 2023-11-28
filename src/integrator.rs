@@ -1,10 +1,9 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use bumpalo::Bump;
 use itertools::Itertools;
-use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
-use rayon::prelude;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thread_local::ThreadLocal;
 
 use crate::{
@@ -112,11 +111,29 @@ impl IntegratorI for RandomWalkIntegrator {
             // That could mean that our parallel iterations can become a map() to generate some new data,
             // and then we apply that to the film rather than applying to the film within evaluate_pixel_sample(),
             // similar to my previous ray tracer. This might be more "Rusty".
-            // It might be okay to extract
+            // It might be okay to make evaluate_pixel_sample() take an Arc<RefCell<Camera>> rather than a &mut self,
+            // and then each thread can have a pointer to the camera. Then they can all act on it.
+            // That's a little unfortunate - threads all have to wait on others wiriting to the camera's film
+            // to generate rays etc. In fact, I think PBRT leaves this unmanaged on purpose IIRC as it assumes
+            // we won't have our splats onto the film collide:
+            // "Film implementations can assume that multiple threads will not call AddSample() concurrently with
+            // the same pFilm location (though they should assume that threads will call it concurrently with different ones).
+            // Therefore, it is not necessary to worry about mutual exclusion in this method’s implementation unless
+            // some data that is not unique to a pixel is modified."
+            //   We can't make that assumption though, as we need to prove it to the compiler.
+            // So we might want something like havingevaluate_pixel_sample *return* a new struct, FilmSample,
+            //  that just contains the parameters for self.camera.get_film().add_sample().
+            //  This would let us use a const self for evaluate_pixel_sample (we'd need a get_const_film() in Camera).
+            //  Then, we can collect a list of FilmSamples and call add_sample() with them outside the parallel
+            //  context, thereby avoiding potential conflicts that the compiler is complaining about.
+            //  I think that's the last hurdle, as li() isn't mut self, and that's the only mut thing left.
+            //  Other things are constant and can be accessed across threads no problem, I think.
 
             tiles.par_iter().for_each(|tile| {
                 // TODO Be wary of allocating anything on the scratchbuffer that uses the
                 // heap to avoid memory leaks; it doesn't call their drop().
+
+                // Initialize or get thread-local objects.
                 let scratch_buffer =
                     scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(256)));
                 let sampler = sampler_tl.get_or(|| RefCell::new(self.sampler_prototype.clone()));
