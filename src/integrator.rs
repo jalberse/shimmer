@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use bumpalo::Bump;
+use indicatif::ParallelProgressIterator;
 use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thread_local::ThreadLocal;
@@ -102,63 +103,63 @@ impl IntegratorI for RandomWalkIntegrator {
 
         let tiles = Tile::tile(pixel_bounds, 8, 8);
 
-        // TODO Add a progress reporter. Reference my old ray tracer.
         let scratch_buffer_tl = ThreadLocal::new();
         let sampler_tl = ThreadLocal::new();
         // Render in waves until the samples per pixel limit is reached.
         while wave_start < spp {
-            // TODO To avoid issues with concurrency, we might want to change our model.
-            // That could mean that our parallel iterations can become a map() to generate some new data,
-            // and then we apply that to the film rather than applying to the film within evaluate_pixel_sample(),
-            // similar to my previous ray tracer. This might be more "Rusty".
-            // It might be okay to make evaluate_pixel_sample() take an Arc<RefCell<Camera>> rather than a &mut self,
-            // and then each thread can have a pointer to the camera. Then they can all act on it.
-            // That's a little unfortunate - threads all have to wait on others wiriting to the camera's film
-            // to generate rays etc. In fact, I think PBRT leaves this unmanaged on purpose IIRC as it assumes
-            // we won't have our splats onto the film collide:
-            // "Film implementations can assume that multiple threads will not call AddSample() concurrently with
-            // the same pFilm location (though they should assume that threads will call it concurrently with different ones).
-            // Therefore, it is not necessary to worry about mutual exclusion in this method’s implementation unless
-            // some data that is not unique to a pixel is modified."
-            //   We can't make that assumption though, as we need to prove it to the compiler.
-            // So we might want something like havingevaluate_pixel_sample *return* a new struct, FilmSample,
-            //  that just contains the parameters for self.camera.get_film().add_sample().
-            //  This would let us use a const self for evaluate_pixel_sample (we'd need a get_const_film() in Camera).
-            //  Then, we can collect a list of FilmSamples and call add_sample() with them outside the parallel
-            //  context, thereby avoiding potential conflicts that the compiler is complaining about.
-            //  I think that's the last hurdle, as li() isn't mut self, and that's the only mut thing left.
-            //  Other things are constant and can be accessed across threads no problem, I think.
+            let film_samples: Vec<Vec<FilmSample>> = tiles
+                .par_iter()
+                .progress()
+                .map(|tile| -> Vec<FilmSample> {
+                    // TODO Be wary of allocating anything on the scratchbuffer that uses the
+                    // heap to avoid memory leaks; it doesn't call their drop().
 
-            tiles.par_iter().for_each(|tile| {
-                // TODO Be wary of allocating anything on the scratchbuffer that uses the
-                // heap to avoid memory leaks; it doesn't call their drop().
+                    let mut samples = Vec::with_capacity(
+                        (tile.bounds.width() * tile.bounds.height() * wave_end - wave_start)
+                            as usize,
+                    );
 
-                // Initialize or get thread-local objects.
-                let scratch_buffer =
-                    scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(256)));
-                let sampler = sampler_tl.get_or(|| RefCell::new(self.sampler_prototype.clone()));
+                    // Initialize or get thread-local objects.
+                    let scratch_buffer =
+                        scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(256)));
+                    let sampler =
+                        sampler_tl.get_or(|| RefCell::new(self.sampler_prototype.clone()));
 
-                for x in tile.bounds.min.x..tile.bounds.max.x {
-                    for y in tile.bounds.min.y..tile.bounds.max.y {
-                        let p_pixel = Point2i::new(x, y);
-                        for sample_index in wave_start..wave_end {
-                            sampler
-                                .borrow_mut()
-                                .start_pixel_sample(p_pixel, sample_index, 0);
-                            self.evaluate_pixel_sample(
-                                p_pixel,
-                                sample_index,
-                                &mut sampler.borrow_mut(),
-                                &mut scratch_buffer.borrow_mut(),
-                                options,
-                            );
-                            // Note that this does not call drop() on anything allocated in
-                            // the scratch buffer. If we allocate anything on the heap, we gotta clean
-                            // that ourselves. This is where memory leaks can happen!
-                            scratch_buffer.borrow_mut().reset();
+                    for x in tile.bounds.min.x..tile.bounds.max.x {
+                        for y in tile.bounds.min.y..tile.bounds.max.y {
+                            let p_pixel = Point2i::new(x, y);
+                            for sample_index in wave_start..wave_end {
+                                sampler
+                                    .borrow_mut()
+                                    .start_pixel_sample(p_pixel, sample_index, 0);
+                                let film_sample = self.evaluate_pixel_sample(
+                                    &self.camera,
+                                    p_pixel,
+                                    sample_index,
+                                    &mut sampler.borrow_mut(),
+                                    &mut scratch_buffer.borrow_mut(),
+                                    options,
+                                );
+                                samples.push(film_sample);
+                                // Note that this does not call drop() on anything allocated in
+                                // the scratch buffer. If we allocate anything on the heap, we gotta clean
+                                // that ourselves. This is where memory leaks can happen!
+                                scratch_buffer.borrow_mut().reset();
+                            }
                         }
                     }
-                }
+                    samples
+                })
+                .collect();
+            let samples: Vec<FilmSample> = film_samples.into_iter().flatten().collect();
+            samples.into_iter().for_each(|s| {
+                self.camera.get_film().add_sample(
+                    &s.p_film,
+                    &s.l,
+                    &s.lambda,
+                    &s.visible_surface,
+                    s.weight,
+                )
             });
 
             wave_start = wave_end;
@@ -298,29 +299,28 @@ impl RandomWalkIntegrator {
         }
     }
 
-    pub fn evaluate_pixel_sample(
-        &mut self,
+    fn evaluate_pixel_sample(
+        &self,
+        camera: &Camera,
         p_pixel: Point2i,
         sample_index: i32,
         sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
-    ) {
+    ) -> FilmSample {
         // Sample wavelengths for the ray
         let lu = if options.disable_wavelength_jitter {
             0.5
         } else {
             sampler.get_1d()
         };
-        let lambda = self.camera.get_film().sample_wavelengths(lu);
+        let lambda = camera.get_film_const().sample_wavelengths(lu);
 
         // Initialize camera_sample for the current sample
-        let filter = self.camera.get_film().get_filter();
+        let filter = camera.get_film_const().get_filter();
         let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
 
-        let camera_ray = self
-            .camera
-            .generate_ray_differential(&camera_sample, &lambda);
+        let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
 
         let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
             debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
@@ -338,7 +338,7 @@ impl RandomWalkIntegrator {
             // TODO increment number of camera rays (I think that's just useful for logging though)
 
             // Evaluate radiance along the camera ray
-            let visible_surface = if self.camera.get_film().uses_visible_surface() {
+            let visible_surface = if camera.get_film_const().uses_visible_surface() {
                 Some(VisibleSurface::default())
             } else {
                 None
@@ -371,14 +371,13 @@ impl RandomWalkIntegrator {
             )
         };
 
-        // Add the camera ray's contribution to the image.
-        self.camera.get_film().add_sample(
-            &p_pixel,
-            &l,
-            &lambda,
-            &visible_surface,
-            camera_sample.filter_weight,
-        );
+        FilmSample {
+            p_film: p_pixel,
+            l,
+            lambda,
+            visible_surface,
+            weight: camera_sample.filter_weight,
+        }
     }
 
     pub fn li(
@@ -457,4 +456,12 @@ impl RandomWalkIntegrator {
         le + fcos * self.li_random_walk(&ray, lambda, sampler, depth + 1, scratch_buffer, options)
             / (1.0 / (4.0 * PI_F))
     }
+}
+
+struct FilmSample {
+    p_film: Point2i,
+    l: SampledSpectrum,
+    lambda: SampledWavelengths,
+    visible_surface: Option<VisibleSurface>,
+    weight: Float,
 }
