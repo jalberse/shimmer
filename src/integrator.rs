@@ -1,3 +1,4 @@
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 
 use bumpalo::Bump;
@@ -100,35 +101,43 @@ impl IntegratorI for RandomWalkIntegrator {
         // TODO record pixel statistics option and other things PBRT handles here.
         // Not necessary for just getting a rendered image though.
 
-        let mut tiles = Tile::tile(pixel_bounds, 8, 8);
+        let tiles = Tile::tile(pixel_bounds, 8, 8);
 
         // TODO Add a progress reporter. Reference my old ray tracer.
         let scratch_buffer_tl = ThreadLocal::new();
         let sampler_tl = ThreadLocal::new();
         // Render in waves until the samples per pixel limit is reached.
         while wave_start < spp {
+            // TODO To avoid issues with concurrency, we might want to change our model.
+            // That could mean that our parallel iterations can become a map() to generate some new data,
+            // and then we apply that to the film rather than applying to the film within evaluate_pixel_sample(),
+            // similar to my previous ray tracer. This might be more "Rusty".
+
             tiles.par_iter().for_each(|tile| {
                 // TODO Be wary of allocating anything on the scratchbuffer that uses the
                 // heap to avoid memory leaks; it doesn't call their drop().
-                let mut scratch_buffer = scratch_buffer_tl.get_or(|| Bump::with_capacity(256));
-                let mut sampler = sampler_tl.get_or(|| self.sampler_prototype.clone());
+                let scratch_buffer =
+                    scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(256)));
+                let sampler = sampler_tl.get_or(|| RefCell::new(self.sampler_prototype.clone()));
 
                 for x in tile.bounds.min.x..tile.bounds.max.x {
                     for y in tile.bounds.min.y..tile.bounds.max.y {
                         let p_pixel = Point2i::new(x, y);
                         for sample_index in wave_start..wave_end {
-                            sampler.start_pixel_sample(p_pixel, sample_index, 0);
+                            sampler
+                                .borrow_mut()
+                                .start_pixel_sample(p_pixel, sample_index, 0);
                             self.evaluate_pixel_sample(
                                 p_pixel,
                                 sample_index,
-                                &mut sampler,
-                                &mut scratch_buffer,
+                                &mut sampler.borrow_mut(),
+                                &mut scratch_buffer.borrow_mut(),
                                 options,
                             );
                             // Note that this does not call drop() on anything allocated in
                             // the scratch buffer. If we allocate anything on the heap, we gotta clean
                             // that ourselves. This is where memory leaks can happen!
-                            scratch_buffer.reset();
+                            scratch_buffer.borrow_mut().reset();
                         }
                     }
                 }
