@@ -5,12 +5,9 @@
 // PBRT constructs with pointers first and then converts to a vec-based implementation.
 //   I could try to do the same I suppose, but I suspect we'll run into ownership issues.
 
-use std::{
-    rc::Rc,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 
 use itertools::{partition, Itertools};
@@ -546,7 +543,7 @@ impl BvhBuildNode {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{rc::Rc, sync::Arc};
 
     use float_cmp::assert_approx_eq;
 
@@ -577,8 +574,8 @@ mod tests {
         );
         let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
         let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
-        let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let prim = Arc::new(Primitive::Simple(SimplePrimitive {
             shape: Shape::Sphere(sphere),
             material,
         }));
@@ -605,8 +602,8 @@ mod tests {
         );
         let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
         let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
-        let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let prim = Arc::new(Primitive::Simple(SimplePrimitive {
             shape: Shape::Sphere(sphere),
             material,
         }));
@@ -648,8 +645,8 @@ mod tests {
             let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
             let kd =
                 crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-            let material = Rc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
-            let prim = Rc::new(Primitive::Simple(SimplePrimitive {
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let prim = Arc::new(Primitive::Simple(SimplePrimitive {
                 shape: Shape::Sphere(sphere),
                 material,
             }));
