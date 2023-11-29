@@ -24,6 +24,7 @@ pub mod material;
 pub mod math;
 pub mod medium;
 pub mod options;
+pub mod parser;
 pub mod primitive;
 pub mod ray;
 pub mod rgb_to_spectra;
