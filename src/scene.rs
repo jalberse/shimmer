@@ -15,6 +15,7 @@ use string_interner::symbol::SymbolUsize;
 /// It is used for the film, sampler, integrator, pixel filter, and accelerator,
 /// and is also used as a "base" for some of the other scene entity types.
 pub struct SceneEntity {
+    // TODO We will need to use a global StringInterner for this. We can use a Lazy one.
     name: SymbolUsize,
     loc: FileLoc,
     parameters: ParameterDictionary,

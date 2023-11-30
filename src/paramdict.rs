@@ -1,8 +1,11 @@
 use std::{fmt::Display, rc::Rc};
 
 use crate::{
+    color::RGB,
     colorspace::RgbColorSpace,
+    options::Options,
     parser::{FileLoc, ParsedParameterVector},
+    spectra::Spectrum,
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f},
     Float,
 };
@@ -206,11 +209,12 @@ pub struct ParsedParameter {
     bools: Vec<bool>,
     /// Used for code relating to extracting parameter values; used for error handling.
     looked_up: bool,
-    color_space: Option<Box<RgbColorSpace>>,
+    color_space: Option<Rc<RgbColorSpace>>,
     may_be_unused: bool,
 }
 
-enum SpectrumType {
+#[derive(Debug, Copy, Clone)]
+pub enum SpectrumType {
     Illuminant,
     Albedo,
     Unbounded,
@@ -326,6 +330,124 @@ impl ParameterDictionary {
             return P::convert(values.as_slice(), &p.loc);
         }
         default_value
+    }
+
+    pub fn get_one_float(&mut self, name: &str, default_value: Float) -> Float {
+        self.lookup_single::<FloatParam>(name, default_value)
+    }
+
+    pub fn get_one_int(&mut self, name: &str, default_value: i32) -> i32 {
+        self.lookup_single::<IntegerParam>(name, default_value)
+    }
+
+    pub fn get_one_bool(&mut self, name: &str, default_value: bool) -> bool {
+        self.lookup_single::<BooleanParam>(name, default_value)
+    }
+
+    pub fn get_one_point2f(&mut self, name: &str, default_value: Point2f) -> Point2f {
+        self.lookup_single::<Point2fParam>(name, default_value)
+    }
+
+    pub fn get_one_vector2f(&mut self, name: &str, default_value: Vector2f) -> Vector2f {
+        self.lookup_single::<Vector2fParam>(name, default_value)
+    }
+
+    pub fn get_one_vector3f(&mut self, name: &str, default_value: Vector3f) -> Vector3f {
+        self.lookup_single::<Vector3fParam>(name, default_value)
+    }
+
+    pub fn get_one_normal3f(&mut self, name: &str, default_value: Normal3f) -> Normal3f {
+        self.lookup_single::<Normal3fParam>(name, default_value)
+    }
+
+    pub fn get_one_string(&mut self, name: &str, default_value: String) -> String {
+        self.lookup_single::<StringParam>(name, default_value)
+    }
+
+    pub fn get_one_spectrum(
+        &mut self,
+        name: &str,
+        default_value: Spectrum,
+        spectrum_type: SpectrumType,
+    ) -> Spectrum {
+        let p = self.params.iter_mut().find(|p| p.name == name);
+        if let Some(p) = p {
+            let s = Self::extract_spectrum_array(p, spectrum_type, self.color_space);
+            if !s.is_empty() {
+                if s.len() > 1 {
+                    panic!(
+                        "{} More than one value provided for parameter {}",
+                        p.loc, p.name
+                    );
+                }
+                return s.into_iter().nth(0).expect("Expected non-empty vector");
+            }
+            default_value
+        } else {
+            default_value
+        }
+    }
+
+    fn extract_spectrum_array(
+        param: &mut ParsedParameter,
+        spectrum_type: SpectrumType,
+        color_space: Rc<RgbColorSpace>,
+    ) -> Vec<Spectrum> {
+        if param.param_type == "rgb" {
+            // TODO We could also handle "color" in this block with an upgrade option, but
+            //  I don't intend to use old PBRT scene files for now.
+
+            // TODO issue is that we can't take param.floats immutably, because we take param mutably, which includes param.floats.
+            //  But we also don't want to enforce that values must live inside param just because that's the case here...
+            // We could pass param as const I think and just change looked_up here.
+
+            return Self::return_array(
+                param.floats.as_slice(),
+                param,
+                3,
+                |v: &[Float], loc: &FileLoc| -> Spectrum {
+                    let rgb = RGB::new(v[0], v[1], v[2]);
+                    let cs = if let Some(cs) = param.color_space {
+                        cs.clone()
+                    } else {
+                        color_space
+                    };
+                    todo!()
+                },
+            );
+        }
+        // TODO other cases
+
+        todo!()
+    }
+
+    fn return_array<ValueType, ReturnType, C>(
+        values: &[ValueType],
+        param: &mut ParsedParameter,
+        n_per_item: i32,
+        convert: C,
+    ) -> Vec<ReturnType>
+    where
+        C: Fn(&[ValueType], &FileLoc) -> ReturnType,
+    {
+        if values.is_empty() {
+            panic!("{} No values provided for {}", param.loc, param.name);
+        }
+        if values.len() % n_per_item as usize != 0 {
+            panic!(
+                "{} Number of values provided for {} is not a multiple of {}",
+                param.loc, param.name, n_per_item
+            );
+        }
+
+        param.looked_up = true;
+        let n = values.len() / n_per_item as usize;
+
+        let mut v = Vec::with_capacity(n);
+        for i in 0..n {
+            v[i] = convert(&values[n_per_item as usize * i..], &param.loc);
+        }
+        v
     }
 }
 
