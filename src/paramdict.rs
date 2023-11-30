@@ -1,11 +1,15 @@
 use std::{fmt::Display, rc::Rc};
 
+use log::warn;
+
 use crate::{
     color::RGB,
     colorspace::RgbColorSpace,
     options::Options,
     parser::{FileLoc, ParsedParameterVector},
-    spectra::Spectrum,
+    spectra::{
+        spectrum::RgbIlluminantSpectrum, BlackbodySpectrum, PiecewiseLinearSpectrum, Spectrum,
+    },
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f},
     Float,
 };
@@ -372,7 +376,7 @@ impl ParameterDictionary {
     ) -> Spectrum {
         let p = self.params.iter_mut().find(|p| p.name == name);
         if let Some(p) = p {
-            let s = Self::extract_spectrum_array(p, spectrum_type, self.color_space);
+            let s = Self::extract_spectrum_array(p, spectrum_type, self.color_space.clone());
             if !s.is_empty() {
                 if s.len() > 1 {
                     panic!(
@@ -397,22 +401,75 @@ impl ParameterDictionary {
             // TODO We could also handle "color" in this block with an upgrade option, but
             //  I don't intend to use old PBRT scene files for now.
 
-            // TODO issue is that we can't take param.floats immutably, because we take param mutably, which includes param.floats.
-            //  But we also don't want to enforce that values must live inside param just because that's the case here...
-            // We could pass param as const I think and just change looked_up here.
-
             return Self::return_array(
                 param.floats.as_slice(),
-                param,
+                &param.loc,
+                &param.name,
+                &mut param.looked_up,
                 3,
-                |v: &[Float], loc: &FileLoc| -> Spectrum {
+                |v: &[Float], _loc: &FileLoc| -> Spectrum {
                     let rgb = RGB::new(v[0], v[1], v[2]);
-                    let cs = if let Some(cs) = param.color_space {
+                    let cs = if let Some(cs) = &param.color_space {
                         cs.clone()
                     } else {
-                        color_space
+                        color_space.clone()
                     };
-                    todo!()
+                    match spectrum_type {
+                        SpectrumType::Illuminant => {
+                            return Spectrum::RgbIlluminantSpectrum(RgbIlluminantSpectrum::new(
+                                &cs, &rgb,
+                            ));
+                        }
+                        SpectrumType::Albedo => todo!(),
+                        SpectrumType::Unbounded => todo!(),
+                    }
+                },
+            );
+        } else if param.param_type == "blackbody" {
+            return Self::return_array(
+                param.floats.as_slice(),
+                &param.loc,
+                &param.name,
+                &mut param.looked_up,
+                1,
+                |v: &[Float], _loc: &FileLoc| -> Spectrum {
+                    return Spectrum::Blackbody(BlackbodySpectrum::new(v[0]));
+                },
+            );
+        } else if param.param_type == "spectrum" && !param.floats.is_empty() {
+            if param.floats.len() % 2 != 0 {
+                panic!(
+                    "{} Found odd number of values for {}",
+                    param.loc, param.name
+                );
+            }
+            let n_samples = param.floats.len() / 2;
+            if n_samples == 1 {
+                warn!("{} {} Specified spectrum is only non-zero at a single wavelength; probably unintended", param.loc, param.name);
+            }
+            return Self::return_array(
+                param.floats.as_slice(),
+                &param.loc,
+                &param.name,
+                &mut param.looked_up,
+                param.floats.len() as i32,
+                |v: &[Float], _loc: &FileLoc| -> Spectrum {
+                    let mut lambda = vec![0.0; n_samples];
+                    let mut value = vec![0.0; n_samples];
+                    for i in 0..n_samples {
+                        if i > 0 && v[2 * i] <= lambda[i - 1] {
+                            panic!("{} Spectrum description invalid: at {}'th entry, wavelengths aren't increasing: {} >= {}", param.loc, i - 1, lambda[i -1], v[2 * i]);
+                        }
+                        lambda[i] = v[2 * i];
+                        value[i] = v[2 * i + 1];
+                    }
+                    // TODO We need to change new() to take a slice, not a fixed size array.
+                    // I thought it would always be known at compile-time, but it's not known here.
+                    // We can have debug assertions on length.
+                    return Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
+                        lambda.as_slice(),
+                        value.as_slice(),
+                    ));
                 },
             );
         }
@@ -423,7 +480,9 @@ impl ParameterDictionary {
 
     fn return_array<ValueType, ReturnType, C>(
         values: &[ValueType],
-        param: &mut ParsedParameter,
+        loc: &FileLoc,
+        name: &str,
+        looked_up: &mut bool,
         n_per_item: i32,
         convert: C,
     ) -> Vec<ReturnType>
@@ -431,21 +490,21 @@ impl ParameterDictionary {
         C: Fn(&[ValueType], &FileLoc) -> ReturnType,
     {
         if values.is_empty() {
-            panic!("{} No values provided for {}", param.loc, param.name);
+            panic!("{} No values provided for {}", loc, name);
         }
         if values.len() % n_per_item as usize != 0 {
             panic!(
                 "{} Number of values provided for {} is not a multiple of {}",
-                param.loc, param.name, n_per_item
+                loc, name, n_per_item
             );
         }
 
-        param.looked_up = true;
+        *looked_up = true;
         let n = values.len() / n_per_item as usize;
 
         let mut v = Vec::with_capacity(n);
         for i in 0..n {
-            v[i] = convert(&values[n_per_item as usize * i..], &param.loc);
+            v[i] = convert(&values[n_per_item as usize * i..], &loc);
         }
         v
     }
