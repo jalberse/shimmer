@@ -6,11 +6,26 @@
 
 // TODO Possibly use nom for parsing.
 
-use crate::{colorspace::RgbColorSpace, Float};
+use std::fmt::Display;
+
+use crate::{paramdict::ParsedParameter, Float};
 
 use arrayvec::ArrayVec;
 
-type ParsedParameterVector = ArrayVec<ParsedParameter, 8>;
+pub type ParsedParameterVector = ArrayVec<ParsedParameter, 8>;
+
+/// Used for error reporting to convey error locations in scene description files.
+pub struct FileLoc {
+    filename: String,
+    line: i32,
+    column: i32,
+}
+
+impl Display for FileLoc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} {}", self.filename, self.line, self.column)
+    }
+}
 
 pub trait ParserTarget {
     fn scale(&mut self, sx: Float, sy: Float, sz: Float, loc: FileLoc);
@@ -71,29 +86,4 @@ pub trait ParserTarget {
     fn object_end(&mut self, loc: FileLoc);
     fn object_instance(&mut self, name: &str, loc: FileLoc);
     fn end_of_files(&mut self);
-}
-
-/// Used for error reporting to convey error locations in scene description files.
-pub struct FileLoc {
-    filename: String,
-    line: i32,
-    column: i32,
-}
-
-pub struct ParsedParameter {
-    /// The name of the parameter, e.g. "radius"
-    name: String,
-    /// The type of the parameter; e.g. "float"
-    param_type: String,
-    /// The location in the file
-    loc: FileLoc,
-    // These store the parameter values
-    floats: Vec<Float>,
-    ints: Vec<i32>,
-    strings: Vec<String>,
-    bools: Vec<bool>,
-    /// Used for code relating to extracting parameter values; used for error handling.
-    looked_up: bool,
-    color_space: Option<Box<RgbColorSpace>>,
-    may_be_unused: bool,
 }
