@@ -18,6 +18,18 @@ pub enum NamedSpectrum {
     GlassBaf10,
 }
 
+impl NamedSpectrum {
+    pub fn from_str(name: &str) -> Option<NamedSpectrum> {
+        match name {
+            "StdIllum-D65" => Some(NamedSpectrum::StdIllumD65),
+            "illum-acesD60" => Some(NamedSpectrum::IllumAcesD60),
+            "glass-BK7" => Some(NamedSpectrum::GlassBk7),
+            "glass-baf10" => Some(NamedSpectrum::GlassBaf10),
+            _ => None,
+        }
+    }
+}
+
 // NOTE: These intentionally use static, not const.
 // const will compile, but will not work properly. See once_cell documentation.
 pub static STD_ILLUM_D65: Lazy<Spectrum> = Lazy::new(|| {

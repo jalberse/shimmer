@@ -8,7 +8,8 @@ use crate::{
     options::Options,
     parser::{FileLoc, ParsedParameterVector},
     spectra::{
-        spectrum::RgbIlluminantSpectrum, BlackbodySpectrum, PiecewiseLinearSpectrum, Spectrum,
+        named_spectrum, spectrum::RgbIlluminantSpectrum, BlackbodySpectrum, NamedSpectrum,
+        PiecewiseLinearSpectrum, Spectrum,
     },
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f},
     Float,
@@ -463,19 +464,37 @@ impl ParameterDictionary {
                         lambda[i] = v[2 * i];
                         value[i] = v[2 * i + 1];
                     }
-                    // TODO We need to change new() to take a slice, not a fixed size array.
-                    // I thought it would always be known at compile-time, but it's not known here.
-                    // We can have debug assertions on length.
                     return Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
                         lambda.as_slice(),
                         value.as_slice(),
                     ));
                 },
             );
-        }
-        // TODO other cases
+        } else if param.param_type == "spectrum" && !param.strings.is_empty() {
+            return Self::return_array(
+                param.strings.as_slice(),
+                &param.loc,
+                &param.name,
+                &mut param.looked_up,
+                1,
+                |s: &[String], loc: &FileLoc| -> Spectrum {
+                    let named_spectrum = NamedSpectrum::from_str(&s[0]);
+                    if let Some(named_spectrum) = named_spectrum {
+                        // TODO the static refrence here is awkward.
+                        // Maybe this needs to return a Vec<Arc<Spectrum>> and
+                        // the get_named_spectrum (and the file loading one)
+                        // return an Arc, not a reference.
+                        return Spectrum::get_named_spectrum(named_spectrum);
+                    }
 
-        todo!()
+                    // TODO The other case - reading from file.
+                    //  Note that we can implement cachedSpectra as a Lazy hash map.
+                    todo!()
+                },
+            );
+        } else {
+            return Vec::new();
+        }
     }
 
     fn return_array<ValueType, ReturnType, C>(

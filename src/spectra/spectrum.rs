@@ -89,17 +89,6 @@ impl SpectrumI for Spectrum {
 impl Spectrum {
     /// Gets a lazily-evaluated named spectrum.
     pub fn get_named_spectrum(spectrum: NamedSpectrum) -> &'static Spectrum {
-        // TODO Maybe for this, rather than using once_cell, could we use static RwLock?
-        // https://www.cs.brandeis.edu/~cs146a/rust/doc-02-21-2015/std/sync/struct.StaticRwLock.html
-        // Since RwLock and Mutex are now const functions, we can define them as static during compile time,
-        // as long as the code involved can also be const.
-        // This way we don't need lazy evaluation, we can do it at compile time.
-        // Plus, I think it might be more efficient than the match, but that's not so important.
-
-        // PAPERDOC Embedded spectral data 4.5.3.
-        // Instead of a map on string keys (which requires evaluating the hash),
-        // we use an Enum with the names and match on it and return ref to static-lifetimed
-        // spectra. These are thread-safe read-only single-instance objects.
         match spectrum {
             NamedSpectrum::StdIllumD65 => Lazy::force(&super::named_spectrum::STD_ILLUM_D65),
             NamedSpectrum::IllumAcesD60 => Lazy::force(&super::named_spectrum::ILLUM_ACES_D60),
@@ -237,14 +226,8 @@ pub struct PiecewiseLinearSpectrum {
 impl PiecewiseLinearSpectrum {
     /// Creates a piecewise linear spectrum from associated lambdas and values;
     /// these slices must be sorted.
-    pub fn new<const N: usize>(
-        lambdas: &[Float; N],
-        values: &[Float; N],
-    ) -> PiecewiseLinearSpectrum {
-        // PAPERDOC I think this is a good way to ensure lambdas.len() == values.len() at compile-time,
-        // rather than a runtime check as in PBRTv4. I'll need to see how it fairs in practice.
-        // I think you can do this in C++ too though.
-
+    pub fn new(lambdas: &[Float], values: &[Float]) -> PiecewiseLinearSpectrum {
+        debug_assert!(lambdas.len() == values.len());
         // TODO This follows PBRT, which also makes a copy; could it be beneficial to take ownership instead?
         // Note that we're taking a slice, which is read-only, so we perform a copy here.
         let mut l = vec![0.0; lambdas.len()];
@@ -302,7 +285,7 @@ impl PiecewiseLinearSpectrum {
         // let's do this for now.
         // TODO switch off of interleaved data structures so we can just use one value N.
         // This means changing the named spectra to have separate lambda and value arrays.
-        let mut spectrum = PiecewiseLinearSpectrum::new::<S>(
+        let mut spectrum = PiecewiseLinearSpectrum::new(
             lambda.as_slice().try_into().expect("Invalid length"),
             v.as_slice().try_into().expect("Invalid length"),
         );
