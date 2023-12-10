@@ -1,13 +1,15 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     color::{RgbSigmoidPolynomial, RGB},
     colorspace::RgbColorSpace,
+    file::read_float_file,
     math::{self, lerp},
     spectra::cie::{CIE, CIE_Y_INTEGRAL},
     Float,
 };
 
+use log::warn;
 use once_cell::sync::Lazy;
 
 use super::{
@@ -87,13 +89,39 @@ impl SpectrumI for Spectrum {
 }
 
 impl Spectrum {
+    pub fn read_from_file(
+        filename: &str,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Option<Arc<Spectrum>> {
+        // TODO sanitize/resolve filename with search directory?
+        let spectrum = cached_spectra.get(filename);
+        if let Some(spectrum) = spectrum {
+            return Some(spectrum.clone());
+        }
+
+        let pls = PiecewiseLinearSpectrum::read(filename);
+        if let Some(pls) = pls {
+            let spectrum = Arc::new(pls);
+            cached_spectra.insert(filename.to_string(), spectrum.clone());
+            Some(spectrum)
+        } else {
+            None
+        }
+    }
+
     /// Gets a lazily-evaluated named spectrum.
-    pub fn get_named_spectrum(spectrum: NamedSpectrum) -> &'static Spectrum {
+    pub fn get_named_spectrum(spectrum: NamedSpectrum) -> Arc<Spectrum> {
         match spectrum {
-            NamedSpectrum::StdIllumD65 => Lazy::force(&super::named_spectrum::STD_ILLUM_D65),
-            NamedSpectrum::IllumAcesD60 => Lazy::force(&super::named_spectrum::ILLUM_ACES_D60),
-            NamedSpectrum::GlassBk7 => Lazy::force(&super::named_spectrum::GLASS_BK7_ETA),
-            NamedSpectrum::GlassBaf10 => Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA),
+            NamedSpectrum::StdIllumD65 => {
+                Lazy::force(&super::named_spectrum::STD_ILLUM_D65).clone()
+            }
+            NamedSpectrum::IllumAcesD60 => {
+                Lazy::force(&super::named_spectrum::ILLUM_ACES_D60).clone()
+            }
+            NamedSpectrum::GlassBk7 => Lazy::force(&super::named_spectrum::GLASS_BK7_ETA).clone(),
+            NamedSpectrum::GlassBaf10 => {
+                Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA).clone()
+            }
         }
     }
 
@@ -277,14 +305,6 @@ impl PiecewiseLinearSpectrum {
             v.push(*v.last().unwrap());
         }
 
-        // PAPERDOC Interesting callsite as we enforce the slices must have the same length N.
-        // Note that N must propagate up through this function, then; but that should be okay for our case.
-        // This is enabled by const generics, which were added recently (in 2022?) to Rust.
-        // Note that the N, S arrangement is a bit awkward - but that could be avoided
-        // by not interleaving the data, which would honestly be better. But for convenience,
-        // let's do this for now.
-        // TODO switch off of interleaved data structures so we can just use one value N.
-        // This means changing the named spectra to have separate lambda and value arrays.
         let mut spectrum = PiecewiseLinearSpectrum::new(
             lambda.as_slice().try_into().expect("Invalid length"),
             v.as_slice().try_into().expect("Invalid length"),
@@ -301,6 +321,34 @@ impl PiecewiseLinearSpectrum {
         }
 
         spectrum
+    }
+
+    pub fn read(filename: &str) -> Option<Spectrum> {
+        let vals = read_float_file(filename);
+        if vals.is_empty() {
+            warn!("Unable to read spectrum file: {}", filename);
+            return None;
+        }
+
+        if vals.len() % 2 != 0 {
+            warn!("Extra value found in spectrum file: {}", filename);
+            return None;
+        }
+
+        let mut lambda: Vec<Float> = Vec::new();
+        let mut v: Vec<Float> = Vec::new();
+        for i in 0..(vals.len() / 2) {
+            if i > 0 && vals[2 * i] <= *lambda.last().unwrap() {
+                warn!("{}: Spectrum file invalid at the {} entry, wavelengths not increasing {} >= {}", filename, i, *lambda.last().unwrap(), vals[2* i]);
+                return None;
+            }
+            lambda.push(vals[2 * i]);
+            v.push(vals[2 * i + 1]);
+        }
+        Some(Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum {
+            lambdas: lambda,
+            values: v,
+        }))
     }
 
     pub fn scale(&mut self, s: Float) {

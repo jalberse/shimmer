@@ -16,26 +16,17 @@ pub enum CIE {
 }
 
 pub static X: Lazy<Spectrum> = Lazy::new(|| {
-    let xpls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new::<NUM_CIE_SAMPLES>(
-        &CIE_LAMBDA,
-        &CIE_X,
-    ));
+    let xpls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(&CIE_LAMBDA, &CIE_X));
     Spectrum::DenselySampled(DenselySampledSpectrum::new(&xpls))
 });
 
 pub static Y: Lazy<Spectrum> = Lazy::new(|| {
-    let ypls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new::<NUM_CIE_SAMPLES>(
-        &CIE_LAMBDA,
-        &CIE_Y,
-    ));
+    let ypls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(&CIE_LAMBDA, &CIE_Y));
     Spectrum::DenselySampled(DenselySampledSpectrum::new(&ypls))
 });
 
 pub static Z: Lazy<Spectrum> = Lazy::new(|| {
-    let zpls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new::<NUM_CIE_SAMPLES>(
-        &CIE_LAMBDA,
-        &CIE_Z,
-    ));
+    let zpls = Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(&CIE_LAMBDA, &CIE_Z));
     Spectrum::DenselySampled(DenselySampledSpectrum::new(&zpls))
 });
 

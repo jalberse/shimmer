@@ -9,6 +9,7 @@ pub mod color;
 pub mod colorspace;
 pub mod compensated_float;
 pub mod direction_cone;
+mod file;
 pub mod film;
 pub mod filter;
 pub mod float;

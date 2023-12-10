@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 /// Provides named spectra.
 /// Largely separated from the spectrum module to isolate large amounts of embedded
 /// data in its own file; this and spectrum should be re-exported to the top of the
@@ -32,31 +34,27 @@ impl NamedSpectrum {
 
 // NOTE: These intentionally use static, not const.
 // const will compile, but will not work properly. See once_cell documentation.
-pub static STD_ILLUM_D65: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<214, 107>(
-        &CIE_ILLUM_D6500,
-        true,
+pub static STD_ILLUM_D65: Lazy<Arc<Spectrum>> = Lazy::new(|| {
+    Arc::new(Spectrum::PiecewiseLinear(
+        PiecewiseLinearSpectrum::from_interleaved::<214, 107>(&CIE_ILLUM_D6500, true),
     ))
 });
 
-pub static ILLUM_ACES_D60: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<214, 107>(
-        &ACES_ILLUM_D60,
-        true,
+pub static ILLUM_ACES_D60: Lazy<Arc<Spectrum>> = Lazy::new(|| {
+    Arc::new(Spectrum::PiecewiseLinear(
+        PiecewiseLinearSpectrum::from_interleaved::<214, 107>(&ACES_ILLUM_D60, true),
     ))
 });
 
-pub static GLASS_BK7_ETA: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<58, 24>(
-        &GLASS_BK7_ETA_SAMPLES,
-        false,
+pub static GLASS_BK7_ETA: Lazy<Arc<Spectrum>> = Lazy::new(|| {
+    Arc::new(Spectrum::PiecewiseLinear(
+        PiecewiseLinearSpectrum::from_interleaved::<58, 24>(&GLASS_BK7_ETA_SAMPLES, false),
     ))
 });
 
-pub static GLASS_BAF10_ETA: Lazy<Spectrum> = Lazy::new(|| {
-    Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::from_interleaved::<54, 27>(
-        &GLASS_BAF10_ETA_SAMPLES,
-        false,
+pub static GLASS_BAF10_ETA: Lazy<Arc<Spectrum>> = Lazy::new(|| {
+    Arc::new(Spectrum::PiecewiseLinear(
+        PiecewiseLinearSpectrum::from_interleaved::<54, 27>(&GLASS_BAF10_ETA_SAMPLES, false),
     ))
 });
 

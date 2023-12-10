@@ -117,7 +117,7 @@ pub static SRGB: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
         Point2f::new(0.64, 0.33),
         Point2f::new(0.3, 0.6),
         Point2f::new(0.15, 0.06),
-        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::StdIllumD65),
+        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::StdIllumD65).as_ref(),
         Gamut::SRGB,
     ))
 });
@@ -127,7 +127,7 @@ pub static REC_2020: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
         Point2f::new(0.708, 0.292),
         Point2f::new(0.170, 0.797),
         Point2f::new(0.131, 0.046),
-        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::StdIllumD65),
+        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::StdIllumD65).as_ref(),
         Gamut::Rec2020,
     ))
 });
@@ -137,7 +137,7 @@ pub static ACES2065_1: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
         Point2f::new(0.7347, 0.2653),
         Point2f::new(0.0, 1.0),
         Point2f::new(0.0001, -0.077),
-        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::IllumAcesD60),
+        Spectrum::get_named_spectrum(crate::spectra::NamedSpectrum::IllumAcesD60).as_ref(),
         Gamut::Aces2065_1,
     ))
 });

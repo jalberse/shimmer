@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{collections::HashMap, fmt::Display, rc::Rc, sync::Arc};
 
 use log::warn;
 
@@ -8,8 +8,9 @@ use crate::{
     options::Options,
     parser::{FileLoc, ParsedParameterVector},
     spectra::{
-        named_spectrum, spectrum::RgbIlluminantSpectrum, BlackbodySpectrum, NamedSpectrum,
-        PiecewiseLinearSpectrum, Spectrum,
+        named_spectrum,
+        spectrum::{RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum},
+        BlackbodySpectrum, NamedSpectrum, PiecewiseLinearSpectrum, Spectrum,
     },
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f},
     Float,
@@ -374,10 +375,16 @@ impl ParameterDictionary {
         name: &str,
         default_value: Spectrum,
         spectrum_type: SpectrumType,
-    ) -> Spectrum {
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Arc<Spectrum> {
         let p = self.params.iter_mut().find(|p| p.name == name);
         if let Some(p) = p {
-            let s = Self::extract_spectrum_array(p, spectrum_type, self.color_space.clone());
+            let s = Self::extract_spectrum_array(
+                p,
+                spectrum_type,
+                self.color_space.clone(),
+                cached_spectra,
+            );
             if !s.is_empty() {
                 if s.len() > 1 {
                     panic!(
@@ -387,9 +394,9 @@ impl ParameterDictionary {
                 }
                 return s.into_iter().nth(0).expect("Expected non-empty vector");
             }
-            default_value
+            Arc::new(default_value)
         } else {
-            default_value
+            Arc::new(default_value)
         }
     }
 
@@ -397,7 +404,8 @@ impl ParameterDictionary {
         param: &mut ParsedParameter,
         spectrum_type: SpectrumType,
         color_space: Rc<RgbColorSpace>,
-    ) -> Vec<Spectrum> {
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Vec<Arc<Spectrum>> {
         if param.param_type == "rgb" {
             // TODO We could also handle "color" in this block with an upgrade option, but
             //  I don't intend to use old PBRT scene files for now.
@@ -408,21 +416,39 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 3,
-                |v: &[Float], _loc: &FileLoc| -> Spectrum {
+                |v: &[Float], loc: &FileLoc| -> Arc<Spectrum> {
                     let rgb = RGB::new(v[0], v[1], v[2]);
                     let cs = if let Some(cs) = &param.color_space {
                         cs.clone()
                     } else {
                         color_space.clone()
                     };
+                    if rgb.r < 0.0 || rgb.g < 0.0 || rgb.b < 0.0 {
+                        panic!(
+                            "{} RGB Parameter {} has negative component",
+                            loc, param.name
+                        );
+                    }
                     match spectrum_type {
                         SpectrumType::Illuminant => {
-                            return Spectrum::RgbIlluminantSpectrum(RgbIlluminantSpectrum::new(
-                                &cs, &rgb,
+                            return Arc::new(Spectrum::RgbIlluminantSpectrum(
+                                RgbIlluminantSpectrum::new(&cs, &rgb),
                             ));
                         }
-                        SpectrumType::Albedo => todo!(),
-                        SpectrumType::Unbounded => todo!(),
+                        SpectrumType::Albedo => {
+                            if rgb.r > 1.0 || rgb.g > 1.0 || rgb.b > 1.0 {
+                                panic!(
+                                    "{} RGB Parameter {} has component value > 1.0",
+                                    loc, param.name
+                                );
+                            }
+                            Arc::new(Spectrum::RgbAlbedoSpectrum(RgbAlbedoSpectrum::new(
+                                &cs, &rgb,
+                            )))
+                        }
+                        SpectrumType::Unbounded => Arc::new(Spectrum::RgbUnboundedSpectrum(
+                            RgbUnboundedSpectrum::new(&cs, &rgb),
+                        )),
                     }
                 },
             );
@@ -433,8 +459,8 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 1,
-                |v: &[Float], _loc: &FileLoc| -> Spectrum {
-                    return Spectrum::Blackbody(BlackbodySpectrum::new(v[0]));
+                |v: &[Float], _loc: &FileLoc| -> Arc<Spectrum> {
+                    return Arc::new(Spectrum::Blackbody(BlackbodySpectrum::new(v[0])));
                 },
             );
         } else if param.param_type == "spectrum" && !param.floats.is_empty() {
@@ -454,7 +480,7 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 param.floats.len() as i32,
-                |v: &[Float], _loc: &FileLoc| -> Spectrum {
+                |v: &[Float], _loc: &FileLoc| -> Arc<Spectrum> {
                     let mut lambda = vec![0.0; n_samples];
                     let mut value = vec![0.0; n_samples];
                     for i in 0..n_samples {
@@ -464,10 +490,10 @@ impl ParameterDictionary {
                         lambda[i] = v[2 * i];
                         value[i] = v[2 * i + 1];
                     }
-                    return Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
+                    return Arc::new(Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
                         lambda.as_slice(),
                         value.as_slice(),
-                    ));
+                    )));
                 },
             );
         } else if param.param_type == "spectrum" && !param.strings.is_empty() {
@@ -477,19 +503,17 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 1,
-                |s: &[String], loc: &FileLoc| -> Spectrum {
+                |s: &[String], loc: &FileLoc| -> Arc<Spectrum> {
                     let named_spectrum = NamedSpectrum::from_str(&s[0]);
                     if let Some(named_spectrum) = named_spectrum {
-                        // TODO the static refrence here is awkward.
-                        // Maybe this needs to return a Vec<Arc<Spectrum>> and
-                        // the get_named_spectrum (and the file loading one)
-                        // return an Arc, not a reference.
                         return Spectrum::get_named_spectrum(named_spectrum);
                     }
 
-                    // TODO The other case - reading from file.
-                    //  Note that we can implement cachedSpectra as a Lazy hash map.
-                    todo!()
+                    let spd = Spectrum::read_from_file(&s[0], cached_spectra);
+                    if spd.is_none() {
+                        panic!("{} Unable to read/invalid spectrum file {}", &s[0], loc);
+                    }
+                    return spd.unwrap();
                 },
             );
         } else {
@@ -503,10 +527,10 @@ impl ParameterDictionary {
         name: &str,
         looked_up: &mut bool,
         n_per_item: i32,
-        convert: C,
+        mut convert: C,
     ) -> Vec<ReturnType>
     where
-        C: Fn(&[ValueType], &FileLoc) -> ReturnType,
+        C: FnMut(&[ValueType], &FileLoc) -> ReturnType,
     {
         if values.is_empty() {
             panic!("{} No values provided for {}", loc, name);
@@ -526,6 +550,57 @@ impl ParameterDictionary {
             v[i] = convert(&values[n_per_item as usize * i..], &loc);
         }
         v
+    }
+
+    fn lookup_array<P: ParameterType>(&mut self, name: &str) -> Vec<P::ReturnType> {
+        for p in &mut self.params {
+            if p.name == name || p.param_type == P::TYPE_NAME {
+                let mut looked_up = p.looked_up;
+                let to_return = Self::return_array(
+                    P::get_values(p),
+                    &p.loc,
+                    &p.name,
+                    &mut looked_up,
+                    P::N_PER_ITEM,
+                    P::convert,
+                );
+                p.looked_up = looked_up;
+                return to_return;
+            }
+        }
+        Vec::new()
+    }
+
+    fn get_float_array(&mut self, name: &str) -> Vec<Float> {
+        self.lookup_array::<FloatParam>(name)
+    }
+
+    fn get_int_array(&mut self, name: &str) -> Vec<i32> {
+        self.lookup_array::<IntegerParam>(name)
+    }
+
+    fn get_bool_array(&mut self, name: &str) -> Vec<bool> {
+        self.lookup_array::<BooleanParam>(name)
+    }
+
+    fn get_point2f_array(&mut self, name: &str) -> Vec<Point2f> {
+        self.lookup_array::<Point2fParam>(name)
+    }
+
+    fn get_vector2f_array(&mut self, name: &str) -> Vec<Vector2f> {
+        self.lookup_array::<Vector2fParam>(name)
+    }
+
+    fn get_point3f_array(&mut self, name: &str) -> Vec<Point3f> {
+        self.lookup_array::<Point3fParam>(name)
+    }
+
+    fn get_vector3f_array(&mut self, name: &str) -> Vec<Vector3f> {
+        self.lookup_array::<Vector3fParam>(name)
+    }
+
+    fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
+        self.lookup_array::<Normal3fParam>(name)
     }
 }
 
