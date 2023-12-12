@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use crate::{
     camera::CameraTransform,
@@ -15,7 +15,7 @@ use string_interner::{symbol::SymbolU32, StringInterner};
 pub struct BasicScene {
     pub integrator: SceneEntity,
     pub accelerator: SceneEntity,
-    pub film_color_space: Rc<RgbColorSpace>,
+    pub film_color_space: Arc<RgbColorSpace>,
     pub shapes: Vec<ShapeSceneEntity>,
     pub instances: Vec<InstanceSceneEntity>,
     pub instance_definitions: Vec<InstanceDefinitionSceneEntity>,
@@ -59,7 +59,8 @@ impl BasicScene {
             film.loc,
         );
 
-        // TODO the rest of this
+        // TODO the rest of this, we're working on Film::create() right now though
+
         BasicScene {
             integrator: integ,
             accelerator: accel,
@@ -92,8 +93,8 @@ pub enum MaterialRef {
 
 pub struct ShapeSceneEntity {
     base: SceneEntity,
-    render_from_object: Rc<Transform>,
-    object_from_render: Rc<Transform>,
+    render_from_object: Arc<Transform>,
+    object_from_render: Arc<Transform>,
     reverse_orientation: bool,
     material_ref: MaterialRef,
     light_index: i32,

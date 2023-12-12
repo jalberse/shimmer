@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use log::warn;
+use log::{error, warn};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -100,16 +100,18 @@ impl Film {
         exposure_time: Float,
         camera_transform: &CameraTransform,
         filter: Filter,
-        loc: FileLoc,
+        loc: &FileLoc,
+        options: &Options,
     ) -> Film {
         match name {
-            "rgb" => RgbFilm::create(
+            "rgb" => Film::RgbFilm(RgbFilm::create(
                 parameters,
                 exposure_time,
                 filter,
                 parameters.color_space,
                 loc,
-            ),
+                options,
+            )),
             _ => panic!("{} Unknown film type {}", loc, name),
         }
     }
@@ -219,7 +221,7 @@ struct FilmBaseParameters {
     pixel_bounds: Bounds2i,
     filter: Filter,
     diagonal: Float,
-    // TODO should be a pointer instead maybe?
+    // TODO should be an RC pointer instead maybe?
     sensor: PixelSensor,
     filename: String,
 }
@@ -227,9 +229,9 @@ struct FilmBaseParameters {
 impl FilmBaseParameters {
     pub fn create(
         parameters: &ParameterDictionary,
-        filter: &Filter,
-        sensor: &PixelSensor,
-        loc: FileLoc,
+        filter: Filter,
+        sensor: PixelSensor,
+        loc: &FileLoc,
         options: &Options,
     ) -> FilmBaseParameters {
         let filename = parameters.get_one_string("filename", "".to_string());
@@ -245,13 +247,169 @@ impl FilmBaseParameters {
             filename
         };
 
-        // TODO starting with fullscreen
+        // TODO Fullscreen option, if we get to GUI.
+        let full_resolution = Point2i::new(
+            parameters.get_one_int("xresolution", 1280),
+            parameters.get_one_int("yresolution", 720),
+        );
 
-        todo!()
+        let full_resolution = if options.quick_render {
+            Point2i::new(
+                i32::max(1, full_resolution.x / 4),
+                i32::max(1, full_resolution.y / 4),
+            )
+        } else {
+            full_resolution
+        };
+
+        let pixel_bounds = Bounds2i::new(Point2i::ZERO, full_resolution);
+
+        let pb = parameters.get_int_array("pixelbounds");
+        let pixel_bounds = if let Some(new_bounds) = options.pixel_bounds {
+            let intersect = new_bounds
+                .intersect(&pixel_bounds)
+                .expect("Pixel bounds extend past image!");
+            if intersect != new_bounds {
+                warn!(
+                    "{} Supplied pixel bounds extend beyond image, clamping",
+                    loc
+                );
+            }
+            if !pb.is_empty() {
+                warn!(
+                    "{} Both pixel bounds and crop window are specified; using crop window",
+                    loc
+                );
+            }
+            intersect
+        } else if !pb.is_empty() {
+            if pb.len() != 4 {
+                panic!(
+                    "{} Too many values ({}) supplied for pixel bounds, expected 4",
+                    loc,
+                    pb.len()
+                );
+            }
+            let new_bounds = Bounds2i::new(Point2i::new(pb[0], pb[2]), Point2i::new(pb[1], pb[3]));
+            let intersect = new_bounds
+                .intersect(&pixel_bounds)
+                .expect("Supplied bounds do not intersect with image!");
+            if intersect != new_bounds {
+                warn!(
+                    "{} Supplied pixel bounds extend beyond image resolution, clamping.",
+                    loc
+                );
+            }
+            intersect
+        } else {
+            pixel_bounds
+        };
+
+        // Compute pixel bounds based on crop
+        let cr = parameters.get_float_array("cropwindow");
+        let pixel_bounds = if let Some(crop) = options.crop_window {
+            let crop = if crop
+                .intersect(&Bounds2f::new(Point2f::ZERO, Point2f::ONE))
+                .expect("Expected some overlap")
+                != crop
+            {
+                error!(
+                    "{} Film crop window is not in [0,1]; did you mean to use pixel_bounds instead? Clamping to valid range.",
+                    loc
+                );
+                crop.intersect(&Bounds2f::new(Point2f::ZERO, Point2f::ONE))
+                    .expect("Expected some overlap")
+            } else {
+                crop
+            };
+            if !cr.is_empty() {
+                warn!(
+                    "{} Crop window on command line will override the one in the file",
+                    loc
+                );
+            }
+            if options.pixel_bounds.is_some() || !pb.is_empty() {
+                warn!(
+                    "{} Both pixel bounds and crop window specified; using crop window",
+                    loc
+                );
+            }
+            Bounds2i::new(
+                Point2i::new(
+                    Float::ceil(full_resolution.x as Float * crop.min.x) as i32,
+                    Float::ceil(full_resolution.y as Float * crop.min.y) as i32,
+                ),
+                Point2i::new(
+                    Float::ceil(full_resolution.x as Float * crop.max.x) as i32,
+                    Float::ceil(full_resolution.y as Float * crop.max.y) as i32,
+                ),
+            )
+        } else if !cr.is_empty() {
+            if options.pixel_bounds.is_some() {
+                warn!(
+                    "{} Ignoring cropwindow since pixel bounds were specified on command line",
+                    loc
+                );
+                pixel_bounds
+            } else if cr.len() == 4 {
+                if !pb.is_empty() {
+                    warn!(
+                        "{} Both pixel bounds and crop window specified; using crop window",
+                        loc
+                    );
+                }
+
+                let crop = Bounds2f::new(
+                    Point2f::new(
+                        Float::clamp(Float::min(cr[0], cr[1]), 0.0, 1.0),
+                        Float::clamp(Float::max(cr[0], cr[1]), 0.0, 1.0),
+                    ),
+                    Point2f::new(
+                        Float::clamp(Float::min(cr[2], cr[3]), 0.0, 1.0),
+                        Float::clamp(Float::max(cr[2], cr[3]), 0.0, 1.0),
+                    ),
+                );
+
+                Bounds2i::new(
+                    Point2i::new(
+                        Float::ceil(full_resolution.x as Float * crop.min.x) as i32,
+                        Float::ceil(full_resolution.y as Float * crop.min.y) as i32,
+                    ),
+                    Point2i::new(
+                        Float::ceil(full_resolution.x as Float * crop.max.x) as i32,
+                        Float::ceil(full_resolution.y as Float * crop.max.y) as i32,
+                    ),
+                )
+            } else {
+                error!(
+                    "{} {} Values provided for cropwindow, expected 4.",
+                    loc,
+                    cr.len()
+                );
+                pixel_bounds
+            }
+        } else {
+            pixel_bounds
+        };
+
+        if pixel_bounds.is_empty() {
+            panic!("{} Degenerate pixel bounds provided to film", loc);
+        }
+
+        let diagonal = parameters.get_one_float("diagonal", 35.0);
+
+        FilmBaseParameters {
+            full_resolution,
+            pixel_bounds,
+            filter,
+            diagonal,
+            sensor,
+            filename,
+        }
     }
 }
 
-// Other structs wihch implement FilmI can have a FilmBase which
+// Other structs which implement FilmI can have a FilmBase which
 // implements shared functionality.
 #[derive(Debug)]
 struct FilmBase {
@@ -264,7 +422,6 @@ struct FilmBase {
 }
 
 impl FilmBase {
-    // TODO I think that the PixelSensor might need to become an Rc pointer.
     pub fn new(
         full_resolution: Point2i,
         pixel_bounds: Bounds2i,
@@ -329,18 +486,21 @@ struct RgbFilmPixel {
 impl RgbFilm {
     pub fn create(
         parameters: &ParameterDictionary,
+        exposure_time: Float,
         filter: Filter,
         color_space: Arc<RgbColorSpace>,
         loc: &FileLoc,
+        options: &Options,
     ) -> RgbFilm {
         let max_component_value = parameters.get_one_float("maxcomponentvalue", Float::INFINITY);
         let write_fp16 = parameters.get_one_bool("savefp16", true);
 
-        let sensor = PixelSensor::create(parameters, colorspace, exposure_time, loc);
+        let sensor = PixelSensor::create(parameters, color_space, exposure_time, loc);
 
-        // TODO Create the RgbFilm. We probably want to refactor to use FilmBaseParamters, since the parsing
-        // for that from the ParameterDictionary is useful to share...
+        let film_base_parameters =
+            FilmBaseParameters::create(parameters, filter, sensor, loc, options);
 
+        // TODO Instantiate the RgbFilm. Need to refactor its constructor to take FilmBaseParamters.
         todo!()
     }
 
@@ -620,7 +780,6 @@ impl PixelSensor {
 
         let imaging_ratio = exposure_time * iso / 100.0;
 
-        // TODO d illum based on temperature
         let white_balance_temp_to_pass = if white_balance_temp != 0.0 {
             6500.0
         } else {

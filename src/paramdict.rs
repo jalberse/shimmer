@@ -215,7 +215,7 @@ pub struct ParsedParameter {
     bools: Vec<bool>,
     /// Used for code relating to extracting parameter values; used for error handling.
     looked_up: bool,
-    color_space: Option<Rc<RgbColorSpace>>,
+    color_space: Option<Arc<RgbColorSpace>>,
     may_be_unused: bool,
 }
 
@@ -243,7 +243,7 @@ impl Display for SpectrumType {
 /// Thus, it is the class that is used for SceneEntity::parameters.
 pub struct ParameterDictionary {
     pub params: ParsedParameterVector,
-    pub color_space: Rc<RgbColorSpace>,
+    pub color_space: Arc<RgbColorSpace>,
     pub n_owned_params: i32,
 }
 
@@ -251,7 +251,7 @@ impl ParameterDictionary {
     /// The RGBColorSpace defines the color space of any RGB-valued parameters.
     pub fn new(
         params: ParsedParameterVector,
-        color_space: Rc<RgbColorSpace>,
+        color_space: Arc<RgbColorSpace>,
     ) -> ParameterDictionary {
         let n_owned_params = params.len() as i32;
         // TODO PBRT reverses params; why?
@@ -403,7 +403,7 @@ impl ParameterDictionary {
     fn extract_spectrum_array(
         param: &mut ParsedParameter,
         spectrum_type: SpectrumType,
-        color_space: Rc<RgbColorSpace>,
+        color_space: Arc<RgbColorSpace>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     ) -> Vec<Arc<Spectrum>> {
         if param.param_type == "rgb" {
@@ -571,35 +571,35 @@ impl ParameterDictionary {
         Vec::new()
     }
 
-    fn get_float_array(&mut self, name: &str) -> Vec<Float> {
+    pub fn get_float_array(&mut self, name: &str) -> Vec<Float> {
         self.lookup_array::<FloatParam>(name)
     }
 
-    fn get_int_array(&mut self, name: &str) -> Vec<i32> {
+    pub fn get_int_array(&mut self, name: &str) -> Vec<i32> {
         self.lookup_array::<IntegerParam>(name)
     }
 
-    fn get_bool_array(&mut self, name: &str) -> Vec<bool> {
+    pub fn get_bool_array(&mut self, name: &str) -> Vec<bool> {
         self.lookup_array::<BooleanParam>(name)
     }
 
-    fn get_point2f_array(&mut self, name: &str) -> Vec<Point2f> {
+    pub fn get_point2f_array(&mut self, name: &str) -> Vec<Point2f> {
         self.lookup_array::<Point2fParam>(name)
     }
 
-    fn get_vector2f_array(&mut self, name: &str) -> Vec<Vector2f> {
+    pub fn get_vector2f_array(&mut self, name: &str) -> Vec<Vector2f> {
         self.lookup_array::<Vector2fParam>(name)
     }
 
-    fn get_point3f_array(&mut self, name: &str) -> Vec<Point3f> {
+    pub fn get_point3f_array(&mut self, name: &str) -> Vec<Point3f> {
         self.lookup_array::<Point3fParam>(name)
     }
 
-    fn get_vector3f_array(&mut self, name: &str) -> Vec<Vector3f> {
+    pub fn get_vector3f_array(&mut self, name: &str) -> Vec<Vector3f> {
         self.lookup_array::<Vector3fParam>(name)
     }
 
-    fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
+    pub fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
         self.lookup_array::<Normal3fParam>(name)
     }
 }
