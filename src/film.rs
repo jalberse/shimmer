@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
 };
 
+use log::warn;
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -14,6 +15,7 @@ use crate::{
     image::{Image, ImageMetadata, PixelFormat},
     interaction::SurfaceInteraction,
     math::linear_least_squares_3,
+    options::Options,
     paramdict::ParameterDictionary,
     parser::{self, FileLoc},
     spectra::{
@@ -209,6 +211,43 @@ impl FilmI for Film {
         match self {
             Film::RgbFilm(f) => f.get_filename(),
         }
+    }
+}
+
+struct FilmBaseParameters {
+    full_resolution: Point2i,
+    pixel_bounds: Bounds2i,
+    filter: Filter,
+    diagonal: Float,
+    // TODO should be a pointer instead maybe?
+    sensor: PixelSensor,
+    filename: String,
+}
+
+impl FilmBaseParameters {
+    pub fn create(
+        parameters: &ParameterDictionary,
+        filter: &Filter,
+        sensor: &PixelSensor,
+        loc: FileLoc,
+        options: &Options,
+    ) -> FilmBaseParameters {
+        let filename = parameters.get_one_string("filename", "".to_string());
+        let filename = if options.image_file.is_empty() {
+            if !filename.is_empty() {
+                warn!("Output filename supploed on command line {} will override filename in scene description file {}", options.image_file, filename);
+            }
+            options.image_file
+        } else if filename.is_empty() {
+            // TODO Change this to .exr when I add exr support
+            "shimmer.pfm".to_string()
+        } else {
+            filename
+        };
+
+        // TODO starting with fullscreen
+
+        todo!()
     }
 }
 

@@ -10,6 +10,7 @@ pub struct Options {
     pub disable_pixel_jitter: bool,
     pub disable_wavelength_jitter: bool,
     pub force_diffuse: bool,
+    pub image_file: String,
 }
 
 impl Default for Options {
@@ -20,6 +21,7 @@ impl Default for Options {
             disable_pixel_jitter: false,
             disable_wavelength_jitter: false,
             force_diffuse: false,
+            image_file: "".to_string(),
         }
     }
 }
