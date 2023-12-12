@@ -7,18 +7,21 @@ use once_cell::sync::Lazy;
 
 use crate::{
     bounding_box::{Bounds2f, Bounds2i},
+    camera::CameraTransform,
     color::{white_balance, RGB, XYZ},
     colorspace::RgbColorSpace,
     filter::{Filter, FilterI},
     image::{Image, ImageMetadata, PixelFormat},
     interaction::SurfaceInteraction,
     math::linear_least_squares_3,
+    paramdict::ParameterDictionary,
+    parser::{self, FileLoc},
     spectra::{
         inner_product,
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{SpectrumI, LAMBDA_MAX, LAMBDA_MIN},
-        DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum,
+        DenselySampledSpectrum, NamedSpectrum, PiecewiseLinearSpectrum, Spectrum,
     },
     square_matrix::SquareMatrix,
     vec2d::Vec2d,
@@ -88,7 +91,27 @@ pub enum Film {
     RgbFilm(RgbFilm),
 }
 
-impl Film {}
+impl Film {
+    pub fn create(
+        name: &str,
+        parameters: &ParameterDictionary,
+        exposure_time: Float,
+        camera_transform: &CameraTransform,
+        filter: Filter,
+        loc: FileLoc,
+    ) -> Film {
+        match name {
+            "rgb" => RgbFilm::create(
+                parameters,
+                exposure_time,
+                filter,
+                parameters.color_space,
+                loc,
+            ),
+            _ => panic!("{} Unknown film type {}", loc, name),
+        }
+    }
+}
 
 impl FilmI for Film {
     fn add_sample(
@@ -265,6 +288,23 @@ struct RgbFilmPixel {
 }
 
 impl RgbFilm {
+    pub fn create(
+        parameters: &ParameterDictionary,
+        filter: Filter,
+        color_space: Arc<RgbColorSpace>,
+        loc: &FileLoc,
+    ) -> RgbFilm {
+        let max_component_value = parameters.get_one_float("maxcomponentvalue", Float::INFINITY);
+        let write_fp16 = parameters.get_one_bool("savefp16", true);
+
+        let sensor = PixelSensor::create(parameters, colorspace, exposure_time, loc);
+
+        // TODO Create the RgbFilm. We probably want to refactor to use FilmBaseParamters, since the parsing
+        // for that from the ParameterDictionary is useful to share...
+
+        todo!()
+    }
+
     pub fn new(
         full_resolution: Point2i,
         pixel_bounds: Bounds2i,
@@ -521,6 +561,58 @@ pub struct PixelSensor {
 }
 
 impl PixelSensor {
+    pub fn create(
+        parameters: &ParameterDictionary,
+        colorspace: Arc<RgbColorSpace>,
+        exposure_time: Float,
+        loc: &FileLoc,
+    ) -> PixelSensor {
+        let iso = parameters.get_one_float("iso", 100.0);
+        let white_balance_temp = parameters.get_one_float("whitebalance", 0.0);
+        let sensor_name = parameters.get_one_string("sensor", "cie1931".to_string());
+
+        // Pass through 0 for cie1931 if it's unspecified so that it doesn't do any white balancing.
+        // For actual sensors, 6500 is the default
+        let white_balance_temp = if sensor_name != "cie1931" && white_balance_temp == 0.0 {
+            6500.0
+        } else {
+            white_balance_temp
+        };
+
+        let imaging_ratio = exposure_time * iso / 100.0;
+
+        // TODO d illum based on temperature
+        let white_balance_temp_to_pass = if white_balance_temp != 0.0 {
+            6500.0
+        } else {
+            white_balance_temp
+        };
+
+        let d_illum = DenselySampledSpectrum::d(white_balance_temp_to_pass);
+        let sensor_illum = if white_balance_temp != 0.0 {
+            Some(Spectrum::DenselySampled(d_illum))
+        } else {
+            None
+        };
+
+        if sensor_name == "cie1931" {
+            PixelSensor::new(&colorspace, &sensor_illum, imaging_ratio)
+        } else {
+            let r = Spectrum::get_named_spectrum(
+                NamedSpectrum::from_str(&(sensor_name + "_r")).expect("{} Unknown sensor type"),
+            );
+            let g = Spectrum::get_named_spectrum(
+                NamedSpectrum::from_str(&(sensor_name + "_g")).expect("{} Unknown sensor type"),
+            );
+            let b = Spectrum::get_named_spectrum(
+                NamedSpectrum::from_str(&(sensor_name + "_b")).expect("{} Unknown sensor type"),
+            );
+
+            // TODO TODO Should we handle None sensor_illum differently?
+            PixelSensor::new_with_rgb(r, g, b, &colorspace, &sensor_illum.unwrap(), imaging_ratio)
+        }
+    }
+
     /// Uses the XYZ matching functions for the pixel sensor's spectral response curves.
     /// This is a reasonable default.
     /// sensor_illum: If None is provided, no white balancing is done (it can be done in post-processing).
@@ -549,9 +641,9 @@ impl PixelSensor {
 
     /// Creates a new sensor given the RGB response curves.
     pub fn new_with_rgb(
-        r: &Spectrum,
-        g: &Spectrum,
-        b: &Spectrum,
+        r: Arc<Spectrum>,
+        g: Arc<Spectrum>,
+        b: Arc<Spectrum>,
         output_colorspace: &RgbColorSpace,
         sensor_illum: &Spectrum,
         imaging_ratio: Float,
@@ -579,7 +671,7 @@ impl PixelSensor {
 
         // compute xyz_output values for training swatches
         let mut xyz_output = [[0.0; 3]; NUM_SWATCH_REFLECTANCES];
-        let sensor_white_g = inner_product(sensor_illum, g);
+        let sensor_white_g = inner_product(sensor_illum, g.as_ref());
         let sensor_white_y = inner_product(sensor_illum, Spectrum::get_cie(crate::spectra::CIE::Y));
         for i in 0..NUM_SWATCH_REFLECTANCES {
             let s = &SWATCH_REFLECTANCES[i];

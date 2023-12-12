@@ -1,12 +1,76 @@
 use std::rc::Rc;
 
 use crate::{
+    camera::CameraTransform,
     colorspace::RgbColorSpace,
+    film::Film,
+    filter::Filter,
     paramdict::ParameterDictionary,
     parser::{FileLoc, ParsedParameterVector, ParserTarget},
+    transform::Transform,
 };
 
-use string_interner::symbol::SymbolUsize;
+use string_interner::{symbol::SymbolU32, StringInterner};
+
+pub struct BasicScene {
+    pub integrator: SceneEntity,
+    pub accelerator: SceneEntity,
+    pub film_color_space: Rc<RgbColorSpace>,
+    pub shapes: Vec<ShapeSceneEntity>,
+    pub instances: Vec<InstanceSceneEntity>,
+    pub instance_definitions: Vec<InstanceDefinitionSceneEntity>,
+    film: Film,
+}
+
+impl BasicScene {
+    pub fn new(
+        filter: SceneEntity,
+        film: SceneEntity,
+        camera: CameraSceneEntity,
+        sampler: SceneEntity,
+        integ: SceneEntity,
+        accel: SceneEntity,
+        string_interner: StringInterner,
+    ) -> BasicScene {
+        let filt = Filter::create(
+            &string_interner
+                .resolve(filter.name)
+                .expect("Unresolved name!"),
+            &filter.parameters,
+            &filter.loc,
+        );
+
+        let exposure_time = camera.base.parameters.get_one_float("shutterclose", 1.0)
+            - camera.base.parameters.get_one_float("shutteropen", 0.0);
+
+        if exposure_time <= 0.0 {
+            panic!(
+                "{} The specified camera shutter times imply the camera won't open.",
+                camera.base.loc
+            );
+        }
+
+        let concrete_film = Film::create(
+            &string_interner.resolve(film.name).unwrap(),
+            &film.parameters,
+            exposure_time,
+            &camera.camera_transform,
+            filt,
+            film.loc,
+        );
+
+        // TODO the rest of this
+        BasicScene {
+            integrator: integ,
+            accelerator: accel,
+            film_color_space: film.parameters.color_space.clone(),
+            shapes: (),
+            instances: (),
+            instance_definitions: (),
+            film: concrete_film,
+        }
+    }
+}
 
 /// All objects in the scene are described by various *Entity classes.
 /// The SceneEntity is the simplest; it records the name of the entity,
@@ -16,9 +80,52 @@ use string_interner::symbol::SymbolUsize;
 /// and is also used as a "base" for some of the other scene entity types.
 pub struct SceneEntity {
     // TODO We will need to use a global StringInterner for this. We can use a Lazy one.
-    name: SymbolUsize,
+    name: SymbolU32,
     loc: FileLoc,
     parameters: ParameterDictionary,
+}
+
+pub enum MaterialRef {
+    Index(i32),
+    Name(String),
+}
+
+pub struct ShapeSceneEntity {
+    base: SceneEntity,
+    render_from_object: Rc<Transform>,
+    object_from_render: Rc<Transform>,
+    reverse_orientation: bool,
+    material_ref: MaterialRef,
+    light_index: i32,
+    inside_medium: String,
+    outside_medium: String,
+}
+
+pub struct CameraSceneEntity {
+    base: SceneEntity,
+    camera_transform: CameraTransform,
+    // TODO medium: String,
+}
+
+pub struct TransformedSceneEntity {
+    base: SceneEntity,
+    // TODO this may need to be an AnimatedTransform
+    render_from_object: Transform,
+}
+
+pub struct InstanceSceneEntity {
+    name: SymbolU32,
+    loc: FileLoc,
+    render_from_instance: Transform,
+    // TODO Possibly aniamted transform
+}
+
+pub struct InstanceDefinitionSceneEntity {
+    // TODO we will need a stringinterner on this, same as in SceneEntity
+    name: SymbolU32,
+    loc: FileLoc,
+    shapes: Vec<ShapeSceneEntity>,
+    // TODO aniamted_shapes: Vec<AnimatedShapeSceneEntity>,
 }
 
 pub struct BasicSceneBuilder {}

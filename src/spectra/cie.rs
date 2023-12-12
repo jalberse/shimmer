@@ -6,6 +6,7 @@ use super::{DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum};
 use crate::Float;
 
 pub const NUM_CIE_SAMPLES: usize = 471;
+pub const NUM_CIES_SAMPLES: usize = 107;
 
 pub const CIE_Y_INTEGRAL: Float = 106.856895;
 

@@ -5,7 +5,10 @@ use crate::{
     colorspace::RgbColorSpace,
     file::read_float_file,
     math::{self, lerp},
-    spectra::cie::{CIE, CIE_Y_INTEGRAL},
+    spectra::{
+        cie::{CIE, CIE_Y_INTEGRAL, NUM_CIE_SAMPLES},
+        named_spectrum::{CIE_S0, CIE_S1, CIE_S2, CIE_S_LAMBDA},
+    },
     Float,
 };
 
@@ -205,6 +208,53 @@ impl DenselySampledSpectrum {
             lambda_min: lambda_min as i32,
             lambda_max: lambda_max as i32,
         }
+    }
+
+    pub fn d(temperature: Float) -> DenselySampledSpectrum {
+        // Convert temperature to cct
+        let cct = temperature * 1.4388 / 1.4380;
+
+        if cct < 4000.0 {
+            // CIE D ill-defined, use blackbody
+            let bb = BlackbodySpectrum::new(cct);
+            let blackbody = DenselySampledSpectrum::sample_function(
+                |lambda: Float| bb.get(lambda),
+                LAMBDA_MIN as usize,
+                LAMBDA_MAX as usize,
+            );
+            return blackbody;
+        }
+
+        // Convert CCT to xy
+        let x = if cct <= 7000.0 {
+            -4.607 * 1e9 / Float::powi(cct, 3)
+                + 2.9678 * 1e6 / cct * cct
+                + 0.09911 * 1e3 / cct
+                + 0.244063
+        } else {
+            -2.0064 * 1e9 / Float::powi(cct, 3)
+                + 1.9018 * 1e6 / cct * cct
+                + 0.24748 * 1e3 / cct
+                + 0.23704
+        };
+        let y = -3.0 * x * x + 2.870 * x - 0.275;
+
+        // Interpolate D spectrum
+        let m = 0.0241 + 0.2562 * x - 0.7341 * y;
+        let m1 = (-1.3515 - 1.7703 * x + 5.9114 * y) / m;
+        let m2 = (0.0300 - 31.4424 * x + 30.0717 * y) / m;
+
+        let mut values: Vec<Float> = Vec::with_capacity(NUM_CIE_SAMPLES);
+        for i in 0..NUM_CIE_SAMPLES {
+            values.push((CIE_S0[i] + CIE_S1[i] * m1 + CIE_S2[i] * m2) * 0.01);
+        }
+
+        let dpls = &Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
+            CIE_S_LAMBDA.as_slice(),
+            values.as_slice(),
+        ));
+
+        DenselySampledSpectrum::new(dpls)
     }
 }
 

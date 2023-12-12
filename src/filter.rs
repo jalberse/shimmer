@@ -1,5 +1,7 @@
 use crate::{
     math::lerp,
+    paramdict::ParameterDictionary,
+    parser::FileLoc,
     vecmath::{Point2f, Tuple2, Vector2f},
     Float,
 };
@@ -17,6 +19,15 @@ pub trait FilterI {
 #[derive(Debug)]
 pub enum Filter {
     BoxFilter(BoxFilter),
+}
+
+impl Filter {
+    pub fn create(name: &str, parameters: &ParameterDictionary, loc: &FileLoc) -> Filter {
+        match name {
+            "box" => Filter::BoxFilter(BoxFilter::create(parameters, loc)),
+            _ => panic!("Unknown filter type!"),
+        }
+    }
 }
 
 impl FilterI for Filter {
@@ -54,6 +65,14 @@ pub struct BoxFilter {
 }
 
 impl BoxFilter {
+    pub fn create(parameters: &ParameterDictionary, loc: &FileLoc) -> BoxFilter {
+        let xw = parameters.get_one_float("xradius", 0.5);
+        let yw = parameters.get_one_float("yradius", 0.5);
+        BoxFilter {
+            radius: Vector2f { x: xw, y: yw },
+        }
+    }
+
     pub fn new(radius: Vector2f) -> BoxFilter {
         BoxFilter { radius }
     }

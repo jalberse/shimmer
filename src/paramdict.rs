@@ -242,9 +242,9 @@ impl Display for SpectrumType {
 /// ParameterDictionary adds both semantics and convenience to vectors of ParsedParameters.
 /// Thus, it is the class that is used for SceneEntity::parameters.
 pub struct ParameterDictionary {
-    params: ParsedParameterVector,
-    color_space: Rc<RgbColorSpace>,
-    n_owned_params: i32,
+    pub params: ParsedParameterVector,
+    pub color_space: Rc<RgbColorSpace>,
+    pub n_owned_params: i32,
 }
 
 impl ParameterDictionary {
