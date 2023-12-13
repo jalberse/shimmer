@@ -17,7 +17,7 @@ use crate::{
     math::linear_least_squares_3,
     options::Options,
     paramdict::ParameterDictionary,
-    parser::{self, FileLoc},
+    parser::FileLoc,
     spectra::{
         inner_product,
         sampled_spectrum::SampledSpectrum,
@@ -500,8 +500,17 @@ impl RgbFilm {
         let film_base_parameters =
             FilmBaseParameters::create(parameters, filter, sensor, loc, options);
 
-        // TODO Instantiate the RgbFilm. Need to refactor its constructor to take FilmBaseParamters.
-        todo!()
+        RgbFilm::new(
+            film_base_parameters.full_resolution,
+            film_base_parameters.pixel_bounds,
+            film_base_parameters.filter,
+            film_base_parameters.diagonal,
+            film_base_parameters.sensor,
+            &film_base_parameters.filename,
+            color_space,
+            max_component_value,
+            write_fp16,
+        )
     }
 
     pub fn new(

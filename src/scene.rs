@@ -5,6 +5,7 @@ use crate::{
     colorspace::RgbColorSpace,
     film::Film,
     filter::Filter,
+    options::Options,
     paramdict::ParameterDictionary,
     parser::{FileLoc, ParsedParameterVector, ParserTarget},
     transform::Transform,
@@ -31,6 +32,7 @@ impl BasicScene {
         integ: SceneEntity,
         accel: SceneEntity,
         string_interner: StringInterner,
+        options: &Options,
     ) -> BasicScene {
         let filt = Filter::create(
             &string_interner
@@ -56,7 +58,8 @@ impl BasicScene {
             exposure_time,
             &camera.camera_transform,
             filt,
-            film.loc,
+            &film.loc,
+            options,
         );
 
         // TODO the rest of this, we're working on Film::create() right now though
