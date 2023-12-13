@@ -96,7 +96,7 @@ pub enum Film {
 impl Film {
     pub fn create(
         name: &str,
-        parameters: &ParameterDictionary,
+        parameters: &mut ParameterDictionary,
         exposure_time: Float,
         camera_transform: &CameraTransform,
         filter: Filter,
@@ -108,7 +108,7 @@ impl Film {
                 parameters,
                 exposure_time,
                 filter,
-                parameters.color_space,
+                parameters.color_space.clone(),
                 loc,
                 options,
             )),
@@ -228,7 +228,7 @@ struct FilmBaseParameters {
 
 impl FilmBaseParameters {
     pub fn create(
-        parameters: &ParameterDictionary,
+        parameters: &mut ParameterDictionary,
         filter: Filter,
         sensor: PixelSensor,
         loc: &FileLoc,
@@ -239,7 +239,7 @@ impl FilmBaseParameters {
             if !filename.is_empty() {
                 warn!("Output filename supploed on command line {} will override filename in scene description file {}", options.image_file, filename);
             }
-            options.image_file
+            options.image_file.clone()
         } else if filename.is_empty() {
             // TODO Change this to .exr when I add exr support
             "shimmer.pfm".to_string()
@@ -485,7 +485,7 @@ struct RgbFilmPixel {
 
 impl RgbFilm {
     pub fn create(
-        parameters: &ParameterDictionary,
+        parameters: &mut ParameterDictionary,
         exposure_time: Float,
         filter: Filter,
         color_space: Arc<RgbColorSpace>,
@@ -495,7 +495,7 @@ impl RgbFilm {
         let max_component_value = parameters.get_one_float("maxcomponentvalue", Float::INFINITY);
         let write_fp16 = parameters.get_one_bool("savefp16", true);
 
-        let sensor = PixelSensor::create(parameters, color_space, exposure_time, loc);
+        let sensor = PixelSensor::create(parameters, color_space.clone(), exposure_time, loc);
 
         let film_base_parameters =
             FilmBaseParameters::create(parameters, filter, sensor, loc, options);
@@ -770,7 +770,7 @@ pub struct PixelSensor {
 
 impl PixelSensor {
     pub fn create(
-        parameters: &ParameterDictionary,
+        parameters: &mut ParameterDictionary,
         colorspace: Arc<RgbColorSpace>,
         exposure_time: Float,
         loc: &FileLoc,
@@ -806,10 +806,12 @@ impl PixelSensor {
             PixelSensor::new(&colorspace, &sensor_illum, imaging_ratio)
         } else {
             let r = Spectrum::get_named_spectrum(
-                NamedSpectrum::from_str(&(sensor_name + "_r")).expect("{} Unknown sensor type"),
+                NamedSpectrum::from_str(&(sensor_name.clone() + "_r"))
+                    .expect("{} Unknown sensor type"),
             );
             let g = Spectrum::get_named_spectrum(
-                NamedSpectrum::from_str(&(sensor_name + "_g")).expect("{} Unknown sensor type"),
+                NamedSpectrum::from_str(&(sensor_name.clone() + "_g"))
+                    .expect("{} Unknown sensor type"),
             );
             let b = Spectrum::get_named_spectrum(
                 NamedSpectrum::from_str(&(sensor_name + "_b")).expect("{} Unknown sensor type"),

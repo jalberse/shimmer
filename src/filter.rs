@@ -22,7 +22,7 @@ pub enum Filter {
 }
 
 impl Filter {
-    pub fn create(name: &str, parameters: &ParameterDictionary, loc: &FileLoc) -> Filter {
+    pub fn create(name: &str, parameters: &mut ParameterDictionary, loc: &FileLoc) -> Filter {
         match name {
             "box" => Filter::BoxFilter(BoxFilter::create(parameters, loc)),
             _ => panic!("Unknown filter type!"),
@@ -65,7 +65,7 @@ pub struct BoxFilter {
 }
 
 impl BoxFilter {
-    pub fn create(parameters: &ParameterDictionary, loc: &FileLoc) -> BoxFilter {
+    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> BoxFilter {
         let xw = parameters.get_one_float("xradius", 0.5);
         let yw = parameters.get_one_float("yradius", 0.5);
         BoxFilter {

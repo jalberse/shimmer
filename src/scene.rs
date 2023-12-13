@@ -25,10 +25,10 @@ pub struct BasicScene {
 
 impl BasicScene {
     pub fn new(
-        filter: SceneEntity,
-        film: SceneEntity,
-        camera: CameraSceneEntity,
-        sampler: SceneEntity,
+        mut filter: SceneEntity,
+        mut film: SceneEntity,
+        mut camera: CameraSceneEntity,
+        mut sampler: SceneEntity,
         integ: SceneEntity,
         accel: SceneEntity,
         string_interner: StringInterner,
@@ -38,8 +38,8 @@ impl BasicScene {
             &string_interner
                 .resolve(filter.name)
                 .expect("Unresolved name!"),
-            &filter.parameters,
-            &filter.loc,
+            &mut filter.parameters,
+            &mut filter.loc,
         );
 
         let exposure_time = camera.base.parameters.get_one_float("shutterclose", 1.0)
@@ -54,7 +54,7 @@ impl BasicScene {
 
         let concrete_film = Film::create(
             &string_interner.resolve(film.name).unwrap(),
-            &film.parameters,
+            &mut film.parameters,
             exposure_time,
             &camera.camera_transform,
             filt,
@@ -62,17 +62,16 @@ impl BasicScene {
             options,
         );
 
-        // TODO the rest of this, we're working on Film::create() right now though
-
-        BasicScene {
-            integrator: integ,
-            accelerator: accel,
-            film_color_space: film.parameters.color_space.clone(),
-            shapes: (),
-            instances: (),
-            instance_definitions: (),
-            film: concrete_film,
-        }
+        todo!()
+        //BasicScene {
+        //    integrator: integ,
+        //    accelerator: accel,
+        //    film_color_space: film.parameters.color_space.clone(),
+        //    shapes: (),
+        //    instances: (),
+        //    instance_definitions: (),
+        //    film: concrete_film,
+        //}
     }
 }
 
