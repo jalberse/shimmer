@@ -21,7 +21,10 @@ use crate::{
     primitive::{Primitive, PrimitiveI},
     ray::{Ray, RayDifferential},
     sampler::{Sampler, SamplerI},
-    sampling::{get_camera_sample, sample_uniform_sphere},
+    sampling::{
+        get_camera_sample, sample_uniform_hemisphere, sample_uniform_sphere,
+        uniform_hemisphere_pdf, uniform_sphere_pdf,
+    },
     shape::ShapeIntersection,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     vecmath::{vector::Vector3, HasNan, Length, Point2i, Tuple2, Vector3f},
@@ -579,8 +582,9 @@ impl SimplePathTracer {
                 }
             }
 
-            // TODO Sample outgoing direction at intersection to continue path.
+            // Sample outgoing direction at intersection to continue path.
             if self.sample_bsdf {
+                // Sample BSDF for new path direction
                 let u = sampler.get_1d();
                 let bs = bsdf.sample_f(
                     wo,
@@ -595,16 +599,44 @@ impl SimplePathTracer {
                 let bs = bs.unwrap();
                 beta *= bs.f * bs.wi.abs_dot_normal(&isect.shading.n) / bs.pdf;
                 specular_bounce = bs.is_specular();
-                ray = isect.spawn_ray(&bs.wi);
+                *ray = isect.interaction.spawn_ray(bs.wi);
             } else {
-                todo!()
+                // Uniformly sample sphere or hemisphere to get new path direction
+                let flags = bsdf.flags();
+                let (pdf, wi) = if flags.is_reflective() && flags.is_transmissive() {
+                    let wi = sample_uniform_sphere(sampler.get_2d());
+                    let pdf = uniform_sphere_pdf();
+                    (pdf, wi)
+                } else {
+                    let wi = sample_uniform_hemisphere(sampler.get_2d());
+                    let pdf = uniform_hemisphere_pdf();
+                    let wi = if (flags.is_reflective()
+                        && wo.dot_normal(&isect.interaction.n)
+                            * wi.dot_normal(&isect.interaction.n)
+                            < 0.0)
+                        || (flags.is_transmissive()
+                            && wo.dot_normal(&isect.interaction.n)
+                                * wi.dot_normal(&isect.interaction.n)
+                                > 0.0)
+                    {
+                        -wi
+                    } else {
+                        wi
+                    };
+                    (pdf, wi)
+                };
+                beta *= bsdf
+                    .f(wo, wi, crate::bxdf::TransportMode::Radiance)
+                    .unwrap()
+                    * wi.abs_dot_normal(&isect.shading.n)
+                    / pdf;
+                specular_bounce = false;
+                *ray = isect.interaction.spawn_ray(wi);
             }
 
-            // TODO the rest here...
+            debug_assert!(beta.y(lambda) >= 0.0);
+            debug_assert!(beta.y(lambda).is_finite());
         }
-
-        todo!()
-
-        // TODO We want to finish Li, and then work up to tiled etc. Will need to share code, work that out.
+        l
     }
 }

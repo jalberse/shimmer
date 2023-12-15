@@ -66,6 +66,7 @@ impl Interaction {
     }
 
     pub fn spawn_ray(&self, d: Vector3f) -> RayDifferential {
+        // TODO get_medium() here.
         let ray = Ray::new(self.offset_ray_origin(d), d, None);
         RayDifferential {
             ray,
