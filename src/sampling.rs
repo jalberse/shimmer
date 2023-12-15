@@ -4,7 +4,7 @@ use crate::{
     camera::CameraSample,
     filter::{Filter, FilterI},
     float::{next_float_down, Float, PI_F},
-    math::{lerp, safe_sqrt, DifferenceOfProducts, INV_2PI, INV_PI, PI_OVER_2, PI_OVER_4},
+    math::{lerp, safe_sqrt, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4},
     options::Options,
     sampler::SamplerI,
     vecmath::{
@@ -117,6 +117,10 @@ pub fn sample_uniform_sphere(u: Point2f) -> Vector3f {
         y: r * Float::sin(phi),
         z,
     }
+}
+
+pub fn uniform_sphere_pdf() -> Float {
+    INV_4PI
 }
 
 pub fn sample_uniform_hemisphere(u: Point2f) -> Vector3f {
