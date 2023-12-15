@@ -46,9 +46,9 @@ pub trait LightI {
     /// the sampled point.
     fn sample_li(
         &self,
-        ctx: LightSampleContext,
+        ctx: &LightSampleContext,
         u: Point2f,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
         allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample>;
 
@@ -56,7 +56,7 @@ pub trait LightI {
     /// Assumes that a ray from ctx in the direction wi has already been found to intersect
     /// the light source. PDF is measured w.r.t. solid angle; 0 if the light is described
     /// by a Dirac delta function.
-    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float;
+    fn pdf_li(&self, ctx: &LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float;
 
     /// For area light sources, finds the radiance that is emitted back along the ray.
     /// Takes information about the intersection point and the outgoing direction.
@@ -111,9 +111,9 @@ impl LightI for Light {
 
     fn sample_li(
         &self,
-        ctx: LightSampleContext,
+        ctx: &LightSampleContext,
         u: Point2f,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
         allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
         match self {
@@ -122,7 +122,7 @@ impl LightI for Light {
         }
     }
 
-    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float {
+    fn pdf_li(&self, ctx: &LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float {
         match self {
             Light::Point(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
             Light::DiffuseAreaLight(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
@@ -234,9 +234,9 @@ impl LightI for PointLight {
     // entry point for the light interface.
     fn sample_li(
         &self,
-        ctx: LightSampleContext,
+        ctx: &LightSampleContext,
         _u: Point2f,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
         _allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
         let p = self.base.render_from_light.apply(&Point3f::ZERO);
@@ -257,7 +257,7 @@ impl LightI for PointLight {
 
     fn pdf_li(
         &self,
-        _ctx: LightSampleContext,
+        _ctx: &LightSampleContext,
         _wi: Vector3f,
         _allow_incomplete_pdf: bool,
     ) -> Float {
@@ -340,9 +340,9 @@ impl LightI for DiffuseAreaLight {
 
     fn sample_li(
         &self,
-        ctx: LightSampleContext,
+        ctx: &LightSampleContext,
         u: Point2f,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
         _allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
         let shape_ctx = ShapeSampleContext::new(ctx.pi, ctx.n, ctx.ns, 0.0);
@@ -368,7 +368,7 @@ impl LightI for DiffuseAreaLight {
         Some(LightLiSample::new(le, wi, ss.pdf, ss.intr))
     }
 
-    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, _allow_incomplete_pdf: bool) -> Float {
+    fn pdf_li(&self, ctx: &LightSampleContext, wi: Vector3f, _allow_incomplete_pdf: bool) -> Float {
         let shape_ctx = ShapeSampleContext::new(ctx.pi, ctx.n, ctx.ns, 0.0);
         self.shape.pdf_with_context(&shape_ctx, wi)
     }

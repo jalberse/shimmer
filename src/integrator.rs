@@ -9,11 +9,14 @@ use thread_local::ThreadLocal;
 
 use crate::{
     bounding_box::Bounds2i,
+    bxdf::BxDFReflTransFlags,
     camera::{Camera, CameraI},
     film::{FilmI, VisibleSurface},
     float::PI_F,
     image::ImageMetadata,
-    light::{Light, LightI, LightType},
+    interaction::Interaction,
+    light::{Light, LightI, LightSampleContext, LightType},
+    light_sampler::{LightSamplerI, UniformLightSampler},
     options::Options,
     primitive::{Primitive, PrimitiveI},
     ray::{Ray, RayDifferential},
@@ -25,7 +28,13 @@ use crate::{
     Float,
 };
 
-// TODO In places where PBRT uses a ScatchBuffer, I think that an Arena Allocator is a good Rust alternative.
+struct FilmSample {
+    p_film: Point2i,
+    l: SampledSpectrum,
+    lambda: SampledWavelengths,
+    visible_surface: Option<VisibleSurface>,
+    weight: Float,
+}
 
 pub trait IntegratorI {
     fn render(&mut self, options: &Options);
@@ -72,9 +81,15 @@ impl IntegratorBase {
     /// intersection, rather than information about the intersection. Potentially
     /// more efficient if only the existence of an intersection is needed.
     /// Useful for shadow rays.
+    const SHADOW_EPISLON: f32 = 0.0001;
+
     pub fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         debug_assert!(ray.d != Vector3f::ZERO);
         self.aggregate.intersect_predicate(ray, t_max)
+    }
+
+    pub fn unoccluded(&self, p0: &Interaction, p1: &Interaction) -> bool {
+        !self.intersect_predicate(&p0.spawn_ray_to_interaction(p1), 1.0 - Self::SHADOW_EPISLON)
     }
 }
 
@@ -458,10 +473,138 @@ impl RandomWalkIntegrator {
     }
 }
 
-struct FilmSample {
-    p_film: Point2i,
-    l: SampledSpectrum,
-    lambda: SampledWavelengths,
-    visible_surface: Option<VisibleSurface>,
-    weight: Float,
+/// A step up from a RandomWalkIntegrator.
+/// The PathIntegrator is better when efficiency is important.
+/// This is useful for debugging and for validating the implementation of sampling algorithms.
+/// For example, it can be configured to use BSDFs’ sampling methods or to use uniform directional sampling;
+/// given a sufficient number of samples, both approaches should converge to the same result
+/// (assuming that the BSDF is not perfect specular).
+/// If they do not, the error is presumably in the BSDF sampling code.
+/// Light sampling techniques can be tested in a similar fashion.
+pub struct SimplePathTracer {
+    max_depth: i32,
+    /// Determines whether lights’ SampleLi() methods should be used to sample direct illumination or
+    /// whether illumination should only be found by rays randomly intersecting emissive surfaces,
+    /// as was done in the RandomWalkIntegrator.
+    sample_lights: bool,
+    /// Determines whether BSDFs’ Sample_f() methods should be used to sample directions or whether
+    /// uniform directional sampling should be used.
+    sample_bsdf: bool,
+    light_sampler: UniformLightSampler,
+
+    // TODO Below here we should share with ImageTileIntegrator and Integrator base
+    camera: Camera,
+    sampler_prototype: Sampler,
+    base: IntegratorBase,
+}
+
+impl SimplePathTracer {
+    /// Returns an estimate of the radiance along the provided ray.
+    pub fn li(
+        &self,
+        ray: &mut RayDifferential,
+        lambda: &SampledWavelengths,
+        sampler: &mut Sampler,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> SampledSpectrum {
+        // The current estimated scattered radiance
+        let mut l = SampledSpectrum::from_const(0.0);
+        // Tracks if the last outgoing path direction sampled was due to specular reflection.
+        let mut specular_bounce = true;
+        // The "path throughput weight". That is, the product of the BSDF values and cosine terms for the vertices
+        // generated so far, divided by their respective sampling PDFs.
+        let mut beta = SampledSpectrum::from_const(1.0);
+        let mut depth = 0;
+
+        while !beta.is_zero() {
+            // Find next SimplePathIntegrator vertex and accumulate contribution
+            let si = self.base.intersect(&ray.ray, Float::INFINITY);
+
+            // Account for infinite lights if ray has no intersections
+            if si.is_none() {
+                if !self.sample_lights || specular_bounce {
+                    for light in self.base.infinite_lights.iter() {
+                        l += beta * light.le(&ray.ray, lambda);
+                    }
+                }
+                break;
+            }
+            let si = si.unwrap();
+
+            // Account for emissive surface if light was not sampled
+            let mut isect = si.intr;
+            if !self.sample_lights || specular_bounce {
+                l += beta * isect.le(-ray.ray.d, lambda);
+            }
+
+            // End path if maximum depth reached
+            if depth == self.max_depth {
+                break;
+            }
+            depth += 1;
+
+            // Get BSFD and skip over medium boundaries
+            let bsdf = isect.get_bsdf(ray, lambda, &self.camera, sampler, options);
+            if bsdf.is_none() {
+                specular_bounce = true;
+                isect.skip_intersection(ray, si.t_hit);
+                continue;
+            }
+            let bsdf = bsdf.unwrap();
+
+            let wo = -ray.ray.d;
+            // Sample direct illumination if specified
+            if self.sample_lights {
+                let sampled_light = self.light_sampler.sample_light(sampler.get_1d());
+                if let Some(sampled_light) = sampled_light {
+                    // Sample point on sampled_light to estimate direct illumination
+                    let u_light = sampler.get_2d();
+                    let light_sample_ctx = LightSampleContext::from(&isect);
+                    let ls =
+                        sampled_light
+                            .light
+                            .sample_li(&light_sample_ctx, u_light, lambda, false);
+                    if let Some(ls) = ls {
+                        if !ls.l.is_zero() && ls.pdf > 0.0 {
+                            // Evaluate BSDF for light and possibly scattered radiance
+                            let wi = ls.wi;
+                            let f = bsdf.f(wo, wi, crate::bxdf::TransportMode::Radiance);
+                            if f.is_some() && self.base.unoccluded(&isect.interaction, &ls.p_light)
+                            {
+                                l += beta * f.unwrap() * ls.l / (sampled_light.p * ls.pdf);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // TODO Sample outgoing direction at intersection to continue path.
+            if self.sample_bsdf {
+                let u = sampler.get_1d();
+                let bs = bsdf.sample_f(
+                    wo,
+                    u,
+                    sampler.get_2d(),
+                    crate::bxdf::TransportMode::Radiance,
+                    BxDFReflTransFlags::all(),
+                );
+                if bs.is_none() {
+                    break;
+                }
+                let bs = bs.unwrap();
+                beta *= bs.f * bs.wi.abs_dot_normal(&isect.shading.n) / bs.pdf;
+                specular_bounce = bs.is_specular();
+                ray = isect.spawn_ray(&bs.wi);
+            } else {
+                todo!()
+            }
+
+            // TODO the rest here...
+        }
+
+        todo!()
+
+        // TODO We want to finish Li, and then work up to tiled etc. Will need to share code, work that out.
+    }
 }

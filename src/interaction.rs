@@ -8,7 +8,7 @@ use crate::{
     material::{Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
     math::DifferenceOfProducts,
     options::Options,
-    ray::{Ray, RayDifferential},
+    ray::{AuxiliaryRays, Ray, RayDifferential},
     sampler::{Sampler, SamplerI},
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     vecmath::{
@@ -71,6 +71,12 @@ impl Interaction {
             ray,
             auxiliary: None,
         }
+    }
+
+    pub fn spawn_ray_to_interaction(&self, it: &Interaction) -> Ray {
+        let mut r = Ray::spawn_ray_to_both_offset(self.pi, self.n, self.time, it.pi, it.n);
+        // TODO set medium
+        r
     }
 }
 
@@ -335,6 +341,28 @@ impl SurfaceInteraction {
             self.shading.dpdu /= 1e8;
             self.shading.dpdv /= 1e8;
         }
+    }
+
+    /// When a ray crosses to a new media that does not scatter light, spawn a ray
+    /// in the same direction as the original ray, and set up any ray differentials
+    /// so they continue in a straight line across the boundary.
+    pub fn skip_intersection(&mut self, ray: &mut RayDifferential, t: Float) {
+        let mut new_ray = self.interaction.spawn_ray(ray.ray.d);
+        new_ray.auxiliary = if let Some(aux) = &ray.auxiliary {
+            let rx_origin = aux.rx_origin + t * aux.rx_direction;
+            let ry_origin = aux.ry_origin + t * aux.ry_direction;
+            let rx_direction = aux.rx_direction;
+            let ry_direction = aux.ry_direction;
+            Some(AuxiliaryRays {
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            })
+        } else {
+            None
+        };
+        *ray = new_ray
     }
 }
 

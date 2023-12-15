@@ -24,7 +24,7 @@ pub trait LightSamplerI {
 pub struct SampledLight {
     pub light: Arc<Light>,
     /// Discrete probability for this light to be sampled
-    p: Float,
+    pub p: Float,
 }
 
 pub enum LightSampler {

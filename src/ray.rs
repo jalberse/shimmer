@@ -69,6 +69,33 @@ impl Ray {
 
         po
     }
+
+    pub fn spawn_ray(pi: Point3fi, n: Normal3f, time: Float, d: Vector3f) -> Ray {
+        Ray::new_with_time(Ray::offset_ray_origin(pi, n, d), d, time, None)
+    }
+
+    pub fn spawn_ray_to(p_from: Point3fi, n: Normal3f, time: Float, p_to: Point3f) -> Ray {
+        let d = p_to - Point3f::from(p_from);
+        Self::spawn_ray(p_from, n, time, d)
+    }
+
+    pub fn spawn_ray_to_both_offset(
+        p_from: Point3fi,
+        n_from: Normal3f,
+        time: Float,
+        p_to: Point3fi,
+        n_to: Normal3f,
+    ) -> Ray {
+        let pf =
+            Self::offset_ray_origin(p_from, n_from, Point3f::from(p_to) - Point3f::from(p_from));
+        let pt = Self::offset_ray_origin(p_to, n_to, pf - Point3f::from(p_to));
+        Ray {
+            o: pf,
+            d: pt - pf,
+            time,
+            medium: None,
+        }
+    }
 }
 
 impl RayI for Ray {
