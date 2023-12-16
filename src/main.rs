@@ -10,7 +10,7 @@ use shimmer::{
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
     float::PI_F,
-    integrator::{IntegratorI, RandomWalkIntegrator},
+    integrator::{Integrator, RandomWalkIntegrator},
     light::{DiffuseAreaLight, Light},
     material::{DiffuseMaterial, Material},
     options::Options,

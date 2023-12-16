@@ -39,7 +39,7 @@ struct FilmSample {
     weight: Float,
 }
 
-pub trait IntegratorI {
+pub trait Integrator {
     fn render(&mut self, options: &Options);
 }
 
@@ -107,7 +107,7 @@ pub struct RandomWalkIntegrator {
     max_depth: i32,
 }
 
-impl IntegratorI for RandomWalkIntegrator {
+impl Integrator for RandomWalkIntegrator {
     fn render(&mut self, options: &Options) {
         let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
