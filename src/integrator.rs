@@ -53,6 +53,8 @@ pub struct IntegratorBase {
 }
 
 impl IntegratorBase {
+    const SHADOW_EPISLON: f32 = 0.0001;
+
     /// Creates an IntegratorBase from the given aggregate and lights;
     /// Also does any necessary preprocessing for the lights.
     pub fn new(aggregate: Primitive, mut lights: Vec<Light>) -> IntegratorBase {
@@ -84,8 +86,6 @@ impl IntegratorBase {
     /// intersection, rather than information about the intersection. Potentially
     /// more efficient if only the existence of an intersection is needed.
     /// Useful for shadow rays.
-    const SHADOW_EPISLON: f32 = 0.0001;
-
     pub fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         debug_assert!(ray.d != Vector3f::ZERO);
         self.aggregate.intersect_predicate(ray, t_max)
@@ -195,109 +195,6 @@ impl IntegratorI for RandomWalkIntegrator {
                     .unwrap();
             }
         }
-    }
-}
-
-struct Tile {
-    bounds: Bounds2i,
-}
-
-impl Tile {
-    /// Returns a list of Tiles covering the image.
-    ///
-    /// The tiles are returned in a flattened Vec in row-major order.
-    /// If the image cannot be perfectly divided by the tile width or height,
-    /// then smaller tiles are created to fill the remainder of the image width or height.
-    /// It's recommended to pick a tiling size that fits into the image resolution well.
-    /// Note that 8x8 is a reasonable tile size and 8 evenly divides common resolution
-    /// sizes like 1920, 1080, 720, etc.
-    ///
-    /// * `pixel_bounds` - The pixel bounds of the image.
-    /// * `tile_width` - Width of each tile, in pixels.
-    /// * `tile_height` - Height of each tile, in pixels.
-    pub fn tile(pixel_bounds: Bounds2i, tile_width: i32, tile_height: i32) -> Vec<Tile> {
-        let image_width = pixel_bounds.width();
-        let image_height = pixel_bounds.height();
-        let num_horizontal_tiles = image_width / tile_width;
-        let remainder_horizontal_pixels = image_width % tile_width;
-        let num_vertical_tiles = image_height / tile_height;
-        let remainder_vertical_pixels = image_height % tile_height;
-
-        let mut tiles = Vec::with_capacity((num_horizontal_tiles * num_vertical_tiles) as usize);
-
-        for tile_y in 0..num_vertical_tiles {
-            for tile_x in 0..num_horizontal_tiles {
-                let tile_start_x = pixel_bounds.min.x + tile_x * tile_width;
-                let tile_start_y = pixel_bounds.min.y + tile_y * tile_height;
-                tiles.push(Tile {
-                    bounds: Bounds2i::new(
-                        Point2i {
-                            x: tile_start_x,
-                            y: tile_start_y,
-                        },
-                        Point2i {
-                            x: tile_start_x + tile_width,
-                            y: tile_start_y + tile_height,
-                        },
-                    ),
-                });
-            }
-            // Add the rightmost row if necessary
-            if remainder_horizontal_pixels > 0 {
-                let tile_start_x = pixel_bounds.min.x + num_horizontal_tiles * tile_width;
-                let tile_start_y = pixel_bounds.min.y + tile_y * tile_height;
-                tiles.push(Tile {
-                    bounds: Bounds2i::new(
-                        Point2i {
-                            x: tile_start_x,
-                            y: tile_start_y,
-                        },
-                        Point2i {
-                            x: tile_start_x + remainder_horizontal_pixels,
-                            y: tile_start_y + tile_height,
-                        },
-                    ),
-                });
-            }
-        }
-        // Add the bottom row if necessary
-        if remainder_vertical_pixels > 0 {
-            for tile_x in 0..num_horizontal_tiles {
-                let tile_start_x = pixel_bounds.min.x + tile_x * tile_width;
-                let tile_start_y = pixel_bounds.min.y + num_vertical_tiles * tile_height;
-                tiles.push(Tile {
-                    bounds: Bounds2i::new(
-                        Point2i {
-                            x: tile_start_x,
-                            y: tile_start_y,
-                        },
-                        Point2i {
-                            x: tile_start_x + tile_width,
-                            y: tile_start_y + remainder_vertical_pixels,
-                        },
-                    ),
-                });
-            }
-        }
-        // Add the bottom-most, right-most Tile if necessary
-        if remainder_horizontal_pixels > 0 && remainder_vertical_pixels > 0 {
-            let tile_start_x = pixel_bounds.min.x + num_horizontal_tiles * tile_width;
-            let tile_start_y = pixel_bounds.min.y + num_vertical_tiles * tile_height;
-            tiles.push(Tile {
-                bounds: Bounds2i::new(
-                    Point2i {
-                        x: tile_start_x,
-                        y: tile_start_y,
-                    },
-                    Point2i {
-                        x: tile_start_x + remainder_horizontal_pixels,
-                        y: tile_start_y + remainder_vertical_pixels,
-                    },
-                ),
-            });
-        }
-
-        tiles
     }
 }
 
@@ -476,6 +373,17 @@ impl RandomWalkIntegrator {
     }
 }
 
+// TODO We want to share code between the SimplePathTracer and the RandomWalkIntegrator.
+//   They really differ only in li().
+//   They share EvaluatePixelSample (as RayIntegrators).
+//   They also share the render() of an ImageTileIntegrator...
+//   So we could say, each integrator we want can *have* an ImageTileIntegrator that handles the render(), e.g.,
+//     but we might need to provide an evaluate_pixel_sample() and li() function to it. We can pass self in that case?
+//     And the ImageTileIntegrator's render() will take traits PixelSampleEvaluator and LiEvaluator, or something like that.
+//     That way e.g. RandomWalkIntegrator and SimplePathIntegrator can share the ImageTileIntegrator's render().
+//         They can also share the PixelSampleEvaluator, and just pass self for li.
+//     I think that's the best approach, try that.
+
 /// A step up from a RandomWalkIntegrator.
 /// The PathIntegrator is better when efficiency is important.
 /// This is useful for debugging and for validating the implementation of sampling algorithms.
@@ -484,7 +392,7 @@ impl RandomWalkIntegrator {
 /// (assuming that the BSDF is not perfect specular).
 /// If they do not, the error is presumably in the BSDF sampling code.
 /// Light sampling techniques can be tested in a similar fashion.
-pub struct SimplePathTracer {
+pub struct SimplePathIntegrator {
     max_depth: i32,
     /// Determines whether lights’ SampleLi() methods should be used to sample direct illumination or
     /// whether illumination should only be found by rays randomly intersecting emissive surfaces,
@@ -501,7 +409,7 @@ pub struct SimplePathTracer {
     base: IntegratorBase,
 }
 
-impl SimplePathTracer {
+impl SimplePathIntegrator {
     /// Returns an estimate of the radiance along the provided ray.
     pub fn li(
         &self,
@@ -638,5 +546,108 @@ impl SimplePathTracer {
             debug_assert!(beta.y(lambda).is_finite());
         }
         l
+    }
+}
+
+struct Tile {
+    bounds: Bounds2i,
+}
+
+impl Tile {
+    /// Returns a list of Tiles covering the image.
+    ///
+    /// The tiles are returned in a flattened Vec in row-major order.
+    /// If the image cannot be perfectly divided by the tile width or height,
+    /// then smaller tiles are created to fill the remainder of the image width or height.
+    /// It's recommended to pick a tiling size that fits into the image resolution well.
+    /// Note that 8x8 is a reasonable tile size and 8 evenly divides common resolution
+    /// sizes like 1920, 1080, 720, etc.
+    ///
+    /// * `pixel_bounds` - The pixel bounds of the image.
+    /// * `tile_width` - Width of each tile, in pixels.
+    /// * `tile_height` - Height of each tile, in pixels.
+    pub fn tile(pixel_bounds: Bounds2i, tile_width: i32, tile_height: i32) -> Vec<Tile> {
+        let image_width = pixel_bounds.width();
+        let image_height = pixel_bounds.height();
+        let num_horizontal_tiles = image_width / tile_width;
+        let remainder_horizontal_pixels = image_width % tile_width;
+        let num_vertical_tiles = image_height / tile_height;
+        let remainder_vertical_pixels = image_height % tile_height;
+
+        let mut tiles = Vec::with_capacity((num_horizontal_tiles * num_vertical_tiles) as usize);
+
+        for tile_y in 0..num_vertical_tiles {
+            for tile_x in 0..num_horizontal_tiles {
+                let tile_start_x = pixel_bounds.min.x + tile_x * tile_width;
+                let tile_start_y = pixel_bounds.min.y + tile_y * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + tile_width,
+                            y: tile_start_y + tile_height,
+                        },
+                    ),
+                });
+            }
+            // Add the rightmost row if necessary
+            if remainder_horizontal_pixels > 0 {
+                let tile_start_x = pixel_bounds.min.x + num_horizontal_tiles * tile_width;
+                let tile_start_y = pixel_bounds.min.y + tile_y * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + remainder_horizontal_pixels,
+                            y: tile_start_y + tile_height,
+                        },
+                    ),
+                });
+            }
+        }
+        // Add the bottom row if necessary
+        if remainder_vertical_pixels > 0 {
+            for tile_x in 0..num_horizontal_tiles {
+                let tile_start_x = pixel_bounds.min.x + tile_x * tile_width;
+                let tile_start_y = pixel_bounds.min.y + num_vertical_tiles * tile_height;
+                tiles.push(Tile {
+                    bounds: Bounds2i::new(
+                        Point2i {
+                            x: tile_start_x,
+                            y: tile_start_y,
+                        },
+                        Point2i {
+                            x: tile_start_x + tile_width,
+                            y: tile_start_y + remainder_vertical_pixels,
+                        },
+                    ),
+                });
+            }
+        }
+        // Add the bottom-most, right-most Tile if necessary
+        if remainder_horizontal_pixels > 0 && remainder_vertical_pixels > 0 {
+            let tile_start_x = pixel_bounds.min.x + num_horizontal_tiles * tile_width;
+            let tile_start_y = pixel_bounds.min.y + num_vertical_tiles * tile_height;
+            tiles.push(Tile {
+                bounds: Bounds2i::new(
+                    Point2i {
+                        x: tile_start_x,
+                        y: tile_start_y,
+                    },
+                    Point2i {
+                        x: tile_start_x + remainder_horizontal_pixels,
+                        y: tile_start_y + remainder_vertical_pixels,
+                    },
+                ),
+            });
+        }
+
+        tiles
     }
 }
