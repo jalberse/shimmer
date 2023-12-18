@@ -96,18 +96,32 @@ impl IntegratorBase {
     }
 }
 
-// TODO When we write other integrators, look at how we can pull out common functionality.
-//   I am writing a single working RandomWalkIntegrator first, though.
-
-pub struct RandomWalkIntegrator {
+pub struct ImageTileIntegrator {
     base: IntegratorBase,
     camera: Camera,
-    // This is named sampler_prototype because we will clone individual samplers from it for each thread.
     sampler_prototype: Sampler,
-    max_depth: i32,
+
+    pixel_sample_evaluator: PixelSampleEvaluator,
 }
 
-impl Integrator for RandomWalkIntegrator {
+impl ImageTileIntegrator {
+    pub fn new(
+        aggregate: Primitive,
+        lights: Vec<Light>,
+        camera: Camera,
+        sampler: Sampler,
+        pixel_sample_evaluator: PixelSampleEvaluator,
+    ) -> ImageTileIntegrator {
+        ImageTileIntegrator {
+            base: IntegratorBase::new(aggregate, lights),
+            camera,
+            sampler_prototype: sampler,
+            pixel_sample_evaluator,
+        }
+    }
+}
+
+impl Integrator for ImageTileIntegrator {
     fn render(&mut self, options: &Options) {
         let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
@@ -150,14 +164,16 @@ impl Integrator for RandomWalkIntegrator {
                                 sampler
                                     .borrow_mut()
                                     .start_pixel_sample(p_pixel, sample_index, 0);
-                                let film_sample = self.evaluate_pixel_sample(
-                                    &self.camera,
-                                    p_pixel,
-                                    sample_index,
-                                    &mut sampler.borrow_mut(),
-                                    &mut scratch_buffer.borrow_mut(),
-                                    options,
-                                );
+                                let film_sample =
+                                    self.pixel_sample_evaluator.evaluate_pixel_sample(
+                                        &self.base,
+                                        &self.camera,
+                                        p_pixel,
+                                        sample_index,
+                                        &mut sampler.borrow_mut(),
+                                        &mut scratch_buffer.borrow_mut(),
+                                        options,
+                                    );
                                 samples.push(film_sample);
                                 // Note that this does not call drop() on anything allocated in
                                 // the scratch buffer. If we allocate anything on the heap, we gotta clean
@@ -198,24 +214,66 @@ impl Integrator for RandomWalkIntegrator {
     }
 }
 
-impl RandomWalkIntegrator {
-    pub fn new(
-        aggregate: Primitive,
-        lights: Vec<Light>,
-        camera: Camera,
-        sampler: Sampler,
-        max_depth: i32,
-    ) -> RandomWalkIntegrator {
-        RandomWalkIntegrator {
-            base: IntegratorBase::new(aggregate, lights),
-            camera,
-            sampler_prototype: sampler,
-            max_depth,
-        }
-    }
-
+trait PixelSampleEvaluatorI {
     fn evaluate_pixel_sample(
         &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        p_pixel: Point2i,
+        sample_index: i32,
+        sampler: &mut Sampler,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> FilmSample;
+}
+
+enum PixelSampleEvaluator {
+    RandomWalk(RandomWalkIntegrator),
+    SimplePath(SimplePathIntegrator),
+}
+
+impl PixelSampleEvaluatorI for PixelSampleEvaluator {
+    fn evaluate_pixel_sample(
+        &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        p_pixel: Point2i,
+        sample_index: i32,
+        sampler: &mut Sampler,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> FilmSample {
+        match self {
+            PixelSampleEvaluator::RandomWalk(integrator) => integrator.evaluate_pixel_sample(
+                base,
+                camera,
+                p_pixel,
+                sample_index,
+                sampler,
+                scratch_buffer,
+                options,
+            ),
+            PixelSampleEvaluator::SimplePath(integrator) => integrator.evaluate_pixel_sample(
+                base,
+                camera,
+                p_pixel,
+                sample_index,
+                sampler,
+                scratch_buffer,
+                options,
+            ),
+        }
+    }
+}
+
+struct RandomWalkIntegrator {
+    max_depth: i32,
+}
+
+impl PixelSampleEvaluatorI for RandomWalkIntegrator {
+    fn evaluate_pixel_sample(
+        &self,
+        base: &IntegratorBase,
         camera: &Camera,
         p_pixel: Point2i,
         sample_index: i32,
@@ -263,6 +321,8 @@ impl RandomWalkIntegrator {
             //   one they can initialize. Q: why not restructure so li() just creates it?
             let l = camera_ray.weight
                 * self.li(
+                    base,
+                    camera,
                     &camera_ray.ray,
                     &lambda,
                     sampler,
@@ -294,9 +354,13 @@ impl RandomWalkIntegrator {
             weight: camera_sample.filter_weight,
         }
     }
+}
 
+impl RandomWalkIntegrator {
     pub fn li(
         &self,
+        base: &IntegratorBase,
+        camera: &Camera,
         ray: &RayDifferential,
         lambda: &SampledWavelengths,
         sampler: &mut Sampler,
@@ -304,13 +368,24 @@ impl RandomWalkIntegrator {
         scratch_buffer: &mut Bump,
         options: &Options,
     ) -> SampledSpectrum {
-        self.li_random_walk(ray, lambda, sampler, 0, scratch_buffer, options)
+        self.li_random_walk(
+            base,
+            camera,
+            ray,
+            lambda,
+            sampler,
+            0,
+            scratch_buffer,
+            options,
+        )
     }
 
     /// Depth is the *current depth* of the recursive call to this.
     /// It's not to be confused with the max depth of the walk.
     fn li_random_walk(
         &self,
+        base: &IntegratorBase,
+        camera: &Camera,
         ray: &RayDifferential,
         lambda: &SampledWavelengths,
         sampler: &mut Sampler,
@@ -318,7 +393,7 @@ impl RandomWalkIntegrator {
         scratch_buffer: &mut Bump,
         options: &Options,
     ) -> SampledSpectrum {
-        let si = self.base.intersect(&ray.ray, Float::INFINITY);
+        let si = base.intersect(&ray.ray, Float::INFINITY);
 
         // TODO Since this is a random walk, it will never hit point lights.
         //  We probably want to implement an infinite light, then.
@@ -326,7 +401,7 @@ impl RandomWalkIntegrator {
         if si.is_none() {
             // Return emitted light from infinite light sources
             let mut le = SampledSpectrum::from_const(0.0);
-            for light in self.base.infinite_lights.iter() {
+            for light in base.infinite_lights.iter() {
                 le += light.le(&ray.ray, lambda);
             }
             return le;
@@ -347,7 +422,7 @@ impl RandomWalkIntegrator {
         }
 
         // Compute BSDF at random walk intersection point.
-        let bsdf = isect.get_bsdf(ray, lambda, &self.camera, sampler, &options);
+        let bsdf = isect.get_bsdf(ray, lambda, camera, sampler, &options);
         if bsdf.is_none() {
             return le;
         }
@@ -368,21 +443,20 @@ impl RandomWalkIntegrator {
         // Recursively trace ray to estimate incident radiance at surface
         let ray = isect.interaction.spawn_ray(wp);
 
-        le + fcos * self.li_random_walk(&ray, lambda, sampler, depth + 1, scratch_buffer, options)
+        le + fcos
+            * self.li_random_walk(
+                base,
+                camera,
+                &ray,
+                lambda,
+                sampler,
+                depth + 1,
+                scratch_buffer,
+                options,
+            )
             / (1.0 / (4.0 * PI_F))
     }
 }
-
-// TODO We want to share code between the SimplePathTracer and the RandomWalkIntegrator.
-//   They really differ only in li().
-//   They share EvaluatePixelSample (as RayIntegrators).
-//   They also share the render() of an ImageTileIntegrator...
-//   So we could say, each integrator we want can *have* an ImageTileIntegrator that handles the render(), e.g.,
-//     but we might need to provide an evaluate_pixel_sample() and li() function to it. We can pass self in that case?
-//     And the ImageTileIntegrator's render() will take traits PixelSampleEvaluator and LiEvaluator, or something like that.
-//     That way e.g. RandomWalkIntegrator and SimplePathIntegrator can share the ImageTileIntegrator's render().
-//         They can also share the PixelSampleEvaluator, and just pass self for li.
-//     I think that's the best approach, try that.
 
 /// A step up from a RandomWalkIntegrator.
 /// The PathIntegrator is better when efficiency is important.

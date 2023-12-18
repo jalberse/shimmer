@@ -10,7 +10,7 @@ use shimmer::{
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
     float::PI_F,
-    integrator::{Integrator, RandomWalkIntegrator},
+    integrator::{ImageTileIntegrator, Integrator},
     light::{DiffuseAreaLight, Light},
     material::{DiffuseMaterial, Material},
     options::Options,
@@ -68,7 +68,7 @@ fn main() {
         Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
     ));
 
-    let mut integrator = RandomWalkIntegrator::new(bvh, lights, camera, sampler, 8);
+    let mut integrator = ImageTileIntegrator::new(bvh, lights, camera, sampler, 8);
 
     // Note this is just going to stdout right now.
     integrator.render(&options);
