@@ -56,14 +56,13 @@ impl IntegratorBase {
     const SHADOW_EPISLON: f32 = 0.0001;
 
     /// Creates an IntegratorBase from the given aggregate and lights;
-    /// Also does any necessary preprocessing for the lights.
-    pub fn new(aggregate: Primitive, mut lights: Vec<Light>) -> IntegratorBase {
-        let scene_bounds = aggregate.bounds();
+    /// lights must have preprocess() called on them already, probably before
+    /// they are wrapped in Arc. After wrapping in Arc, calling preprocess()
+    /// would require wrapping them in a Mutex. To avoid that, we'll pre-process
+    /// before passing lights to integrators and so on.
+    pub fn new(aggregate: Primitive, lights: Vec<Arc<Light>>) -> IntegratorBase {
         let mut infinite_lights = Vec::new();
-        for light in &mut lights {
-            light.preprocess(&scene_bounds);
-        }
-        let lights = lights.into_iter().map(|l| Arc::new(l)).collect_vec();
+
         for light in &lights {
             if light.light_type() == LightType::Infinite {
                 infinite_lights.push(light.clone());
@@ -107,7 +106,7 @@ pub struct ImageTileIntegrator {
 impl ImageTileIntegrator {
     pub fn new(
         aggregate: Primitive,
-        lights: Vec<Light>,
+        lights: Vec<Arc<Light>>,
         camera: Camera,
         sampler: Sampler,
         pixel_sample_evaluator: PixelSampleEvaluator,
@@ -214,6 +213,11 @@ impl Integrator for ImageTileIntegrator {
     }
 }
 
+// TODO We don't need this to be a trait necessarily.
+//   If we're just matching inside the PixelSampleEvaluator enum's impl,
+//   then we can have each one take their own parameters for evaluate_pixel_sample().
+//   We don't actually need the trait, just the match.
+// We also want to share the evaluate_pixel_sample implementation, thought.
 trait PixelSampleEvaluatorI {
     fn evaluate_pixel_sample(
         &self,
@@ -227,7 +231,7 @@ trait PixelSampleEvaluatorI {
     ) -> FilmSample;
 }
 
-enum PixelSampleEvaluator {
+pub enum PixelSampleEvaluator {
     RandomWalk(RandomWalkIntegrator),
     SimplePath(SimplePathIntegrator),
 }
@@ -266,7 +270,7 @@ impl PixelSampleEvaluatorI for PixelSampleEvaluator {
     }
 }
 
-struct RandomWalkIntegrator {
+pub struct RandomWalkIntegrator {
     max_depth: i32,
 }
 
@@ -467,29 +471,112 @@ impl RandomWalkIntegrator {
 /// If they do not, the error is presumably in the BSDF sampling code.
 /// Light sampling techniques can be tested in a similar fashion.
 pub struct SimplePathIntegrator {
-    max_depth: i32,
+    pub max_depth: i32,
     /// Determines whether lights’ SampleLi() methods should be used to sample direct illumination or
     /// whether illumination should only be found by rays randomly intersecting emissive surfaces,
     /// as was done in the RandomWalkIntegrator.
-    sample_lights: bool,
+    pub sample_lights: bool,
     /// Determines whether BSDFs’ Sample_f() methods should be used to sample directions or whether
     /// uniform directional sampling should be used.
-    sample_bsdf: bool,
-    light_sampler: UniformLightSampler,
+    pub sample_bsdf: bool,
+    pub light_sampler: UniformLightSampler,
+}
 
-    // TODO Below here we should share with ImageTileIntegrator and Integrator base
-    camera: Camera,
-    sampler_prototype: Sampler,
-    base: IntegratorBase,
+// TODO This should be shared between SimplePathINtegrator and RandomWalkIntegrator.
+impl PixelSampleEvaluatorI for SimplePathIntegrator {
+    fn evaluate_pixel_sample(
+        &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        p_pixel: Point2i,
+        sample_index: i32,
+        sampler: &mut Sampler,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> FilmSample {
+        // Sample wavelengths for the ray
+        let lu = if options.disable_wavelength_jitter {
+            0.5
+        } else {
+            sampler.get_1d()
+        };
+        let lambda = camera.get_film_const().sample_wavelengths(lu);
+
+        // Initialize camera_sample for the current sample
+        let filter = camera.get_film_const().get_filter();
+        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
+
+        let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
+
+        let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
+            debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
+            debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
+
+            // TODO Scale camera ray differentials absed on image sampling rate.
+            let ray_diff_scale = Float::max(
+                0.125,
+                1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
+            );
+            if !options.disable_pixel_jitter {
+                camera_ray.ray.scale_differentials(ray_diff_scale);
+            }
+
+            // TODO increment number of camera rays (I think that's just useful for logging though)
+
+            // Evaluate radiance along the camera ray
+            let visible_surface = if camera.get_film_const().uses_visible_surface() {
+                Some(VisibleSurface::default())
+            } else {
+                None
+            };
+
+            let l = camera_ray.weight
+                * self.li(
+                    base,
+                    camera,
+                    &mut camera_ray.ray,
+                    &lambda,
+                    sampler,
+                    &visible_surface,
+                    scratch_buffer,
+                    options,
+                );
+
+            if l.has_nan() {
+                // TODO log error, set SampledSpectrum l to 0.
+                // Use env_logger.
+            } else if l.y(&lambda).is_infinite() {
+                // TODO log error, set SampledSpectrum l to 0
+            }
+
+            (l, visible_surface)
+        } else {
+            (
+                SampledSpectrum::from_const(0.0),
+                Some(VisibleSurface::default()),
+            )
+        };
+
+        FilmSample {
+            p_film: p_pixel,
+            l,
+            lambda,
+            visible_surface,
+            weight: camera_sample.filter_weight,
+        }
+    }
 }
 
 impl SimplePathIntegrator {
     /// Returns an estimate of the radiance along the provided ray.
     pub fn li(
         &self,
+        base: &IntegratorBase,
+        camera: &Camera,
         ray: &mut RayDifferential,
         lambda: &SampledWavelengths,
         sampler: &mut Sampler,
+        _visible_surface: &Option<VisibleSurface>,
         scratch_buffer: &mut Bump,
         options: &Options,
     ) -> SampledSpectrum {
@@ -504,12 +591,12 @@ impl SimplePathIntegrator {
 
         while !beta.is_zero() {
             // Find next SimplePathIntegrator vertex and accumulate contribution
-            let si = self.base.intersect(&ray.ray, Float::INFINITY);
+            let si = base.intersect(&ray.ray, Float::INFINITY);
 
             // Account for infinite lights if ray has no intersections
             if si.is_none() {
                 if !self.sample_lights || specular_bounce {
-                    for light in self.base.infinite_lights.iter() {
+                    for light in base.infinite_lights.iter() {
                         l += beta * light.le(&ray.ray, lambda);
                     }
                 }
@@ -530,7 +617,7 @@ impl SimplePathIntegrator {
             depth += 1;
 
             // Get BSFD and skip over medium boundaries
-            let bsdf = isect.get_bsdf(ray, lambda, &self.camera, sampler, options);
+            let bsdf = isect.get_bsdf(ray, lambda, &camera, sampler, options);
             if bsdf.is_none() {
                 specular_bounce = true;
                 isect.skip_intersection(ray, si.t_hit);
@@ -555,8 +642,7 @@ impl SimplePathIntegrator {
                             // Evaluate BSDF for light and possibly scattered radiance
                             let wi = ls.wi;
                             let f = bsdf.f(wo, wi, crate::bxdf::TransportMode::Radiance);
-                            if f.is_some() && self.base.unoccluded(&isect.interaction, &ls.p_light)
-                            {
+                            if f.is_some() && base.unoccluded(&isect.interaction, &ls.p_light) {
                                 l += beta * f.unwrap() * ls.l / (sampled_light.p * ls.pdf);
                             }
                         }

@@ -10,11 +10,12 @@ use shimmer::{
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
     float::PI_F,
-    integrator::{ImageTileIntegrator, Integrator},
-    light::{DiffuseAreaLight, Light},
+    integrator::{ImageTileIntegrator, Integrator, PixelSampleEvaluator, SimplePathIntegrator},
+    light::{DiffuseAreaLight, Light, LightI},
+    light_sampler::UniformLightSampler,
     material::{DiffuseMaterial, Material},
     options::Options,
-    primitive::{GeometricPrimitive, Primitive},
+    primitive::{GeometricPrimitive, Primitive, PrimitiveI},
     sampler::{IndependentSampler, Sampler},
     shape::{sphere::Sphere, Shape, Triangle, TriangleMesh},
     spectra::{spectrum::spectrum_to_photometric, ConstantSpectrum, Spectrum},
@@ -28,7 +29,7 @@ use shimmer::{
 };
 
 fn main() {
-    let (prims, lights) = get_triangular_mesh_test_scene();
+    let (prims, mut lights) = get_triangular_mesh_test_scene();
 
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
@@ -68,7 +69,24 @@ fn main() {
         Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
     ));
 
-    let mut integrator = ImageTileIntegrator::new(bvh, lights, camera, sampler, 8);
+    for light in &mut lights {
+        light.preprocess(&bvh.bounds());
+    }
+    let lights = lights.into_iter().map(|l| Arc::new(l)).collect_vec();
+
+    let light_sampler = UniformLightSampler {
+        lights: lights.clone(),
+    };
+
+    let simple_path_pixel_evaluator = PixelSampleEvaluator::SimplePath(SimplePathIntegrator {
+        max_depth: 8,
+        sample_lights: true,
+        sample_bsdf: true,
+        light_sampler,
+    });
+
+    let mut integrator =
+        ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);
 
     // Note this is just going to stdout right now.
     integrator.render(&options);
