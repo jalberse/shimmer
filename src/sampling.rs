@@ -158,7 +158,7 @@ pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
     if u_offset.x == 0.0 && u_offset.y == 0.0 {
         return Point2f::ZERO;
     }
-    let (theta, r) = if u_offset.x.abs() > u_offset.y.abs() {
+    let (r, theta) = if u_offset.x.abs() > u_offset.y.abs() {
         (u_offset.x, PI_OVER_4 * (u_offset.y / u_offset.x))
     } else {
         (
