@@ -1,5 +1,7 @@
 // TODO these shouldn't all be public; reorganize.
 
+#![feature(get_mut_unchecked)]
+
 pub mod aggregate;
 pub mod bounding_box;
 pub mod bsdf;

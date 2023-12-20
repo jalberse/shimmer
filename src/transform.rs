@@ -745,15 +745,6 @@ fn apply_point_helper(m: &SquareMatrix<4>, p: &Point3f) -> Point3f {
         // For efficiency, skips division if the weight is 1.
         Point3f::new(xp, yp, zp)
     } else {
-        // TODO We fail an assertion (now within the division, as PBRT does)
-        //   for wp != 0. So... Why do we get this, and they don't?
-        //   Well, our m[3] is all 0'd out, so wp is actually always zero (at least, for that matrix).
-        //   Am I constructing m wrong?
-        //   The very first time this is reached, we get the error.
-        //  I mean, I have tests for point transforms and they do fine?
-        // Hm yeah, well, the last column should *really* not be 0'd out - I would expect [0 0 0 1].
-        //  Am I getting it zero'd from the composition of matrices?
-        // ugh I guess look into this tomorrow.
         Point3f::new(xp, yp, zp) / wp
     }
 }

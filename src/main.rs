@@ -1,4 +1,6 @@
-use std::{process::id, rc::Rc, sync::Arc};
+#![feature(get_mut_unchecked)]
+
+use std::sync::Arc;
 
 use itertools::Itertools;
 use rand::Rng;
@@ -11,11 +13,11 @@ use shimmer::{
     filter::{BoxFilter, Filter},
     float::PI_F,
     integrator::{ImageTileIntegrator, Integrator, PixelSampleEvaluator, SimplePathIntegrator},
-    light::{DiffuseAreaLight, Light, LightI},
+    light::{DiffuseAreaLight, Light},
     light_sampler::UniformLightSampler,
     material::{DiffuseMaterial, Material},
     options::Options,
-    primitive::{GeometricPrimitive, Primitive, PrimitiveI},
+    primitive::{GeometricPrimitive, Primitive},
     sampler::{IndependentSampler, Sampler},
     shape::{sphere::Sphere, Shape, Triangle, TriangleMesh},
     spectra::{spectrum::spectrum_to_photometric, ConstantSpectrum, Spectrum},
@@ -29,7 +31,7 @@ use shimmer::{
 };
 
 fn main() {
-    let (prims, mut lights) = get_triangular_mesh_test_scene();
+    let (prims, lights) = get_triangular_mesh_test_scene();
 
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
@@ -46,7 +48,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_tiled_rayon.pfm",
+        "test_light_sampling_unsafe_nightly.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -69,11 +71,6 @@ fn main() {
         Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
     ));
 
-    for light in &mut lights {
-        light.preprocess(&bvh.bounds());
-    }
-    let lights = lights.into_iter().map(|l| Arc::new(l)).collect_vec();
-
     let light_sampler = UniformLightSampler {
         lights: lights.clone(),
     };
@@ -85,19 +82,27 @@ fn main() {
         light_sampler,
     });
 
+    // let random_walk_pixel_evaluator =
+    //     PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth: 8 });
+
+    // TODO Resulting image isn't what I expect - I would expect something similar
+    //  to what we get when sample_lights is set to false (which also matches RandomWalk).
+    //  It's possible that we have a bug in the `if self.sample_lights` block in the integrator.
+    //  I do think it's correct to have the lights vec hold the second reference to the
+    //  Arc<Light> area lights in the GeometricPrimitive - we want the same light in both.
+
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);
 
-    // Note this is just going to stdout right now.
     integrator.render(&options);
 }
 
 // Two triangular meshes representing rough spheres side-by-side.
 // The vertices also have slight offsets from the radius.
-fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
+fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     // TODO This triangulated mesh has a bug where the endcap is missing
-    // But it's really not that important, I don't think it's just a bug with this
-    // mesh generation code.
+    // But it's really not that important, I think it's just a bug with the generated mesh,
+    //  not with our mesh code itself.
 
     let mut rng = rand::thread_rng();
     // Make a triangular mesh for a triangulated sphere (with vertices randomly
@@ -211,10 +216,12 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
 
     let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
     let scale = 1.0 / spectrum_to_photometric(&le);
+
+    // If we add the DiffuseAreaLights to the lights vector only, then the other objects are illuminated,
+    // but we wouldn't see the light itself. If we add them to the primitives vector, then we see the light itself.
     let mut light_prims = light_tris_shapes
         .into_iter()
-        .map(|t| {
-            // TODO Is this the right transform for thise?
+        .map(|t| -> Arc<Primitive> {
             let area_light = Some(Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
                 light_location.inverse(),
                 le.clone(),
@@ -229,12 +236,21 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
             )))
         })
         .collect_vec();
+
+    // Get pointers to the lights data from the primitives, so we can add them to the lights vector.
+    let lights = light_prims
+        .iter()
+        .map(|p| -> Arc<Light> {
+            match p.as_ref() {
+                Primitive::Geometric(p) => p.area_light.clone().expect("Expected area light"),
+                _ => panic!("Expected GeometricPrimitive"),
+            }
+        })
+        .collect_vec();
+
     prims.append(&mut light_prims);
 
-    // Our lights array can actually be empty; the area light contributions will come from the area_light on
-    // the primitives. We could add infinite light sources to this (or point lights, but those won't be hit
-    // by a random walk).
-    let lights = Vec::new();
+    // We could also add infinite or point lights that don't have associated primitives to the lights vector
     (prims, lights)
 }
 

@@ -40,6 +40,7 @@ impl BSDF {
         self.shading_frame.from_local_v(&v)
     }
 
+    /// Returns the value of the distribution function for the given pair of directions
     pub fn f(
         &self,
         wo_render: Vector3f,
@@ -74,7 +75,7 @@ impl BSDF {
         if bs.f.is_zero() || bs.pdf == 0.0 || bs.wi.z == 0.0 {
             return None;
         }
-        debug_assert!(bs.pdf > 0.0);
+        debug_assert!(bs.pdf >= 0.0);
 
         bs.wi = self.local_to_render(bs.wi);
         Some(bs)

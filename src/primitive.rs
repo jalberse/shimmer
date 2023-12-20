@@ -65,10 +65,10 @@ impl PrimitiveI for Primitive {
 
 /// Stores a variety of properties that may be associated with a shape.
 pub struct GeometricPrimitive {
-    shape: Shape,
-    material: Arc<Material>,
+    pub shape: Shape,
+    pub material: Arc<Material>,
     /// Stores the emissive properties if the shape is a light source
-    area_light: Option<Arc<Light>>,
+    pub area_light: Option<Arc<Light>>,
     // TODO add alpha FloatTexture
     // TODO add medium_interface member
 }

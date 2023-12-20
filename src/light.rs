@@ -78,7 +78,7 @@ pub trait LightI {
     fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum;
 
     /// Invoked prior to rendering, informs the lights of the scene bounds, which
-    /// may not be available whiel constructing the lights.
+    /// may not be available while constructing the lights.
     fn preprocess(&mut self, scene_bounds: &Bounds3f);
 
     // TODO bounds() method

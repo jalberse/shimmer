@@ -195,9 +195,7 @@ impl SurfaceInteraction {
 
         let bsdf = if options.force_diffuse {
             // TODO PBRT also checks if bsdf is null. PBRT does this alot with its
-            //   tagged pointers. We might want to have a "Null" variant of our equivalent enums
-            //   and check for that? We could wrap in Option, which perhaps expresses intent better,
-            //   but it also involves more memory consumption...
+            //   tagged pointers. We might want to wrap things in Option<> if this is possible.
 
             // Override bsdf with the diffuse equivalent
             let r = bsdf.rho_hd(

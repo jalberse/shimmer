@@ -55,12 +55,35 @@ pub struct IntegratorBase {
 impl IntegratorBase {
     const SHADOW_EPISLON: f32 = 0.0001;
 
-    /// Creates an IntegratorBase from the given aggregate and lights;
-    /// lights must have preprocess() called on them already, probably before
-    /// they are wrapped in Arc. After wrapping in Arc, calling preprocess()
-    /// would require wrapping them in a Mutex. To avoid that, we'll pre-process
-    /// before passing lights to integrators and so on.
-    pub fn new(aggregate: Primitive, lights: Vec<Arc<Light>>) -> IntegratorBase {
+    /// Creates an IntegratorBase from the given aggregate and lights.
+    /// Also does pre-processing for the lights.
+    pub fn new(aggregate: Primitive, mut lights: Vec<Arc<Light>>) -> IntegratorBase {
+        let scene_bounds = aggregate.bounds();
+
+        // TODO Is there a better alternative here that does not require get_mut_unchecked?
+        // That is nightly-only and unsafe, and I'd like to avoid that if possible.
+        // But this is a quick way forward, so we'll do it for now.
+        // The alternatives could include:
+        // 1. Use Vec<Arc<Mutex<Light>>>, but we don't ever need the Mutex after this (read-only after this write),
+        //    and I don't want to pay that cost. We could try to convert afterwards, but that's awkward, touching a lot of structs.
+        // 2. Defer wrapping the Lights in Arc until after this pre-processing step. But that would mean only
+        //    keeping one copy - maybe we keep one copy of the area_light Arc in the aggregate (we could use get_mut() for that,
+        //    which is stable), and then keep one copy of all other lights (point, infinite) in the lights vector.
+        //    Then we can pre-process those while there's only one reference, and then copy the lights from the aggregate
+        //    into the lights list (thereby making the second reference for those).
+        // I think that option 2 is probably best. We can just add a fn to the aggregate that returns the area lights,
+
+        for light in &mut lights {
+            // Unsafe get_mut_unchecked() - If any other Arc or Weak pointers to the same allocation exist,
+            // then they must not be dereferenced or have active borrows for the duration.
+            // That should be okay here, because the only other Arcs to the same allocations
+            // are the ones in the aggregate (specifically area lights in geometry primitives),
+            // which we're not touching here.
+            unsafe {
+                Arc::get_mut_unchecked(light).preprocess(&scene_bounds);
+            }
+        }
+
         let mut infinite_lights = Vec::new();
 
         for light in &lights {
@@ -68,6 +91,7 @@ impl IntegratorBase {
                 infinite_lights.push(light.clone());
             }
         }
+
         IntegratorBase {
             aggregate,
             lights,
@@ -271,7 +295,7 @@ impl PixelSampleEvaluatorI for PixelSampleEvaluator {
 }
 
 pub struct RandomWalkIntegrator {
-    max_depth: i32,
+    pub max_depth: i32,
 }
 
 impl PixelSampleEvaluatorI for RandomWalkIntegrator {
@@ -482,7 +506,7 @@ pub struct SimplePathIntegrator {
     pub light_sampler: UniformLightSampler,
 }
 
-// TODO This should be shared between SimplePathINtegrator and RandomWalkIntegrator.
+// TODO This should be shared between SimplePathIntegrator and RandomWalkIntegrator.
 impl PixelSampleEvaluatorI for SimplePathIntegrator {
     fn evaluate_pixel_sample(
         &self,
