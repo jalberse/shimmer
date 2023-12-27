@@ -48,7 +48,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_light_sampling_unsafe_nightly.pfm",
+        "only_lights_in_primitives.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -85,11 +85,17 @@ fn main() {
     // let random_walk_pixel_evaluator =
     //     PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth: 8 });
 
-    // TODO Resulting image isn't what I expect - I would expect something similar
-    //  to what we get when sample_lights is set to false (which also matches RandomWalk).
+    // TODO Our image is bad when sampling lights! It should match what we get when sample_lights is false (and RandomWalk).
+    // With light sampling, currently:
+    // If the lights are only in the primitives (not in the lights vector), then we see only the light sphere, flatly.
+    // If the lights are only in the lights vector (not in the primitives), then we see only the diffuse sphere, lit correctly.
+    // If the lights are in both (which I think is correct, TODO check), then we see both, but with horrible
+    //  acne on the diffuse sphere and noise in the light.
     //  It's possible that we have a bug in the `if self.sample_lights` block in the integrator.
-    //  I do think it's correct to have the lights vec hold the second reference to the
-    //  Arc<Light> area lights in the GeometricPrimitive - we want the same light in both.
+    // I think the issue is that the light source is being occluded by the surface of the light:
+    // see ShadowEpsilon: https://pbr-book.org/4ed/Shapes/Managing_Rounding_Error#ShadowEpsilon
+    // I thought I handled all that stuff, but let's double-check it to be sure.
+    //   Since it works fine when the light primitives aren't present, it likely is the occlusion problem.
 
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);
