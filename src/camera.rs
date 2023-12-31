@@ -398,8 +398,8 @@ impl CameraTransform {
     pub fn render_from_camera_n(&self, n: &Normal3f) -> Normal3f {
         self.render_from_camera.apply(n)
     }
-    pub fn render_from_camera_r(&self, r: &Ray) -> Ray {
-        self.render_from_camera.apply(r)
+    pub fn render_from_camera_r(&self, r: &Ray, t_max: Float) -> Ray {
+        self.render_from_camera.apply_ray(r, Some(Float))
     }
     pub fn render_from_camera_rd(&self, r: &RayDifferential) -> RayDifferential {
         self.render_from_camera.apply(r)
