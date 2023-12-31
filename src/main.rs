@@ -48,7 +48,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "testing_shadow_occlusion_ray_t_max_adjusted.pfm",
+        "testing_aggregate_intersection_tmax.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -101,7 +101,12 @@ fn main() {
     // find any intersections with shapes that are close to the light source and actually occlude it,
     // while avoiding reporting incorrect intersections with the surface of the light source.
     // Unfortunately, our implementation does not address this issue, so we set the tMax value
-    // of shadow rays to be just under one so that they stop before the surface of light sources.""
+    // of shadow rays to be just under one so that they stop before the surface of light sources."
+    //
+    // Okay I think issue is moreso in respecting t_max in intersection predicate, for reasons listed in unoccluded().
+    // We could try with a scene with spheres instead of tris to see if the t_max issue is related to the Triangle implementation.
+    // If spheres works fine, then it's likely the Triangle implementation.
+    // If spheres are also messed up (compared to random walk, or with sample_lights = false), then it's likely the t_max issue in the aggregate.
 
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);

@@ -114,17 +114,14 @@ impl IntegratorBase {
     }
 
     pub fn unoccluded(&self, p0: &Interaction, p1: &Interaction) -> bool {
-        // TODO I think the spawn_ray_to_interaction() impl may be wrong, leading to lights being
-        //  incorrectly occluded by the surface they're on. Investigate.
-        // The enforcement mechanism *should* be that t_max is just under 1, so we stop just before
-        //   the light and don't hit it *or* the surface, but probably hit everything before it.
-        //   So it's possible that spawn_ray_to_interaction is fine, but our t_max logic isn't working.
-        //   A larger shadow epsilon had no apparent effect, but it could still be either.
-        // I mean, the ray is *from* the interaction, *to* the light - the light occlusion would not
-        //  have to do with the offset at the origin. So it's probably the t_max logic.
-        //  POSSIBLY missing t_max logic in apply() for ray transformations, OR something I haven't seen yet
-        //   in the BVH or triangle intersection predicate logic.
-        //   But fix the prior first, since it's definitely wrong.
+        // Alright commenting out unoccluded caused the diffuse to be lit, it's definitely this that is the problem. The lit sphere's geo is occluding the lights that are sampled.
+        // Making shadow_epsilon large has no effect, though - it's still occluding.
+        // Also, it's spawning the ray *from* the interaction *to* the light, so I don't think the
+        // spawn_ray_to_interaction (which is offsetting the ORIGIN) is the problem - the issue is
+        //   at the end of the ray, not getting occluded at the start.
+        // So I think the issue might be in intersect_predicate then? Perhaps it's not respecting the t_max?
+        //    That would make sense with the face that making SHADOW_EPSILON large has no effect...
+        // And I could see our aggregate intersection code messing up t_max handling. So yeah, investigate that I guess.
         !self.intersect_predicate(&p0.spawn_ray_to_interaction(p1), 1.0 - Self::SHADOW_EPISLON)
     }
 }
@@ -666,6 +663,8 @@ impl SimplePathIntegrator {
                             // Evaluate BSDF for light and possibly scattered radiance
                             let wi = ls.wi;
                             let f = bsdf.f(wo, wi, crate::bxdf::TransportMode::Radiance);
+                            // TODO Commenting out unoccluded check results in things being lit "correct" but with no shadows, which is what I would expect.
+                            //    So the lack of lighting means unoccluded is returning true incorrectly, so we need to fix our unoccluded logic.
                             if f.is_some() && base.unoccluded(&isect.interaction, &ls.p_light) {
                                 l += beta * f.unwrap() * ls.l / (sampled_light.p * ls.pdf);
                             }
