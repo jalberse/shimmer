@@ -1,7 +1,5 @@
 use std::{ffi::OsStr, path::Path};
 
-use crate::Float;
-
 /// Checks if the filename has the extension.
 /// The case of ext is ignored, and should not contain the leading period.
 pub fn has_extension(filename: &str, ext: &str) -> bool {

@@ -48,7 +48,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "only_lights_in_primitives.pfm",
+        "testing_shadow_occlusion.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -90,12 +90,18 @@ fn main() {
     // If the lights are only in the primitives (not in the lights vector), then we see only the light sphere, flatly.
     // If the lights are only in the lights vector (not in the primitives), then we see only the diffuse sphere, lit correctly.
     // If the lights are in both (which I think is correct, TODO check), then we see both, but with horrible
-    //  acne on the diffuse sphere and noise in the light.
+    //  acne on the diffuse sphere and noise in the light. I think the diffuse is poorly lit because the lights are incorrectly "occluded".
     //  It's possible that we have a bug in the `if self.sample_lights` block in the integrator.
     // I think the issue is that the light source is being occluded by the surface of the light:
     // see ShadowEpsilon: https://pbr-book.org/4ed/Shapes/Managing_Rounding_Error#ShadowEpsilon
     // I thought I handled all that stuff, but let's double-check it to be sure.
     //   Since it works fine when the light primitives aren't present, it likely is the occlusion problem.
+    // "The approach we have developed so far addresses the effect of floating-point error at the origins of rays
+    // leaving surfaces; there is a related issue for shadow rays to area light sources: we would like to
+    // find any intersections with shapes that are close to the light source and actually occlude it,
+    // while avoiding reporting incorrect intersections with the surface of the light source.
+    // Unfortunately, our implementation does not address this issue, so we set the tMax value
+    // of shadow rays to be just under one so that they stop before the surface of light sources.""
 
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);

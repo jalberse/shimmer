@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use bumpalo::Bump;
 use indicatif::ParallelProgressIterator;
-use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thread_local::ThreadLocal;
 
@@ -53,7 +52,7 @@ pub struct IntegratorBase {
 }
 
 impl IntegratorBase {
-    const SHADOW_EPISLON: f32 = 0.0001;
+    const SHADOW_EPISLON: Float = 0.0001;
 
     /// Creates an IntegratorBase from the given aggregate and lights.
     /// Also does pre-processing for the lights.
@@ -115,6 +114,17 @@ impl IntegratorBase {
     }
 
     pub fn unoccluded(&self, p0: &Interaction, p1: &Interaction) -> bool {
+        // TODO I think the spawn_ray_to_interaction() impl may be wrong, leading to lights being
+        //  incorrectly occluded by the surface they're on. Investigate.
+        // The enforcement mechanism *should* be that t_max is just under 1, so we stop just before
+        //   the light and don't hit it *or* the surface, but probably hit everything before it.
+        //   So it's possible that spawn_ray_to_interaction is fine, but our t_max logic isn't working.
+        //   A larger shadow epsilon had no apparent effect, but it could still be either.
+        // I mean, the ray is *from* the interaction, *to* the light - the light occlusion would not
+        //  have to do with the offset at the origin. So it's probably the t_max logic.
+        //  POSSIBLY missing t_max logic in apply() for ray transformations, OR something I haven't seen yet
+        //   in the BVH or triangle intersection predicate logic.
+        //   But fix the prior first, since it's definitely wrong.
         !self.intersect_predicate(&p0.spawn_ray_to_interaction(p1), 1.0 - Self::SHADOW_EPISLON)
     }
 }
@@ -152,9 +162,6 @@ impl Integrator for ImageTileIntegrator {
         let mut wave_start = 0;
         let mut wave_end = 1;
         let mut next_wave_size = 1;
-
-        // TODO record pixel statistics option and other things PBRT handles here.
-        // Not necessary for just getting a rendered image though.
 
         let tiles = Tile::tile(pixel_bounds, 8, 8);
 
@@ -327,7 +334,7 @@ impl PixelSampleEvaluatorI for RandomWalkIntegrator {
             debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
             debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
 
-            // TODO Scale camera ray differentials absed on image sampling rate.
+            // TODO Scale camera ray differentials based on image sampling rate.
             let ray_diff_scale = Float::max(
                 0.125,
                 1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
@@ -336,8 +343,6 @@ impl PixelSampleEvaluatorI for RandomWalkIntegrator {
                 camera_ray.ray.scale_differentials(ray_diff_scale);
             }
 
-            // TODO increment number of camera rays (I think that's just useful for logging though)
-
             // Evaluate radiance along the camera ray
             let visible_surface = if camera.get_film_const().uses_visible_surface() {
                 Some(VisibleSurface::default())
@@ -345,8 +350,6 @@ impl PixelSampleEvaluatorI for RandomWalkIntegrator {
                 None
             };
 
-            // TODO RandomWalk won't use visible surface, but others would expect
-            //   one they can initialize. Q: why not restructure so li() just creates it?
             let l = camera_ray.weight
                 * self.li(
                     base,
@@ -423,9 +426,6 @@ impl RandomWalkIntegrator {
     ) -> SampledSpectrum {
         let si = base.intersect(&ray.ray, Float::INFINITY);
 
-        // TODO Since this is a random walk, it will never hit point lights.
-        //  We probably want to implement an infinite light, then.
-
         if si.is_none() {
             // Return emitted light from infinite light sources
             let mut le = SampledSpectrum::from_const(0.0);
@@ -436,7 +436,6 @@ impl RandomWalkIntegrator {
         }
         // Note that we declare the interaction as mutable; this is because
         // we must calculate differentials stored within the surface interaction.
-        // TODO Could we modify how we handle this to allow us to use const?
         let mut si = si.unwrap();
         let isect = &mut si.intr;
 
@@ -544,8 +543,6 @@ impl PixelSampleEvaluatorI for SimplePathIntegrator {
             if !options.disable_pixel_jitter {
                 camera_ray.ray.scale_differentials(ray_diff_scale);
             }
-
-            // TODO increment number of camera rays (I think that's just useful for logging though)
 
             // Evaluate radiance along the camera ray
             let visible_surface = if camera.get_film_const().uses_visible_surface() {
@@ -661,6 +658,9 @@ impl SimplePathIntegrator {
                         sampled_light
                             .light
                             .sample_li(&light_sample_ctx, u_light, lambda, false);
+                    // TODO I thought the issue might be incorrect sampling, but I got my spaces messed up (it doesn't return barycentric).
+                    //   So the issue likely IS an occlusion problem, i.e. likely a precision problem. That is congruent with my experiments.
+                    //   So, investigate from here likely. The other alternative is some issue with f().
                     if let Some(ls) = ls {
                         if !ls.l.is_zero() && ls.pdf > 0.0 {
                             // Evaluate BSDF for light and possibly scattered radiance

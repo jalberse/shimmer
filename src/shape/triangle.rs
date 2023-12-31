@@ -579,7 +579,7 @@ impl ShapeI for Triangle {
             (b[0] * p0).abs() + (b[1] * p1).abs().into() + ((1.0 - b[0] - b[1]) * p2).abs().into();
         let p_error: Vector3f = (gamma(6) * p_abs_sum).into();
 
-        // Return ShapeSample for solid angle smapled point on triangle.
+        // Return ShapeSample for solid angle sampled point on triangle.
         let p = b[0] * p0 + (b[1] * p1).into() + (b[2] * p2).into();
         // Compute surface normal for sampled point on triangle
         let n: Normal3f = (p1 - p0).cross(&(p2 - p0)).normalize().into();
@@ -672,4 +672,98 @@ pub struct TriangleIntersection {
     b2: Float,
     /// The t value along the ray the intersection occured
     t: Float,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use float_cmp::assert_approx_eq;
+
+    use crate::{
+        sampler::{IndependentSampler, Sampler, SamplerI},
+        shape::{ShapeI, ShapeSampleContext, TriangleMesh},
+        transform::Transform,
+        vecmath::{point::Point3fi, Normal3f, Point3f, Tuple3},
+        Float,
+    };
+
+    use super::Triangle;
+
+    #[test]
+    fn triangle_sample() {
+        // Note that the returned point is not barycentric; the sampling functions
+        // use barycentric with the vertices to get it in the same space as the vertices.
+        let vertices = vec![
+            Point3f::new(0.0, 0.0, 0.0),
+            Point3f::new(1.0, 0.0, 0.0),
+            Point3f::new(0.0, 1.0, 0.0),
+        ];
+        let indices = vec![0, 1, 2];
+        let mesh = Arc::new(TriangleMesh::new(
+            &Transform::default(),
+            false,
+            indices,
+            vertices,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        ));
+        let tris = Triangle::create_triangles(mesh);
+        let tri = &tris[0];
+
+        let mut sampler = Sampler::Independent(IndependentSampler::new(0, 100));
+
+        for _ in 0..100 {
+            let sample = tri.sample(sampler.get_2d());
+            assert!(sample.is_some());
+            let sample = sample.unwrap();
+            assert!(sample.intr.p().x() >= 0.0 && sample.intr.p().x() <= 1.0);
+            assert!(sample.intr.p().y() >= 0.0 && sample.intr.p().y() <= 1.0);
+            assert_approx_eq!(Float, sample.intr.p().z(), 0.0);
+        }
+    }
+
+    #[test]
+    fn triangle_sample_with_context() {
+        // Note that the returned point is not barycentric; the sampling functions
+        // use barycentric with the vertices to get it in the same space as the vertices.
+        let vertices = vec![
+            Point3f::new(0.0, 0.0, 0.0),
+            Point3f::new(1.0, 0.0, 0.0),
+            Point3f::new(0.0, 1.0, 0.0),
+        ];
+        let indices = vec![0, 1, 2];
+        let mesh = Arc::new(TriangleMesh::new(
+            &Transform::default(),
+            false,
+            indices,
+            vertices,
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        ));
+        let tris = Triangle::create_triangles(mesh);
+        let tri = &tris[0];
+
+        let mut sampler = Sampler::Independent(IndependentSampler::new(0, 100));
+
+        let ctx = ShapeSampleContext::new(
+            Point3fi::from(Point3f::new(0.0, 0.0, 1.0)),
+            Normal3f::new(0.0, 0.0, -1.0),
+            Normal3f::new(0.0, 0.0, -1.0),
+            0.0,
+        );
+
+        for _ in 0..100 {
+            let sample = tri.sample_with_context(&ctx, sampler.get_2d());
+            assert!(sample.is_some());
+            let sample = sample.unwrap();
+            assert!(sample.intr.p().x() >= 0.0 && sample.intr.p().x() <= 1.0);
+            assert!(sample.intr.p().y() >= 0.0 && sample.intr.p().y() <= 1.0);
+            assert_approx_eq!(Float, sample.intr.p().z(), 0.0);
+        }
+    }
 }
