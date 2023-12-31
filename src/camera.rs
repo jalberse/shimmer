@@ -361,7 +361,7 @@ pub struct CameraSample {
 
 pub struct CameraTransform {
     // TODO render_from_camera should be an AnimatedTransform when that's implemented,
-    //  along with any associated changes that entails.
+    //  along with any associated changes that entails (notably, handling the time)
     render_from_camera: Transform,
     world_from_render: Transform,
 }
@@ -398,11 +398,11 @@ impl CameraTransform {
     pub fn render_from_camera_n(&self, n: &Normal3f) -> Normal3f {
         self.render_from_camera.apply(n)
     }
-    pub fn render_from_camera_r(&self, r: &Ray, t_max: Float) -> Ray {
-        self.render_from_camera.apply_ray(r, Some(Float))
+    pub fn render_from_camera_r(&self, r: &Ray) -> Ray {
+        self.render_from_camera.apply_ray(r, None)
     }
     pub fn render_from_camera_rd(&self, r: &RayDifferential) -> RayDifferential {
-        self.render_from_camera.apply(r)
+        self.render_from_camera.apply_ray(r, None)
     }
 
     pub fn camera_from_render_p(&self, p: &Point3f, _time: Float) -> Point3f {
@@ -415,10 +415,10 @@ impl CameraTransform {
         self.render_from_camera.apply_inv(n)
     }
     pub fn camera_from_render_r(&self, r: &Ray, _time: Float) -> Ray {
-        self.render_from_camera.apply_inv(r)
+        self.render_from_camera.apply_ray_inverse(r, None)
     }
     pub fn camera_from_render_rd(&self, r: &RayDifferential, _time: Float) -> RayDifferential {
-        self.render_from_camera.apply_inv(r)
+        self.render_from_camera.apply_ray_inverse(r, None)
     }
 
     pub fn render_from_world_p(&self, p: &Point3f) -> Point3f {

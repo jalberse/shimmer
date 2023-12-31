@@ -48,7 +48,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "testing_shadow_occlusion.pfm",
+        "testing_shadow_occlusion_ray_t_max_adjusted.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,

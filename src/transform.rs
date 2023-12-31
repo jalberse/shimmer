@@ -16,6 +16,28 @@ use crate::{
     Float,
 };
 
+pub trait Transformable {
+    fn apply(&self, transform: &Transform) -> Self;
+}
+
+pub trait TransformableRay {
+    /// Applies the transformation, returning the transformed ray
+    /// and the new t_max, if provided. The t_max is adjusted to account for
+    /// error correction necessary for ray transformations.
+    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self;
+}
+
+pub trait InverseTransformable {
+    fn apply_inverse(&self, transform: &Transform) -> Self;
+}
+
+pub trait InverseTransformableRay {
+    /// Applies the inverse transformation, returning the transformed ray
+    /// and the new t_max, if provided. The t_max is adjusted to account for
+    /// error correction necessary for ray transformations.
+    fn apply_ray_inverse(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self;
+}
+
 // TODO Note that since transforms are relatively memory hungry, it can be good to
 // de-duplicate them in use. C.2.3 InternCache. We likely want something like that,
 // but for now we will abstain.
@@ -326,19 +348,15 @@ impl Transform {
         val.apply_inverse(&self)
     }
 
-    pub fn apply_ray<T: TransformableRay>(
-        &self,
-        val: &T,
-        t_max: Option<Float>,
-    ) -> (T, Option<Float>) {
+    pub fn apply_ray<T: TransformableRay>(&self, val: &T, t_max: Option<&mut Float>) -> T {
         val.apply_ray(&self, t_max)
     }
 
     pub fn apply_ray_inverse<T: InverseTransformableRay>(
         &self,
         val: &T,
-        t_max: Option<Float>,
-    ) -> (T, Option<Float>) {
+        t_max: Option<&mut Float>,
+    ) -> T {
         val.apply_ray_inverse(&self, t_max)
     }
 }
@@ -359,35 +377,6 @@ impl_op_ex!(*|t1: &Transform, t2: &Transform| -> Transform {
         m_inv: t2.m_inv * t1.m_inv,
     }
 });
-
-pub trait Transformable {
-    fn apply(&self, transform: &Transform) -> Self;
-}
-
-// TODO Un-implement the Transformable trait for Rays and implement these instead, accounting for
-//  t_max.
-
-pub trait TransformableRay {
-    /// Applies the transformation, returning the transformed ray
-    /// and the new t_max, if provided. The t_max is adjusted to account for
-    /// error correction necessary for ray transformations.
-    fn apply_ray(&self, transform: &Transform, t_max: Option<Float>) -> (Self, Option<Float>)
-    where
-        Self: Sized;
-}
-
-pub trait InverseTransformableRay {
-    /// Applies the inverse transformation, returning the transformed ray
-    /// and the new t_max, if provided. The t_max is adjusted to account for
-    /// error correction necessary for ray transformations.
-    fn apply_ray_inverse(
-        &self,
-        transform: &Transform,
-        t_max: Option<Float>,
-    ) -> (Self, Option<Float>)
-    where
-        Self: Sized;
-}
 
 impl Transformable for Point3f {
     fn apply(&self, transform: &Transform) -> Self {
@@ -540,31 +529,28 @@ impl Transformable for Vector3fi {
 }
 
 impl TransformableRay for Ray {
-    fn apply_ray(&self, transform: &Transform, mut t_max: Option<Float>) -> (Self, Option<Float>) {
+    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self {
         let o: Point3fi = transform.apply(&self.o).into();
         let d: Vector3f = transform.apply(&self.d);
         // Offset ray origin to edge of error bounds and compute t_max
         let length_squared = d.length_squared();
         let o: Point3fi = if length_squared > 0.0 {
             let dt = d.abs().dot(&o.error().into()) / length_squared;
-            if let Some(t_max) = &t_max {
-                *t_max = t_max - dt;
+            if let Some(t_max) = t_max {
+                *t_max = *t_max - dt;
             }
             o + (d * dt).into()
         } else {
             o
         };
-        (
-            Ray::new_with_time(o.into(), d.into(), self.time, self.medium),
-            t_max,
-        )
+        Ray::new_with_time(o.into(), d.into(), self.time, self.medium)
     }
 }
 
 impl TransformableRay for RayDifferential {
-    fn apply_ray(&self, transform: &Transform, t_max: Option<Float>) -> (Self, Option<Float>) {
+    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self {
         // Get the transformed base ray
-        let (tr, t_max) = transform.apply_ray(&self.ray, t_max);
+        let tr = transform.apply_ray(&self.ray, t_max);
         // Get the transformed aux rays, if any
         let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &self.auxiliary {
             let rx_origin = transform.apply(&aux.rx_origin);
@@ -580,7 +566,7 @@ impl TransformableRay for RayDifferential {
         } else {
             None
         };
-        (RayDifferential { ray: tr, auxiliary }, t_max)
+        RayDifferential { ray: tr, auxiliary }
     }
 }
 
@@ -636,10 +622,6 @@ impl Transformable for SurfaceInteraction {
             dvdy: self.dvdy,
         }
     }
-}
-
-pub trait InverseTransformable {
-    fn apply_inverse(&self, transform: &Transform) -> Self;
 }
 
 impl InverseTransformable for Point3f {
@@ -733,11 +715,7 @@ impl InverseTransformable for Point3fi {
 }
 
 impl InverseTransformableRay for Ray {
-    fn apply_ray_inverse(
-        &self,
-        transform: &Transform,
-        mut t_max: Option<Float>,
-    ) -> (Ray, Option<Float>) {
+    fn apply_ray_inverse(&self, transform: &Transform, t_max: Option<&mut Float>) -> Ray {
         let o: Point3fi = Point3fi::from(self.o).apply_inverse(transform);
         let d: Vector3f = self.d.apply_inverse(transform);
         // Offset ray origin to edge of error bounds
@@ -749,17 +727,14 @@ impl InverseTransformableRay for Ray {
                 o.z().width() / 2.0,
             );
             let dt = d.abs().dot(&o_error) / length_squared;
-            if let Some(t_max) = &t_max {
-                *t_max = t_max - dt;
+            if let Some(t_max) = t_max {
+                *t_max = *t_max - dt;
             }
             o + (d * dt).into()
         } else {
             o
         };
-        (
-            Ray::new_with_time(Point3f::from(o), d, self.time, self.medium),
-            t_max,
-        )
+        Ray::new_with_time(Point3f::from(o), d, self.time, self.medium)
     }
 }
 
@@ -767,10 +742,10 @@ impl InverseTransformableRay for RayDifferential {
     fn apply_ray_inverse(
         &self,
         transform: &Transform,
-        t_max: Option<Float>,
-    ) -> (RayDifferential, Option<Float>) {
+        t_max: Option<&mut Float>,
+    ) -> RayDifferential {
         // Get the transformed base ray
-        let (tr, t_max) = transform.apply_ray_inverse(&self.ray, t_max);
+        let tr = transform.apply_ray_inverse(&self.ray, t_max);
         // Get the transformed aux rays, if any
         let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &self.auxiliary {
             let rx_origin = transform.apply_inv(&aux.rx_origin);
@@ -786,7 +761,7 @@ impl InverseTransformableRay for RayDifferential {
         } else {
             None
         };
-        (RayDifferential { ray: tr, auxiliary }, t_max)
+        RayDifferential { ray: tr, auxiliary }
     }
 }
 

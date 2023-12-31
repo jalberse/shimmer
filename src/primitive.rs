@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     aggregate::BvhAggregate,
@@ -156,8 +156,10 @@ impl PrimitiveI for TransformedPrimitive {
         self.render_from_primitive.apply(&self.primitive.bounds())
     }
 
-    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
-        let ray = self.render_from_primitive.apply_inv(ray);
+    fn intersect(&self, ray: &Ray, mut t_max: Float) -> Option<ShapeIntersection> {
+        let ray = self
+            .render_from_primitive
+            .apply_ray_inverse(ray, Some(&mut t_max));
         let mut si = self.primitive.intersect(&ray, t_max)?;
         debug_assert!(si.t_hit <= 1.001 * t_max);
 
@@ -167,8 +169,8 @@ impl PrimitiveI for TransformedPrimitive {
         Some(si)
     }
 
-    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
-        let ray = self.render_from_primitive.apply(ray);
+    fn intersect_predicate(&self, ray: &Ray, mut t_max: Float) -> bool {
+        let ray = self.render_from_primitive.apply_ray(ray, Some(&mut t_max));
         self.primitive.intersect_predicate(&ray, t_max)
     }
 }
