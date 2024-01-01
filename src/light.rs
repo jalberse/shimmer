@@ -345,6 +345,7 @@ impl LightI for DiffuseAreaLight {
         lambda: &SampledWavelengths,
         _allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
+        // Sample point on shape for the diffuse area light.
         let shape_ctx = ShapeSampleContext::new(ctx.pi, ctx.n, ctx.ns, 0.0);
         let ss = self.shape.sample_with_context(&shape_ctx, u);
         if ss.is_none() {
@@ -355,8 +356,8 @@ impl LightI for DiffuseAreaLight {
             return None;
         }
         debug_assert!(!ss.pdf.is_nan());
-        // TODO set the medium interface of ss.
 
+        // TODO set the medium interface of ss.
         // TODO check against the alpha texture with alpha_masked().
 
         // Return LightLiSample for the sampled point on the shape.

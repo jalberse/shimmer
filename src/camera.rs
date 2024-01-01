@@ -280,6 +280,7 @@ impl CameraBase {
         let down_z_from_camera =
             Transform::rotate_from_to(&Vector3f::from(p_camera).normalize(), &Vector3f::Z);
         let p_down_z = down_z_from_camera.apply(&p_camera);
+        // TODO Finding cases where n_down_z.z is 0, which propagates down to dpdx and dpdy being NaN.
         let n_down_z = down_z_from_camera.apply(&self.camera_from_render_n(n, time));
         let d = n_down_z.z * p_down_z.z;
 

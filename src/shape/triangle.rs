@@ -583,11 +583,13 @@ impl ShapeI for Triangle {
         let p = b[0] * p0 + (b[1] * p1).into() + (b[2] * p2).into();
         // Compute surface normal for sampled point on triangle
         let n: Normal3f = (p1 - p0).cross(&(p2 - p0)).normalize().into();
-        let n = if self.mesh.n.is_empty() {
-            n * -1.0
-        } else {
+        let n = if !self.mesh.n.is_empty() {
             let ns = b[0] * self.mesh.n[v[0]] + b[1] * self.mesh.n[v[1]] + b[2] * self.mesh.n[v[2]];
             n.face_forward(&ns)
+        } else if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
+            n * -1.0
+        } else {
+            n
         };
 
         // Compute (u,v) for sampled point on triangle.

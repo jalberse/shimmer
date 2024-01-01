@@ -114,14 +114,6 @@ impl IntegratorBase {
     }
 
     pub fn unoccluded(&self, p0: &Interaction, p1: &Interaction) -> bool {
-        // Alright commenting out unoccluded caused the diffuse to be lit, it's definitely this that is the problem. The lit sphere's geo is occluding the lights that are sampled.
-        // Making shadow_epsilon large has no effect, though - it's still occluding.
-        // Also, it's spawning the ray *from* the interaction *to* the light, so I don't think the
-        // spawn_ray_to_interaction (which is offsetting the ORIGIN) is the problem - the issue is
-        //   at the end of the ray, not getting occluded at the start.
-        // So I think the issue might be in intersect_predicate then? Perhaps it's not respecting the t_max?
-        //    That would make sense with the face that making SHADOW_EPSILON large has no effect...
-        // And I could see our aggregate intersection code messing up t_max handling. So yeah, investigate that I guess.
         !self.intersect_predicate(&p0.spawn_ray_to_interaction(p1), 1.0 - Self::SHADOW_EPISLON)
     }
 }
@@ -634,7 +626,7 @@ impl SimplePathIntegrator {
             }
             depth += 1;
 
-            // Get BSFD and skip over medium boundaries
+            // Get BSDF and skip over medium boundaries
             let bsdf = isect.get_bsdf(ray, lambda, &camera, sampler, options);
             if bsdf.is_none() {
                 specular_bounce = true;
@@ -655,16 +647,11 @@ impl SimplePathIntegrator {
                         sampled_light
                             .light
                             .sample_li(&light_sample_ctx, u_light, lambda, false);
-                    // TODO I thought the issue might be incorrect sampling, but I got my spaces messed up (it doesn't return barycentric).
-                    //   So the issue likely IS an occlusion problem, i.e. likely a precision problem. That is congruent with my experiments.
-                    //   So, investigate from here likely. The other alternative is some issue with f().
                     if let Some(ls) = ls {
                         if !ls.l.is_zero() && ls.pdf > 0.0 {
                             // Evaluate BSDF for light and possibly scattered radiance
                             let wi = ls.wi;
                             let f = bsdf.f(wo, wi, crate::bxdf::TransportMode::Radiance);
-                            // TODO Commenting out unoccluded check results in things being lit "correct" but with no shadows, which is what I would expect.
-                            //    So the lack of lighting means unoccluded is returning true incorrectly, so we need to fix our unoccluded logic.
                             if f.is_some() && base.unoccluded(&isect.interaction, &ls.p_light) {
                                 l += beta * f.unwrap() * ls.l / (sampled_light.p * ls.pdf);
                             }

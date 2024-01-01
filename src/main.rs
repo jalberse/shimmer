@@ -31,7 +31,7 @@ use shimmer::{
 };
 
 fn main() {
-    let (prims, lights) = two_triangles_scene();
+    let (prims, lights) = get_triangular_mesh_test_scene();
 
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
@@ -39,7 +39,7 @@ fn main() {
         shimmer::aggregate::SplitMethod::Middle,
     ));
 
-    let sampler = Sampler::Independent(IndependentSampler::new(0, 100));
+    let sampler = Sampler::Independent(IndependentSampler::new(0, 1000));
     let full_resolution = Point2i::new(500, 500);
     let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
     let film = RgbFilm::new(
@@ -48,13 +48,12 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_two_tris_sampling.pfm",
+        "test_fixed_tri_sample_normal_1000_samples.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
     );
     let options = Options::default();
-    // TODO Image is inverted it seems? Based on locations of some objects. Is it an issue when writing the image or in transform stuff?
     let camera_transform = Transform::look_at(
         &Point3f::new(0.0, 0.0, -5.0),
         &Point3f::new(0.0, 0.0, 0.0),
@@ -84,39 +83,6 @@ fn main() {
 
     // let random_walk_pixel_evaluator =
     //     PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth: 8 });
-
-    // TODO Our image is bad when sampling lights! It should match what we get when sample_lights is false (and RandomWalk).
-    // With light sampling, currently:
-    // If the lights are only in the primitives (not in the lights vector), then we see only the light sphere, flatly.
-    // If the lights are only in the lights vector (not in the primitives), then we see only the diffuse sphere, lit correctly.
-    // If the lights are in both (which I think is correct, TODO check), then we see both, but with horrible
-    //  acne on the diffuse sphere and noise in the light. I think the diffuse is poorly lit because the lights are incorrectly "occluded".
-    //  It's possible that we have a bug in the `if self.sample_lights` block in the integrator.
-    // I think the issue is that the light source is being occluded by the surface of the light:
-    // see ShadowEpsilon: https://pbr-book.org/4ed/Shapes/Managing_Rounding_Error#ShadowEpsilon
-    // I thought I handled all that stuff, but let's double-check it to be sure.
-    //   Since it works fine when the light primitives aren't present, it likely is the occlusion problem.
-    // "The approach we have developed so far addresses the effect of floating-point error at the origins of rays
-    // leaving surfaces; there is a related issue for shadow rays to area light sources: we would like to
-    // find any intersections with shapes that are close to the light source and actually occlude it,
-    // while avoiding reporting incorrect intersections with the surface of the light source.
-    // Unfortunately, our implementation does not address this issue, so we set the tMax value
-    // of shadow rays to be just under one so that they stop before the surface of light sources."
-    //
-    // Okay I think issue is moreso in respecting t_max in intersection predicate, for reasons listed in unoccluded().
-    // We could try with a scene with spheres instead of tris to see if the t_max issue is related to the Triangle implementation.
-    // If spheres works fine, then it's likely the Triangle implementation.
-    // If spheres are also messed up (compared to random walk, or with sample_lights = false), then it's likely the t_max issue in the aggregate.
-    //
-    // Alright so spheres have ~something else~ wrong with them, or at least it's presenting differently.
-    // Like there's a harsh line on the sphere between lit and unlit, and the dark side has some odd halo
-    // though the halo is present in the random walk as well.
-    // The halo is really present in the light too with it being too bright. Maybe something to do with orientations or transposing coordinates or something, seems like it's on 45's.
-    //
-    // TODO Fix whatever is up with the spheres - maybe it's related, but if not at least I'm fixing something witht he sphere logic.
-    // TODO Alright, so with two simple tris facing each other, we can see the diffuse with no sampling and not see it when there is sampling.
-    //       The spheres are messed up, but we can at least see the diffuse sphere with sampling enabled.
-    //       So I ~think~ it's likely that the issue is in the triangle intersection code specifically, not in the aggregate.
 
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);
@@ -444,14 +410,14 @@ fn two_triangles_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     // Clockwise winding order
     let mut light_verts = Vec::new();
     light_verts.push(Point3f::new(0.0, 0.0, 0.0));
-    light_verts.push(Point3f::new(0.8, 0.8, -0.8));
-    light_verts.push(Point3f::new(0.8, 0.0, -0.8));
+    light_verts.push(Point3f::new(0.8, 0.8, -0.4));
+    light_verts.push(Point3f::new(0.8, 0.1, -0.4));
     let light_indices = vec![0, 1, 2];
 
     let mut diff_verts = Vec::new();
-    diff_verts.push(Point3f::new(-0.8, 0.8, -0.8));
-    diff_verts.push(Point3f::new(0.0, 0.0, 0.0));
-    diff_verts.push(Point3f::new(-0.8, 0.0, -0.8));
+    diff_verts.push(Point3f::new(-0.8, 0.8, -0.4));
+    diff_verts.push(Point3f::new(0.0, 0.1, 0.0));
+    diff_verts.push(Point3f::new(-0.8, 0.0, -0.4));
     let diff_indices = vec![0, 1, 2];
 
     let light_mesh = Arc::new(TriangleMesh::new(

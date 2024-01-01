@@ -22,7 +22,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             rendering_coord_system: RenderingCoordinateSystem::CameraWorld,
-            disable_texture_filtering: false,
+            disable_texture_filtering: true, // TODO change back to false, see #41.
             disable_pixel_jitter: false,
             disable_wavelength_jitter: false,
             force_diffuse: false,

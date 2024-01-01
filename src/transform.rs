@@ -803,9 +803,12 @@ fn apply_normal_helper(m: &SquareMatrix<4>, n: &Normal3f) -> Normal3f {
 
 #[cfg(test)]
 mod tests {
+    use float_cmp::assert_approx_eq;
+
     use crate::{
         bounding_box::Bounds3f,
-        vecmath::{Normal3f, Point3f, Tuple3, Vector3f},
+        vecmath::{Normal3f, Normalize, Point3f, Tuple3, Vector3f},
+        Float,
     };
 
     use super::Transform;
@@ -943,5 +946,14 @@ mod tests {
         let r = Transform::rotate_from_to(&from, &to);
         let to_new = r.apply(&from);
         assert_eq!(to, to_new);
+
+        // Note that rotate_from_to() expects normalized vectors.
+        let from = Vector3f::new(0.1, 0.2, 0.3).normalize();
+        let to = Vector3f::new(0.4, 0.5, 0.6).normalize();
+        let r = Transform::rotate_from_to(&from, &to);
+        let to_new = r.apply(&from);
+        assert_approx_eq!(Float, to.x, to_new.x);
+        assert_approx_eq!(Float, to.y, to_new.y);
+        assert_approx_eq!(Float, to.z, to_new.z);
     }
 }
