@@ -31,7 +31,7 @@ use shimmer::{
 };
 
 fn main() {
-    let (prims, lights) = get_triangular_mesh_test_scene();
+    let (prims, lights) = two_triangles_scene();
 
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
@@ -48,7 +48,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "testing_aggregate_intersection_tmax.pfm",
+        "test_two_tris_sampling.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -107,6 +107,16 @@ fn main() {
     // We could try with a scene with spheres instead of tris to see if the t_max issue is related to the Triangle implementation.
     // If spheres works fine, then it's likely the Triangle implementation.
     // If spheres are also messed up (compared to random walk, or with sample_lights = false), then it's likely the t_max issue in the aggregate.
+    //
+    // Alright so spheres have ~something else~ wrong with them, or at least it's presenting differently.
+    // Like there's a harsh line on the sphere between lit and unlit, and the dark side has some odd halo
+    // though the halo is present in the random walk as well.
+    // The halo is really present in the light too with it being too bright. Maybe something to do with orientations or transposing coordinates or something, seems like it's on 45's.
+    //
+    // TODO Fix whatever is up with the spheres - maybe it's related, but if not at least I'm fixing something witht he sphere logic.
+    // TODO Alright, so with two simple tris facing each other, we can see the diffuse with no sampling and not see it when there is sampling.
+    //       The spheres are messed up, but we can at least see the diffuse sphere with sampling enabled.
+    //       So I ~think~ it's likely that the issue is in the triangle intersection code specifically, not in the aggregate.
 
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);
@@ -271,15 +281,12 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     (prims, lights)
 }
 
-fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
+fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     let mut rng = rand::thread_rng();
     // Create some random lights
     let (mut light_prims, lights) = {
         let mut light_prims = Vec::new();
-        // Our lights array can actually be empty; the area light contributions will come from the area_light on
-        // the primitives. We could add infinite light sources to this (or point lights, but those won't be hit
-        // by a random walk).
-        let lights = Vec::new();
+        let mut lights = Vec::new();
         for _ in 0..10 {
             let object_from_render = Transform::translate(Vector3f {
                 x: rng.gen_range(-0.8..0.8),
@@ -299,21 +306,22 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
 
             let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
             let scale = 1.0 / spectrum_to_photometric(&le);
-            let area_light = Light::DiffuseAreaLight(DiffuseAreaLight::new(
+            let area_light = Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
                 Transform::default(),
                 le,
                 scale,
                 sphere.clone(),
                 false,
-            ));
+            )));
 
             let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
             let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
             let sphere_light_primitive =
-                GeometricPrimitive::new(sphere, material, Some(Arc::new(area_light)));
+                GeometricPrimitive::new(sphere, material, Some(area_light.clone()));
             light_prims.push(Arc::new(Primitive::Geometric(sphere_light_primitive)));
+            lights.push(area_light)
         }
         (light_prims, lights)
     };
@@ -351,5 +359,177 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Light>) {
     let mut prims = Vec::new();
     prims.append(&mut light_prims);
     prims.append(&mut sphere_prims);
+    (prims, lights)
+}
+
+fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
+    // Create some random lights
+    let (mut light_prims, lights) = {
+        let mut light_prims = Vec::new();
+        let mut lights = Vec::new();
+        let object_from_render = Transform::translate(Vector3f {
+            x: 0.4,
+            y: 0.0,
+            z: 0.0,
+        });
+        let light_radius = 0.33;
+        let sphere = Shape::Sphere(Sphere::new(
+            object_from_render.inverse(),
+            object_from_render,
+            false,
+            light_radius,
+            -light_radius,
+            light_radius,
+            360.0,
+        ));
+
+        let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
+        let scale = 1.0 / spectrum_to_photometric(&le);
+        let area_light = Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
+            Transform::default(),
+            le,
+            scale,
+            sphere.clone(),
+            false,
+        )));
+
+        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+
+        let sphere_light_primitive =
+            GeometricPrimitive::new(sphere, material, Some(area_light.clone()));
+        light_prims.push(Arc::new(Primitive::Geometric(sphere_light_primitive)));
+        lights.push(area_light);
+        (light_prims, lights)
+    };
+
+    // A diffuse sphere to be lit by the light.
+    let mut sphere_prims = {
+        let mut sphere_prims = Vec::new();
+        let object_from_render = Transform::translate(Vector3f {
+            x: -0.4,
+            y: 0.0,
+            z: 0.0,
+        });
+        let radius = 0.33;
+        let sphere = Shape::Sphere(Sphere::new(
+            object_from_render.inverse(),
+            object_from_render,
+            false,
+            radius,
+            -radius,
+            radius,
+            360.0,
+        ));
+
+        let cs = Spectrum::Constant(ConstantSpectrum::new(0.6));
+        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let sphere_primitive =
+            Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
+        sphere_prims.push(Arc::new(sphere_primitive));
+        sphere_prims
+    };
+
+    let mut prims = Vec::new();
+    prims.append(&mut light_prims);
+    prims.append(&mut sphere_prims);
+    (prims, lights)
+}
+
+// Two triangles side-by-side, angled towards each other + the camera at a 45 degree angle.
+fn two_triangles_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
+    // Construct the light
+    // Clockwise winding order
+    let mut light_verts = Vec::new();
+    light_verts.push(Point3f::new(0.0, 0.0, 0.0));
+    light_verts.push(Point3f::new(0.8, 0.8, -0.8));
+    light_verts.push(Point3f::new(0.8, 0.0, -0.8));
+    let light_indices = vec![0, 1, 2];
+
+    let mut diff_verts = Vec::new();
+    diff_verts.push(Point3f::new(-0.8, 0.8, -0.8));
+    diff_verts.push(Point3f::new(0.0, 0.0, 0.0));
+    diff_verts.push(Point3f::new(-0.8, 0.0, -0.8));
+    let diff_indices = vec![0, 1, 2];
+
+    let light_mesh = Arc::new(TriangleMesh::new(
+        &Transform::default(),
+        false,
+        light_indices.clone(),
+        light_verts.clone(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    ));
+
+    let diff_mesh = Arc::new(TriangleMesh::new(
+        &Transform::default(),
+        false,
+        diff_indices.clone(),
+        diff_verts.clone(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    ));
+
+    let cs = Spectrum::Constant(ConstantSpectrum::new(0.7));
+    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+
+    let light_tris = Triangle::create_triangles(light_mesh);
+
+    let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
+    let scale = 1.0 / spectrum_to_photometric(&le);
+
+    let mut light_prims = light_tris
+        .into_iter()
+        .map(|t| -> Arc<Primitive> {
+            let area_light = Some(Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
+                Transform::default(),
+                le.clone(),
+                scale,
+                t.clone(),
+                false,
+            ))));
+            Arc::new(Primitive::Geometric(GeometricPrimitive::new(
+                t,
+                material.clone(),
+                area_light,
+            )))
+        })
+        .collect_vec();
+
+    // Get pointers to the lights data from the primitives, so we can add them to the lights vector.
+    let lights = light_prims
+        .iter()
+        .map(|p| -> Arc<Light> {
+            match p.as_ref() {
+                Primitive::Geometric(p) => p.area_light.clone().expect("Expected area light"),
+                _ => panic!("Expected GeometricPrimitive"),
+            }
+        })
+        .collect_vec();
+
+    let diff_tris = Triangle::create_triangles(diff_mesh);
+    let mut diff_prims = diff_tris
+        .into_iter()
+        .map(|t| -> Arc<Primitive> {
+            Arc::new(Primitive::Geometric(GeometricPrimitive::new(
+                t,
+                material.clone(),
+                None,
+            )))
+        })
+        .collect_vec();
+
+    let mut prims = Vec::new();
+    prims.append(&mut diff_prims);
+    prims.append(&mut light_prims);
+
+    // We could also add infinite or point lights that don't have associated primitives to the lights vector
     (prims, lights)
 }

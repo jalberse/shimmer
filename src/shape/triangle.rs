@@ -191,8 +191,8 @@ impl Triangle {
         let t = t_scaled * inv_det;
         debug_assert!(!t.is_nan());
 
-        // Ensure that the computed traingle t is conservatively greater than zero.
-        // Compute delta_z term for triangel t error bounds.
+        // Ensure that the computed triangle t is conservatively greater than zero.
+        // Compute delta_z term for triangle t error bounds.
         let max_zt = Vector3f::new(p0t.z, p1t.z, p2t.z)
             .abs()
             .max_component_value();

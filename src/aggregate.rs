@@ -1,10 +1,3 @@
-// TODO We'll probably iumplement either Middle or EqualCounts as SplitMethod first because they're easy,
-// but the others are more useful.
-// The BVHAggregate is defined in a different module because it's useful to split them, but they will
-//   also be in the Primitive enum and implement the PrimitiveI interface.
-// PBRT constructs with pointers first and then converts to a vec-based implementation.
-//   I could try to do the same I suppose, but I suspect we'll run into ownership issues.
-
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -25,8 +18,6 @@ use pdqselect;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SplitMethod {
-    // TODO Other split methods; Middle isn't very good, but simple for the first implementation.\
-    // EqualCounts is the next simplest.
     Middle,
     EqualCounts,
 }
@@ -145,9 +136,6 @@ impl PrimitiveI for BvhAggregate {
                 if node.n_primitives > 0 {
                     // Leaf node; intersect ray with primitives in the node
                     for i in 0..node.n_primitives {
-                        // TODO Actually, given this use case, let's not store the offset
-                        // in a variant. The runtime cost of the match while extremely small
-                        // is probably less important than saving the byte or whatever.
                         if self.primitives[node.primitive_offset + i as usize]
                             .as_ref()
                             .intersect_predicate(ray, t_max)
