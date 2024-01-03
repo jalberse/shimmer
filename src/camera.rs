@@ -58,6 +58,7 @@ pub trait CameraI {
 
 pub enum Camera {
     Orthographic(OrthographicCamera),
+    Perspective(PerspectiveCamera),
 }
 
 impl CameraI for Camera {
@@ -68,6 +69,7 @@ impl CameraI for Camera {
     ) -> Option<CameraRay> {
         match self {
             Camera::Orthographic(c) => c.generate_ray(sample, lambda),
+            Camera::Perspective(c) => c.generate_ray(sample, lambda),
         }
     }
 
@@ -78,36 +80,42 @@ impl CameraI for Camera {
     ) -> Option<CameraRayDifferential> {
         match self {
             Camera::Orthographic(c) => c.generate_ray_differential(sample, lambda),
+            Camera::Perspective(c) => c.generate_ray_differential(sample, lambda),
         }
     }
 
     fn get_film(&mut self) -> &mut Film {
         match self {
             Camera::Orthographic(c) => c.get_film(),
+            Camera::Perspective(c) => c.get_film(),
         }
     }
 
     fn get_film_const(&self) -> &Film {
         match self {
             Camera::Orthographic(c) => c.get_film_const(),
+            Camera::Perspective(c) => c.get_film_const(),
         }
     }
 
     fn sample_time(&self, u: Float) -> Float {
         match self {
             Camera::Orthographic(c) => c.sample_time(u),
+            Camera::Perspective(c) => c.sample_time(u),
         }
     }
 
     fn init_metadata(&self, metadata: &mut ImageMetadata) {
         match self {
             Camera::Orthographic(c) => c.init_metadata(metadata),
+            Camera::Perspective(c) => c.init_metadata(metadata),
         }
     }
 
     fn get_camera_transform(&self) -> &CameraTransform {
         match self {
             Camera::Orthographic(c) => c.get_camera_transform(),
+            Camera::Perspective(c) => c.get_camera_transform(),
         }
     }
 
@@ -121,6 +129,7 @@ impl CameraI for Camera {
     ) -> (Vector3f, Vector3f) {
         match self {
             Camera::Orthographic(c) => c.approximate_dp_dxy(p, n, time, samples_per_pixel, options),
+            Camera::Perspective(c) => c.approximate_dp_dxy(p, n, time, samples_per_pixel, options),
         }
     }
 }
