@@ -5,6 +5,7 @@ use crate::{
     float::gamma,
     frame::Frame,
     interaction::{Interaction, SurfaceInteraction, SurfaceInteractionShading},
+    math::radians,
     ray::{AuxiliaryRays, Ray, RayDifferential},
     square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{
@@ -317,6 +318,19 @@ impl Transform {
             m: camera_from_world,
             m_inv: world_from_camera,
         }
+    }
+
+    pub fn perspective(fov: Float, n: Float, f: Float) -> Transform {
+        let persp: SquareMatrix<4> = SquareMatrix {
+            m: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, f / (f - n), -f * n / (f - n)],
+                [0.0, 0.0, 1.0, 0.0],
+            ],
+        };
+        let inv_tan_ang = 1.0 / Float::tan(radians(fov) / 2.0);
+        Transform::scale(inv_tan_ang, inv_tan_ang, 1.0) * Transform::new_calc_inverse(persp)
     }
 
     pub fn transpose(&self) -> Transform {
