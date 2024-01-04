@@ -825,10 +825,9 @@ impl PerspectiveCamera {
             area,
         };
 
-        // TODO uncomment
-        // projective_base
-        //     .camera_base
-        //     .find_minimum_differentials(&camera);
+        projective_base
+            .camera_base
+            .find_minimum_differentials(&camera);
 
         // I dislike having to make the PerspectiveCamera twice, but we need to create it in order
         // to (conveniently) use it to find its minimum differentials, and then

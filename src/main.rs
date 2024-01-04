@@ -7,15 +7,12 @@ use rand::Rng;
 use shimmer::{
     aggregate::BvhAggregate,
     bounding_box::{Bounds2f, Bounds2i},
-    camera::{Camera, CameraTransform, OrthographicCamera, PerspectiveCamera},
+    camera::{Camera, CameraTransform, PerspectiveCamera},
     colorspace::RgbColorSpace,
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
     float::PI_F,
-    integrator::{
-        ImageTileIntegrator, Integrator, PixelSampleEvaluator, RandomWalkIntegrator,
-        SimplePathIntegrator,
-    },
+    integrator::{ImageTileIntegrator, Integrator, PixelSampleEvaluator, SimplePathIntegrator},
     light::{DiffuseAreaLight, Light},
     light_sampler::UniformLightSampler,
     material::{DiffuseMaterial, Material},
@@ -34,7 +31,7 @@ use shimmer::{
 };
 
 fn main() {
-    let (prims, lights) = one_sphere_scene();
+    let (prims, lights) = get_triangular_mesh_test_scene();
 
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
@@ -51,49 +48,20 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_perspective_random_walk.pfm",
+        "test_perspective_triangular_meshes.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
     );
     let options = Options::default();
-    let camera_transform = Transform::look_at(
-        &Point3f::new(0.0, 0.0, -10.0),
+    let camera_from_world = Transform::look_at(
         &Point3f::new(0.0, 0.0, 0.0),
+        &Point3f::new(0.0, 0.0, 1.0),
         &Vector3f::Y,
     );
-    // let camera = Camera::Orthographic(OrthographicCamera::new(
-    //     CameraTransform::new(&camera_transform, &options),
-    //     0.0,
-    //     1.0,
-    //     Film::RgbFilm(film),
-    //     None,
-    //     0.0,
-    //     5.0,
-    //     Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
-    // ));
-
-    // TODO Hmm, not working right. Seems zoomed in way too far, or a narrow fov? Mishandling fov?
-    // I wonder if the CameraTransform is wrong? Other logic seems OK.
-    //   And the Orthographic handling is simple, so maybe we didn't uncover a CameraTransform bug when using it.
-    // Yeah, like, the z position of the camera_transform seems to have no effect?
-    //   x and y DO have an effect, but less than I thought it would? Maybe the FOV is narrow?
-    //    but I checked the FOV logic, maybe... double check it...
-    // I also tried just having z be VERY far away, and it didn't seem to have effect?
-    // Hmm, but having the camera at positive 10 z, looking at positive 100 z... we still see the spheres?
-    //    Which, uh, shouldn't happen, we should be looking away from the origin.
-    //    So... potentially something is wrong there? And I just wasn't seeing in orthographic?
-    // This is so confusing I feel like I'm just missing something?
-    // Like, orthographic cameras and perspective cameras are NOT that different.
-    //   I don't even understand how my perspective one is generating this red image.
-    //   Hm... I guess if it was on the inside of the sphere...
-    //   That could be consistent with the fact that changing z didn't seem to have an effect?
-    //   Maybe our transforms are wrong? Like we're always operating at the origin?
-    //   So maybe I'm assuming we're operating in camera space but not transforming to world space right or smth?
-    //   Our x and y values seemed to have an effect, just not Z, which is weird.
 
     let camera = Camera::Perspective(PerspectiveCamera::new(
-        CameraTransform::new(&camera_transform, &options),
+        CameraTransform::new(&camera_from_world.inverse(), &options),
         0.0,
         1.0,
         Film::RgbFilm(film),
@@ -191,13 +159,13 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         indices.push(get_offset(n_theta - 2, p + 1));
     }
 
-    let diffuse_location = Transform::translate(Vector3f {
+    let diffuse_render_from_object = Transform::translate(Vector3f {
         x: -0.75,
         y: 0.0,
-        z: 0.0,
+        z: 2.0,
     });
     let mesh = Arc::new(TriangleMesh::new(
-        &diffuse_location,
+        &diffuse_render_from_object,
         false,
         indices.clone(),
         vertices.clone(),
@@ -224,13 +192,13 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         .collect_vec();
 
     // Test the same shape but as an emitter at a different location.
-    let light_location = Transform::translate(Vector3f {
+    let light_render_from_object = Transform::translate(Vector3f {
         x: 0.75,
         y: 0.0,
-        z: 0.0,
+        z: 2.0,
     }) * Transform::rotate_x(1.0);
     let light_mesh = Arc::new(TriangleMesh::new(
-        &light_location,
+        &light_render_from_object,
         false,
         indices,
         vertices,
@@ -250,7 +218,7 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         .into_iter()
         .map(|t| -> Arc<Primitive> {
             let area_light = Some(Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
-                light_location.inverse(),
+                light_render_from_object.inverse(),
                 le.clone(),
                 scale,
                 t.clone(),
@@ -291,7 +259,7 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             let object_from_render = Transform::translate(Vector3f {
                 x: rng.gen_range(-0.8..0.8),
                 y: rng.gen_range(-0.8..0.8),
-                z: rng.gen_range(-0.8..0.8),
+                z: 2.0 + rng.gen_range(-0.8..0.8),
             });
             let light_radius = rng.gen_range(0.2..0.35);
             let sphere = Shape::Sphere(Sphere::new(
@@ -333,7 +301,7 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             let object_from_render = Transform::translate(Vector3f {
                 x: rng.gen_range(-0.8..0.8),
                 y: rng.gen_range(-0.8..0.8),
-                z: rng.gen_range(-0.8..0.8),
+                z: 2.0 + rng.gen_range(-0.8..0.8),
             });
             let radius = rng.gen_range(0.1..0.3);
             let sphere = Shape::Sphere(Sphere::new(
@@ -370,7 +338,7 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         let object_from_render = Transform::translate(Vector3f {
             x: 0.4,
             y: 0.0,
-            z: 0.0,
+            z: 2.0,
         });
         let light_radius = 0.33;
         let sphere = Shape::Sphere(Sphere::new(
@@ -386,7 +354,11 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
         let scale = 1.0 / spectrum_to_photometric(&le);
         let area_light = Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
-            Transform::default(),
+            Transform::translate(Vector3f {
+                x: 0.0,
+                y: 0.0,
+                z: 2.0,
+            }),
             le,
             scale,
             sphere.clone(),
@@ -410,7 +382,7 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         let object_from_render = Transform::translate(Vector3f {
             x: -0.4,
             y: 0.0,
-            z: 0.0,
+            z: 2.0,
         });
         let radius = 0.33;
         let sphere = Shape::Sphere(Sphere::new(
@@ -446,9 +418,9 @@ fn one_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         let object_from_render = Transform::translate(Vector3f {
             x: 0.0,
             y: 0.0,
-            z: 0.0,
+            z: 2.0,
         });
-        let light_radius = 0.05;
+        let light_radius = 0.5;
         let sphere = Shape::Sphere(Sphere::new(
             object_from_render.inverse(),
             object_from_render,
@@ -462,7 +434,11 @@ fn one_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
         let scale = 1.0 / spectrum_to_photometric(&le);
         let area_light = Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
-            Transform::default(),
+            Transform::translate(Vector3f {
+                x: 0.0,
+                y: 0.0,
+                z: 2.0,
+            }),
             le,
             scale,
             sphere.clone(),
@@ -502,7 +478,11 @@ fn two_triangles_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     let diff_indices = vec![0, 1, 2];
 
     let light_mesh = Arc::new(TriangleMesh::new(
-        &Transform::default(),
+        &Transform::translate(Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 2.0,
+        }),
         false,
         light_indices.clone(),
         light_verts.clone(),
@@ -513,7 +493,11 @@ fn two_triangles_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     ));
 
     let diff_mesh = Arc::new(TriangleMesh::new(
-        &Transform::default(),
+        &Transform::translate(Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 2.0,
+        }),
         false,
         diff_indices.clone(),
         diff_verts.clone(),
@@ -536,7 +520,11 @@ fn two_triangles_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         .into_iter()
         .map(|t| -> Arc<Primitive> {
             let area_light = Some(Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
-                Transform::default(),
+                Transform::translate(Vector3f {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 2.0,
+                }),
                 le.clone(),
                 scale,
                 t.clone(),
