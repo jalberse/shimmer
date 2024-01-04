@@ -16,7 +16,7 @@ pub trait FilterI {
     fn sample(&self, u: Point2f) -> FilterSample;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Filter {
     BoxFilter(BoxFilter),
 }
@@ -59,7 +59,7 @@ impl FilterI for Filter {
 /// Equivalent to not addressing filtering or reconstruction.
 /// Other filters tend to be better; its simplicity is computationally efficient.
 /// Equally weights all samples within a square region of an image.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoxFilter {
     radius: Vector2f,
 }

@@ -88,7 +88,7 @@ pub trait FilmI {
     fn get_filename(&self) -> &str;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Film {
     RgbFilm(RgbFilm),
 }
@@ -411,7 +411,7 @@ impl FilmBaseParameters {
 
 // Other structs which implement FilmI can have a FilmBase which
 // implements shared functionality.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FilmBase {
     pub full_resolution: Point2i,
     pub pixel_bounds: Bounds2i,
@@ -457,7 +457,7 @@ impl FilmBase {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RgbFilm {
     base: FilmBase,
     color_space: Arc<RgbColorSpace>,
@@ -755,7 +755,7 @@ impl FilmI for RgbFilm {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PixelSensor {
     pub xyz_from_sensor_rgb: SquareMatrix<3>,
     /// The red RGB matching function

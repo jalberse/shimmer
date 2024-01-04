@@ -7,6 +7,7 @@ use crate::{
     bounding_box::Bounds2f,
     film::{Film, FilmI},
     filter::FilterI,
+    frame::Frame,
     image::ImageMetadata,
     math::{lerp, radians},
     medium::Medium,
@@ -15,7 +16,9 @@ use crate::{
     sampling::sample_uniform_disk_concentric,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     transform::Transform,
-    vecmath::{normal::Normal3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f},
+    vecmath::{
+        normal::Normal3, Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f,
+    },
     Float,
 };
 
@@ -135,6 +138,7 @@ impl CameraI for Camera {
 }
 
 /// Shared implementation details for different kinds of cameras.
+#[derive(Debug, Clone)]
 struct CameraBase {
     camera_transform: CameraTransform,
     /// The time of the shutter opening
@@ -324,6 +328,82 @@ impl CameraBase {
             spp_scale * self.render_from_camera_v(&down_z_from_camera.apply_inv(&(py - p_down_z)));
         (dpdx, dpdy)
     }
+
+    pub fn find_minimum_differentials<T>(&mut self, camera: &T)
+    where
+        T: CameraI,
+    {
+        self.min_pos_differential_x =
+            Vector3f::new(Float::INFINITY, Float::INFINITY, Float::INFINITY);
+        self.min_pos_differential_y =
+            Vector3f::new(Float::INFINITY, Float::INFINITY, Float::INFINITY);
+        self.min_dir_differential_x =
+            Vector3f::new(Float::INFINITY, Float::INFINITY, Float::INFINITY);
+        self.min_dir_differential_y =
+            Vector3f::new(Float::INFINITY, Float::INFINITY, Float::INFINITY);
+
+        let mut sample = CameraSample {
+            p_film: Default::default(),
+            p_lens: Point2f::new(0.5, 0.5),
+            time: 0.5,
+            filter_weight: 1.0,
+        };
+        let lambda = SampledWavelengths::sample_visible(0.5);
+
+        let n = 512;
+        for i in 0..n {
+            sample.p_film.x =
+                i as Float / (n - 1) as Float * self.film.full_resolution().x as Float;
+            sample.p_film.y =
+                i as Float / (n - 1) as Float * self.film.full_resolution().y as Float;
+
+            let crd = camera.generate_ray_differential(&sample, &lambda);
+
+            if crd.is_none() {
+                continue;
+            }
+            let mut crd = crd.unwrap();
+
+            let ray = &mut crd.ray;
+
+            let dox = self.camera_from_render_v(
+                &(ray.auxiliary.as_ref().unwrap().rx_origin - ray.ray.o),
+                ray.ray.time,
+            );
+            if dox.length() < self.min_pos_differential_x.length() {
+                self.min_pos_differential_x = dox;
+            }
+            let doy = self.camera_from_render_v(
+                &(ray.auxiliary.as_ref().unwrap().ry_origin - ray.ray.o),
+                ray.ray.time,
+            );
+            if doy.length() < self.min_pos_differential_y.length() {
+                self.min_pos_differential_y = doy;
+            }
+
+            ray.ray.d = ray.ray.d.normalize();
+            ray.auxiliary.as_mut().unwrap().rx_direction =
+                ray.auxiliary.as_ref().unwrap().rx_direction.normalize();
+            ray.auxiliary.as_mut().unwrap().ry_direction =
+                ray.auxiliary.as_ref().unwrap().ry_direction.normalize();
+
+            let f = Frame::from_z(ray.ray.d);
+            let df = f.to_local_v(&ray.ray.d); // Should be (0, 0, 1)
+            let dxf = f
+                .to_local_v(&ray.auxiliary.as_ref().unwrap().rx_direction)
+                .normalize();
+            let dyf = f
+                .to_local_v(&ray.auxiliary.as_ref().unwrap().ry_direction)
+                .normalize();
+
+            if (dxf - df).length() < self.min_dir_differential_x.length() {
+                self.min_dir_differential_x = dxf - df;
+            }
+            if (dyf - df).length() < self.min_dir_differential_y.length() {
+                self.min_dir_differential_y = dyf - df;
+            }
+        }
+    }
 }
 
 pub struct CameraRay {
@@ -371,6 +451,18 @@ pub struct CameraSample {
     pub filter_weight: Float,
 }
 
+impl Default for CameraSample {
+    fn default() -> Self {
+        Self {
+            p_film: Default::default(),
+            p_lens: Default::default(),
+            time: 0.0,
+            filter_weight: 1.0,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct CameraTransform {
     // TODO render_from_camera should be an AnimatedTransform when that's implemented,
     //  along with any associated changes that entails (notably, handling the time)
@@ -455,6 +547,7 @@ impl CameraTransform {
 }
 
 /// Serves to provide shared functionality across orthographic and perspective cameras
+#[derive(Debug, Clone)]
 struct ProjectiveCameraBase {
     camera_base: CameraBase,
     screen_from_camera: Transform,
@@ -683,7 +776,7 @@ impl PerspectiveCamera {
     ) -> PerspectiveCamera {
         // TODO must calculate screen_from_camera
         let screen_from_camera = Transform::perspective(fov, 1e-2, 1000.0);
-        let projective_base = ProjectiveCameraBase::new(
+        let mut projective_base = ProjectiveCameraBase::new(
             camera_transform,
             shutter_open,
             shutter_close,
@@ -724,8 +817,24 @@ impl PerspectiveCamera {
         p_max /= p_max.z;
         let area = Float::abs((p_max.x - p_min.x) * (p_max.y - p_min.y));
 
-        // TODO Compute minimum differentials and set them in camera_base
+        let camera = PerspectiveCamera {
+            projective_base: projective_base.clone(),
+            dx_camera,
+            dy_camera,
+            cos_total_width,
+            area,
+        };
 
+        // TODO uncomment
+        // projective_base
+        //     .camera_base
+        //     .find_minimum_differentials(&camera);
+
+        // I dislike having to make the PerspectiveCamera twice, but we need to create it in order
+        // to (conveniently) use it to find its minimum differentials, and then
+        // make a new camera with those minimum differntials set. There are other approaches, but this is simple,
+        // if a bit inefficient.
+        // TODO - This approach could be improved.
         PerspectiveCamera {
             projective_base,
             dx_camera,

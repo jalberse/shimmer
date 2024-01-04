@@ -7,12 +7,15 @@ use rand::Rng;
 use shimmer::{
     aggregate::BvhAggregate,
     bounding_box::{Bounds2f, Bounds2i},
-    camera::{Camera, CameraTransform, OrthographicCamera},
+    camera::{Camera, CameraTransform, OrthographicCamera, PerspectiveCamera},
     colorspace::RgbColorSpace,
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
     float::PI_F,
-    integrator::{ImageTileIntegrator, Integrator, PixelSampleEvaluator, SimplePathIntegrator},
+    integrator::{
+        ImageTileIntegrator, Integrator, PixelSampleEvaluator, RandomWalkIntegrator,
+        SimplePathIntegrator,
+    },
     light::{DiffuseAreaLight, Light},
     light_sampler::UniformLightSampler,
     material::{DiffuseMaterial, Material},
@@ -31,7 +34,7 @@ use shimmer::{
 };
 
 fn main() {
-    let (prims, lights) = get_triangular_mesh_test_scene();
+    let (prims, lights) = one_sphere_scene();
 
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
@@ -39,7 +42,7 @@ fn main() {
         shimmer::aggregate::SplitMethod::Middle,
     ));
 
-    let sampler = Sampler::Independent(IndependentSampler::new(0, 1000));
+    let sampler = Sampler::Independent(IndependentSampler::new(0, 100));
     let full_resolution = Point2i::new(500, 500);
     let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
     let film = RgbFilm::new(
@@ -48,26 +51,57 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_fixed_tri_sample_normal_1000_samples.pfm",
+        "test_perspective_random_walk.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
     );
     let options = Options::default();
     let camera_transform = Transform::look_at(
-        &Point3f::new(0.0, 0.0, -5.0),
+        &Point3f::new(0.0, 0.0, -10.0),
         &Point3f::new(0.0, 0.0, 0.0),
         &Vector3f::Y,
     );
-    let camera = Camera::Orthographic(OrthographicCamera::new(
+    // let camera = Camera::Orthographic(OrthographicCamera::new(
+    //     CameraTransform::new(&camera_transform, &options),
+    //     0.0,
+    //     1.0,
+    //     Film::RgbFilm(film),
+    //     None,
+    //     0.0,
+    //     5.0,
+    //     Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
+    // ));
+
+    // TODO Hmm, not working right. Seems zoomed in way too far, or a narrow fov? Mishandling fov?
+    // I wonder if the CameraTransform is wrong? Other logic seems OK.
+    //   And the Orthographic handling is simple, so maybe we didn't uncover a CameraTransform bug when using it.
+    // Yeah, like, the z position of the camera_transform seems to have no effect?
+    //   x and y DO have an effect, but less than I thought it would? Maybe the FOV is narrow?
+    //    but I checked the FOV logic, maybe... double check it...
+    // I also tried just having z be VERY far away, and it didn't seem to have effect?
+    // Hmm, but having the camera at positive 10 z, looking at positive 100 z... we still see the spheres?
+    //    Which, uh, shouldn't happen, we should be looking away from the origin.
+    //    So... potentially something is wrong there? And I just wasn't seeing in orthographic?
+    // This is so confusing I feel like I'm just missing something?
+    // Like, orthographic cameras and perspective cameras are NOT that different.
+    //   I don't even understand how my perspective one is generating this red image.
+    //   Hm... I guess if it was on the inside of the sphere...
+    //   That could be consistent with the fact that changing z didn't seem to have an effect?
+    //   Maybe our transforms are wrong? Like we're always operating at the origin?
+    //   So maybe I'm assuming we're operating in camera space but not transforming to world space right or smth?
+    //   Our x and y values seemed to have an effect, just not Z, which is weird.
+
+    let camera = Camera::Perspective(PerspectiveCamera::new(
         CameraTransform::new(&camera_transform, &options),
         0.0,
         1.0,
         Film::RgbFilm(film),
         None,
-        0.0,
-        5.0,
+        90.0,
         Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
+        0.0,
+        1e6,
     ));
 
     let light_sampler = UniformLightSampler {
@@ -401,6 +435,53 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     let mut prims = Vec::new();
     prims.append(&mut light_prims);
     prims.append(&mut sphere_prims);
+    (prims, lights)
+}
+
+fn one_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
+    // Create some random lights
+    let (mut light_prims, lights) = {
+        let mut light_prims = Vec::new();
+        let mut lights = Vec::new();
+        let object_from_render = Transform::translate(Vector3f {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        });
+        let light_radius = 0.05;
+        let sphere = Shape::Sphere(Sphere::new(
+            object_from_render.inverse(),
+            object_from_render,
+            false,
+            light_radius,
+            -light_radius,
+            light_radius,
+            360.0,
+        ));
+
+        let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
+        let scale = 1.0 / spectrum_to_photometric(&le);
+        let area_light = Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
+            Transform::default(),
+            le,
+            scale,
+            sphere.clone(),
+            false,
+        )));
+
+        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+
+        let sphere_light_primitive =
+            GeometricPrimitive::new(sphere, material, Some(area_light.clone()));
+        light_prims.push(Arc::new(Primitive::Geometric(sphere_light_primitive)));
+        lights.push(area_light);
+        (light_prims, lights)
+    };
+
+    let mut prims = Vec::new();
+    prims.append(&mut light_prims);
     (prims, lights)
 }
 

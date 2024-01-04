@@ -102,21 +102,3 @@ impl SamplerI for IndependentSampler {
         self.get_2d()
     }
 }
-
-pub struct CameraSample {
-    p_film: Point2f,
-    p_lens: Point2f,
-    time: Float,
-    filter_wieght: Float,
-}
-
-impl Default for CameraSample {
-    fn default() -> Self {
-        Self {
-            p_film: Default::default(),
-            p_lens: Default::default(),
-            time: 0.0,
-            filter_wieght: 1.0,
-        }
-    }
-}
