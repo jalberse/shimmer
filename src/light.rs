@@ -11,6 +11,7 @@ use crate::{
     float::PI_F,
     interaction::{Interaction, SurfaceInteraction},
     ray::Ray,
+    sampling::{sample_uniform_sphere, uniform_hemisphere_pdf, uniform_sphere_pdf},
     shape::{Shape, ShapeI, ShapeSampleContext},
     spectra::{
         sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
@@ -92,6 +93,7 @@ pub trait LightI {
 pub enum Light {
     Point(PointLight),
     DiffuseAreaLight(DiffuseAreaLight),
+    UniformInfinite(UniformInfiniteLight),
 }
 
 impl LightI for Light {
@@ -99,6 +101,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.phi(lambda),
             Light::DiffuseAreaLight(l) => l.phi(lambda),
+            Light::UniformInfinite(l) => l.phi(lambda),
         }
     }
 
@@ -106,6 +109,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.light_type(),
             Light::DiffuseAreaLight(l) => l.light_type(),
+            Light::UniformInfinite(l) => l.light_type(),
         }
     }
 
@@ -119,6 +123,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
             Light::DiffuseAreaLight(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+            Light::UniformInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
         }
     }
 
@@ -126,6 +131,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
             Light::DiffuseAreaLight(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
+            Light::UniformInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
         }
     }
 
@@ -140,6 +146,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.l(p, n, uv, w, lambda),
             Light::DiffuseAreaLight(l) => l.l(p, n, uv, w, lambda),
+            Light::UniformInfinite(l) => l.l(p, n, uv, w, lambda),
         }
     }
 
@@ -147,6 +154,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.le(ray, lambda),
             Light::DiffuseAreaLight(l) => l.le(ray, lambda),
+            Light::UniformInfinite(l) => l.le(ray, lambda),
         }
     }
 
@@ -154,6 +162,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.preprocess(scene_bounds),
             Light::DiffuseAreaLight(l) => l.preprocess(scene_bounds),
+            Light::UniformInfinite(l) => l.preprocess(scene_bounds),
         }
     }
 }
@@ -399,6 +408,115 @@ impl LightI for DiffuseAreaLight {
 
     fn preprocess(&mut self, scene_bounds: &Bounds3f) {
         // Nothing to do here!
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UniformInfiniteLight {
+    base: LightBase,
+    l_emit: Arc<DenselySampledSpectrum>,
+    scale: Float,
+    scene_center: Point3f,
+    scene_radius: Float,
+}
+
+impl UniformInfiniteLight {
+    /// The scene center and radius are calculated in preprocess().
+    pub fn new(
+        render_from_light: Transform,
+        le: Arc<Spectrum>,
+        scale: Float,
+    ) -> UniformInfiniteLight {
+        let base = LightBase {
+            light_type: LightType::Infinite,
+            render_from_light,
+        };
+        UniformInfiniteLight {
+            base,
+            l_emit: Arc::new(DenselySampledSpectrum::new(le.as_ref())),
+            scale,
+            scene_center: Point3f::ZERO,
+            scene_radius: 0.0,
+        }
+    }
+}
+
+impl LightI for UniformInfiniteLight {
+    fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        3.0 * PI_F
+            * PI_F
+            * self.scene_radius
+            * self.scene_radius
+            * self.scale
+            * self.l_emit.sample(lambda)
+    }
+
+    fn light_type(&self) -> LightType {
+        self.base.light_type
+    }
+
+    fn sample_li(
+        &self,
+        ctx: &LightSampleContext,
+        u: Point2f,
+        lambda: &SampledWavelengths,
+        allow_incomplete_pdf: bool,
+    ) -> Option<LightLiSample> {
+        if allow_incomplete_pdf {
+            None
+        } else {
+            // Return uniform spherical sample for uniform infinite light.
+            let wi = sample_uniform_sphere(u);
+            let pdf = uniform_hemisphere_pdf();
+            Some(LightLiSample::new(
+                self.scale * self.l_emit.sample(lambda),
+                wi,
+                pdf,
+                Interaction::new(
+                    (ctx.p() + wi * (2.0 * self.scene_radius)).into(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                ),
+            ))
+        }
+    }
+
+    fn pdf_li(
+        &self,
+        _ctx: &LightSampleContext,
+        _wi: Vector3f,
+        allow_incomplete_pdf: bool,
+    ) -> Float {
+        if allow_incomplete_pdf {
+            0.0
+        } else {
+            uniform_sphere_pdf()
+        }
+    }
+
+    fn l(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        uv: Point2f,
+        w: Vector3f,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
+        self.base.l(p, n, uv, w, lambda)
+    }
+
+    /// Returns the emitted radiance along the given ray.
+    /// Since a Uniform Infinite Light emits the same amount for all rays, this is trivial.
+    fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
+        self.scale * self.l_emit.sample(lambda)
+    }
+
+    fn preprocess(&mut self, scene_bounds: &Bounds3f) {
+        let bounding_sphere = scene_bounds.bounding_sphere();
+        self.scene_center = bounding_sphere.center;
+        self.scene_radius = bounding_sphere.radius;
     }
 }
 

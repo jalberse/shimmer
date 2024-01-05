@@ -89,6 +89,7 @@ fn main() {
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);
 
+    // TODO Uniform infinite light should be implemented, let's make a test scene for it :)
     integrator.render(&options);
 }
 
