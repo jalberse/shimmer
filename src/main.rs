@@ -13,7 +13,7 @@ use shimmer::{
     filter::{BoxFilter, Filter},
     float::PI_F,
     integrator::{ImageTileIntegrator, Integrator, PixelSampleEvaluator, SimplePathIntegrator},
-    light::{DiffuseAreaLight, Light},
+    light::{DiffuseAreaLight, Light, UniformInfiniteLight},
     light_sampler::UniformLightSampler,
     material::{DiffuseMaterial, Material},
     options::Options,
@@ -31,7 +31,7 @@ use shimmer::{
 };
 
 fn main() {
-    let (prims, lights) = get_triangular_mesh_test_scene();
+    let (prims, lights) = get_tri_mesh_inf_light_scene();
 
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(
         prims,
@@ -39,7 +39,7 @@ fn main() {
         shimmer::aggregate::SplitMethod::Middle,
     ));
 
-    let sampler = Sampler::Independent(IndependentSampler::new(0, 100));
+    let sampler = Sampler::Independent(IndependentSampler::new(0, 50));
     let full_resolution = Point2i::new(500, 500);
     let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
     let film = RgbFilm::new(
@@ -48,7 +48,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test_perspective_triangular_meshes.pfm",
+        "test.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -56,7 +56,7 @@ fn main() {
     let options = Options::default();
     let camera_from_world = Transform::look_at(
         &Point3f::new(0.0, 0.0, 0.0),
-        &Point3f::new(0.0, 0.0, 1.0),
+        &Point3f::new(0.0, 0.0, 2.0),
         &Vector3f::Y,
     );
 
@@ -89,8 +89,110 @@ fn main() {
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);
 
-    // TODO Uniform infinite light should be implemented, let's make a test scene for it :)
     integrator.render(&options);
+}
+
+// Triangulated sphere lit by a uniform infinite light.
+fn get_tri_mesh_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
+    // Make a triangular mesh for a triangulated sphere (with vertices randomly
+    // offset along their normal), centered at the origin.
+    let n_theta = 16;
+    let n_phi = 16;
+    let n_vertices = n_theta * n_phi;
+    let mut vertices = Vec::new();
+    for t in 0..n_theta {
+        let theta = PI_F * t as Float / (n_theta - 1) as Float;
+        let cos_theta = Float::cos(theta);
+        let sin_theta = Float::sin(theta);
+        for p in 0..n_phi {
+            let phi = 2.0 * PI_F * p as Float / (n_phi - 1) as Float;
+            let radius = 1.0;
+            // Make sure all the top and bottom vertices are coincident
+            if t == 0 {
+                vertices.push(Point3f::new(0.0, 0.0, radius));
+            } else if t == n_theta - 1 {
+                vertices.push(Point3f::new(0.0, 0.0, -radius));
+            } else if p == n_phi - 1 {
+                // Close it up exactly at the end
+                vertices.push(vertices[vertices.len() - (n_phi - 1)]);
+            } else {
+                vertices
+                    .push(Point3f::ZERO + radius * spherical_direction(sin_theta, cos_theta, phi));
+            }
+        }
+    }
+    assert_eq!(n_vertices, vertices.len());
+
+    let mut indices = Vec::new();
+    // fan at top
+    let get_offset = |t: usize, p: usize| -> usize { t * n_phi + p };
+    for p in 0..(n_phi - 1) {
+        indices.push(get_offset(0, 0));
+        indices.push(get_offset(1, p));
+        indices.push(get_offset(1, p + 1));
+    }
+
+    // "Quads" (bisected) in the middle rows
+    for t in 1..(n_theta - 2) {
+        for p in 0..(n_phi - 1) {
+            indices.push(get_offset(t, p));
+            indices.push(get_offset(t + 1, p));
+            indices.push(get_offset(t + 1, p + 1));
+
+            indices.push(get_offset(t, p));
+            indices.push(get_offset(t + 1, p + 1));
+            indices.push(get_offset(t, p + 1));
+        }
+    }
+
+    // Fan at the bottom
+    for p in 0..(n_phi - 1) {
+        indices.push(get_offset(n_theta - 1, 0));
+        indices.push(get_offset(n_theta - 2, p));
+        indices.push(get_offset(n_theta - 2, p + 1));
+    }
+
+    let diffuse_render_from_object = Transform::translate(Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: 2.0,
+    });
+    let mesh = Arc::new(TriangleMesh::new(
+        &diffuse_render_from_object,
+        false,
+        indices.clone(),
+        vertices.clone(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    ));
+
+    let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+
+    let tris = Triangle::create_triangles(mesh);
+    let prims = tris
+        .into_iter()
+        .map(|t| {
+            Arc::new(Primitive::Geometric(GeometricPrimitive::new(
+                t,
+                material.clone(),
+                None,
+            )))
+        })
+        .collect_vec();
+
+    let inf_light = Arc::new(Light::UniformInfinite(UniformInfiniteLight::new(
+        Transform::default(),
+        Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.005))),
+        1.0,
+    )));
+    let lights = vec![inf_light];
+
+    // We could also add infinite or point lights that don't have associated primitives to the lights vector
+    (prims, lights)
 }
 
 // Two triangular meshes representing rough spheres side-by-side.
@@ -567,5 +669,50 @@ fn two_triangles_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     prims.append(&mut light_prims);
 
     // We could also add infinite or point lights that don't have associated primitives to the lights vector
+    (prims, lights)
+}
+
+fn get_random_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
+    let mut rng = rand::thread_rng();
+
+    let inf_light = Light::UniformInfinite(UniformInfiniteLight::new(
+        Transform::default(),
+        Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.1))),
+        1.0,
+    ));
+    let lights = vec![Arc::new(inf_light)];
+
+    // Diffuse spheres to be lit by the light.
+    let mut sphere_prims = {
+        let mut sphere_prims = Vec::new();
+        for _ in 0..10 {
+            let object_from_render = Transform::translate(Vector3f {
+                x: rng.gen_range(-0.8..0.8),
+                y: rng.gen_range(-0.8..0.8),
+                z: 1.0 + rng.gen_range(-0.8..0.8),
+            });
+            let radius = rng.gen_range(0.1..0.3);
+            let sphere = Shape::Sphere(Sphere::new(
+                object_from_render.inverse(),
+                object_from_render,
+                false,
+                radius,
+                -radius,
+                radius,
+                360.0,
+            ));
+
+            let cs = Spectrum::Constant(ConstantSpectrum::new(0.6));
+            let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let sphere_primitive =
+                Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
+            sphere_prims.push(Arc::new(sphere_primitive));
+        }
+        sphere_prims
+    };
+
+    let mut prims = Vec::new();
+    prims.append(&mut sphere_prims);
     (prims, lights)
 }
