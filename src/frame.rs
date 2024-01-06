@@ -12,7 +12,7 @@ impl Frame {
     }
 
     pub fn from_xz(x: Vector3f, z: Vector3f) -> Frame {
-        let y = x.cross(&z);
+        let y = z.cross(&x);
         Frame::new(x, y, z)
     }
 
