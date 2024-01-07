@@ -21,8 +21,8 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
-            rendering_coord_system: RenderingCoordinateSystem::CameraWorld,
-            disable_texture_filtering: true, // TODO change back to false, see #41.
+            rendering_coord_system: RenderingCoordinateSystem::World,
+            disable_texture_filtering: false,
             disable_pixel_jitter: false,
             disable_wavelength_jitter: false,
             force_diffuse: false,
