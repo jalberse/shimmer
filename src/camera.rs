@@ -3,8 +3,11 @@
 // TODO circular camera (maybe, low priority)
 // TODO place Camera types into a Camera enum that impl CameraI (typical pattern).
 
+use log::warn;
+
 use crate::{
     bounding_box::Bounds2f,
+    camera,
     film::{Film, FilmI},
     filter::FilterI,
     frame::Frame,
@@ -12,6 +15,8 @@ use crate::{
     math::{lerp, radians},
     medium::Medium,
     options::{Options, RenderingCoordinateSystem},
+    paramdict::ParameterDictionary,
+    parser::FileLoc,
     ray::{AuxiliaryRays, Ray, RayDifferential, RayI},
     sampling::sample_uniform_disk_concentric,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
@@ -62,6 +67,38 @@ pub trait CameraI {
 pub enum Camera {
     Orthographic(OrthographicCamera),
     Perspective(PerspectiveCamera),
+}
+
+impl Camera {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        medium: Option<Medium>,
+        camera_transform: CameraTransform,
+        film: Film,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> Camera {
+        match name {
+            "perspective" => Camera::Perspective(PerspectiveCamera::create(
+                parameters,
+                camera_transform,
+                film,
+                medium,
+                options,
+                loc,
+            )),
+            "orthographic" => Camera::Orthographic(OrthographicCamera::create(
+                parameters,
+                camera_transform,
+                film,
+                medium,
+                options,
+                loc,
+            )),
+            _ => panic!("Camera type \"{}\" unknown.", name),
+        }
+    }
 }
 
 impl CameraI for Camera {
@@ -560,22 +597,18 @@ struct ProjectiveCameraBase {
 
 impl ProjectiveCameraBase {
     pub fn new(
-        camera_transform: CameraTransform,
-        shutter_open: Float,
-        shutter_close: Float,
-        film: Film,
-        medium: Option<Medium>,
+        camera_base_parameters: CameraBaseParameters,
         lens_radius: Float,
         focal_distance: Float,
         screen_from_camera: Transform,
         screen_window: Bounds2f,
     ) -> ProjectiveCameraBase {
         let camera_base = CameraBase {
-            camera_transform,
-            shutter_open,
-            shutter_close,
-            film,
-            medium,
+            camera_transform: camera_base_parameters.camera_transform,
+            shutter_open: camera_base_parameters.shutter_open,
+            shutter_close: camera_base_parameters.shutter_close,
+            film: camera_base_parameters.film,
+            medium: camera_base_parameters.medium,
             // These differentials can be set by the calling code. TODO - Can we improve this?
             min_pos_differential_x: Default::default(),
             min_pos_differential_y: Default::default(),
@@ -630,12 +663,55 @@ pub struct OrthographicCamera {
 }
 
 impl OrthographicCamera {
-    pub fn new(
+    pub fn create(
+        parameters: &mut ParameterDictionary,
         camera_transform: CameraTransform,
-        shutter_open: Float,
-        shutter_close: Float,
         film: Film,
         medium: Option<Medium>,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> OrthographicCamera {
+        let camera_base_paramters =
+            CameraBaseParameters::new(camera_transform, film, medium, parameters, loc);
+
+        let lens_radius = parameters.get_one_float("lensradius", 0.0);
+        let focal_distance = parameters.get_one_float("focaldistance", 1e6);
+        let frame = parameters.get_one_float(
+            "frameaspectratio",
+            camera_base_paramters.film.full_resolution().x as Float
+                / camera_base_paramters.film.full_resolution().y as Float,
+        );
+
+        let mut screen = if frame > 1.0 {
+            Bounds2f::new(Point2f::new(-frame, -1.0), Point2f::new(frame, 1.0))
+        } else {
+            Bounds2f::new(
+                Point2f::new(-1.0, -1.0 / frame),
+                Point2f::new(1.0, 1.0 / frame),
+            )
+        };
+        let sw = parameters.get_float_array("screenwindow");
+        if !sw.is_empty() {
+            if options.fullscreen {
+                warn!("screenwindow is ignored in fullscreen mode");
+            } else {
+                if sw.len() == 4 {
+                    screen = Bounds2f::new(Point2f::new(sw[0], sw[2]), Point2f::new(sw[1], sw[3]));
+                } else {
+                    warn!(
+                        "{} Expected four values for \"screenwindow\" parameter. Got {}.",
+                        loc,
+                        sw.len()
+                    );
+                }
+            }
+        }
+
+        OrthographicCamera::new(camera_base_paramters, lens_radius, focal_distance, screen)
+    }
+
+    pub fn new(
+        camera_base_parameters: CameraBaseParameters,
         lens_radius: Float,
         focal_distance: Float,
         screen_window: Bounds2f,
@@ -643,11 +719,7 @@ impl OrthographicCamera {
         let screen_from_camera = Transform::orthographic(0.0, 1.0);
 
         let mut projective_base = ProjectiveCameraBase::new(
-            camera_transform,
-            shutter_open,
-            shutter_close,
-            film,
-            medium,
+            camera_base_parameters,
             lens_radius,
             focal_distance,
             screen_from_camera,
@@ -763,12 +835,61 @@ pub struct PerspectiveCamera {
 }
 
 impl PerspectiveCamera {
-    pub fn new(
+    pub fn create(
+        parameters: &mut ParameterDictionary,
         camera_transform: CameraTransform,
-        shutter_open: Float,
-        shutter_close: Float,
         film: Film,
         medium: Option<Medium>,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> PerspectiveCamera {
+        let camera_base_paramters =
+            CameraBaseParameters::new(camera_transform, film, medium, parameters, loc);
+
+        let lens_radius = parameters.get_one_float("lensradius", 0.0);
+        let focal_distance = parameters.get_one_float("focaldistance", 1e6);
+        let frame = parameters.get_one_float(
+            "frameaspectratio",
+            camera_base_paramters.film.full_resolution().x as Float
+                / camera_base_paramters.film.full_resolution().y as Float,
+        );
+        let mut screen = if frame > 1.0 {
+            Bounds2f::new(Point2f::new(-frame, -1.0), Point2f::new(frame, 1.0))
+        } else {
+            Bounds2f::new(
+                Point2f::new(-1.0, -1.0 / frame),
+                Point2f::new(1.0, 1.0 / frame),
+            )
+        };
+
+        let sw = parameters.get_float_array("screenwindow");
+        if !sw.is_empty() {
+            if options.fullscreen {
+                warn!("screenwindow is ignored in fullscreen mode");
+            } else {
+                if sw.len() == 4 {
+                    screen = Bounds2f::new(Point2f::new(sw[0], sw[2]), Point2f::new(sw[1], sw[3]));
+                } else {
+                    warn!(
+                        "Expeced four values for \"screenwindow\" parameter. Got {}.",
+                        sw.len()
+                    );
+                }
+            }
+        }
+
+        let fov = parameters.get_one_float("fov", 90.0);
+        PerspectiveCamera::new(
+            camera_base_paramters,
+            fov,
+            screen,
+            lens_radius,
+            focal_distance,
+        )
+    }
+
+    pub fn new(
+        camera_base_parameters: CameraBaseParameters,
         fov: Float,
         screen_window: Bounds2f,
         lens_radius: Float,
@@ -777,11 +898,7 @@ impl PerspectiveCamera {
         // TODO must calculate screen_from_camera
         let screen_from_camera = Transform::perspective(fov, 1e-2, 1000.0);
         let mut projective_base = ProjectiveCameraBase::new(
-            camera_transform,
-            shutter_open,
-            shutter_close,
-            film,
-            medium,
+            camera_base_parameters,
             lens_radius,
             focal_distance,
             screen_from_camera,
@@ -991,5 +1108,40 @@ impl CameraI for PerspectiveCamera {
         self.projective_base
             .camera_base
             .approximate_dp_dxy(p, n, time, samples_per_pixel, options)
+    }
+}
+
+pub struct CameraBaseParameters {
+    pub camera_transform: CameraTransform,
+    pub shutter_open: Float,
+    pub shutter_close: Float,
+    pub film: Film,
+    pub medium: Option<Medium>,
+}
+
+impl CameraBaseParameters {
+    pub fn new(
+        camera_transform: CameraTransform,
+        film: Film,
+        medium: Option<Medium>,
+        parameters: &mut ParameterDictionary,
+        loc: &FileLoc,
+    ) -> CameraBaseParameters {
+        let mut shutter_open = parameters.get_one_float("shutteropen", 0.0);
+        let mut shutter_close = parameters.get_one_float("shutterclose", 1.0);
+        if shutter_close < shutter_open {
+            warn!(
+                "{} Shutter close time [{}] < shutter open [{}]. Swapping them.",
+                loc, shutter_close, shutter_open
+            );
+            std::mem::swap(&mut shutter_close, &mut shutter_open);
+        }
+        CameraBaseParameters {
+            camera_transform: camera_transform,
+            shutter_open,
+            shutter_close,
+            film,
+            medium,
+        }
     }
 }
