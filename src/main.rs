@@ -12,7 +12,10 @@ use shimmer::{
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
     float::PI_F,
-    integrator::{ImageTileIntegrator, Integrator, PixelSampleEvaluator, SimplePathIntegrator},
+    integrator::{
+        ImageTileIntegrator, Integrator, PixelSampleEvaluator, RandomWalkIntegrator,
+        SimplePathIntegrator,
+    },
     light::{DiffuseAreaLight, Light, UniformInfiniteLight},
     light_sampler::UniformLightSampler,
     material::{DiffuseMaterial, Material},
@@ -39,7 +42,7 @@ fn main() {
         shimmer::aggregate::SplitMethod::Middle,
     ));
 
-    let sampler = Sampler::Independent(IndependentSampler::new(0, 50));
+    let sampler = Sampler::Independent(IndependentSampler::new(0, 1000));
     let full_resolution = Point2i::new(500, 500);
     let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
     let film = RgbFilm::new(
@@ -48,7 +51,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "test.pfm",
+        "the_dark_side_of_the_moon_tris_random_walk_2000spp.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -56,7 +59,7 @@ fn main() {
     let options = Options::default();
     let camera_from_world = Transform::look_at(
         &Point3f::new(0.0, 0.0, 0.0),
-        &Point3f::new(0.0, 0.0, 2.0),
+        &Point3f::new(0.0, 0.0, -1.0),
         &Vector3f::Y,
     );
 
@@ -83,13 +86,51 @@ fn main() {
         light_sampler,
     });
 
-    // let random_walk_pixel_evaluator =
-    //     PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth: 8 });
+    let random_walk_pixel_evaluator =
+        PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth: 8 });
 
     let mut integrator =
-        ImageTileIntegrator::new(bvh, lights, camera, sampler, simple_path_pixel_evaluator);
+        ImageTileIntegrator::new(bvh, lights, camera, sampler, random_walk_pixel_evaluator);
 
+    // TODO - Maybe we can make a scene with one diffuse tri, and rotate it around. We can isolate axes rotations and see what's up.
+    // TODO I'm a  bit confused how dpdus is getting used in the BSDF shading frame if it can be 0.
     integrator.render(&options);
+}
+
+fn one_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
+    // Create some random lights
+    let render_from_object = Transform::translate(Vector3f {
+        x: 0.0,
+        y: 0.0,
+        z: -2.0,
+    });
+    let radius = 1.0;
+    let sphere = Shape::Sphere(Sphere::new(
+        render_from_object,
+        render_from_object.inverse(),
+        false,
+        radius,
+        -radius,
+        radius,
+        360.0,
+    ));
+
+    let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+
+    let diffuse_sphere_primitive = GeometricPrimitive::new(sphere, material, None);
+    let mut prims = Vec::new();
+    prims.push(Arc::new(Primitive::Geometric(diffuse_sphere_primitive)));
+
+    let inf_light = Arc::new(Light::UniformInfinite(UniformInfiniteLight::new(
+        Transform::default(),
+        Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.005))),
+        1.0,
+    )));
+    let lights = vec![inf_light];
+
+    (prims, lights)
 }
 
 // Triangulated sphere lit by a uniform infinite light.
@@ -155,7 +196,7 @@ fn get_tri_mesh_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     let diffuse_render_from_object = Transform::translate(Vector3f {
         x: 0.0,
         y: 0.0,
-        z: 2.0,
+        z: -2.0,
     });
     let mesh = Arc::new(TriangleMesh::new(
         &diffuse_render_from_object,
@@ -198,10 +239,6 @@ fn get_tri_mesh_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
 // Two triangular meshes representing rough spheres side-by-side.
 // The vertices also have slight offsets from the radius.
 fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
-    // TODO This triangulated mesh has a bug where the endcap is missing
-    // But it's really not that important, I think it's just a bug with the generated mesh,
-    //  not with our mesh code itself.
-
     let mut rng = rand::thread_rng();
     // Make a triangular mesh for a triangulated sphere (with vertices randomly
     // offset along their normal), centered at the origin.
@@ -510,57 +547,6 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     let mut prims = Vec::new();
     prims.append(&mut light_prims);
     prims.append(&mut sphere_prims);
-    (prims, lights)
-}
-
-fn one_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
-    // Create some random lights
-    let (mut light_prims, lights) = {
-        let mut light_prims = Vec::new();
-        let mut lights = Vec::new();
-        let object_from_render = Transform::translate(Vector3f {
-            x: 0.0,
-            y: 0.0,
-            z: 2.0,
-        });
-        let light_radius = 0.5;
-        let sphere = Shape::Sphere(Sphere::new(
-            object_from_render.inverse(),
-            object_from_render,
-            false,
-            light_radius,
-            -light_radius,
-            light_radius,
-            360.0,
-        ));
-
-        let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
-        let scale = 1.0 / spectrum_to_photometric(&le);
-        let area_light = Arc::new(Light::DiffuseAreaLight(DiffuseAreaLight::new(
-            Transform::translate(Vector3f {
-                x: 0.0,
-                y: 0.0,
-                z: 2.0,
-            }),
-            le,
-            scale,
-            sphere.clone(),
-            false,
-        )));
-
-        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
-        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
-
-        let sphere_light_primitive =
-            GeometricPrimitive::new(sphere, material, Some(area_light.clone()));
-        light_prims.push(Arc::new(Primitive::Geometric(sphere_light_primitive)));
-        lights.push(area_light);
-        (light_prims, lights)
-    };
-
-    let mut prims = Vec::new();
-    prims.append(&mut light_prims);
     (prims, lights)
 }
 

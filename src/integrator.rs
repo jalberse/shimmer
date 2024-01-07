@@ -715,6 +715,10 @@ impl SimplePathIntegrator {
             debug_assert!(beta.y(lambda) >= 0.0);
             debug_assert!(beta.y(lambda).is_finite());
         }
+        debug_assert!(!l.values[0].is_nan());
+        debug_assert!(!l.values[1].is_nan());
+        debug_assert!(!l.values[2].is_nan());
+        debug_assert!(!l.values[3].is_nan());
         l
     }
 }
