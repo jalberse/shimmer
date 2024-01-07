@@ -73,8 +73,6 @@ impl Triangle {
         (p0, p1, p2)
     }
 
-    // TODO oh alright, my bug is that I'm getting v as the first vertex index, but they're not
-    // necessarily consecutive.
     fn get_vertex_indices(&self) -> &[usize] {
         &self.mesh.vertex_indices
             [(3 * self.tri_index as usize)..((3 * self.tri_index as usize) + 3)]
