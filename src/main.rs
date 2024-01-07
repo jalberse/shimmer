@@ -42,7 +42,7 @@ fn main() {
         shimmer::aggregate::SplitMethod::Middle,
     ));
 
-    let sampler = Sampler::Independent(IndependentSampler::new(0, 1000));
+    let sampler = Sampler::Independent(IndependentSampler::new(0, 50));
     let full_resolution = Point2i::new(500, 500);
     let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
     let film = RgbFilm::new(
@@ -51,7 +51,7 @@ fn main() {
         filter,
         1.0,
         PixelSensor::default(),
-        "the_dark_side_of_the_moon_tris_random_walk_2000spp.pfm",
+        "fix_interval_high.pfm",
         RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
         Float::INFINITY,
         false,
@@ -92,8 +92,6 @@ fn main() {
     let mut integrator =
         ImageTileIntegrator::new(bvh, lights, camera, sampler, random_walk_pixel_evaluator);
 
-    // TODO - Maybe we can make a scene with one diffuse tri, and rotate it around. We can isolate axes rotations and see what's up.
-    // TODO I'm a  bit confused how dpdus is getting used in the BSDF shading frame if it can be 0.
     integrator.render(&options);
 }
 
