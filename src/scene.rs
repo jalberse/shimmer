@@ -1,13 +1,14 @@
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
-    camera::CameraTransform,
+    camera::{Camera, CameraTransform},
     colorspace::RgbColorSpace,
-    film::Film,
+    film::{Film, FilmI},
     filter::Filter,
     options::Options,
     paramdict::ParameterDictionary,
     parser::{FileLoc, ParsedParameterVector, ParserTarget},
+    sampler::Sampler,
     transform::Transform,
 };
 
@@ -20,11 +21,17 @@ pub struct BasicScene {
     pub shapes: Vec<ShapeSceneEntity>,
     pub instances: Vec<InstanceSceneEntity>,
     pub instance_definitions: Vec<InstanceDefinitionSceneEntity>,
+    camera: Camera,
     film: Film,
+    sampler: Sampler,
+    named_materials: Vec<(String, SceneEntity)>,
+    materials: Vec<SceneEntity>,
+    area_lights: Vec<SceneEntity>,
 }
 
 impl BasicScene {
-    pub fn new(
+    pub fn set_options(
+        &mut self,
         mut filter: SceneEntity,
         mut film: SceneEntity,
         mut camera: CameraSceneEntity,
@@ -33,7 +40,11 @@ impl BasicScene {
         accel: SceneEntity,
         string_interner: StringInterner,
         options: &Options,
-    ) -> BasicScene {
+    ) {
+        self.film_color_space = film.parameters.color_space.clone();
+        self.integrator = integ;
+        self.accelerator = accel;
+
         let filt = Filter::create(
             &string_interner
                 .resolve(filter.name)
@@ -52,7 +63,7 @@ impl BasicScene {
             );
         }
 
-        let concrete_film = Film::create(
+        self.film = Film::create(
             &string_interner.resolve(film.name).unwrap(),
             &mut film.parameters,
             exposure_time,
@@ -62,16 +73,24 @@ impl BasicScene {
             options,
         );
 
-        todo!()
-        //BasicScene {
-        //    integrator: integ,
-        //    accelerator: accel,
-        //    film_color_space: film.parameters.color_space.clone(),
-        //    shapes: (),
-        //    instances: (),
-        //    instance_definitions: (),
-        //    film: concrete_film,
-        //}
+        let res = self.film.full_resolution();
+        self.sampler = Sampler::create(
+            &string_interner.resolve(sampler.name).unwrap(),
+            &mut sampler.parameters,
+            res,
+            options,
+            &mut sampler.loc,
+        );
+
+        self.camera = Camera::create(
+            &string_interner.resolve(camera.base.name).unwrap(),
+            &mut camera.base.parameters,
+            None,
+            camera.camera_transform,
+            self.film.clone(),
+            options,
+            &mut camera.base.loc,
+        );
     }
 }
 

@@ -7,7 +7,7 @@ use rand::Rng;
 use shimmer::{
     aggregate::BvhAggregate,
     bounding_box::{Bounds2f, Bounds2i},
-    camera::{Camera, CameraTransform, PerspectiveCamera},
+    camera::{Camera, CameraBaseParameters, CameraTransform, PerspectiveCamera},
     colorspace::RgbColorSpace,
     film::{Film, PixelSensor, RgbFilm},
     filter::{BoxFilter, Filter},
@@ -63,12 +63,16 @@ fn main() {
         &Vector3f::Y,
     );
 
+    let camera_base_parameters = CameraBaseParameters {
+        camera_transform: CameraTransform::new(&camera_from_world.inverse(), &options),
+        shutter_open: 0.0,
+        shutter_close: 1.0,
+        film: Film::RgbFilm(film),
+        medium: None,
+    };
+
     let camera = Camera::Perspective(PerspectiveCamera::new(
-        CameraTransform::new(&camera_from_world.inverse(), &options),
-        0.0,
-        1.0,
-        Film::RgbFilm(film),
-        None,
+        camera_base_parameters,
         90.0,
         Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
         0.0,

@@ -1,4 +1,7 @@
 use crate::{
+    options::Options,
+    paramdict::ParameterDictionary,
+    parser::FileLoc,
     vecmath::{Point2f, Point2i},
     Float,
 };
@@ -24,6 +27,23 @@ pub trait SamplerI {
 #[derive(Debug, Clone)]
 pub enum Sampler {
     Independent(IndependentSampler),
+}
+
+impl Sampler {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        full_res: Point2i,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> Sampler {
+        match name {
+            "independent" => {
+                Sampler::Independent(IndependentSampler::create(parameters, options, loc))
+            }
+            _ => panic!("Unknown sampler type!"),
+        }
+    }
 }
 
 impl SamplerI for Sampler {
@@ -67,6 +87,19 @@ pub struct IndependentSampler {
 }
 
 impl IndependentSampler {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        options: &Options,
+        file_loc: &FileLoc,
+    ) -> IndependentSampler {
+        let mut ns = parameters.get_one_int("pixelsamples", 4);
+        if let Some(pixel_samples) = options.pixel_samples {
+            ns = pixel_samples;
+        }
+        let seed = parameters.get_one_int("seed", options.seed) as u64;
+        IndependentSampler::new(seed, ns)
+    }
+
     pub fn new(seed: u64, samples_per_pixel: i32) -> IndependentSampler {
         IndependentSampler {
             seed,
