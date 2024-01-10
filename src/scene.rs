@@ -775,8 +775,9 @@ impl ParserTarget for BasicSceneBuilder {
         self.graphics_state.area_light_loc = loc;
     }
 
-    fn reverse_orientation(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+    fn reverse_orientation(&mut self, _loc: crate::parser::FileLoc) {
+        // TODO verify world
+        self.graphics_state.reverse_orientation = !self.graphics_state.reverse_orientation;
     }
 
     fn object_begin(&mut self, name: &str, loc: crate::parser::FileLoc) {
