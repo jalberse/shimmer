@@ -765,7 +765,14 @@ impl ParserTarget for BasicSceneBuilder {
         params: ParsedParameterVector,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        // TODO Verify world
+        self.graphics_state.area_light_name = name.to_owned();
+        self.graphics_state.area_light_params = ParameterDictionary::new_with_unowned(
+            params,
+            self.graphics_state.light_attributes.clone(),
+            self.graphics_state.color_space.clone(),
+        );
+        self.graphics_state.area_light_loc = loc;
     }
 
     fn reverse_orientation(&mut self, loc: crate::parser::FileLoc) {
