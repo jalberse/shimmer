@@ -1,4 +1,8 @@
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::{Index, IndexMut},
+    sync::Arc,
+};
 
 use crate::{
     camera::{Camera, CameraTransform},
@@ -9,9 +13,13 @@ use crate::{
     paramdict::ParameterDictionary,
     parser::{FileLoc, ParsedParameterVector, ParserTarget},
     sampler::Sampler,
+    square_matrix::SquareMatrix,
     transform::Transform,
+    vecmath::{Point3f, Tuple3, Vector3f},
+    Float,
 };
 
+use log::warn;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
 pub struct BasicScene {
@@ -38,7 +46,7 @@ impl BasicScene {
         mut sampler: SceneEntity,
         integ: SceneEntity,
         accel: SceneEntity,
-        string_interner: StringInterner,
+        string_interner: &StringInterner,
         options: &Options,
     ) {
         self.film_color_space = film.parameters.color_space.clone();
@@ -92,6 +100,52 @@ impl BasicScene {
             &mut camera.base.loc,
         );
     }
+
+    fn add_named_material(&mut self, name: &str, material: SceneEntity) {
+        todo!()
+    }
+
+    fn add_material(&mut self, material: SceneEntity) {
+        todo!()
+    }
+
+    fn add_medium(&mut self, medium: SceneEntity) {
+        todo!()
+    }
+
+    fn add_float_texture(&mut self, name: &str, texture: TextureSceneEntity) {
+        todo!()
+    }
+
+    fn add_spectrum_texture(&mut self, name: &str, texture: TextureSceneEntity) {
+        todo!()
+    }
+
+    fn add_light(&mut self, light: LightSceneEntity, string_interner: &StringInterner) {
+        todo!()
+    }
+
+    fn add_area_light(&mut self, light: SceneEntity) {
+        todo!()
+    }
+
+    fn add_shapes(&mut self, shapes: &[ShapeSceneEntity]) {
+        todo!()
+    }
+
+    // TODO add_animated_shapes().
+
+    fn add_instance_definition(&mut self, instance: InstanceDefinitionSceneEntity) {
+        todo!()
+    }
+
+    fn add_instance_uses(&mut self, instances: &[InstanceSceneEntity]) {
+        todo!()
+    }
+
+    fn done(&mut self) {
+        todo!()
+    }
 }
 
 /// All objects in the scene are described by various *Entity classes.
@@ -100,11 +154,26 @@ impl BasicScene {
 /// and any user-provided parameters.
 /// It is used for the film, sampler, integrator, pixel filter, and accelerator,
 /// and is also used as a "base" for some of the other scene entity types.
+#[derive(Debug, Clone)]
 pub struct SceneEntity {
-    // TODO We will need to use a global StringInterner for this. We can use a Lazy one.
     name: SymbolU32,
     loc: FileLoc,
     parameters: ParameterDictionary,
+}
+
+impl SceneEntity {
+    pub fn new(
+        name: &str,
+        loc: FileLoc,
+        parameters: ParameterDictionary,
+        string_interner: &mut StringInterner,
+    ) -> Self {
+        Self {
+            name: string_interner.get_or_intern(name),
+            loc,
+            parameters,
+        }
+    }
 }
 
 pub enum MaterialRef {
@@ -123,6 +192,7 @@ pub struct ShapeSceneEntity {
     outside_medium: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct CameraSceneEntity {
     base: SceneEntity,
     camera_transform: CameraTransform,
@@ -133,6 +203,47 @@ pub struct TransformedSceneEntity {
     base: SceneEntity,
     // TODO this may need to be an AnimatedTransform
     render_from_object: Transform,
+}
+
+impl TransformedSceneEntity {
+    pub fn new(
+        name: &str,
+        parameters: ParameterDictionary,
+        string_interner: &mut StringInterner,
+        loc: FileLoc,
+        render_from_object: Transform,
+    ) -> Self {
+        Self {
+            base: SceneEntity::new(name, loc, parameters, string_interner),
+            render_from_object,
+        }
+    }
+}
+
+pub type MediumSceneEntity = TransformedSceneEntity;
+pub type TextureSceneEntity = TransformedSceneEntity;
+
+pub struct LightSceneEntity {
+    base: TransformedSceneEntity,
+    medium: String,
+}
+
+impl LightSceneEntity {
+    fn new(
+        name: &str,
+        parameters: ParameterDictionary,
+        string_interner: &mut StringInterner,
+        loc: FileLoc,
+        render_from_light: Transform,
+        medium: &str,
+    ) -> LightSceneEntity {
+        let base =
+            TransformedSceneEntity::new(name, parameters, string_interner, loc, render_from_light);
+        LightSceneEntity {
+            base,
+            medium: medium.to_owned(),
+        }
+    }
 }
 
 pub struct InstanceSceneEntity {
@@ -150,19 +261,164 @@ pub struct InstanceDefinitionSceneEntity {
     // TODO aniamted_shapes: Vec<AnimatedShapeSceneEntity>,
 }
 
-pub struct BasicSceneBuilder {}
+const MAX_TRANSFORMS: usize = 2;
 
-impl ParserTarget for BasicSceneBuilder {
-    fn scale(
-        &mut self,
-        sx: crate::Float,
-        sy: crate::Float,
-        sz: crate::Float,
-        loc: crate::parser::FileLoc,
-    ) {
-        todo!()
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct TransformSet {
+    t: [Transform; MAX_TRANSFORMS],
+}
+
+impl TransformSet {
+    fn inverse(ts: &TransformSet) -> TransformSet {
+        let mut t_inv = TransformSet::default();
+        for i in 0..MAX_TRANSFORMS {
+            t_inv.t[i] = Transform::inverse(&ts.t[i]);
+        }
+        t_inv
     }
 
+    fn is_animated(&self) -> bool {
+        for i in 0..(MAX_TRANSFORMS - 1) {
+            if self.t[i] != self.t[i + 1] {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+impl Default for TransformSet {
+    fn default() -> Self {
+        Self {
+            t: Default::default(),
+        }
+    }
+}
+
+impl Index<usize> for TransformSet {
+    type Output = Transform;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        debug_assert!(index < MAX_TRANSFORMS);
+        &self.t[index]
+    }
+}
+
+impl IndexMut<usize> for TransformSet {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        debug_assert!(index < MAX_TRANSFORMS);
+        &mut self.t[index]
+    }
+}
+
+struct GraphicsState {
+    current_inside_medium: String,
+    current_outside_medium: String,
+
+    current_material_index: i32,
+    current_named_material: String,
+
+    area_light_name: String,
+    area_light_params: ParameterDictionary,
+    area_light_loc: FileLoc,
+
+    shape_attributes: ParsedParameterVector,
+    light_attributes: ParsedParameterVector,
+    material_attributes: ParsedParameterVector,
+    medium_attributes: ParsedParameterVector,
+    texture_attributes: ParsedParameterVector,
+    reverse_orientation: bool,
+    color_space: Arc<RgbColorSpace>,
+    ctm: TransformSet,
+    active_transform_bits: u32,
+    transform_start_time: Float,
+    transform_end_time: Float,
+}
+
+impl Default for GraphicsState {
+    fn default() -> Self {
+        Self {
+            current_inside_medium: Default::default(),
+            current_outside_medium: Default::default(),
+            current_material_index: 0,
+            current_named_material: Default::default(),
+            area_light_name: Default::default(),
+            area_light_params: Default::default(),
+            area_light_loc: Default::default(),
+            shape_attributes: Default::default(),
+            light_attributes: Default::default(),
+            material_attributes: Default::default(),
+            medium_attributes: Default::default(),
+            texture_attributes: Default::default(),
+            reverse_orientation: Default::default(),
+            color_space: RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+            ctm: Default::default(),
+            active_transform_bits: Default::default(),
+            transform_start_time: 0.0,
+            transform_end_time: 1.0,
+        }
+    }
+}
+
+impl GraphicsState {
+    pub fn for_active_transforms(&mut self, func: impl Fn(&mut Transform)) {
+        for i in 0..MAX_TRANSFORMS {
+            if self.active_transform_bits & (1 << i) != 0 {
+                func(&mut self.ctm[i]);
+            }
+        }
+    }
+}
+
+enum BlockState {
+    OptionsBlock,
+    WorldBlock,
+}
+
+pub struct BasicSceneBuilder {
+    scene: Box<BasicScene>,
+    current_block: BlockState,
+    graphics_state: GraphicsState,
+    named_coordinate_systems: HashMap<String, TransformSet>,
+    render_from_world: Transform,
+    // TODO Transform cache - we will implement this in the future.
+    pushed_graphics_states: Vec<GraphicsState>,
+    // TODO Should the push_stack be an enum instead? Natural representation, each variant can store a FileLoc too.
+    push_stack: Vec<(u8, FileLoc)>, // 'a' attribute, 'o' object
+    // TODO instance definition stuff
+
+    // Buffered for consistent ordering across runs
+    shapes: Vec<ShapeSceneEntity>,
+    instance_uses: Vec<InstanceSceneEntity>,
+
+    named_material_names: HashSet<String>,
+    medium_names: HashSet<String>,
+    float_texture_names: HashSet<String>,
+    spectrum_texture_names: HashSet<String>,
+    instance_names: HashSet<String>,
+
+    current_material_index: i32,
+    current_light_index: i32,
+    sampler: SceneEntity,
+    film: SceneEntity,
+    integrator: SceneEntity,
+    filter: SceneEntity,
+    accelerator: SceneEntity,
+    camera: CameraSceneEntity,
+}
+
+impl BasicSceneBuilder {
+    const START_TRANSFORM_BITS: u32 = 1 << 0;
+    const END_TRANSFORM_BITS: u32 = 1 << 1;
+    const ALL_TRANSFORM_BITS: u32 = (1 << MAX_TRANSFORMS) - 1;
+
+    fn render_from_object(&self) -> Transform {
+        // TODO Want to create a version for AnimatedTransform that uses both of ctm.
+        self.render_from_world * self.graphics_state.ctm[0]
+    }
+}
+
+impl ParserTarget for BasicSceneBuilder {
     fn shape(&mut self, name: &str, params: ParsedParameterVector, loc: crate::parser::FileLoc) {
         todo!()
     }
@@ -171,8 +427,9 @@ impl ParserTarget for BasicSceneBuilder {
         todo!()
     }
 
-    fn identity(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+    fn identity(&mut self, _loc: crate::parser::FileLoc) {
+        self.graphics_state
+            .for_active_transforms(|t: &mut Transform| *t = Transform::default());
     }
 
     fn translate(
@@ -180,9 +437,23 @@ impl ParserTarget for BasicSceneBuilder {
         dx: crate::Float,
         dy: crate::Float,
         dz: crate::Float,
-        loc: crate::parser::FileLoc,
+        _loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        self.graphics_state
+            .for_active_transforms(|t: &mut Transform| {
+                *t = *t * Transform::translate(Vector3f::new(dx, dy, dz))
+            });
+    }
+
+    fn scale(
+        &mut self,
+        sx: crate::Float,
+        sy: crate::Float,
+        sz: crate::Float,
+        _loc: crate::parser::FileLoc,
+    ) {
+        self.graphics_state
+            .for_active_transforms(|t: &mut Transform| *t = *t * Transform::scale(sx, sy, sz));
     }
 
     fn rotate(
@@ -191,9 +462,12 @@ impl ParserTarget for BasicSceneBuilder {
         ax: crate::Float,
         ay: crate::Float,
         az: crate::Float,
-        loc: crate::parser::FileLoc,
+        _loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        self.graphics_state
+            .for_active_transforms(|t: &mut Transform| {
+                *t = *t * Transform::rotate(angle, &Vector3f::new(ax, ay, az))
+            });
     }
 
     fn look_at(
@@ -207,49 +481,81 @@ impl ParserTarget for BasicSceneBuilder {
         ux: crate::Float,
         uy: crate::Float,
         uz: crate::Float,
-        loc: crate::parser::FileLoc,
+        _loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        let transform = Transform::look_at(
+            &Point3f::new(ex, ey, ez),
+            &Point3f::new(lx, ly, lz),
+            &Vector3f::new(ux, uy, uz),
+        );
+        self.graphics_state
+            .for_active_transforms(|t: &mut Transform| *t = *t * transform);
     }
 
-    fn concat_transform(&mut self, transform: [crate::Float; 16], loc: crate::parser::FileLoc) {
-        todo!()
+    fn transform(&mut self, transform: [crate::Float; 16], _loc: crate::parser::FileLoc) {
+        self.graphics_state
+            .for_active_transforms(|t: &mut Transform| {
+                *t = Transform::transpose(&Transform::new_calc_inverse(SquareMatrix::<4>::from(
+                    transform.as_slice(),
+                )));
+            })
     }
 
-    fn transform(&mut self, transform: [crate::Float; 16], loc: crate::parser::FileLoc) {
-        todo!()
+    fn concat_transform(&mut self, transform: [crate::Float; 16], _loc: crate::parser::FileLoc) {
+        self.graphics_state
+            .for_active_transforms(|t: &mut Transform| {
+                *t = *t
+                    * Transform::transpose(&Transform::new_calc_inverse(SquareMatrix::<4>::from(
+                        transform.as_slice(),
+                    )));
+            })
     }
 
     fn coordinate_system(&mut self, name: &str, loc: crate::parser::FileLoc) {
-        todo!()
+        // TODO Normalize name to UTF-8.
+        self.named_coordinate_systems
+            .insert(name.to_owned(), self.graphics_state.ctm.clone());
     }
 
     fn coordinate_sys_transform(&mut self, name: &str, loc: crate::parser::FileLoc) {
-        todo!()
+        // TODO Normalize name to UTF-8.
+        if let Some(ctm) = self.named_coordinate_systems.get(name) {
+            self.graphics_state.ctm = ctm.clone();
+        } else {
+            warn!("{}: Couldn't find named coordinate system {}.", loc, name);
+        }
     }
 
-    fn active_transform_all(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+    fn active_transform_all(&mut self, _loc: crate::parser::FileLoc) {
+        self.graphics_state.active_transform_bits = Self::ALL_TRANSFORM_BITS;
     }
 
-    fn active_transform_end_time(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+    fn active_transform_end_time(&mut self, _loc: crate::parser::FileLoc) {
+        self.graphics_state.active_transform_bits = Self::END_TRANSFORM_BITS;
     }
 
-    fn active_transform_start_time(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+    fn active_transform_start_time(&mut self, _loc: crate::parser::FileLoc) {
+        self.graphics_state.active_transform_bits = Self::START_TRANSFORM_BITS;
     }
 
     fn transform_times(
         &mut self,
         start: crate::Float,
         end: crate::Float,
-        loc: crate::parser::FileLoc,
+        _loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        // TODO verify options
+        self.graphics_state.transform_start_time = start;
+        self.graphics_state.transform_end_time = end;
     }
 
-    fn color_space(&mut self, n: &str, loc: crate::parser::FileLoc) {
+    fn color_space(
+        &mut self,
+        n: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: crate::parser::FileLoc,
+    ) {
         todo!()
     }
 
@@ -257,40 +563,73 @@ impl ParserTarget for BasicSceneBuilder {
         &mut self,
         name: &str,
         params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
+        // TODO Verify options
+        self.filter = SceneEntity::new(name, loc, dict, string_interner);
     }
 
     fn film(
         &mut self,
         film_type: &str,
         params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
+        // TODO Verify options
+        self.film = SceneEntity::new(film_type, loc, dict, string_interner);
     }
 
     fn accelerator(
         &mut self,
         name: &str,
         params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
+        // TODO Verify options
+        self.accelerator = SceneEntity::new(name, loc, dict, string_interner);
     }
 
     fn integrator(
         &mut self,
         name: &str,
         params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
+        // TODO Verify options
+        self.integrator = SceneEntity::new(name, loc, dict, string_interner);
     }
 
-    fn camera(&mut self, name: &str, params: ParsedParameterVector, loc: crate::parser::FileLoc) {
-        todo!()
+    fn camera(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: crate::parser::FileLoc,
+        options: &Options,
+    ) {
+        let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
+
+        let camera_from_world = &self.graphics_state.ctm;
+        let world_from_camera = TransformSet::inverse(&camera_from_world);
+        // TODO Animated transform
+        let camera_transform = CameraTransform::new(&world_from_camera[0], options);
+        self.named_coordinate_systems
+            .insert("camera".to_owned(), world_from_camera);
+
+        self.render_from_world = camera_transform.render_from_world();
+
+        self.camera = CameraSceneEntity {
+            base: SceneEntity::new(name, loc, dict, string_interner),
+            camera_transform,
+        };
     }
 
     fn make_named_medium(
@@ -311,12 +650,43 @@ impl ParserTarget for BasicSceneBuilder {
         todo!()
     }
 
-    fn sampler(&mut self, name: &str, params: ParsedParameterVector, loc: crate::parser::FileLoc) {
-        todo!()
+    fn sampler(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: crate::parser::FileLoc,
+    ) {
+        let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
+        // TODO Verify options
+        self.sampler = SceneEntity::new(name, loc, dict, string_interner);
     }
 
-    fn world_begin(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+    fn world_begin(
+        &mut self,
+        string_interner: &mut StringInterner,
+        loc: crate::parser::FileLoc,
+        options: &Options,
+    ) {
+        self.current_block = BlockState::WorldBlock;
+        for i in 0..MAX_TRANSFORMS {
+            self.graphics_state.ctm[i] = Transform::default();
+        }
+        self.graphics_state.active_transform_bits = Self::ALL_TRANSFORM_BITS;
+        self.named_coordinate_systems
+            .insert("world".to_owned(), self.graphics_state.ctm.clone());
+
+        // Pass pre-world-begin entities to the scene
+        self.scene.set_options(
+            self.filter.clone(),
+            self.film.clone(),
+            self.camera.clone(),
+            self.sampler.clone(),
+            self.integrator.clone(),
+            self.accelerator.clone(),
+            string_interner,
+            options,
+        );
     }
 
     fn attribute_begin(&mut self, loc: crate::parser::FileLoc) {
@@ -368,9 +738,25 @@ impl ParserTarget for BasicSceneBuilder {
         &mut self,
         name: &str,
         params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        let dict = ParameterDictionary::new_with_unowned(
+            params,
+            self.graphics_state.light_attributes.clone(),
+            self.graphics_state.color_space.clone(),
+        );
+        self.scene.add_light(
+            LightSceneEntity::new(
+                name,
+                dict,
+                string_interner,
+                loc,
+                self.render_from_object(),
+                &self.graphics_state.current_outside_medium,
+            ),
+            &string_interner,
+        );
     }
 
     fn area_light_source(

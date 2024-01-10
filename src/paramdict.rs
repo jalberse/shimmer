@@ -201,6 +201,7 @@ impl ParameterType for StringParam {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ParsedParameter {
     /// The name of the parameter, e.g. "radius"
     name: String,
@@ -241,10 +242,21 @@ impl Display for SpectrumType {
 /// for checking the validity of parameters or for easily extracting parameter values. To that end,
 /// ParameterDictionary adds both semantics and convenience to vectors of ParsedParameters.
 /// Thus, it is the class that is used for SceneEntity::parameters.
+#[derive(Debug, Clone)]
 pub struct ParameterDictionary {
     pub params: ParsedParameterVector,
     pub color_space: Arc<RgbColorSpace>,
     pub n_owned_params: i32,
+}
+
+impl Default for ParameterDictionary {
+    fn default() -> Self {
+        Self {
+            params: Default::default(),
+            color_space: RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+            n_owned_params: Default::default(),
+        }
+    }
 }
 
 impl ParameterDictionary {
@@ -254,7 +266,23 @@ impl ParameterDictionary {
         color_space: Arc<RgbColorSpace>,
     ) -> ParameterDictionary {
         let n_owned_params = params.len() as i32;
-        // TODO PBRT reverses params; why?
+        let d = ParameterDictionary {
+            params: params.into_iter().rev().collect(),
+            color_space,
+            n_owned_params,
+        };
+        d.check_parameter_types();
+        d
+    }
+
+    pub fn new_with_unowned(
+        mut params: ParsedParameterVector,
+        params_2: ParsedParameterVector,
+        color_space: Arc<RgbColorSpace>,
+    ) -> ParameterDictionary {
+        let n_owned_params = params.len() as i32;
+        params = params.into_iter().rev().collect();
+        params.extend(params_2.into_iter().rev());
         let d = ParameterDictionary {
             params,
             color_space,

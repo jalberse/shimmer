@@ -43,7 +43,7 @@ pub trait InverseTransformableRay {
 // de-duplicate them in use. C.2.3 InternCache. We likely want something like that,
 // but for now we will abstain.
 
-#[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct Transform {
     m: SquareMatrix<4>,
     // Inverse of m
@@ -83,10 +83,6 @@ impl Transform {
         // This should hopefully be quite self-contained and any NaN poisoning would be
         // extremely obvious, so we'll accept it.
         Transform { m, m_inv }
-    }
-
-    pub fn from_2d(m: [[Float; 4]; 4]) -> Transform {
-        Self::new_calc_inverse(SquareMatrix::new(m))
     }
 
     pub fn from_frame(frame: &Frame) -> Transform {
@@ -381,6 +377,12 @@ impl Default for Transform {
             m: Default::default(),
             m_inv: Default::default(),
         }
+    }
+}
+
+impl From<[[Float; 4]; 4]> for Transform {
+    fn from(value: [[Float; 4]; 4]) -> Self {
+        Self::new_calc_inverse(SquareMatrix::new(value))
     }
 }
 
