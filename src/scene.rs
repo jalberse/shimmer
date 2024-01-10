@@ -552,11 +552,12 @@ impl ParserTarget for BasicSceneBuilder {
     fn color_space(
         &mut self,
         n: &str,
-        params: ParsedParameterVector,
-        string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        _params: ParsedParameterVector,
+        _string_interner: &mut StringInterner,
+        _loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        let cs = RgbColorSpace::get_named(n.into());
+        self.graphics_state.color_space = cs.clone();
     }
 
     fn pixel_filter(

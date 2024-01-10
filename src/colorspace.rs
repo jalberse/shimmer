@@ -112,6 +112,17 @@ pub enum NamedColorSpace {
     ACES2065_1,
 }
 
+impl From<&str> for NamedColorSpace {
+    fn from(value: &str) -> Self {
+        match value.to_ascii_lowercase().as_str() {
+            "srgb" => NamedColorSpace::SRGB,
+            "rec2020" => NamedColorSpace::REC2020,
+            "aces2065-1" => NamedColorSpace::ACES2065_1,
+            _ => panic!("Unknown color space: {}", value),
+        }
+    }
+}
+
 pub static SRGB: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
     Arc::new(RgbColorSpace::new(
         Point2f::new(0.64, 0.33),
