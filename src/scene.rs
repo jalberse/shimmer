@@ -126,7 +126,8 @@ impl BasicScene {
         todo!()
     }
 
-    fn add_area_light(&mut self, light: SceneEntity) {
+    /// Returns the new area light index.
+    fn add_area_light(&mut self, light: SceneEntity) -> i32 {
         todo!()
     }
 
@@ -177,17 +178,15 @@ impl SceneEntity {
     }
 }
 
-pub enum MaterialRef {
-    Index(i32),
-    Name(String),
-}
-
 pub struct ShapeSceneEntity {
     base: SceneEntity,
     render_from_object: Arc<Transform>,
     object_from_render: Arc<Transform>,
     reverse_orientation: bool,
-    material_ref: MaterialRef,
+    // TODO It should be one of these two - enum?
+    // It just makes instatiation a bit more complex
+    material_index: i32,
+    mateiral_name: String,
     light_index: i32,
     inside_medium: String,
     outside_medium: String,
@@ -376,6 +375,13 @@ enum BlockState {
     WorldBlock,
 }
 
+struct ActiveInstanceDefinition {
+    // TODO ctor
+    // TODO Active imports?
+    pub entity: InstanceDefinitionSceneEntity,
+    pub parent: Option<Arc<ActiveInstanceDefinition>>,
+}
+
 pub struct BasicSceneBuilder {
     scene: Box<BasicScene>,
     current_block: BlockState,
@@ -406,6 +412,8 @@ pub struct BasicSceneBuilder {
     filter: SceneEntity,
     accelerator: SceneEntity,
     camera: CameraSceneEntity,
+
+    active_instance_definition: Option<ActiveInstanceDefinition>,
 }
 
 impl BasicSceneBuilder {
@@ -417,11 +425,65 @@ impl BasicSceneBuilder {
         // TODO Want to create a version for AnimatedTransform that uses both of ctm.
         self.render_from_world * self.graphics_state.ctm[0]
     }
+
+    fn ctm_is_animated(&self) -> bool {
+        self.graphics_state.ctm.is_animated()
+    }
 }
 
 impl ParserTarget for BasicSceneBuilder {
-    fn shape(&mut self, name: &str, params: ParsedParameterVector, loc: crate::parser::FileLoc) {
-        todo!()
+    fn shape(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: crate::parser::FileLoc,
+    ) {
+        // TODO Verify world
+        let dict = ParameterDictionary::new_with_unowned(
+            params,
+            self.graphics_state.shape_attributes.clone(),
+            self.graphics_state.color_space.clone(),
+        );
+
+        let area_light_index = if self.graphics_state.area_light_name.is_empty() {
+            -1
+        } else {
+            if self.active_instance_definition.is_some() {
+                warn!("{} Area lights not supported with object instancing", loc)
+            }
+            self.scene.add_area_light(SceneEntity::new(
+                &self.graphics_state.area_light_name,
+                self.graphics_state.area_light_loc.clone(),
+                self.graphics_state.area_light_params.clone(),
+                string_interner,
+            ))
+        };
+
+        if self.ctm_is_animated() {
+            todo!(); // Not yet implemented! We don't have animated transforms yet.
+        } else {
+            // TODO Use transform cache.
+            let render_from_object = self.render_from_object();
+            let object_from_render = Transform::inverse(&render_from_object);
+
+            let entity = ShapeSceneEntity {
+                base: SceneEntity::new(name, loc, dict, string_interner),
+                render_from_object: Arc::new(render_from_object),
+                object_from_render: Arc::new(object_from_render),
+                reverse_orientation: self.graphics_state.reverse_orientation,
+                material_index: self.graphics_state.current_material_index,
+                mateiral_name: self.graphics_state.current_named_material.clone(),
+                light_index: area_light_index,
+                inside_medium: self.graphics_state.current_inside_medium.clone(),
+                outside_medium: self.graphics_state.current_outside_medium.clone(),
+            };
+            if let Some(active_instance_definition) = &mut self.active_instance_definition {
+                active_instance_definition.entity.shapes.push(entity)
+            } else {
+                self.shapes.push(entity)
+            }
+        }
     }
 
     fn option(

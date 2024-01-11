@@ -34,7 +34,13 @@ impl Display for FileLoc {
 }
 
 pub trait ParserTarget {
-    fn shape(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc);
+    fn shape(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: FileLoc,
+    );
     fn option(&mut self, name: &str, value: &str, options: &mut Options, loc: FileLoc);
     fn identity(&mut self, loc: FileLoc);
     fn translate(&mut self, dx: Float, dy: Float, dz: Float, loc: FileLoc);
