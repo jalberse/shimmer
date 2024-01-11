@@ -106,7 +106,8 @@ impl BasicScene {
         todo!()
     }
 
-    fn add_material(&mut self, material: SceneEntity) {
+    // Returns the new material index
+    fn add_material(&mut self, material: SceneEntity) -> i32 {
         todo!()
     }
 
@@ -315,6 +316,7 @@ struct GraphicsState {
     current_inside_medium: String,
     current_outside_medium: String,
 
+    // TODO It's one or the other - use an enum.
     current_material_index: i32,
     current_named_material: String,
 
@@ -859,26 +861,116 @@ impl ParserTarget for BasicSceneBuilder {
         texture_type: &str,
         tex_name: &str,
         params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        // TODO Normalize name to UTF8
+        // TODO Verify world
+
+        let dict = ParameterDictionary::new_with_unowned(
+            params,
+            self.graphics_state.texture_attributes.clone(),
+            self.graphics_state.color_space.clone(),
+        );
+
+        if texture_type != "float" && texture_type != "spectrum" {
+            panic!("{} Texture type \"{}\" unknown.", loc, texture_type);
+        }
+
+        let names = if texture_type == "float" {
+            &mut self.float_texture_names
+        } else {
+            &mut self.spectrum_texture_names
+        };
+
+        if names.insert(name.to_owned()) {
+            match texture_type {
+                "float" => {
+                    self.scene.add_float_texture(
+                        name,
+                        TextureSceneEntity::new(
+                            tex_name,
+                            dict,
+                            string_interner,
+                            loc,
+                            self.render_from_object(),
+                        ),
+                    );
+                }
+                "spectrum" => {
+                    self.scene.add_spectrum_texture(
+                        name,
+                        TextureSceneEntity::new(
+                            tex_name,
+                            dict,
+                            string_interner,
+                            loc,
+                            self.render_from_object(),
+                        ),
+                    );
+                }
+                _ => panic!("{} Unknown texture type {}", loc, texture_type),
+            }
+        } else {
+            // TODO defer error instead
+            panic!("{} Texture \"{}\" redefined.", loc, name);
+        }
     }
 
-    fn material(&mut self, name: &str, params: ParsedParameterVector, loc: crate::parser::FileLoc) {
-        todo!()
+    fn material(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: crate::parser::FileLoc,
+    ) {
+        // TODO Verify world
+        let dict = ParameterDictionary::new_with_unowned(
+            params,
+            self.graphics_state.material_attributes.clone(),
+            self.graphics_state.color_space.clone(),
+        );
+
+        self.graphics_state.current_material_index =
+            self.scene
+                .add_material(SceneEntity::new(name, loc, dict, string_interner));
+        self.graphics_state.current_named_material.clear();
     }
 
     fn make_named_material(
         &mut self,
         name: &str,
         params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        // TODO Normalize name to UTF8
+        let dict = ParameterDictionary::new_with_unowned(
+            params,
+            self.graphics_state.material_attributes.clone(),
+            self.graphics_state.color_space.clone(),
+        );
+
+        if self.named_material_names.insert(name.to_owned()) {
+            self.scene
+                .add_named_material(name, SceneEntity::new(name, loc, dict, string_interner));
+        } else {
+            // TODO defer error instead
+            panic!("{} Named material {} redefined.", loc, name);
+        }
     }
 
-    fn named_material(&mut self, name: &str, loc: crate::parser::FileLoc) {
-        todo!()
+    fn named_material(
+        &mut self,
+        name: &str,
+        _params: ParsedParameterVector,
+        _string_interner: &mut StringInterner,
+        _loc: crate::parser::FileLoc,
+    ) {
+        // TODO Normalize name to UTF8
+        // TODO Verify world
+        self.graphics_state.current_named_material = name.to_owned();
+        self.current_material_index = -1;
     }
 
     fn light_source(

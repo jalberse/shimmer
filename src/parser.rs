@@ -134,11 +134,30 @@ pub trait ParserTarget {
         texture_type: &str,
         tex_name: &str,
         params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
         loc: FileLoc,
     );
-    fn material(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc);
-    fn make_named_material(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc);
-    fn named_material(&mut self, name: &str, loc: FileLoc);
+    fn material(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: FileLoc,
+    );
+    fn make_named_material(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: crate::parser::FileLoc,
+    );
+    fn named_material(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner,
+        loc: FileLoc,
+    );
     fn light_source(
         &mut self,
         name: &str,
