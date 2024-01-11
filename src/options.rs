@@ -1,4 +1,7 @@
-use crate::bounding_box::{Bounds2f, Bounds2i};
+use crate::{
+    bounding_box::{Bounds2f, Bounds2i},
+    Float,
+};
 
 pub enum RenderingCoordinateSystem {
     Camera,
@@ -19,6 +22,11 @@ pub struct Options {
     pub crop_window: Option<Bounds2f>,
     pub pixel_samples: Option<i32>,
     pub fullscreen: bool,
+    pub displacement_edge_scale: Float,
+    pub mse_reference_image: String,
+    pub mse_reference_output: String,
+    pub record_pixel_statistics: bool,
+    pub wavefront: bool,
 }
 
 impl Default for Options {
@@ -36,6 +44,11 @@ impl Default for Options {
             crop_window: None,
             pixel_samples: None,
             fullscreen: false,
+            displacement_edge_scale: 1.0,
+            mse_reference_image: "".to_string(),
+            mse_reference_output: "".to_string(),
+            record_pixel_statistics: false,
+            wavefront: false,
         }
     }
 }

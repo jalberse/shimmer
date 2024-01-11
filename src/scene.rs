@@ -15,7 +15,8 @@ use crate::{
     sampler::Sampler,
     square_matrix::SquareMatrix,
     transform::Transform,
-    vecmath::{Point3f, Tuple3, Vector3f},
+    util::normalize_arg,
+    vecmath::{normalize, Point3f, Tuple3, Vector3f},
     Float,
 };
 
@@ -423,8 +424,91 @@ impl ParserTarget for BasicSceneBuilder {
         todo!()
     }
 
-    fn option(&mut self, name: &str, value: &str, loc: crate::parser::FileLoc) {
-        todo!()
+    fn option(
+        &mut self,
+        name: &str,
+        value: &str,
+        options: &mut Options,
+        loc: crate::parser::FileLoc,
+    ) {
+        let name = normalize_arg(name);
+
+        match name.as_str() {
+            "disablepixeljitter" => match value {
+                "true" => options.disable_pixel_jitter = true,
+                "false" => options.disable_pixel_jitter = false,
+                _ => panic!("{} Unknown option value {}", loc, value),
+            },
+            "disabletexturefiltering" => match value {
+                "true" => options.disable_texture_filtering = true,
+                "false" => options.disable_texture_filtering = false,
+                _ => panic!("{} Unknown option value {}", loc, value),
+            },
+            "disablewavelengthjitter" => match value {
+                "true" => options.disable_wavelength_jitter = true,
+                "false" => options.disable_wavelength_jitter = false,
+                _ => panic!("{} Unknown option value {}", loc, value),
+            },
+            "displacementedgescale" => {
+                options.displacement_edge_scale = value
+                    .parse()
+                    .unwrap_or_else(|_| panic!("{} Unable to parse option value {}", loc, value));
+            }
+            "msereferenceimage" => {
+                if value.len() < 3 || !value.starts_with("\"") || !value.ends_with('\"') {
+                    panic!("{} Expected quotes string for option value {}", loc, value);
+                }
+                options.mse_reference_image = value[1..value.len() - 1].to_owned();
+            }
+            "msereferenceout" => {
+                if value.len() < 3 || !value.starts_with("\"") || !value.ends_with('\"') {
+                    panic!("{} Expected quotes string for option value {}", loc, value);
+                }
+                options.mse_reference_output = value[1..value.len() - 1].to_owned();
+            }
+            "rendercoordsys" => {
+                if value.len() < 3 || !value.starts_with("\"") || !value.ends_with("\"") {
+                    panic!("{} Expected quotes string for option value {}", loc, value);
+                }
+                let render_coord_sys = value[1..value.len() - 1].to_owned();
+                match render_coord_sys.as_str() {
+                    "camera" => {
+                        options.rendering_coord_system =
+                            crate::options::RenderingCoordinateSystem::Camera
+                    }
+                    "cameraworld" => {
+                        options.rendering_coord_system =
+                            crate::options::RenderingCoordinateSystem::CameraWorld
+                    }
+                    "world" => {
+                        options.rendering_coord_system =
+                            crate::options::RenderingCoordinateSystem::World
+                    }
+                    _ => panic!("{} Unknown option value {}", loc, value),
+                }
+            }
+            "seed" => {
+                options.seed = value
+                    .parse()
+                    .unwrap_or_else(|_| panic!("{} Unable to parse option value {}", loc, value));
+            }
+            "forcediffuse" => match value {
+                "true" => options.force_diffuse = true,
+                "false" => options.force_diffuse = false,
+                _ => panic!("{} Unknown option value {}", loc, value),
+            },
+            "pixelstats" => match value {
+                "true" => options.record_pixel_statistics = true,
+                "false" => options.record_pixel_statistics = false,
+                _ => panic!("{} Unknown option value {}", loc, value),
+            },
+            "wavefront" => match value {
+                "true" => options.wavefront = true,
+                "false" => options.wavefront = false,
+                _ => panic!("{} Unknown option value {}", loc, value),
+            },
+            _ => panic!("{} Unknown option {}", loc, name),
+        }
     }
 
     fn identity(&mut self, _loc: crate::parser::FileLoc) {
