@@ -385,6 +385,19 @@ struct ActiveInstanceDefinition {
     pub parent: Option<Arc<ActiveInstanceDefinition>>,
 }
 
+impl ActiveInstanceDefinition {
+    pub fn new(name: &str, loc: FileLoc) -> Self {
+        Self {
+            entity: InstanceDefinitionSceneEntity {
+                name: name.to_owned(),
+                loc,
+                shapes: Default::default(),
+            },
+            parent: None,
+        }
+    }
+}
+
 pub struct BasicSceneBuilder {
     scene: Box<BasicScene>,
     current_block: BlockState,
@@ -1072,8 +1085,7 @@ impl ParserTarget for BasicSceneBuilder {
             );
         }
 
-        // TODO need to create an ActiveInstanceDefinition ctor and assign it here to active_instance_definition.
-        todo!()
+        self.active_instance_definition = Some(ActiveInstanceDefinition::new(name, loc));
     }
 
     fn object_end(&mut self, loc: crate::parser::FileLoc) {
