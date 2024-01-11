@@ -387,6 +387,7 @@ struct ActiveInstanceDefinition {
 
 impl ActiveInstanceDefinition {
     pub fn new(name: &str, loc: FileLoc) -> Self {
+        // TODO We need the string interner; probably a ctor for entity as well.
         Self {
             entity: InstanceDefinitionSceneEntity {
                 name: name.to_owned(),
@@ -1089,7 +1090,44 @@ impl ParserTarget for BasicSceneBuilder {
     }
 
     fn object_end(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+        // TODO Verify world
+        if self.active_instance_definition.is_none() {
+            panic!("{} ObjectEnd called outside of instance definition.", loc);
+        }
+        if self
+            .active_instance_definition
+            .as_ref()
+            .unwrap()
+            .parent
+            .is_some()
+        {
+            panic!(
+                "{} ObjectEnd called inside Import for instance definition.",
+                loc
+            );
+        }
+
+        // Note: Must keep the following consistent with AttributeEnd.
+        if self.pushed_graphics_states.last().is_none() {
+            panic!("{} Unmatched ObjectEnd statement.", loc);
+        }
+        self.graphics_state = self.pushed_graphics_states.pop().unwrap();
+
+        if self.push_stack.last().unwrap().0 == 'a' as u8 {
+            panic!(
+                "{} Mismatched nesting: open AttributeBegin from {} at ObjectEnd.",
+                loc,
+                self.push_stack.last().unwrap().1
+            );
+        } else {
+            assert!(self.push_stack.last().unwrap().0 == 'o' as u8);
+        }
+        self.push_stack.pop();
+
+        // TODO Add instance to scene. I think activeImports is initialized to 1 in ctor (check C++ syntax for atomic).
+        //      So we decrement it here?
+
+        self.active_instance_definition = None;
     }
 
     fn object_instance(&mut self, name: &str, loc: crate::parser::FileLoc) {
