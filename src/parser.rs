@@ -167,7 +167,7 @@ pub trait ParserTarget {
     );
     fn area_light_source(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc);
     fn reverse_orientation(&mut self, loc: FileLoc);
-    fn object_begin(&mut self, name: &str, loc: FileLoc);
+    fn object_begin(&mut self, name: &str, loc: FileLoc, string_interner: &mut StringInterner);
     fn object_end(&mut self, loc: FileLoc);
     fn object_instance(&mut self, name: &str, loc: FileLoc);
     fn end_of_files(&mut self);

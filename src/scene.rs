@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     ops::{Index, IndexMut},
-    sync::Arc,
+    sync::{atomic, Arc},
 };
 
 use crate::{
@@ -262,6 +262,16 @@ pub struct InstanceDefinitionSceneEntity {
     // TODO aniamted_shapes: Vec<AnimatedShapeSceneEntity>,
 }
 
+impl InstanceDefinitionSceneEntity {
+    pub fn new(name: &str, loc: FileLoc, string_interner: &mut StringInterner) -> Self {
+        Self {
+            name: string_interner.get_or_intern(name),
+            loc,
+            shapes: Default::default(),
+        }
+    }
+}
+
 const MAX_TRANSFORMS: usize = 2;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -379,21 +389,16 @@ enum BlockState {
 }
 
 struct ActiveInstanceDefinition {
-    // TODO ctor
-    // TODO Active imports?
+    pub active_imports: atomic::AtomicI32,
     pub entity: InstanceDefinitionSceneEntity,
     pub parent: Option<Arc<ActiveInstanceDefinition>>,
 }
 
 impl ActiveInstanceDefinition {
-    pub fn new(name: &str, loc: FileLoc) -> Self {
-        // TODO We need the string interner; probably a ctor for entity as well.
+    pub fn new(name: &str, loc: FileLoc, string_interner: &mut StringInterner) -> Self {
         Self {
-            entity: InstanceDefinitionSceneEntity {
-                name: name.to_owned(),
-                loc,
-                shapes: Default::default(),
-            },
+            active_imports: atomic::AtomicI32::new(1),
+            entity: InstanceDefinitionSceneEntity::new(name, loc, string_interner),
             parent: None,
         }
     }
@@ -1067,7 +1072,12 @@ impl ParserTarget for BasicSceneBuilder {
         self.graphics_state.reverse_orientation = !self.graphics_state.reverse_orientation;
     }
 
-    fn object_begin(&mut self, name: &str, loc: crate::parser::FileLoc) {
+    fn object_begin(
+        &mut self,
+        name: &str,
+        loc: crate::parser::FileLoc,
+        string_interner: &mut StringInterner,
+    ) {
         // TODO Verify world
         // TODO Normalize name to UTF8
 
@@ -1086,7 +1096,8 @@ impl ParserTarget for BasicSceneBuilder {
             );
         }
 
-        self.active_instance_definition = Some(ActiveInstanceDefinition::new(name, loc));
+        self.active_instance_definition =
+            Some(ActiveInstanceDefinition::new(name, loc, string_interner));
     }
 
     fn object_end(&mut self, loc: crate::parser::FileLoc) {
@@ -1124,8 +1135,22 @@ impl ParserTarget for BasicSceneBuilder {
         }
         self.push_stack.pop();
 
-        // TODO Add instance to scene. I think activeImports is initialized to 1 in ctor (check C++ syntax for atomic).
-        //      So we decrement it here?
+        let active_instance_definition = self.active_instance_definition.take().unwrap();
+        active_instance_definition
+            .active_imports
+            .fetch_sub(1, atomic::Ordering::SeqCst);
+        // TODO Technically, the value could change between fetch_sub() and load().
+        // It would be better to do this entirely within one atomic operation.
+
+        // Otherwise will be taken care of in MergeImported().
+        if active_instance_definition
+            .active_imports
+            .load(atomic::Ordering::SeqCst)
+            == 0
+        {
+            self.scene
+                .add_instance_definition(active_instance_definition.entity);
+        }
 
         self.active_instance_definition = None;
     }
