@@ -398,6 +398,7 @@ impl GraphicsState {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum BlockState {
     OptionsBlock,
     WorldBlock,
@@ -1200,6 +1201,28 @@ impl ParserTarget for BasicSceneBuilder {
     }
 
     fn end_of_files(&mut self) {
-        todo!()
+        if self.current_block != BlockState::WorldBlock {
+            panic!("End of files before WorldBegin.");
+        }
+
+        // Ensure there are no pushed graphics states
+        while !self.pushed_graphics_states.is_empty() {
+            self.pushed_graphics_states.pop();
+            panic!("Missing end to AttributeBegin.");
+        }
+
+        // TODO If we start deferring error handling rather than panicing, this would be a good spot
+        //   to check for any deferred errors and report them and actually error out.
+        //   (Deferred error handling would be good because it lets the user see all the issues
+        //    so they can fix them before running the scene again.)
+
+        if !self.shapes.is_empty() {
+            self.scene.add_shapes(&self.shapes);
+        }
+        if !self.instance_uses.is_empty() {
+            self.scene.add_instance_uses(&self.instance_uses);
+        }
+
+        self.scene.done();
     }
 }
