@@ -16,13 +16,15 @@ use crate::{
     square_matrix::SquareMatrix,
     transform::Transform,
     util::normalize_arg,
-    vecmath::{normalize, Point3f, Tuple3, Vector3f},
+    vecmath::{Point3f, Tuple3, Vector3f},
     Float,
 };
 
 use log::warn;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
+// TODO If/when we make this multi-threaded, most of these will be within a Mutex.
+//      For now, code it sequentially.
 pub struct BasicScene {
     pub integrator: SceneEntity,
     pub accelerator: SceneEntity,
