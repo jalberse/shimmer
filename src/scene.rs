@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     ops::{Index, IndexMut},
+    path::Path,
     sync::{atomic, Arc},
 };
 
@@ -9,6 +10,7 @@ use crate::{
     colorspace::RgbColorSpace,
     film::{Film, FilmI},
     filter::Filter,
+    image::Image,
     options::Options,
     paramdict::ParameterDictionary,
     parser::{FileLoc, ParsedParameterVector, ParserTarget},
@@ -105,6 +107,8 @@ impl BasicScene {
     }
 
     fn add_named_material(&mut self, name: &str, material: SceneEntity) {
+        // TODO, alright, we can just have a load_normal_map() fn that loads the image sequentially.
+        //    We can eventually make it async, but for now, just do it sequentially.
         todo!()
     }
 
@@ -150,6 +154,18 @@ impl BasicScene {
 
     fn done(&mut self) {
         todo!()
+    }
+
+    fn load_normal_map(&mut self, parameters: &mut ParameterDictionary) {
+        let normalmap = parameters.get_one_string("normalmap", "".to_string());
+        let filename = Path::new(&normalmap);
+        if !filename.exists() {
+            warn!("Normal map \"{}\" not found.", filename.display());
+        }
+
+        // TODO Need to implement Image::read(). Since this is scene definintion,
+        // I think we should implement the PNG reading first. That's the most convenient for
+        // scene definition.
     }
 }
 
