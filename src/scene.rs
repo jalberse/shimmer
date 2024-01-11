@@ -312,6 +312,7 @@ impl IndexMut<usize> for TransformSet {
     }
 }
 
+#[derive(Debug, Clone)]
 struct GraphicsState {
     current_inside_medium: String,
     current_outside_medium: String,
@@ -839,20 +840,53 @@ impl ParserTarget for BasicSceneBuilder {
     }
 
     fn attribute_begin(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+        // TODO Verify world
+        self.pushed_graphics_states
+            .push(self.graphics_state.clone());
+        self.push_stack.push(('a' as u8, loc));
     }
 
     fn attribute_end(&mut self, loc: crate::parser::FileLoc) {
-        todo!()
+        // TODO Verify world
+        if self.push_stack.is_empty() {
+            panic!("{} Unmatched attribute_end statement.", loc);
+        }
+
+        // Note: Must keep the following consistent with code in ObjectEnd.
+        self.graphics_state = self.pushed_graphics_states.pop().unwrap();
+
+        if self.push_stack.last().unwrap().0 == 'o' as u8 {
+            panic!(
+                "{} Masmatched nesting: open ObjectBegin from {} at attribute_end.",
+                loc,
+                self.push_stack.last().unwrap().1
+            );
+        } else {
+            assert!(self.push_stack.last().unwrap().0 == 'a' as u8);
+        }
     }
 
     fn attribute(
         &mut self,
         target: &str,
-        params: ParsedParameterVector,
+        mut attrib: ParsedParameterVector,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        let current_attributes = match target {
+            "shape" => &mut self.graphics_state.shape_attributes,
+            "light" => &mut self.graphics_state.light_attributes,
+            "material" => &mut self.graphics_state.material_attributes,
+            "medium" => &mut self.graphics_state.medium_attributes,
+            "texture" => &mut self.graphics_state.texture_attributes,
+            _ => panic!("{} Unknown attribute target {}", loc, target),
+        };
+
+        // We hold onto the curent color space and associate it with the parameters.
+        for p in attrib.iter_mut() {
+            p.may_be_unused = true;
+            p.color_space = Some(self.graphics_state.color_space.clone());
+            current_attributes.push(p.to_owned())
+        }
     }
 
     fn texture(

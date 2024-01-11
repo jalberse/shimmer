@@ -204,20 +204,20 @@ impl ParameterType for StringParam {
 #[derive(Debug, Clone)]
 pub struct ParsedParameter {
     /// The name of the parameter, e.g. "radius"
-    name: String,
+    pub name: String,
     /// The type of the parameter; e.g. "float"
-    param_type: String,
+    pub param_type: String,
     /// The location in the file
-    loc: FileLoc,
+    pub loc: FileLoc,
     // These store the parameter values
-    floats: Vec<Float>,
-    ints: Vec<i32>,
-    strings: Vec<String>,
-    bools: Vec<bool>,
+    pub floats: Vec<Float>,
+    pub ints: Vec<i32>,
+    pub strings: Vec<String>,
+    pub bools: Vec<bool>,
     /// Used for code relating to extracting parameter values; used for error handling.
-    looked_up: bool,
-    color_space: Option<Arc<RgbColorSpace>>,
-    may_be_unused: bool,
+    pub looked_up: bool,
+    pub color_space: Option<Arc<RgbColorSpace>>,
+    pub may_be_unused: bool,
 }
 
 #[derive(Debug, Copy, Clone)]
