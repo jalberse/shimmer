@@ -443,7 +443,6 @@ pub struct BasicSceneBuilder {
     instance_names: HashSet<String>,
 
     current_material_index: i32,
-    current_light_index: i32,
     sampler: SceneEntity,
     film: SceneEntity,
     integrator: SceneEntity,
