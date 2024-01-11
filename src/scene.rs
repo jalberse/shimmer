@@ -254,6 +254,21 @@ pub struct InstanceSceneEntity {
     // TODO Possibly aniamted transform
 }
 
+impl InstanceSceneEntity {
+    pub fn new(
+        name: &str,
+        loc: FileLoc,
+        string_interner: &mut StringInterner,
+        render_from_instance: Transform,
+    ) -> Self {
+        Self {
+            name: string_interner.get_or_intern(name),
+            loc,
+            render_from_instance,
+        }
+    }
+}
+
 pub struct InstanceDefinitionSceneEntity {
     // TODO we will need a stringinterner on this, same as in SceneEntity
     name: SymbolU32,
@@ -1155,8 +1170,33 @@ impl ParserTarget for BasicSceneBuilder {
         self.active_instance_definition = None;
     }
 
-    fn object_instance(&mut self, name: &str, loc: crate::parser::FileLoc) {
-        todo!()
+    fn object_instance(
+        &mut self,
+        name: &str,
+        loc: crate::parser::FileLoc,
+        string_interner: &mut StringInterner,
+    ) {
+        // TODO Normalize name to UTF8
+        // TODO Verify world
+
+        if self.active_instance_definition.is_some() {
+            panic!(
+                "{} ObjectInstance called inside of instance definition.",
+                loc
+            );
+        }
+
+        let worlf_from_render = self.render_from_world.inverse();
+
+        if self.ctm_is_animated() {
+            todo!()
+        }
+
+        // TODO Use transformCache
+        let render_from_instance = self.render_from_object() * worlf_from_render;
+
+        let entity = InstanceSceneEntity::new(name, loc, string_interner, render_from_instance);
+        self.instance_uses.push(entity);
     }
 
     fn end_of_files(&mut self) {
