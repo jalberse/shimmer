@@ -1054,6 +1054,25 @@ impl ParserTarget for BasicSceneBuilder {
     }
 
     fn object_begin(&mut self, name: &str, loc: crate::parser::FileLoc) {
+        // TODO Verify world
+        // TODO Normalize name to UTF8
+
+        self.pushed_graphics_states
+            .push(self.graphics_state.clone());
+
+        if self.active_instance_definition.is_some() {
+            panic!("{} ObjectBegin called inside of instance definition.", loc);
+        }
+
+        let inserted = self.instance_names.insert(name.to_owned());
+        if !inserted {
+            panic!(
+                "{} ObjectBegin trying to redefine object instance {}.",
+                loc, name
+            );
+        }
+
+        // TODO need to create an ActiveInstanceDefinition ctor and assign it here to active_instance_definition.
         todo!()
     }
 
