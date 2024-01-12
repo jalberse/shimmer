@@ -698,6 +698,9 @@ impl Image {
 
         // TODO Hmm, I don't want to do this manually. Consider a crate - png or image maybe?
         // EXR will need to use the EXR crate. For png for now, see which is good.
+        // Okay I think png crate will work.
+        // It has an Info struct that is equivalent to the info_png field in lodepng's state.
+        // This is a good example: https://github.com/image-rs/image-png/blob/master/examples/show.rs
 
         todo!()
     }
