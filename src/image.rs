@@ -11,7 +11,7 @@ use std::{
 
 use crate::{
     bounding_box::Bounds2i,
-    color::{ColorEncoding, ColorEncodingI, RGB},
+    color::{ColorEncoding, ColorEncodingI, SRgbColorEncoding, RGB},
     colorspace::RgbColorSpace,
     float::Float,
     math::lerp,
@@ -673,6 +673,33 @@ impl Image {
         for i in 0..values.len() {
             self.set_channel(p, i, values[i]);
         }
+    }
+
+    pub fn read(name: &str, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
+        // TODO Should return an IO Result instead likely.
+
+        // TODO Other file extension types.
+        if has_extension(name, "png") {
+            return Self::read_png(name, encoding);
+        } else {
+            panic!("Unsupported file extension for {}", name);
+        }
+    }
+
+    fn read_png(name: &str, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
+        // TODO Pass up I/O error instead. I should really improve error handling in this codebase...
+        let contents = std::fs::read(name).expect("Failed to read file");
+
+        let encoding = if let Some(encoding) = encoding {
+            encoding
+        } else {
+            ColorEncoding::SRGB(SRgbColorEncoding {})
+        };
+
+        // TODO Hmm, I don't want to do this manually. Consider a crate - png or image maybe?
+        // EXR will need to use the EXR crate. For png for now, see which is good.
+
+        todo!()
     }
 
     pub fn write(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
