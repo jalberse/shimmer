@@ -6,6 +6,7 @@ use std::{
     fs::File,
     io::{self, BufWriter, Write},
     ops::{Index, IndexMut},
+    path::Path,
     sync::Arc,
 };
 
@@ -701,6 +702,18 @@ impl Image {
         // Okay I think png crate will work.
         // It has an Info struct that is equivalent to the info_png field in lodepng's state.
         // This is a good example: https://github.com/image-rs/image-png/blob/master/examples/show.rs
+
+        let mut decoder = png::Decoder::new(File::open(Path::new(name)).unwrap());
+        // TODO Are these the proper transformations?
+        decoder.set_transformations(png::Transformations::normalize_to_color8());
+        let mut reader = decoder.read_info().unwrap();
+
+        let mut img_data = vec![0; reader.output_buffer_size()];
+        // Info describes one particular frame of the image written to the output buffer.
+        let info = reader.next_frame(&mut img_data).unwrap();
+        // TODO From info, we should be able to get the color_type, width, height, bit_depth, and line_size.
+        //   I think that's what we need to match on according to PBRT.
+        //   So we should be able to translate things into the standard Image format and return that easily.
 
         todo!()
     }
