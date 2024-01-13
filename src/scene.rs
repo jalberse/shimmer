@@ -108,10 +108,9 @@ impl BasicScene {
         );
     }
 
-    fn add_named_material(&mut self, name: &str, material: SceneEntity) {
-        // TODO, alright, we can just have a load_normal_map() fn that loads the image sequentially.
-        //    We can eventually make it async, but for now, just do it sequentially.
-        todo!()
+    fn add_named_material(&mut self, name: &str, mut material: SceneEntity) {
+        self.load_normal_map(&mut material.parameters);
+        self.named_materials.push((name.to_owned(), material));
     }
 
     // Returns the new material index
