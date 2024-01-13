@@ -1,6 +1,7 @@
 use arrayvec::ArrayVec;
 use core::fmt;
 use half::f16;
+use log::Metadata;
 use std::{
     collections::HashMap,
     fs::File,
@@ -687,35 +688,172 @@ impl Image {
         }
     }
 
+    // TODO Test.
     fn read_png(name: &str, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
-        // TODO Pass up I/O error instead. I should really improve error handling in this codebase...
-        let contents = std::fs::read(name).expect("Failed to read file");
-
         let encoding = if let Some(encoding) = encoding {
             encoding
         } else {
             ColorEncoding::SRGB(SRgbColorEncoding {})
         };
 
-        // TODO Hmm, I don't want to do this manually. Consider a crate - png or image maybe?
-        // EXR will need to use the EXR crate. For png for now, see which is good.
-        // Okay I think png crate will work.
-        // It has an Info struct that is equivalent to the info_png field in lodepng's state.
-        // This is a good example: https://github.com/image-rs/image-png/blob/master/examples/show.rs
-
         let mut decoder = png::Decoder::new(File::open(Path::new(name)).unwrap());
-        // TODO Are these the proper transformations?
-        decoder.set_transformations(png::Transformations::normalize_to_color8());
+        decoder.set_transformations(png::Transformations::IDENTITY);
         let mut reader = decoder.read_info().unwrap();
 
         let mut img_data = vec![0; reader.output_buffer_size()];
-        // Info describes one particular frame of the image written to the output buffer.
+        // Get the metadata info, and read the raw bytes into the buffer.
         let info = reader.next_frame(&mut img_data).unwrap();
-        // TODO From info, we should be able to get the color_type, width, height, bit_depth, and line_size.
-        //   I think that's what we need to match on according to PBRT.
-        //   So we should be able to translate things into the standard Image format and return that easily.
 
-        todo!()
+        // Transform the raw bytes into an Image accounting for the format encoded in the header.
+        let image = match info.color_type {
+            png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha => match info.bit_depth {
+                png::BitDepth::Eight => Image::new_p8(
+                    img_data,
+                    Point2i::new(info.width as i32, info.height as i32),
+                    &["Y".to_owned()],
+                    encoding,
+                ),
+                png::BitDepth::Sixteen => {
+                    let mut image = Image::new(
+                        PixelFormat::Half,
+                        Point2i::new(info.width as i32, info.height as i32),
+                        &["Y".to_owned()],
+                        None,
+                    );
+                    for y in 0..info.height {
+                        for x in 0..info.width {
+                            let v = f16::from_le_bytes(
+                                img_data[(2 * (y * info.width + x)) as usize
+                                    ..(2 * (y * info.width + x) + 2) as usize]
+                                    .try_into()
+                                    .unwrap(),
+                            );
+                            let v: Float = v.into();
+                            let v = encoding.to_float_linear(v);
+                            image.set_channel(Point2i::new(x as i32, y as i32), 0, v);
+                        }
+                    }
+                    image
+                }
+                _ => panic!("Unsupported bit depth"),
+            },
+            png::ColorType::Rgb | png::ColorType::Rgba => {
+                let has_alpha = info.color_type == png::ColorType::Rgba;
+                match info.bit_depth {
+                    png::BitDepth::Eight => match has_alpha {
+                        true => Image::new_p8(
+                            img_data,
+                            Point2i::new(info.width as i32, info.height as i32),
+                            &[
+                                "R".to_owned(),
+                                "G".to_owned(),
+                                "B".to_owned(),
+                                "A".to_owned(),
+                            ],
+                            encoding,
+                        ),
+                        false => Image::new_p8(
+                            img_data,
+                            Point2i::new(info.width as i32, info.height as i32),
+                            &["R".to_owned(), "G".to_owned(), "B".to_owned()],
+                            encoding,
+                        ),
+                    },
+                    png::BitDepth::Sixteen => match has_alpha {
+                        true => {
+                            let mut image = Image::new(
+                                PixelFormat::Half,
+                                Point2i::new(info.width as i32, info.height as i32),
+                                &[
+                                    "R".to_owned(),
+                                    "G".to_owned(),
+                                    "B".to_owned(),
+                                    "A".to_owned(),
+                                ],
+                                None,
+                            );
+                            let mut idx = 0;
+                            for y in 0..info.height {
+                                for x in 0..info.width {
+                                    let r = f16::from_le_bytes(
+                                        img_data[idx..idx + 2].try_into().unwrap(),
+                                    );
+                                    let g = f16::from_le_bytes(
+                                        img_data[idx + 2..idx + 4].try_into().unwrap(),
+                                    );
+                                    let b = f16::from_le_bytes(
+                                        img_data[idx + 4..idx + 6].try_into().unwrap(),
+                                    );
+                                    let a = f16::from_le_bytes(
+                                        img_data[idx + 6..idx + 8].try_into().unwrap(),
+                                    );
+                                    let rgba = [r, g, b, a];
+                                    for c in 0..4 {
+                                        let cv = encoding.to_float_linear(rgba[c].into());
+                                        image.set_channel(
+                                            Point2i::new(x as i32, y as i32),
+                                            c,
+                                            cv.into(),
+                                        );
+                                    }
+                                    idx += 8;
+                                }
+                            }
+                            image
+                        }
+                        false => {
+                            let mut image = Image::new(
+                                PixelFormat::Half,
+                                Point2i::new(info.width as i32, info.height as i32),
+                                &["R".to_owned(), "G".to_owned(), "B".to_owned()],
+                                None,
+                            );
+                            let mut idx = 0;
+                            for y in 0..info.height {
+                                for x in 0..info.width {
+                                    let r = f16::from_le_bytes(
+                                        img_data[idx..idx + 2].try_into().unwrap(),
+                                    );
+                                    let g = f16::from_le_bytes(
+                                        img_data[idx + 2..idx + 4].try_into().unwrap(),
+                                    );
+                                    let b = f16::from_le_bytes(
+                                        img_data[idx + 4..idx + 6].try_into().unwrap(),
+                                    );
+                                    let rgb = [r, g, b];
+                                    for c in 0..3 {
+                                        let cv = encoding.to_float_linear(rgb[c].into());
+                                        image.set_channel(
+                                            Point2i::new(x as i32, y as i32),
+                                            c,
+                                            cv.into(),
+                                        );
+                                    }
+                                    idx += 6;
+                                }
+                            }
+                            image
+                        }
+                    },
+                    _ => panic!("Unsupported bit depth"),
+                }
+            }
+            png::ColorType::Indexed => panic!("Indexed PNGs are not supported!"),
+        };
+
+        let metadata = match info.color_type {
+            png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha => ImageMetadata::default(),
+            png::ColorType::Rgb | png::ColorType::Rgba => {
+                let mut metadata = ImageMetadata::default();
+                metadata.color_space = Some(
+                    RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+                );
+                metadata
+            }
+            png::ColorType::Indexed => panic!("Unspported indexed PNGs!"),
+        };
+
+        ImageAndMetadata { image, metadata }
     }
 
     pub fn write(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
