@@ -1,5 +1,6 @@
 use std::{
     ops::{AddAssign, Index, IndexMut, MulAssign},
+    path::Path,
     sync::Arc,
 };
 
@@ -713,7 +714,7 @@ impl FilmI for RgbFilm {
 
     fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()> {
         let image = self.get_image(metadata, splat_scale);
-        image.write(self.get_filename(), metadata)?;
+        image.write(Path::new(self.get_filename()), metadata)?;
         Ok(())
     }
 

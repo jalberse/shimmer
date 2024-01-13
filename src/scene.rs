@@ -7,6 +7,7 @@ use std::{
 
 use crate::{
     camera::{Camera, CameraTransform},
+    color::LinearColorEncoding,
     colorspace::RgbColorSpace,
     film::{Film, FilmI},
     filter::Filter,
@@ -40,6 +41,7 @@ pub struct BasicScene {
     named_materials: Vec<(String, SceneEntity)>,
     materials: Vec<SceneEntity>,
     area_lights: Vec<SceneEntity>,
+    normal_maps: HashMap<String, Box<Image>>,
 }
 
 impl BasicScene {
@@ -157,15 +159,27 @@ impl BasicScene {
     }
 
     fn load_normal_map(&mut self, parameters: &mut ParameterDictionary) {
-        let normalmap = parameters.get_one_string("normalmap", "".to_string());
-        let filename = Path::new(&normalmap);
+        let normal_map_filename = parameters.get_one_string("normalmap", "".to_string());
+        let filename = Path::new(&normal_map_filename);
         if !filename.exists() {
             warn!("Normal map \"{}\" not found.", filename.display());
         }
 
-        // TODO Need to implement Image::read(). Since this is scene definintion,
-        // I think we should implement the PNG reading first. That's the most convenient for
-        // scene definition.
+        let image_and_metadata = Image::read(
+            filename,
+            Some(crate::color::ColorEncoding::Linear(LinearColorEncoding {})),
+        );
+
+        let image = image_and_metadata.image;
+        let rgb_desc = image.get_channel_desc(&["R".to_owned(), "G".to_owned(), "B".to_owned()]);
+        if rgb_desc.size() != 3 {
+            panic!(
+                "Normal map \"{}\" should have RGB channels.",
+                filename.display()
+            );
+        }
+        let image = Box::new(image);
+        self.normal_maps.insert(normal_map_filename, image);
     }
 }
 

@@ -1,11 +1,10 @@
 use arrayvec::ArrayVec;
 use core::fmt;
 use half::f16;
-use log::Metadata;
 use std::{
     collections::HashMap,
     fs::File,
-    io::{self, BufWriter, Write},
+    io::{BufWriter, Write},
     ops::{Index, IndexMut},
     path::Path,
     sync::Arc,
@@ -13,13 +12,10 @@ use std::{
 
 use crate::{
     bounding_box::Bounds2i,
-    color::{ColorEncoding, ColorEncodingI, SRgbColorEncoding, RGB},
+    color::{ColorEncoding, ColorEncodingI, SRgbColorEncoding},
     colorspace::RgbColorSpace,
     float::Float,
-    math::lerp,
     square_matrix::SquareMatrix,
-    util::has_extension,
-    vec2d::Vec2d,
     vecmath::{Point2f, Point2i, Tuple2},
 };
 
@@ -677,26 +673,26 @@ impl Image {
         }
     }
 
-    pub fn read(name: &str, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
+    pub fn read(path: &Path, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
         // TODO Should return an IO Result instead likely.
 
         // TODO Other file extension types.
-        if has_extension(name, "png") {
-            return Self::read_png(name, encoding);
+        if path.extension().unwrap().eq("png") {
+            return Self::read_png(path, encoding);
         } else {
-            panic!("Unsupported file extension for {}", name);
+            panic!("Unsupported file extension for {}", path.to_str().unwrap());
         }
     }
 
     // TODO Test.
-    fn read_png(name: &str, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
+    fn read_png(path: &Path, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
         let encoding = if let Some(encoding) = encoding {
             encoding
         } else {
             ColorEncoding::SRGB(SRgbColorEncoding {})
         };
 
-        let mut decoder = png::Decoder::new(File::open(Path::new(name)).unwrap());
+        let mut decoder = png::Decoder::new(File::open(path).unwrap());
         decoder.set_transformations(png::Transformations::IDENTITY);
         let mut reader = decoder.read_info().unwrap();
 
@@ -856,14 +852,14 @@ impl Image {
         ImageAndMetadata { image, metadata }
     }
 
-    pub fn write(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
+    pub fn write(&self, path: &Path, metadata: &ImageMetadata) -> std::io::Result<()> {
         // TODO There's additional logic we'll need here with other filetypes, but
         // this should be "OK" for writing PFM files.
 
         // TODO Add exr support.
 
-        if has_extension(filename, "pfm") {
-            return self.write_pfm(filename, metadata);
+        if path.extension().unwrap().eq("pfm") {
+            return self.write_pfm(path, metadata);
         } else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -876,8 +872,8 @@ impl Image {
 
     /// Writes the PFM file format.
     /// https://netpbm.sourceforge.net/doc/pfm.html
-    fn write_pfm(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
-        let file = File::create(filename)?;
+    fn write_pfm(&self, path: &Path, metadata: &ImageMetadata) -> std::io::Result<()> {
+        let file = File::create(path)?;
 
         if self.n_channels() != 3 {
             return Err(std::io::Error::new(
