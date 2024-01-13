@@ -114,8 +114,10 @@ impl BasicScene {
     }
 
     // Returns the new material index
-    fn add_material(&mut self, material: SceneEntity) -> i32 {
-        todo!()
+    fn add_material(&mut self, mut material: SceneEntity) -> i32 {
+        self.load_normal_map(&mut material.parameters);
+        self.materials.push(material);
+        (self.materials.len() - 1) as i32
     }
 
     fn add_medium(&mut self, medium: SceneEntity) {
