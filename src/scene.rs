@@ -14,10 +14,11 @@ use crate::{
     filter::Filter,
     image::Image,
     options::Options,
-    paramdict::ParameterDictionary,
+    paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
     parser::{FileLoc, ParsedParameterVector, ParserTarget},
     sampler::Sampler,
     square_matrix::SquareMatrix,
+    texture::FloatTexture,
     transform::Transform,
     util::normalize_arg,
     vecmath::{Point3f, Tuple3, Vector3f},
@@ -47,6 +48,10 @@ pub struct BasicScene {
     serial_spectrum_textures: Vec<(String, TextureSceneEntity)>,
     async_spectrum_textures: Vec<(String, TextureSceneEntity)>,
     loading_texture_filenames: HashSet<String>,
+
+    // TODO When we switch to asynch, we will load all of these at once in parallel
+    //   in create_textures(). For now, just load as we parse into this.
+    textures: NamedTextures,
 }
 
 impl BasicScene {
@@ -178,9 +183,21 @@ impl BasicScene {
 
         // TODO Can make this async.
         let render_from_texture = texture.render_from_object;
-        // TODO Get texture dict.
 
-        todo!()
+        // Pass None because the textures aren't needed for the float texture.
+        let tex_dict = TextureParameterDictionary::new(texture.base.parameters.clone(), None);
+        let float_texture = FloatTexture::create(
+            string_interner
+                .resolve(texture.base.name)
+                .expect("Unknown symbol"),
+            render_from_texture,
+            tex_dict,
+            texture.base.loc,
+        );
+
+        self.textures
+            .float_textures
+            .insert(name.to_owned(), Arc::new(float_texture));
     }
 
     fn add_spectrum_texture(&mut self, name: &str, texture: TextureSceneEntity) {

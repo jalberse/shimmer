@@ -667,19 +667,20 @@ impl ParameterDictionary {
 }
 
 pub struct NamedTextures {
-    float_textures: HashMap<String, Arc<FloatTexture>>,
-    albedo_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
-    unbounded_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
-    illuminant_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
+    pub float_textures: HashMap<String, Arc<FloatTexture>>,
+    pub albedo_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
+    pub unbounded_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
+    pub illuminant_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
 }
 
 pub struct TextureParameterDictionary {
     dict: ParameterDictionary,
-    textures: Arc<NamedTextures>,
+    /// Optional because it's not always needed, such as for a float texture.
+    textures: Option<Arc<NamedTextures>>,
 }
 
 impl TextureParameterDictionary {
-    pub fn new(dict: ParameterDictionary, textures: Arc<NamedTextures>) -> Self {
+    pub fn new(dict: ParameterDictionary, textures: Option<Arc<NamedTextures>>) -> Self {
         Self { dict, textures }
     }
 
@@ -805,7 +806,12 @@ impl TextureParameterDictionary {
 
             p.looked_up = true;
 
-            let tex = self.textures.float_textures.get(p.strings[0].as_str());
+            if self.textures.is_none() {
+                panic!("Expected textures");
+            }
+            let textures = self.textures.as_ref().unwrap();
+
+            let tex = textures.float_textures.get(p.strings[0].as_str());
             if let Some(tex) = tex {
                 return Some(tex.clone());
             } else {
@@ -846,10 +852,14 @@ impl TextureParameterDictionary {
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     ) -> Option<Arc<SpectrumTexture>> {
+        if self.textures.is_none() {
+            panic!("Expected textures");
+        }
+        let textures = self.textures.as_ref().unwrap();
         let spectrum_textures = match spectrum_type {
-            SpectrumType::Illuminant => &self.textures.illuminant_spectrum_textures,
-            SpectrumType::Albedo => &self.textures.albedo_spectrum_textures,
-            SpectrumType::Unbounded => &self.textures.unbounded_spectrum_textures,
+            SpectrumType::Illuminant => &textures.illuminant_spectrum_textures,
+            SpectrumType::Albedo => &textures.albedo_spectrum_textures,
+            SpectrumType::Unbounded => &textures.unbounded_spectrum_textures,
         };
 
         let p = self.dict.params.iter_mut().find(|p| p.name == name);

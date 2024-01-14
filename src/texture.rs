@@ -2,10 +2,13 @@ use std::sync::Arc;
 
 use crate::{
     interaction::{Interaction, SurfaceInteraction},
+    paramdict::TextureParameterDictionary,
+    parser::FileLoc,
     spectra::{
         sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
         spectrum::SpectrumI, Spectrum,
     },
+    transform::Transform,
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Vector3f},
     Float,
 };
@@ -17,6 +20,30 @@ pub trait FloatTextureI {
 #[derive(Debug)]
 pub enum FloatTexture {
     Constant(FloatConstantTexture),
+}
+
+impl FloatTexture {
+    pub fn create(
+        name: &str,
+        render_from_texture: Transform,
+        parameters: TextureParameterDictionary,
+        loc: FileLoc,
+    ) -> FloatTexture {
+        let tex = match name {
+            "constant" => {
+                let t = FloatConstantTexture::create(render_from_texture, parameters, loc);
+                FloatTexture::Constant(t)
+            }
+            _ => {
+                panic!("Texture {} unknown", name);
+            }
+        };
+
+        // TODO Track number of textures created for stats.
+        // TODO Report unused paramters.
+
+        tex
+    }
 }
 
 impl FloatTextureI for FloatTexture {
@@ -35,6 +62,15 @@ pub struct FloatConstantTexture {
 impl FloatConstantTexture {
     pub fn new(value: Float) -> Self {
         Self { value }
+    }
+
+    pub fn create(
+        _render_from_texture: Transform,
+        mut parameters: TextureParameterDictionary,
+        _loc: FileLoc,
+    ) -> FloatConstantTexture {
+        let v = parameters.get_one_float("value", 1.0);
+        FloatConstantTexture::new(v)
     }
 }
 
