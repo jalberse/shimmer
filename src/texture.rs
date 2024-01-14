@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     interaction::{Interaction, SurfaceInteraction},
     spectra::{
@@ -55,7 +57,7 @@ impl SpectrumTextureI for SpectrumTexture {
 
 #[derive(Debug)]
 pub struct SpectrumConstantTexture {
-    pub value: Spectrum,
+    pub value: Arc<Spectrum>,
 }
 
 impl SpectrumTextureI for SpectrumConstantTexture {
@@ -65,7 +67,7 @@ impl SpectrumTextureI for SpectrumConstantTexture {
 }
 
 impl SpectrumConstantTexture {
-    pub fn new(value: Spectrum) -> Self {
+    pub fn new(value: Arc<Spectrum>) -> Self {
         Self { value }
     }
 }

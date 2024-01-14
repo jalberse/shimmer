@@ -406,10 +406,10 @@ impl ParameterDictionary {
     pub fn get_one_spectrum(
         &mut self,
         name: &str,
-        default_value: Spectrum,
+        default_value: Option<Spectrum>,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-    ) -> Arc<Spectrum> {
+    ) -> Option<Arc<Spectrum>> {
         let p = self.params.iter_mut().find(|p| p.name == name);
         if let Some(p) = p {
             let s = Self::extract_spectrum_array(
@@ -425,11 +425,19 @@ impl ParameterDictionary {
                         p.loc, p.name
                     );
                 }
-                return s.into_iter().nth(0).expect("Expected non-empty vector");
+                return Some(s.into_iter().nth(0).expect("Expected non-empty vector"));
             }
-            Arc::new(default_value)
+            if let Some(default_value) = default_value {
+                Some(Arc::new(default_value))
+            } else {
+                None
+            }
         } else {
-            Arc::new(default_value)
+            if let Some(default_value) = default_value {
+                Some(Arc::new(default_value))
+            } else {
+                None
+            }
         }
     }
 
@@ -710,10 +718,10 @@ impl TextureParameterDictionary {
     pub fn get_one_spectrum(
         &mut self,
         name: &str,
-        default_value: Spectrum,
+        default_value: Option<Spectrum>,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-    ) -> Arc<Spectrum> {
+    ) -> Option<Arc<Spectrum>> {
         self.dict
             .get_one_spectrum(name, default_value, spectrum_type, cached_spectra)
     }
@@ -770,7 +778,25 @@ impl TextureParameterDictionary {
 
     // TODO get_float_texture() (or null?)
 
-    // TODO get_spectrum_texture() (or null?)
+    pub fn get_spectrum_texture(
+        &mut self,
+        name: &str,
+        default_value: Option<Arc<Spectrum>>,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Option<Arc<SpectrumTexture>> {
+        let tex = self.get_spectrum_texture_or_none(name, spectrum_type, cached_spectra);
+        if let Some(tex) = tex {
+            return Some(tex);
+        } else if let Some(default_value) = default_value {
+            return Some(Arc::new(SpectrumTexture::Constant(
+                SpectrumConstantTexture::new(default_value.clone()),
+            )));
+        } else {
+            return None;
+        }
+    }
+
     pub fn get_spectrum_texture_or_none(
         &mut self,
         name: &str,
@@ -833,12 +859,16 @@ impl TextureParameterDictionary {
                         ),
                     };
                     Some(Arc::new(SpectrumTexture::Constant(
-                        SpectrumConstantTexture::new(s),
+                        SpectrumConstantTexture::new(Arc::new(s)),
                     )))
                 }
                 "spectrum" | "blackbody" => {
                     let s = self.get_one_spectrum(name, None, spectrum_type, cached_spectra);
-                    todo!()
+                    assert!(s.is_some());
+                    let s = s.unwrap();
+                    Some(Arc::new(SpectrumTexture::Constant(
+                        SpectrumConstantTexture::new(s.clone()),
+                    )))
                 }
                 _ => None,
             }

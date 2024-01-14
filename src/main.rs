@@ -117,7 +117,7 @@ fn one_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         360.0,
     ));
 
-    let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+    let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
     let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
     let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
@@ -211,7 +211,7 @@ fn get_tri_mesh_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         Default::default(),
     ));
 
-    let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+    let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
     let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
     let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
@@ -317,7 +317,7 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         Default::default(),
     ));
 
-    let cs = Spectrum::Constant(ConstantSpectrum::new(0.7));
+    let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.7)));
     let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
     let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
@@ -424,7 +424,7 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
                 false,
             )));
 
-            let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+            let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
             let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
@@ -456,7 +456,7 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
                 360.0,
             ));
 
-            let cs = Spectrum::Constant(ConstantSpectrum::new(0.6));
+            let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
             let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
             let sphere_primitive =
@@ -507,7 +507,7 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             false,
         )));
 
-        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
         let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
         let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
@@ -537,7 +537,7 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             360.0,
         ));
 
-        let cs = Spectrum::Constant(ConstantSpectrum::new(0.6));
+        let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
         let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
         let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
         let sphere_primitive =
@@ -598,7 +598,7 @@ fn two_triangles_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         Default::default(),
     ));
 
-    let cs = Spectrum::Constant(ConstantSpectrum::new(0.7));
+    let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.7)));
     let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
     let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
 
@@ -690,7 +690,7 @@ fn get_random_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>)
                 360.0,
             ));
 
-            let cs = Spectrum::Constant(ConstantSpectrum::new(0.6));
+            let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
             let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
             let sphere_primitive =
