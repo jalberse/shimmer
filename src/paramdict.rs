@@ -12,7 +12,7 @@ use crate::{
         spectrum::{RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum},
         BlackbodySpectrum, NamedSpectrum, PiecewiseLinearSpectrum, Spectrum,
     },
-    texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture},
+    texture::{FloatConstantTexture, FloatTexture, SpectrumConstantTexture, SpectrumTexture},
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f},
     Float,
 };
@@ -667,7 +667,7 @@ impl ParameterDictionary {
 }
 
 pub struct NamedTextures {
-    float_textures: HashMap<String, FloatTexture>,
+    float_textures: HashMap<String, Arc<FloatTexture>>,
     albedo_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
     unbounded_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
     illuminant_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
@@ -776,7 +776,50 @@ impl TextureParameterDictionary {
         self.dict.lookup_array::<StringParam>(name)
     }
 
-    // TODO get_float_texture() (or null?)
+    pub fn get_float_texture(&mut self, name: &str, default_value: Float) -> Arc<FloatTexture> {
+        let tex = self.get_float_texture_or_none(name);
+        if let Some(tex) = tex {
+            return tex;
+        } else {
+            return Arc::new(FloatTexture::Constant(FloatConstantTexture::new(
+                default_value,
+            )));
+        }
+    }
+
+    pub fn get_float_texture_or_none(&mut self, name: &str) -> Option<Arc<FloatTexture>> {
+        let p = self.dict.params.iter_mut().find(|p| p.name == name)?;
+        if p.param_type == "texture" {
+            if p.strings.is_empty() {
+                panic!(
+                    "{} No filename provided for texture parameter {}",
+                    p.loc, p.name
+                );
+            }
+            if p.strings.len() != 1 {
+                panic!(
+                    "{} More than one filename provided for texture parameter {}",
+                    p.loc, p.name
+                );
+            }
+
+            p.looked_up = true;
+
+            let tex = self.textures.float_textures.get(p.strings[0].as_str());
+            if let Some(tex) = tex {
+                return Some(tex.clone());
+            } else {
+                panic!("{} Couldn't find float texture {}", p.loc, p.strings[0]);
+            }
+        } else if p.param_type == "float" {
+            let v = self.get_one_float(name, 0.0);
+            return Some(Arc::new(FloatTexture::Constant(FloatConstantTexture::new(
+                v,
+            ))));
+        } else {
+            None
+        }
+    }
 
     pub fn get_spectrum_texture(
         &mut self,

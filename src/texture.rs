@@ -32,6 +32,12 @@ pub struct FloatConstantTexture {
     value: Float,
 }
 
+impl FloatConstantTexture {
+    pub fn new(value: Float) -> Self {
+        Self { value }
+    }
+}
+
 impl FloatTextureI for FloatConstantTexture {
     fn evaluate(&self, _ctx: &TextureEvalContext) -> Float {
         self.value
