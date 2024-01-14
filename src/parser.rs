@@ -1,8 +1,8 @@
 // TODO Possibly use nom for parsing.
 
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
-use crate::{options::Options, paramdict::ParsedParameter, Float};
+use crate::{options::Options, paramdict::ParsedParameter, spectra::Spectrum, Float};
 
 use arrayvec::ArrayVec;
 use string_interner::StringInterner;
@@ -137,6 +137,7 @@ pub trait ParserTarget {
         string_interner: &mut StringInterner,
         loc: FileLoc,
         options: &Options,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     );
     fn material(
         &mut self,

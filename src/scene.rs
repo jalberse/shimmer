@@ -17,8 +17,9 @@ use crate::{
     paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
     parser::{FileLoc, ParsedParameterVector, ParserTarget},
     sampler::Sampler,
+    spectra::spectrum,
     square_matrix::SquareMatrix,
-    texture::FloatTexture,
+    texture::{FloatTexture, SpectrumTexture},
     transform::Transform,
     util::normalize_arg,
     vecmath::{Point3f, Tuple3, Vector3f},
@@ -26,6 +27,8 @@ use crate::{
 };
 
 use log::warn;
+use rayon::option;
+use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
 // TODO If/when we make this multi-threaded, most of these will be within a Mutex.
@@ -160,13 +163,10 @@ impl BasicScene {
             .base
             .parameters
             .get_one_string("filename", "".to_owned());
-        if filename.is_empty() {
-            panic!("{} No filename provided for texture.", texture.base.loc)
-        }
 
         let filename = resolve_filename(options, filename.as_str());
         if filename.is_empty() {
-            panic!("Texture \"{}\" not found.", filename);
+            panic!("{} No filename provided for texture.", texture.base.loc);
         }
 
         let path = Path::new(filename.as_str());
@@ -174,7 +174,7 @@ impl BasicScene {
             panic!("Texture \"{}\" not found.", filename);
         }
 
-        if !self.loading_texture_filenames.contains(&filename) {
+        if self.loading_texture_filenames.contains(&filename) {
             self.serial_float_textures.push((name.to_owned(), texture));
             return;
         }
@@ -200,8 +200,61 @@ impl BasicScene {
             .insert(name.to_owned(), Arc::new(float_texture));
     }
 
-    fn add_spectrum_texture(&mut self, name: &str, texture: TextureSceneEntity) {
-        todo!()
+    fn add_spectrum_texture(
+        &mut self,
+        name: &str,
+        mut texture: TextureSceneEntity,
+        string_interner: &StringInterner,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        options: &Options,
+    ) {
+        if string_interner.resolve(texture.base.name).unwrap() != "ptex"
+            && string_interner.resolve(texture.base.name).unwrap() != "imagemap"
+        {
+            self.serial_spectrum_textures
+                .push((name.to_owned(), texture));
+            return;
+        }
+
+        let filename = texture
+            .base
+            .parameters
+            .get_one_string("filename", "".to_owned());
+        let filename = resolve_filename(options, filename.as_str());
+
+        if filename.is_empty() {
+            panic!("{} No filename provided for texture.", texture.base.loc);
+        }
+
+        let path = Path::new(&filename);
+        if !path.exists() {
+            panic!("Texture \"{}\" not found.", filename);
+        }
+
+        if self.loading_texture_filenames.contains(&filename) {
+            self.serial_spectrum_textures
+                .push((name.to_owned(), texture));
+            return;
+        }
+        self.loading_texture_filenames.insert(filename);
+
+        let render_from_texture = texture.render_from_object;
+        // None for the textures, as with float textures.
+        let mut text_dict = TextureParameterDictionary::new(texture.base.parameters.clone(), None);
+        // Only create Albedo for now; will get other two types created in create_textures().
+        let spectrum_texture = SpectrumTexture::create(
+            string_interner
+                .resolve(texture.base.name)
+                .expect("Unknown symbol"),
+            render_from_texture,
+            &mut text_dict,
+            crate::paramdict::SpectrumType::Albedo,
+            cached_spectra,
+            texture.base.loc,
+        );
+        self.textures
+            .albedo_spectrum_textures
+            .insert(name.to_owned(), Arc::new(spectrum_texture));
     }
 
     fn add_light(&mut self, light: LightSceneEntity, string_interner: &StringInterner) {
@@ -1037,6 +1090,7 @@ impl ParserTarget for BasicSceneBuilder {
         string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
         options: &Options,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     ) {
         // TODO Normalize name to UTF8
         // TODO Verify world
@@ -1083,6 +1137,9 @@ impl ParserTarget for BasicSceneBuilder {
                             loc,
                             self.render_from_object(),
                         ),
+                        &string_interner,
+                        cached_spectra,
+                        options,
                     );
                 }
                 _ => panic!("{} Unknown texture type {}", loc, texture_type),
