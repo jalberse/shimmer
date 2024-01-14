@@ -9,6 +9,7 @@ use crate::{
     camera::{Camera, CameraTransform},
     color::LinearColorEncoding,
     colorspace::RgbColorSpace,
+    file::resolve_filename,
     film::{Film, FilmI},
     filter::Filter,
     image::Image,
@@ -42,6 +43,10 @@ pub struct BasicScene {
     materials: Vec<SceneEntity>,
     area_lights: Vec<SceneEntity>,
     normal_maps: HashMap<String, Box<Image>>,
+    serial_float_textures: Vec<(String, TextureSceneEntity)>,
+    serial_spectrum_textures: Vec<(String, TextureSceneEntity)>,
+    async_spectrum_textures: Vec<(String, TextureSceneEntity)>,
+    loading_texture_filenames: HashSet<String>,
 }
 
 impl BasicScene {
@@ -124,7 +129,57 @@ impl BasicScene {
         todo!()
     }
 
-    fn add_float_texture(&mut self, name: &str, texture: TextureSceneEntity) {
+    fn add_float_texture(
+        &mut self,
+        name: &str,
+        mut texture: TextureSceneEntity,
+        string_interner: &StringInterner,
+        options: &Options,
+    ) {
+        // TODO Check if animated once we add animated transforms.
+
+        if string_interner
+            .resolve(texture.base.name)
+            .expect("Unknown texture name")
+            != "imagemap"
+            && string_interner
+                .resolve(texture.base.name)
+                .expect("Unknown texture name")
+                != "ptex"
+        {
+            self.serial_float_textures.push((name.to_owned(), texture));
+            return;
+        }
+
+        let filename = texture
+            .base
+            .parameters
+            .get_one_string("filename", "".to_owned());
+        if filename.is_empty() {
+            panic!("{} No filename provided for texture.", texture.base.loc)
+        }
+
+        let filename = resolve_filename(options, filename.as_str());
+        if filename.is_empty() {
+            panic!("Texture \"{}\" not found.", filename);
+        }
+
+        let path = Path::new(filename.as_str());
+        if !path.exists() {
+            panic!("Texture \"{}\" not found.", filename);
+        }
+
+        if !self.loading_texture_filenames.contains(&filename) {
+            self.serial_float_textures.push((name.to_owned(), texture));
+            return;
+        }
+
+        self.loading_texture_filenames.insert(filename);
+
+        // TODO Can make this async.
+        let render_from_texture = texture.render_from_object;
+        // TODO Get texture dict.
+
         todo!()
     }
 
@@ -964,6 +1019,7 @@ impl ParserTarget for BasicSceneBuilder {
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
+        options: &Options,
     ) {
         // TODO Normalize name to UTF8
         // TODO Verify world
@@ -996,6 +1052,8 @@ impl ParserTarget for BasicSceneBuilder {
                             loc,
                             self.render_from_object(),
                         ),
+                        &string_interner,
+                        options,
                     );
                 }
                 "spectrum" => {

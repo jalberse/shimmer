@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, rc::Rc, sync::Arc};
+use std::{collections::HashMap, default, fmt::Display, rc::Rc, sync::Arc};
 
 use log::warn;
 
@@ -12,6 +12,7 @@ use crate::{
         spectrum::{RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum},
         BlackbodySpectrum, NamedSpectrum, PiecewiseLinearSpectrum, Spectrum,
     },
+    texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture},
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f},
     Float,
 };
@@ -386,6 +387,10 @@ impl ParameterDictionary {
         self.lookup_single::<Vector2fParam>(name, default_value)
     }
 
+    pub fn get_one_point3f(&mut self, name: &str, default_value: Point3f) -> Point3f {
+        self.lookup_single::<Point3fParam>(name, default_value)
+    }
+
     pub fn get_one_vector3f(&mut self, name: &str, default_value: Vector3f) -> Vector3f {
         self.lookup_single::<Vector3fParam>(name, default_value)
     }
@@ -549,6 +554,27 @@ impl ParameterDictionary {
         }
     }
 
+    pub fn get_spectrum_array(
+        &mut self,
+        name: &str,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Vec<Arc<Spectrum>> {
+        let p = self.params.iter_mut().find(|p| p.name == name);
+        if let Some(p) = p {
+            let s = Self::extract_spectrum_array(
+                p,
+                spectrum_type,
+                self.color_space.clone(),
+                cached_spectra,
+            );
+            if !s.is_empty() {
+                return s;
+            }
+        }
+        Vec::new()
+    }
+
     fn return_array<ValueType, ReturnType, C>(
         values: &[ValueType],
         loc: &FileLoc,
@@ -629,6 +655,196 @@ impl ParameterDictionary {
 
     pub fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
         self.lookup_array::<Normal3fParam>(name)
+    }
+}
+
+pub struct NamedTextures {
+    float_textures: HashMap<String, FloatTexture>,
+    albedo_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
+    unbounded_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
+    illuminant_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
+}
+
+pub struct TextureParameterDictionary {
+    dict: ParameterDictionary,
+    textures: Arc<NamedTextures>,
+}
+
+impl TextureParameterDictionary {
+    pub fn new(dict: ParameterDictionary, textures: Arc<NamedTextures>) -> Self {
+        Self { dict, textures }
+    }
+
+    pub fn get_one_float(&mut self, name: &str, default_value: Float) -> Float {
+        self.dict.get_one_float(name, default_value)
+    }
+
+    pub fn get_one_int(&mut self, name: &str, default_value: i32) -> i32 {
+        self.dict.get_one_int(name, default_value)
+    }
+
+    pub fn get_one_bool(&mut self, name: &str, default_value: bool) -> bool {
+        self.dict.get_one_bool(name, default_value)
+    }
+
+    pub fn get_one_point2f(&mut self, name: &str, default_value: Point2f) -> Point2f {
+        self.dict.get_one_point2f(name, default_value)
+    }
+
+    pub fn get_one_vector2f(&mut self, name: &str, default_value: Vector2f) -> Vector2f {
+        self.dict.get_one_vector2f(name, default_value)
+    }
+
+    pub fn get_one_point3f(&mut self, name: &str, default_value: Point3f) -> Point3f {
+        self.dict.get_one_point3f(name, default_value)
+    }
+
+    pub fn get_one_vector3f(&mut self, name: &str, default_value: Vector3f) -> Vector3f {
+        self.dict.get_one_vector3f(name, default_value)
+    }
+
+    pub fn get_one_normal3f(&mut self, name: &str, default_value: Normal3f) -> Normal3f {
+        self.dict.get_one_normal3f(name, default_value)
+    }
+
+    pub fn get_one_spectrum(
+        &mut self,
+        name: &str,
+        default_value: Spectrum,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Arc<Spectrum> {
+        self.dict
+            .get_one_spectrum(name, default_value, spectrum_type, cached_spectra)
+    }
+
+    pub fn get_one_string(&mut self, name: &str, default_value: String) -> String {
+        self.dict.get_one_string(name, default_value)
+    }
+
+    pub fn get_float_array(&mut self, name: &str) -> Vec<Float> {
+        self.dict.get_float_array(name)
+    }
+
+    pub fn get_int_array(&mut self, name: &str) -> Vec<i32> {
+        self.dict.get_int_array(name)
+    }
+
+    pub fn get_bool_array(&mut self, name: &str) -> Vec<bool> {
+        self.dict.get_bool_array(name)
+    }
+
+    pub fn get_point2f_array(&mut self, name: &str) -> Vec<Point2f> {
+        self.dict.get_point2f_array(name)
+    }
+
+    pub fn get_vector2f_array(&mut self, name: &str) -> Vec<Vector2f> {
+        self.dict.get_vector2f_array(name)
+    }
+
+    pub fn get_point3f_array(&mut self, name: &str) -> Vec<Point3f> {
+        self.dict.get_point3f_array(name)
+    }
+
+    pub fn get_vector3f_array(&mut self, name: &str) -> Vec<Vector3f> {
+        self.dict.get_vector3f_array(name)
+    }
+
+    pub fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
+        self.dict.get_normal3f_array(name)
+    }
+
+    pub fn get_spectrum_array(
+        &mut self,
+        name: &str,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Vec<Arc<Spectrum>> {
+        self.dict
+            .get_spectrum_array(name, spectrum_type, cached_spectra)
+    }
+
+    pub fn get_string_array(&mut self, name: &str) -> Vec<String> {
+        self.dict.lookup_array::<StringParam>(name)
+    }
+
+    // TODO get_float_texture() (or null?)
+
+    // TODO get_spectrum_texture() (or null?)
+    pub fn get_spectrum_texture_or_none(
+        &mut self,
+        name: &str,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Option<Arc<SpectrumTexture>> {
+        let spectrum_textures = match spectrum_type {
+            SpectrumType::Illuminant => &self.textures.illuminant_spectrum_textures,
+            SpectrumType::Albedo => &self.textures.albedo_spectrum_textures,
+            SpectrumType::Unbounded => &self.textures.unbounded_spectrum_textures,
+        };
+
+        let p = self.dict.params.iter_mut().find(|p| p.name == name);
+        if let Some(p) = p {
+            match p.param_type.as_str() {
+                "texture" => {
+                    if p.strings.is_empty() {
+                        panic!(
+                            "{} No filename provided for texture parameter {}",
+                            p.loc, p.name
+                        );
+                    }
+                    if p.strings.len() > 1 {
+                        panic!(
+                            "{} More than one filename provided for texture parameter {}",
+                            p.loc, p.name
+                        );
+                    }
+
+                    p.looked_up = true;
+
+                    let spec = spectrum_textures.get(p.strings[0].as_str());
+                    if let Some(spec) = spec {
+                        return Some(spec.clone());
+                    } else {
+                        panic!("{} Couldn't find spectrum texture {}", p.loc, p.strings[0]);
+                    }
+                }
+                "rgb" => {
+                    if p.floats.len() != 3 {
+                        panic!(
+                            "{} Expected 3 values for RGB texture parameter {}",
+                            p.loc, p.name
+                        );
+                    }
+                    p.looked_up = true;
+                    let rgb = RGB::new(p.floats[0], p.floats[1], p.floats[2]);
+                    if rgb.r < 0.0 || rgb.g < 0.0 || rgb.b < 0.0 {
+                        panic!("{} RGB Parameter {} has negative component", p.loc, p.name);
+                    }
+                    let s = match spectrum_type {
+                        SpectrumType::Illuminant => Spectrum::RgbIlluminantSpectrum(
+                            RgbIlluminantSpectrum::new(&self.dict.color_space, &rgb),
+                        ),
+                        SpectrumType::Albedo => Spectrum::RgbAlbedoSpectrum(
+                            RgbAlbedoSpectrum::new(&self.dict.color_space, &rgb),
+                        ),
+                        SpectrumType::Unbounded => Spectrum::RgbUnboundedSpectrum(
+                            RgbUnboundedSpectrum::new(&self.dict.color_space, &rgb),
+                        ),
+                    };
+                    Some(Arc::new(SpectrumTexture::Constant(
+                        SpectrumConstantTexture::new(s),
+                    )))
+                }
+                "spectrum" | "blackbody" => {
+                    let s = self.get_one_spectrum(name, None, spectrum_type, cached_spectra);
+                    todo!()
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
     }
 }
 

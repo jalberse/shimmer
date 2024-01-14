@@ -64,6 +64,12 @@ impl SpectrumTextureI for SpectrumConstantTexture {
     }
 }
 
+impl SpectrumConstantTexture {
+    pub fn new(value: Spectrum) -> Self {
+        Self { value }
+    }
+}
+
 /// Provides an interface for 2D texture coordinate generation.
 pub trait TextureMapping2DI {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D;

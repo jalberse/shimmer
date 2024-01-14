@@ -136,6 +136,7 @@ pub trait ParserTarget {
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: FileLoc,
+        options: &Options,
     );
     fn material(
         &mut self,

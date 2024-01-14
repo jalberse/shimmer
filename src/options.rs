@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::{
     bounding_box::{Bounds2f, Bounds2i},
     Float,
@@ -27,6 +29,7 @@ pub struct Options {
     pub mse_reference_output: String,
     pub record_pixel_statistics: bool,
     pub wavefront: bool,
+    pub search_directory: PathBuf,
 }
 
 impl Default for Options {
@@ -49,6 +52,7 @@ impl Default for Options {
             mse_reference_output: "".to_string(),
             record_pixel_statistics: false,
             wavefront: false,
+            search_directory: PathBuf::new(),
         }
     }
 }
