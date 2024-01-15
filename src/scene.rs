@@ -1007,7 +1007,7 @@ impl ParserTarget for BasicSceneBuilder {
         params: ParsedParameterVector,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        todo!("Mediums not yet implemented; can't make named medium.")
     }
 
     fn medium_interface(
@@ -1016,7 +1016,7 @@ impl ParserTarget for BasicSceneBuilder {
         outside_name: &str,
         loc: crate::parser::FileLoc,
     ) {
-        todo!()
+        todo!("Mediums not yet implemented; can't create medium interface.")
     }
 
     fn sampler(
