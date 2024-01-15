@@ -4,20 +4,18 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use itertools::Diff;
 use log::warn;
 
 use crate::{
     bounding_box::Bounds3f,
     camera::CameraTransform,
-    color,
     colorspace::RgbColorSpace,
     file::resolve_filename,
     float::PI_F,
     image::Image,
     interaction::{Interaction, SurfaceInteraction},
     medium::Medium,
-    options::{self, Options},
+    options::Options,
     paramdict::ParameterDictionary,
     parser::FileLoc,
     ray::Ray,
@@ -26,7 +24,7 @@ use crate::{
     spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
-        spectrum::{self, spectrum_to_photometric, SpectrumI},
+        spectrum::{spectrum_to_photometric, SpectrumI},
         DenselySampledSpectrum, Spectrum,
     },
     texture::FloatTexture,
