@@ -2,20 +2,30 @@
 // and implement them later as needed - but just a PointLight should be sufficient for now
 // to render early test scenes.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use log::warn;
 
 use crate::{
     bounding_box::Bounds3f,
+    camera::CameraTransform,
+    color,
+    colorspace::RgbColorSpace,
+    file::resolve_filename,
     float::PI_F,
     interaction::{Interaction, SurfaceInteraction},
+    medium::Medium,
+    options::Options,
+    paramdict::ParameterDictionary,
+    parser::FileLoc,
     ray::Ray,
     sampling::{sample_uniform_sphere, uniform_hemisphere_pdf, uniform_sphere_pdf},
     shape::{Shape, ShapeI, ShapeSampleContext},
     spectra::{
-        sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
-        spectrum::SpectrumI, DenselySampledSpectrum, Spectrum,
+        sampled_spectrum::SampledSpectrum,
+        sampled_wavelengths::SampledWavelengths,
+        spectrum::{spectrum_to_photometric, SpectrumI},
+        DenselySampledSpectrum, Spectrum,
     },
     transform::Transform,
     vecmath::{
@@ -94,6 +104,94 @@ pub enum Light {
     Point(PointLight),
     DiffuseAreaLight(DiffuseAreaLight),
     UniformInfinite(UniformInfiniteLight),
+}
+
+impl Light {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        render_from_light: Transform,
+        camera_transform: &CameraTransform,
+        outside_medium: Option<Medium>,
+        loc: &FileLoc,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        options: &Options,
+    ) -> Light {
+        // Area lights handled in create_area().
+        let light = match name {
+            "point" => Light::Point(PointLight::create(
+                &render_from_light,
+                outside_medium,
+                parameters,
+                parameters.color_space.clone(),
+                loc,
+                cached_spectra,
+            )),
+            "infinite" => {
+                let color_space = parameters.color_space.clone();
+                let l = parameters.get_spectrum_array(
+                    "L",
+                    crate::paramdict::SpectrumType::Illuminant,
+                    cached_spectra,
+                );
+                let mut scale = parameters.get_one_float("scale", 1.0);
+                let portal = parameters.get_point3f_array("portal");
+                let filename = resolve_filename(
+                    options,
+                    parameters
+                        .get_one_string("filename", "".to_owned())
+                        .as_str(),
+                );
+                let e_v = parameters.get_one_float("illuminance", -1.0);
+
+                if l.is_empty() && filename.is_empty() && portal.is_empty() {
+                    // Scale the light spectrum to be equivalent to 1 nit.
+                    scale /= spectrum_to_photometric(&color_space.illuminant);
+                    if e_v > 0.0 {
+                        // If the scene specifies desired illuminance, first calculate
+                        // the illuminance from a uniform hemispherical emission
+                        // of L_v then use this to scale the emission spectrum.
+                        let k_e = 4.0 * PI_F;
+                        scale *= e_v / k_e;
+                    }
+
+                    Light::UniformInfinite(UniformInfiniteLight::new(
+                        render_from_light,
+                        color_space.illuminant.clone(),
+                        scale,
+                    ))
+                } else if !l.is_empty() && portal.is_empty() {
+                    if !filename.is_empty() {
+                        panic!(
+                            "Can't specify both emission L and filename with ImageInfinitelight"
+                        );
+                    }
+
+                    scale /= spectrum_to_photometric(&l[0]);
+                    if e_v > 0.0 {
+                        let k_e = 4.0 * PI_F;
+                        scale *= e_v / k_e;
+                    }
+
+                    Light::UniformInfinite(UniformInfiniteLight::new(
+                        render_from_light,
+                        l[0].clone(),
+                        scale,
+                    ))
+                } else {
+                    // Either an image was provided or it's "L" with a portal
+                    todo!("Image infinite lights not yet implemented")
+                }
+            }
+            _ => {
+                panic!("Light {} unknown", name);
+            }
+        };
+
+        // TODO Report unused params
+
+        light
+    }
 }
 
 impl LightI for Light {
@@ -216,7 +314,7 @@ pub struct PointLight {
 }
 
 impl PointLight {
-    pub fn new(render_from_light: Transform, i: Spectrum, scale: Float) -> PointLight {
+    pub fn new(render_from_light: Transform, i: Arc<Spectrum>, scale: Float) -> PointLight {
         let base = LightBase {
             light_type: LightType::DeltaPosition,
             render_from_light,
@@ -226,6 +324,39 @@ impl PointLight {
             i: Arc::new(DenselySampledSpectrum::new(&i)),
             scale,
         }
+    }
+
+    pub fn create(
+        render_from_light: &Transform,
+        medium: Option<Medium>,
+        parameters: &mut ParameterDictionary,
+        color_space: Arc<RgbColorSpace>,
+        _loc: &FileLoc,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> PointLight {
+        let i = parameters
+            .get_one_spectrum(
+                "I",
+                Some(color_space.illuminant.clone()),
+                crate::paramdict::SpectrumType::Illuminant,
+                cached_spectra,
+            )
+            .expect("PointLight requires I parameter");
+        let mut sc = parameters.get_one_float("scale", 1.0);
+
+        sc /= spectrum_to_photometric(&i);
+
+        let phi_v = parameters.get_one_float("power", -1.0);
+        if phi_v > 0.0 {
+            let k_e = 4.0 * PI_F;
+            sc *= phi_v / k_e;
+        }
+
+        let from = parameters.get_one_point3f("from", Point3f::ZERO);
+        let tf = Transform::translate(Vector3f::from(from));
+        let final_render_from_light = render_from_light * tf;
+
+        PointLight::new(final_render_from_light, i, sc)
     }
 }
 

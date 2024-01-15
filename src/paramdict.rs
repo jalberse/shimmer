@@ -406,7 +406,7 @@ impl ParameterDictionary {
     pub fn get_one_spectrum(
         &mut self,
         name: &str,
-        default_value: Option<Spectrum>,
+        default_value: Option<Arc<Spectrum>>,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     ) -> Option<Arc<Spectrum>> {
@@ -428,13 +428,13 @@ impl ParameterDictionary {
                 return Some(s.into_iter().nth(0).expect("Expected non-empty vector"));
             }
             if let Some(default_value) = default_value {
-                Some(Arc::new(default_value))
+                Some(default_value)
             } else {
                 None
             }
         } else {
             if let Some(default_value) = default_value {
-                Some(Arc::new(default_value))
+                Some(default_value)
             } else {
                 None
             }
@@ -719,7 +719,7 @@ impl TextureParameterDictionary {
     pub fn get_one_spectrum(
         &mut self,
         name: &str,
-        default_value: Option<Spectrum>,
+        default_value: Option<Arc<Spectrum>>,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     ) -> Option<Arc<Spectrum>> {

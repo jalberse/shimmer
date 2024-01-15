@@ -158,7 +158,7 @@ impl SpectrumConstantTexture {
     ) -> SpectrumConstantTexture {
         let one = Spectrum::Constant(ConstantSpectrum::new(1.0));
         let c = parameters
-            .get_one_spectrum("value", Some(one), spectrum_type, cached_spectra)
+            .get_one_spectrum("value", Some(Arc::new(one)), spectrum_type, cached_spectra)
             .unwrap();
         SpectrumConstantTexture::new(c)
     }

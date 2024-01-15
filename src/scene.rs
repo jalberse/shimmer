@@ -6,13 +6,14 @@ use std::{
 };
 
 use crate::{
-    camera::{Camera, CameraTransform},
+    camera::{Camera, CameraI, CameraTransform},
     color::LinearColorEncoding,
     colorspace::RgbColorSpace,
     file::resolve_filename,
     film::{Film, FilmI},
     filter::Filter,
     image::Image,
+    light::Light,
     options::Options,
     paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
     parser::{FileLoc, ParsedParameterVector, ParserTarget},
@@ -53,11 +54,16 @@ pub struct BasicScene {
     loading_texture_filenames: HashSet<String>,
 
     // TODO When we switch to asynch, we will load all of these at once in parallel
-    //   in create_textures(). For now, just load as we parse into this.
+    //   in create_textures(), create_lights() etc. For now, just load as we parse into this.
     textures: NamedTextures,
+    lights: Vec<Light>,
 }
 
 impl BasicScene {
+    pub fn get_camera(&self) -> &Camera {
+        &self.camera
+    }
+
     pub fn set_options(
         &mut self,
         mut filter: SceneEntity,
@@ -257,8 +263,29 @@ impl BasicScene {
             .insert(name.to_owned(), Arc::new(spectrum_texture));
     }
 
-    fn add_light(&mut self, light: LightSceneEntity, string_interner: &StringInterner) {
-        todo!()
+    fn add_light(
+        &mut self,
+        light: &mut LightSceneEntity,
+        string_interner: &StringInterner,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        options: &Options,
+    ) {
+        // TODO Get medium, when I add mediums - will replace none below.
+        // TODO Check for animated light and warn, when I add animated transforms.
+        // TODO Change to async
+
+        self.lights.push(Light::create(
+            string_interner
+                .resolve(light.base.base.name)
+                .expect("Unknown symbol"),
+            &mut light.base.base.parameters,
+            light.base.render_from_object,
+            self.get_camera().get_camera_transform(),
+            None,
+            &light.base.base.loc,
+            cached_spectra,
+            options,
+        ));
     }
 
     /// Returns the new area light index.
@@ -1212,6 +1239,8 @@ impl ParserTarget for BasicSceneBuilder {
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: crate::parser::FileLoc,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        options: &Options,
     ) {
         let dict = ParameterDictionary::new_with_unowned(
             params,
@@ -1219,7 +1248,7 @@ impl ParserTarget for BasicSceneBuilder {
             self.graphics_state.color_space.clone(),
         );
         self.scene.add_light(
-            LightSceneEntity::new(
+            &mut LightSceneEntity::new(
                 name,
                 dict,
                 string_interner,
@@ -1228,6 +1257,8 @@ impl ParserTarget for BasicSceneBuilder {
                 &self.graphics_state.current_outside_medium,
             ),
             &string_interner,
+            cached_spectra,
+            options,
         );
     }
 

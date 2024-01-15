@@ -166,6 +166,8 @@ pub trait ParserTarget {
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: FileLoc,
+        cacjed_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        options: &Options,
     );
     fn area_light_source(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc);
     fn reverse_orientation(&mut self, loc: FileLoc);
