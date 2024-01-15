@@ -290,25 +290,26 @@ impl BasicScene {
 
     /// Returns the new area light index.
     fn add_area_light(&mut self, light: SceneEntity) -> i32 {
-        todo!()
+        self.area_lights.push(light);
+        (self.area_lights.len() - 1) as i32
     }
 
     fn add_shapes(&mut self, shapes: &[ShapeSceneEntity]) {
-        todo!()
+        self.shapes.extend_from_slice(shapes);
     }
 
     // TODO add_animated_shapes().
 
     fn add_instance_definition(&mut self, instance: InstanceDefinitionSceneEntity) {
-        todo!()
+        self.instance_definitions.push(instance);
     }
 
     fn add_instance_uses(&mut self, instances: &[InstanceSceneEntity]) {
-        todo!()
+        self.instances.extend_from_slice(instances);
     }
 
     fn done(&mut self) {
-        todo!()
+        // TODO Check for unused textures, lights, etc and warn about them.
     }
 
     fn load_normal_map(&mut self, parameters: &mut ParameterDictionary) {
@@ -364,6 +365,7 @@ impl SceneEntity {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ShapeSceneEntity {
     base: SceneEntity,
     render_from_object: Arc<Transform>,
@@ -432,6 +434,7 @@ impl LightSceneEntity {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct InstanceSceneEntity {
     name: SymbolU32,
     loc: FileLoc,
