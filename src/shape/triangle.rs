@@ -49,10 +49,13 @@ impl Triangle {
     const MIN_SPHERICAL_SAMPLE_AREA: Float = 3e-4;
     const MAX_SPHERICAL_SAMPLE_AREA: Float = 6.22;
 
-    pub fn create_triangles(mesh: Arc<TriangleMesh>) -> Vec<Shape> {
+    pub fn create_triangles(mesh: Arc<TriangleMesh>) -> Vec<Arc<Shape>> {
         let mut tris = Vec::with_capacity(mesh.n_triangles);
         for i in 0..mesh.n_triangles {
-            tris.push(Shape::Triangle(Triangle::new(mesh.clone(), i as i32)));
+            tris.push(Arc::new(Shape::Triangle(Triangle::new(
+                mesh.clone(),
+                i as i32,
+            ))));
         }
         tris
     }

@@ -107,7 +107,7 @@ fn one_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         z: -2.0,
     });
     let radius = 1.0;
-    let sphere = Shape::Sphere(Sphere::new(
+    let sphere = Arc::new(Shape::Sphere(Sphere::new(
         render_from_object,
         render_from_object.inverse(),
         false,
@@ -115,7 +115,7 @@ fn one_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         -radius,
         radius,
         360.0,
-    ));
+    )));
 
     let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
     let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
@@ -406,7 +406,7 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
                 z: 2.0 + rng.gen_range(-0.8..0.8),
             });
             let light_radius = rng.gen_range(0.2..0.35);
-            let sphere = Shape::Sphere(Sphere::new(
+            let sphere = Arc::new(Shape::Sphere(Sphere::new(
                 object_from_render.inverse(),
                 object_from_render,
                 false,
@@ -414,7 +414,7 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
                 -light_radius,
                 light_radius,
                 360.0,
-            ));
+            )));
 
             let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
             let scale = 1.0 / spectrum_to_photometric(&le);
@@ -448,7 +448,7 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
                 z: 2.0 + rng.gen_range(-0.8..0.8),
             });
             let radius = rng.gen_range(0.1..0.3);
-            let sphere = Shape::Sphere(Sphere::new(
+            let sphere = Arc::new(Shape::Sphere(Sphere::new(
                 object_from_render.inverse(),
                 object_from_render,
                 false,
@@ -456,7 +456,7 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
                 -radius,
                 radius,
                 360.0,
-            ));
+            )));
 
             let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
@@ -485,7 +485,7 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             z: 2.0,
         });
         let light_radius = 0.33;
-        let sphere = Shape::Sphere(Sphere::new(
+        let sphere = Arc::new(Shape::Sphere(Sphere::new(
             object_from_render.inverse(),
             object_from_render,
             false,
@@ -493,7 +493,7 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             -light_radius,
             light_radius,
             360.0,
-        ));
+        )));
 
         let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
         let scale = 1.0 / spectrum_to_photometric(&le);
@@ -529,7 +529,7 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             z: 2.0,
         });
         let radius = 0.33;
-        let sphere = Shape::Sphere(Sphere::new(
+        let sphere = Arc::new(Shape::Sphere(Sphere::new(
             object_from_render.inverse(),
             object_from_render,
             false,
@@ -537,7 +537,7 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             -radius,
             radius,
             360.0,
-        ));
+        )));
 
         let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
         let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
@@ -682,7 +682,7 @@ fn get_random_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>)
                 z: 1.0 + rng.gen_range(-0.8..0.8),
             });
             let radius = rng.gen_range(0.1..0.3);
-            let sphere = Shape::Sphere(Sphere::new(
+            let sphere = Arc::new(Shape::Sphere(Sphere::new(
                 object_from_render.inverse(),
                 object_from_render,
                 false,
@@ -690,7 +690,7 @@ fn get_random_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>)
                 -radius,
                 radius,
                 360.0,
-            ));
+            )));
 
             let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });

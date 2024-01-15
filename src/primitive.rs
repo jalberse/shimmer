@@ -65,7 +65,7 @@ impl PrimitiveI for Primitive {
 
 /// Stores a variety of properties that may be associated with a shape.
 pub struct GeometricPrimitive {
-    pub shape: Shape,
+    pub shape: Arc<Shape>,
     pub material: Arc<Material>,
     /// Stores the emissive properties if the shape is a light source
     pub area_light: Option<Arc<Light>>,
@@ -75,7 +75,7 @@ pub struct GeometricPrimitive {
 
 impl GeometricPrimitive {
     pub fn new(
-        shape: Shape,
+        shape: Arc<Shape>,
         material: Arc<Material>,
         area_light: Option<Arc<Light>>,
     ) -> GeometricPrimitive {
