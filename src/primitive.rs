@@ -112,7 +112,7 @@ impl PrimitiveI for GeometricPrimitive {
 /// the shape. Used if the extra information in a GeometricPrimitive (e.g. lights)
 /// are not needed for this shape.
 pub struct SimplePrimitive {
-    pub shape: Shape,
+    pub shape: Arc<Shape>,
     pub material: Arc<Material>,
 }
 

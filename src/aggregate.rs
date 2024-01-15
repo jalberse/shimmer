@@ -564,7 +564,7 @@ mod tests {
         let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
         let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
         let prim = Arc::new(Primitive::Simple(SimplePrimitive {
-            shape: Shape::Sphere(sphere),
+            shape: Arc::new(Shape::Sphere(sphere)),
             material,
         }));
         let expected_bounds = prim.as_ref().bounds();
@@ -592,7 +592,7 @@ mod tests {
         let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
         let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
         let prim = Arc::new(Primitive::Simple(SimplePrimitive {
-            shape: Shape::Sphere(sphere),
+            shape: Arc::new(Shape::Sphere(sphere)),
             material,
         }));
         let prims = vec![prim];
@@ -634,7 +634,7 @@ mod tests {
             let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
             let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
             let prim = Arc::new(Primitive::Simple(SimplePrimitive {
-                shape: Shape::Sphere(sphere),
+                shape: Arc::new(Shape::Sphere(sphere)),
                 material,
             }));
             prims.push(prim);
