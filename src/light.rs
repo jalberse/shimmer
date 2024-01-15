@@ -4,6 +4,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use itertools::Diff;
 use log::warn;
 
 use crate::{
@@ -13,9 +14,10 @@ use crate::{
     colorspace::RgbColorSpace,
     file::resolve_filename,
     float::PI_F,
+    image::Image,
     interaction::{Interaction, SurfaceInteraction},
     medium::Medium,
-    options::Options,
+    options::{self, Options},
     paramdict::ParameterDictionary,
     parser::FileLoc,
     ray::Ray,
@@ -24,9 +26,10 @@ use crate::{
     spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
-        spectrum::{spectrum_to_photometric, SpectrumI},
+        spectrum::{self, spectrum_to_photometric, SpectrumI},
         DenselySampledSpectrum, Spectrum,
     },
+    texture::FloatTexture,
     transform::Transform,
     vecmath::{
         normal::Normal3,
@@ -191,6 +194,36 @@ impl Light {
         // TODO Report unused params
 
         light
+    }
+
+    // TODO Add medium interface; will use medium_interface.outside for diffuse area light.
+    pub fn create_area(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        render_from_light: Transform,
+        shape: Arc<Shape>,
+        alpha: FloatTexture,
+        loc: &FileLoc,
+        options: &Options,
+    ) -> Light {
+        let area = match name {
+            "diffuse" => Light::DiffuseAreaLight(DiffuseAreaLight::create(
+                render_from_light,
+                None,
+                parameters,
+                parameters.color_space.clone(),
+                loc,
+                shape,
+                alpha,
+                options,
+            )),
+            _ => {
+                panic!("Area light {} unknown", name);
+            }
+        };
+
+        // TODO Report unused params
+        area
     }
 }
 
@@ -430,7 +463,7 @@ impl LightI for PointLight {
 #[derive(Debug, Clone)]
 pub struct DiffuseAreaLight {
     base: LightBase,
-    shape: Shape,
+    shape: Arc<Shape>,
     // TODO alpha: FloatTexture,
     area: Float,
     two_sided: bool,
@@ -445,7 +478,7 @@ impl DiffuseAreaLight {
         render_from_light: Transform,
         le: Arc<Spectrum>,
         scale: Float,
-        shape: Shape,
+        shape: Arc<Shape>,
         two_sided: bool,
     ) -> DiffuseAreaLight {
         let area = shape.area();
@@ -463,6 +496,64 @@ impl DiffuseAreaLight {
             l_emit: Arc::new(DenselySampledSpectrum::new(le.as_ref())),
             scale,
         }
+    }
+
+    pub fn create(
+        render_from_light: Transform,
+        medium: Option<Medium>,
+        parameters: &mut ParameterDictionary,
+        color_space: Arc<RgbColorSpace>,
+        loc: &FileLoc,
+        shape: Arc<Shape>,
+        alpha_tex: FloatTexture,
+        options: &Options,
+    ) -> DiffuseAreaLight {
+        let mut l = parameters.get_one_spectrum(
+            "L",
+            None,
+            crate::paramdict::SpectrumType::Illuminant,
+            &mut HashMap::new(),
+        );
+        let mut scale = parameters.get_one_float("scale", 1.0);
+        let two_sides = parameters.get_one_bool("twosided", false);
+
+        let filename = resolve_filename(
+            options,
+            &parameters.get_one_string("filename", "".to_owned()),
+        );
+
+        let image: Option<Image> = None; // TODO Use this image; it's used in scaling below.
+        if !filename.is_empty() {
+            if l.is_some() {
+                panic!("Both L and filename specifed for diffuse area light");
+            }
+            todo!("Image area lights not yet implemented")
+        }
+
+        let l = if filename.is_empty() && l.is_none() {
+            color_space.illuminant.clone()
+        } else {
+            l.unwrap()
+        };
+
+        // Scale so that radiance is equivalent to 1 nit
+        scale /= spectrum_to_photometric(&l);
+
+        let phi_v = parameters.get_one_float("power", -1.0);
+        if phi_v > 0.0 {
+            let mut k_e = 1.0;
+
+            if image.is_some() {
+                todo!("Image area lights not yet implemented");
+            }
+
+            k_e *= if two_sides { 2.0 } else { 1.0 } * shape.area() * PI_F;
+
+            // Now multiply up scale to hit the target power
+            scale *= phi_v / k_e;
+        }
+
+        DiffuseAreaLight::new(render_from_light, l, scale, shape.clone(), two_sides)
     }
 }
 

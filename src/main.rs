@@ -349,6 +349,8 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         Default::default(),
         Default::default(),
     ));
+
+    // TODO Hmm, should create_triangles return Arc<Triangle> instead of Triangle? Does PBRT store Tris as a pointer in reality?
     let light_tris_shapes = Triangle::create_triangles(light_mesh);
 
     let le = Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)));
