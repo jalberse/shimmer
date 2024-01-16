@@ -39,8 +39,6 @@ pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &Options)
             }
         };
 
-        // TODO Can reference Scene::load() in rust parser, or PBRT's parse() fn.
-
         // TODO I'm passing a default FileLoc here since we don't yet track it in the tokenizer.
         //  We'd like to do that at some point, and then pass it here. It will make error messages better.
         let loc = Default::default();
