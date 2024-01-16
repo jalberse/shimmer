@@ -1,7 +1,6 @@
 //! Directives parser.
 // Adapted from pbrt4 crate under apache license.
 
-use core::time;
 use std::collections::HashMap;
 
 use string_interner::StringInterner;
