@@ -214,6 +214,8 @@ enum ValueType {
     Boolean,
 }
 
+/// A ParsedParamter is simialr to a Param, but the values are stored as a vector of the appropriate type,
+/// rather than as a string. It also provides some other utilities such as the color_space field.
 #[derive(Debug, Clone)]
 pub struct ParsedParameter {
     /// The name of the parameter, e.g. "radius" or "indices"
