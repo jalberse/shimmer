@@ -1,13 +1,30 @@
-// TODO Possibly use nom for parsing.
-
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
-use crate::{options::Options, paramdict::ParsedParameter, spectra::Spectrum, Float};
+use crate::{loading::paramdict::ParsedParameter, options::Options, spectra::Spectrum, Float};
 
 use arrayvec::ArrayVec;
 use string_interner::StringInterner;
 
+use super::param::ParamList;
+
 pub type ParsedParameterVector = ArrayVec<ParsedParameter, 8>;
+
+impl<'a> From<ParamList<'a>> for ParsedParameterVector {
+    fn from(param_list: ParamList) -> Self {
+        let mut params = ArrayVec::new();
+
+        for param in param_list.0.iter() {
+            // TODO I think we will have a conversion Param -> ParsedParam,
+            //  so do that for each and push.
+            // Now, the str in param_list is e.g. xresolution or "cropwindow" or "radius" -
+            //   it is in fact the same as param.name. We're not using a map in ParsedParameterVector,
+            //   so we can basically ignore that.
+            todo!()
+        }
+
+        params
+    }
+}
 
 /// Used for error reporting to convey error locations in scene description files.
 #[derive(Debug, Clone)]
@@ -67,13 +84,7 @@ pub trait ParserTarget {
     fn active_transform_end_time(&mut self, loc: FileLoc);
     fn active_transform_start_time(&mut self, loc: FileLoc);
     fn transform_times(&mut self, start: Float, end: Float, loc: FileLoc);
-    fn color_space(
-        &mut self,
-        n: &str,
-        params: ParsedParameterVector,
-        string_interner: &mut StringInterner,
-        loc: FileLoc,
-    );
+    fn color_space(&mut self, n: &str, loc: FileLoc);
     fn pixel_filter(
         &mut self,
         name: &str,
@@ -151,22 +162,16 @@ pub trait ParserTarget {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
-    );
-    fn named_material(
-        &mut self,
-        name: &str,
-        params: ParsedParameterVector,
-        string_interner: &mut StringInterner,
         loc: FileLoc,
     );
+    fn named_material(&mut self, name: &str, loc: FileLoc);
     fn light_source(
         &mut self,
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: FileLoc,
-        cacjed_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
     );
     fn area_light_source(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc);

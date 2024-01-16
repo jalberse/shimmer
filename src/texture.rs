@@ -4,8 +4,8 @@ use spectrum::ConstantSpectrum;
 
 use crate::{
     interaction::{Interaction, SurfaceInteraction},
-    paramdict::{self, SpectrumType, TextureParameterDictionary},
-    parser::FileLoc,
+    loading::paramdict::{SpectrumType, TextureParameterDictionary},
+    loading::parser_target::FileLoc,
     spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,

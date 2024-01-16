@@ -14,10 +14,10 @@ use crate::{
     float::PI_F,
     image::Image,
     interaction::{Interaction, SurfaceInteraction},
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
     medium::Medium,
     options::Options,
-    paramdict::ParameterDictionary,
-    parser::FileLoc,
     ray::Ray,
     sampling::{sample_uniform_sphere, uniform_hemisphere_pdf, uniform_sphere_pdf},
     shape::{Shape, ShapeI, ShapeSampleContext},
@@ -132,7 +132,7 @@ impl Light {
                 let color_space = parameters.color_space.clone();
                 let l = parameters.get_spectrum_array(
                     "L",
-                    crate::paramdict::SpectrumType::Illuminant,
+                    crate::loading::paramdict::SpectrumType::Illuminant,
                     cached_spectra,
                 );
                 let mut scale = parameters.get_one_float("scale", 1.0);
@@ -369,7 +369,7 @@ impl PointLight {
             .get_one_spectrum(
                 "I",
                 Some(color_space.illuminant.clone()),
-                crate::paramdict::SpectrumType::Illuminant,
+                crate::loading::paramdict::SpectrumType::Illuminant,
                 cached_spectra,
             )
             .expect("PointLight requires I parameter");
@@ -509,7 +509,7 @@ impl DiffuseAreaLight {
         let mut l = parameters.get_one_spectrum(
             "L",
             None,
-            crate::paramdict::SpectrumType::Illuminant,
+            crate::loading::paramdict::SpectrumType::Illuminant,
             &mut HashMap::new(),
         );
         let mut scale = parameters.get_one_float("scale", 1.0);

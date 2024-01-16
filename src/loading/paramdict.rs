@@ -1,24 +1,26 @@
-use std::{collections::HashMap, default, fmt::Display, rc::Rc, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use log::warn;
 
 use crate::{
     color::RGB,
     colorspace::RgbColorSpace,
-    options::Options,
-    parser::{FileLoc, ParsedParameterVector},
+    loading::parser_target::{FileLoc, ParsedParameterVector},
     spectra::{
-        named_spectrum,
         spectrum::{RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum},
         BlackbodySpectrum, NamedSpectrum, PiecewiseLinearSpectrum, Spectrum,
     },
     texture::{FloatConstantTexture, FloatTexture, SpectrumConstantTexture, SpectrumTexture},
+    util::{dequote_string, is_quoted_string},
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f},
     Float,
 };
 
+use super::param::Param;
+
 /// Seal this trait so that it remains internal.
 pub trait ParameterType: sealed::Sealed {
+    // TODO Rather than this constant, should the type just be an enum? ParamType?
     const TYPE_NAME: &'static str;
     const N_PER_ITEM: i32;
     type ConvertType;
@@ -202,15 +204,26 @@ impl ParameterType for StringParam {
     }
 }
 
+// Used while parsing parameter values
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum ValueType {
+    Unknown,
+    Float,
+    Integer,
+    String,
+    Boolean,
+}
+
 #[derive(Debug, Clone)]
 pub struct ParsedParameter {
-    /// The name of the parameter, e.g. "radius"
+    /// The name of the parameter, e.g. "radius" or "indices"
     pub name: String,
-    /// The type of the parameter; e.g. "float"
+    // TODO Should we switch this to an enum? And get rid of TYPE_NAME constant?
+    /// The type of the parameter; e.g. "float" or "integer"
     pub param_type: String,
     /// The location in the file
     pub loc: FileLoc,
-    // These store the parameter values
+    // These store the parameter values. Exactly one will be non-empty of these four.
     pub floats: Vec<Float>,
     pub ints: Vec<i32>,
     pub strings: Vec<String>,
@@ -219,6 +232,113 @@ pub struct ParsedParameter {
     pub looked_up: bool,
     pub color_space: Option<Arc<RgbColorSpace>>,
     pub may_be_unused: bool,
+}
+
+impl ParsedParameter {
+    pub fn add_float(&mut self, v: Float) {
+        assert!(self.ints.is_empty() && self.strings.is_empty() && self.bools.is_empty());
+        self.floats.push(v);
+    }
+
+    pub fn add_int(&mut self, v: i32) {
+        assert!(self.floats.is_empty() && self.strings.is_empty() && self.bools.is_empty());
+        self.ints.push(v);
+    }
+
+    pub fn add_string(&mut self, v: String) {
+        assert!(self.floats.is_empty() && self.ints.is_empty() && self.bools.is_empty());
+        self.strings.push(v);
+    }
+
+    pub fn add_bool(&mut self, v: bool) {
+        assert!(self.floats.is_empty() && self.ints.is_empty() && self.strings.is_empty());
+        self.bools.push(v);
+    }
+}
+
+impl<'a> From<Param<'a>> for ParsedParameter {
+    fn from(value: Param) -> Self {
+        let name = value.name;
+        let param_type = match value.ty {
+            super::param::ParamType::Boolean => BooleanParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Float => FloatParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Integer => IntegerParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Point2 => Point2fParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Point3 => Point3fParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Vector2 => Vector2fParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Vector3 => Vector3fParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Normal3 => Normal3fParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Spectrum => "spectrum".to_owned(),
+            super::param::ParamType::Rgb => "rgb".to_owned(),
+            super::param::ParamType::Blackbody => "blackbody".to_owned(),
+            super::param::ParamType::String => StringParam::TYPE_NAME.to_owned(),
+            super::param::ParamType::Texture => "texture".to_owned(),
+        };
+        // TODO We need loc in tokens, so just do default for now.
+        let loc: FileLoc = Default::default();
+
+        let mut param = ParsedParameter {
+            name: name.to_owned(),
+            param_type,
+            loc,
+            floats: Vec::new(),
+            ints: Vec::new(),
+            strings: Vec::new(),
+            bools: Vec::new(),
+            looked_up: false,
+            color_space: None,
+            may_be_unused: false,
+        };
+
+        // Keeps track of the type of the parameter so we can ensure they're all the same;
+        // check if it's an integer or float at the start so we know which to parse as for
+        // numeric types.
+        let mut val_type = if param.param_type.as_str() == "integer" {
+            ValueType::Integer
+        } else {
+            ValueType::Unknown
+        };
+
+        for v in value.value.split_ascii_whitespace() {
+            if is_quoted_string(v) {
+                match val_type {
+                    ValueType::Unknown => val_type = ValueType::String,
+                    ValueType::String => {}
+                    _ => panic!("Parameter {} has mixed types", name),
+                }
+                param.add_string(dequote_string(v).to_owned());
+            } else if v.starts_with('t') && v == "true" {
+                match val_type {
+                    ValueType::Unknown => val_type = ValueType::Boolean,
+                    ValueType::Boolean => {}
+                    _ => panic!("Parameter {} has mixed types", name),
+                }
+                param.add_bool(true);
+            } else if v.starts_with('f') && v == "false" {
+                match val_type {
+                    ValueType::Unknown => val_type = ValueType::Boolean,
+                    ValueType::Boolean => {}
+                    _ => panic!("Parameter {} has mixed types", name),
+                }
+                param.add_bool(false);
+            } else {
+                match val_type {
+                    ValueType::Unknown => val_type = ValueType::Float,
+                    ValueType::Float => {}
+                    ValueType::Integer => {}
+                    _ => panic!("Parameter {} has mixed types", name),
+                }
+
+                if val_type == ValueType::Integer {
+                    param.add_int(v.parse::<i32>().expect("Expected integer"));
+                } else {
+                    param.add_float(v.parse::<Float>().expect("Expected float"));
+                }
+            }
+        }
+
+        param
+    }
 }
 
 #[derive(Debug, Copy, Clone)]

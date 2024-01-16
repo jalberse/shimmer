@@ -15,10 +15,10 @@ use crate::{
     filter::{Filter, FilterI},
     image::{Image, ImageMetadata, PixelFormat},
     interaction::SurfaceInteraction,
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
     math::linear_least_squares_3,
     options::Options,
-    paramdict::ParameterDictionary,
-    parser::FileLoc,
     spectra::{
         inner_product,
         sampled_spectrum::SampledSpectrum,

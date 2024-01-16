@@ -34,6 +34,15 @@ use shimmer::{
 };
 
 fn main() {
+    // TODO The flow will be -
+    // parse_str() (or later, parse_files()).
+    //   This will create a BasicSceneBuilder, and do calls on it as it parses.
+    //   It will create the BasicScene by the time its done.
+    // then call render_cpu() (new function) passing the BasicScene.
+    // Inside render_cpu(), we call e.g. BasicScene::create_materials() and such to get
+    //    the materials, lights, aggregates, shapes, integrator etc from the SceneEntities.
+    // Finally at the end of render_cpu, we'll call the integrator's render() function.
+
     let (prims, lights) = get_tri_mesh_inf_light_scene();
 
     let bvh = Primitive::BvhAggregate(BvhAggregate::new(

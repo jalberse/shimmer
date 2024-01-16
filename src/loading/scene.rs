@@ -14,9 +14,9 @@ use crate::{
     filter::Filter,
     image::Image,
     light::Light,
+    loading::paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
+    loading::parser_target::{FileLoc, ParsedParameterVector, ParserTarget},
     options::Options,
-    paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
-    parser::{FileLoc, ParsedParameterVector, ParserTarget},
     sampler::Sampler,
     spectra::spectrum,
     square_matrix::SquareMatrix,
@@ -28,7 +28,6 @@ use crate::{
 };
 
 use log::warn;
-use rayon::option;
 use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
@@ -254,7 +253,7 @@ impl BasicScene {
                 .expect("Unknown symbol"),
             render_from_texture,
             &mut text_dict,
-            crate::paramdict::SpectrumType::Albedo,
+            crate::loading::paramdict::SpectrumType::Albedo,
             cached_spectra,
             texture.base.loc,
         );
@@ -662,7 +661,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
     ) {
         // TODO Verify world
         let dict = ParameterDictionary::new_with_unowned(
@@ -711,13 +710,7 @@ impl ParserTarget for BasicSceneBuilder {
         }
     }
 
-    fn option(
-        &mut self,
-        name: &str,
-        value: &str,
-        options: &mut Options,
-        loc: crate::parser::FileLoc,
-    ) {
+    fn option(&mut self, name: &str, value: &str, options: &mut Options, loc: FileLoc) {
         let name = normalize_arg(name);
 
         match name.as_str() {
@@ -798,31 +791,19 @@ impl ParserTarget for BasicSceneBuilder {
         }
     }
 
-    fn identity(&mut self, _loc: crate::parser::FileLoc) {
+    fn identity(&mut self, _loc: FileLoc) {
         self.graphics_state
             .for_active_transforms(|t: &mut Transform| *t = Transform::default());
     }
 
-    fn translate(
-        &mut self,
-        dx: crate::Float,
-        dy: crate::Float,
-        dz: crate::Float,
-        _loc: crate::parser::FileLoc,
-    ) {
+    fn translate(&mut self, dx: crate::Float, dy: crate::Float, dz: crate::Float, _loc: FileLoc) {
         self.graphics_state
             .for_active_transforms(|t: &mut Transform| {
                 *t = *t * Transform::translate(Vector3f::new(dx, dy, dz))
             });
     }
 
-    fn scale(
-        &mut self,
-        sx: crate::Float,
-        sy: crate::Float,
-        sz: crate::Float,
-        _loc: crate::parser::FileLoc,
-    ) {
+    fn scale(&mut self, sx: crate::Float, sy: crate::Float, sz: crate::Float, _loc: FileLoc) {
         self.graphics_state
             .for_active_transforms(|t: &mut Transform| *t = *t * Transform::scale(sx, sy, sz));
     }
@@ -833,7 +814,7 @@ impl ParserTarget for BasicSceneBuilder {
         ax: crate::Float,
         ay: crate::Float,
         az: crate::Float,
-        _loc: crate::parser::FileLoc,
+        _loc: FileLoc,
     ) {
         self.graphics_state
             .for_active_transforms(|t: &mut Transform| {
@@ -852,7 +833,7 @@ impl ParserTarget for BasicSceneBuilder {
         ux: crate::Float,
         uy: crate::Float,
         uz: crate::Float,
-        _loc: crate::parser::FileLoc,
+        _loc: FileLoc,
     ) {
         let transform = Transform::look_at(
             &Point3f::new(ex, ey, ez),
@@ -863,7 +844,7 @@ impl ParserTarget for BasicSceneBuilder {
             .for_active_transforms(|t: &mut Transform| *t = *t * transform);
     }
 
-    fn transform(&mut self, transform: [crate::Float; 16], _loc: crate::parser::FileLoc) {
+    fn transform(&mut self, transform: [crate::Float; 16], _loc: FileLoc) {
         self.graphics_state
             .for_active_transforms(|t: &mut Transform| {
                 *t = Transform::transpose(&Transform::new_calc_inverse(SquareMatrix::<4>::from(
@@ -872,7 +853,7 @@ impl ParserTarget for BasicSceneBuilder {
             })
     }
 
-    fn concat_transform(&mut self, transform: [crate::Float; 16], _loc: crate::parser::FileLoc) {
+    fn concat_transform(&mut self, transform: [crate::Float; 16], _loc: FileLoc) {
         self.graphics_state
             .for_active_transforms(|t: &mut Transform| {
                 *t = *t
@@ -882,13 +863,13 @@ impl ParserTarget for BasicSceneBuilder {
             })
     }
 
-    fn coordinate_system(&mut self, name: &str, loc: crate::parser::FileLoc) {
+    fn coordinate_system(&mut self, name: &str, loc: FileLoc) {
         // TODO Normalize name to UTF-8.
         self.named_coordinate_systems
             .insert(name.to_owned(), self.graphics_state.ctm.clone());
     }
 
-    fn coordinate_sys_transform(&mut self, name: &str, loc: crate::parser::FileLoc) {
+    fn coordinate_sys_transform(&mut self, name: &str, loc: FileLoc) {
         // TODO Normalize name to UTF-8.
         if let Some(ctm) = self.named_coordinate_systems.get(name) {
             self.graphics_state.ctm = ctm.clone();
@@ -897,36 +878,25 @@ impl ParserTarget for BasicSceneBuilder {
         }
     }
 
-    fn active_transform_all(&mut self, _loc: crate::parser::FileLoc) {
+    fn active_transform_all(&mut self, _loc: FileLoc) {
         self.graphics_state.active_transform_bits = Self::ALL_TRANSFORM_BITS;
     }
 
-    fn active_transform_end_time(&mut self, _loc: crate::parser::FileLoc) {
+    fn active_transform_end_time(&mut self, _loc: FileLoc) {
         self.graphics_state.active_transform_bits = Self::END_TRANSFORM_BITS;
     }
 
-    fn active_transform_start_time(&mut self, _loc: crate::parser::FileLoc) {
+    fn active_transform_start_time(&mut self, _loc: FileLoc) {
         self.graphics_state.active_transform_bits = Self::START_TRANSFORM_BITS;
     }
 
-    fn transform_times(
-        &mut self,
-        start: crate::Float,
-        end: crate::Float,
-        _loc: crate::parser::FileLoc,
-    ) {
+    fn transform_times(&mut self, start: crate::Float, end: crate::Float, _loc: FileLoc) {
         // TODO verify options
         self.graphics_state.transform_start_time = start;
         self.graphics_state.transform_end_time = end;
     }
 
-    fn color_space(
-        &mut self,
-        n: &str,
-        _params: ParsedParameterVector,
-        _string_interner: &mut StringInterner,
-        _loc: crate::parser::FileLoc,
-    ) {
+    fn color_space(&mut self, n: &str, _loc: FileLoc) {
         let cs = RgbColorSpace::get_named(n.into());
         self.graphics_state.color_space = cs.clone();
     }
@@ -936,7 +906,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
@@ -948,7 +918,7 @@ impl ParserTarget for BasicSceneBuilder {
         film_type: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
@@ -960,7 +930,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
@@ -972,7 +942,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
@@ -984,7 +954,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
         options: &Options,
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
@@ -1004,21 +974,11 @@ impl ParserTarget for BasicSceneBuilder {
         };
     }
 
-    fn make_named_medium(
-        &mut self,
-        name: &str,
-        params: ParsedParameterVector,
-        loc: crate::parser::FileLoc,
-    ) {
+    fn make_named_medium(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc) {
         todo!("Mediums not yet implemented; can't make named medium.")
     }
 
-    fn medium_interface(
-        &mut self,
-        inside_name: &str,
-        outside_name: &str,
-        loc: crate::parser::FileLoc,
-    ) {
+    fn medium_interface(&mut self, inside_name: &str, outside_name: &str, loc: FileLoc) {
         todo!("Mediums not yet implemented; can't create medium interface.")
     }
 
@@ -1027,7 +987,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
@@ -1037,7 +997,7 @@ impl ParserTarget for BasicSceneBuilder {
     fn world_begin(
         &mut self,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
         options: &Options,
     ) {
         self.current_block = BlockState::WorldBlock;
@@ -1061,14 +1021,14 @@ impl ParserTarget for BasicSceneBuilder {
         );
     }
 
-    fn attribute_begin(&mut self, loc: crate::parser::FileLoc) {
+    fn attribute_begin(&mut self, loc: FileLoc) {
         // TODO Verify world
         self.pushed_graphics_states
             .push(self.graphics_state.clone());
         self.push_stack.push(('a' as u8, loc));
     }
 
-    fn attribute_end(&mut self, loc: crate::parser::FileLoc) {
+    fn attribute_end(&mut self, loc: FileLoc) {
         // TODO Verify world
         if self.push_stack.is_empty() {
             panic!("{} Unmatched attribute_end statement.", loc);
@@ -1088,12 +1048,7 @@ impl ParserTarget for BasicSceneBuilder {
         }
     }
 
-    fn attribute(
-        &mut self,
-        target: &str,
-        mut attrib: ParsedParameterVector,
-        loc: crate::parser::FileLoc,
-    ) {
+    fn attribute(&mut self, target: &str, mut attrib: ParsedParameterVector, loc: FileLoc) {
         let current_attributes = match target {
             "shape" => &mut self.graphics_state.shape_attributes,
             "light" => &mut self.graphics_state.light_attributes,
@@ -1118,7 +1073,7 @@ impl ParserTarget for BasicSceneBuilder {
         tex_name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
         options: &Options,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     ) {
@@ -1185,7 +1140,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
     ) {
         // TODO Verify world
         let dict = ParameterDictionary::new_with_unowned(
@@ -1205,7 +1160,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
     ) {
         // TODO Normalize name to UTF8
         let dict = ParameterDictionary::new_with_unowned(
@@ -1223,13 +1178,7 @@ impl ParserTarget for BasicSceneBuilder {
         }
     }
 
-    fn named_material(
-        &mut self,
-        name: &str,
-        _params: ParsedParameterVector,
-        _string_interner: &mut StringInterner,
-        _loc: crate::parser::FileLoc,
-    ) {
+    fn named_material(&mut self, name: &str, _loc: FileLoc) {
         // TODO Normalize name to UTF8
         // TODO Verify world
         self.graphics_state.current_named_material = name.to_owned();
@@ -1241,7 +1190,7 @@ impl ParserTarget for BasicSceneBuilder {
         name: &str,
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
-        loc: crate::parser::FileLoc,
+        loc: FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
     ) {
@@ -1265,12 +1214,7 @@ impl ParserTarget for BasicSceneBuilder {
         );
     }
 
-    fn area_light_source(
-        &mut self,
-        name: &str,
-        params: ParsedParameterVector,
-        loc: crate::parser::FileLoc,
-    ) {
+    fn area_light_source(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc) {
         // TODO Verify world
         self.graphics_state.area_light_name = name.to_owned();
         self.graphics_state.area_light_params = ParameterDictionary::new_with_unowned(
@@ -1281,17 +1225,12 @@ impl ParserTarget for BasicSceneBuilder {
         self.graphics_state.area_light_loc = loc;
     }
 
-    fn reverse_orientation(&mut self, _loc: crate::parser::FileLoc) {
+    fn reverse_orientation(&mut self, _loc: FileLoc) {
         // TODO verify world
         self.graphics_state.reverse_orientation = !self.graphics_state.reverse_orientation;
     }
 
-    fn object_begin(
-        &mut self,
-        name: &str,
-        loc: crate::parser::FileLoc,
-        string_interner: &mut StringInterner,
-    ) {
+    fn object_begin(&mut self, name: &str, loc: FileLoc, string_interner: &mut StringInterner) {
         // TODO Verify world
         // TODO Normalize name to UTF8
 
@@ -1314,7 +1253,7 @@ impl ParserTarget for BasicSceneBuilder {
             Some(ActiveInstanceDefinition::new(name, loc, string_interner));
     }
 
-    fn object_end(&mut self, loc: crate::parser::FileLoc) {
+    fn object_end(&mut self, loc: FileLoc) {
         // TODO Verify world
         if self.active_instance_definition.is_none() {
             panic!("{} ObjectEnd called outside of instance definition.", loc);
@@ -1369,12 +1308,7 @@ impl ParserTarget for BasicSceneBuilder {
         self.active_instance_definition = None;
     }
 
-    fn object_instance(
-        &mut self,
-        name: &str,
-        loc: crate::parser::FileLoc,
-        string_interner: &mut StringInterner,
-    ) {
+    fn object_instance(&mut self, name: &str, loc: FileLoc, string_interner: &mut StringInterner) {
         // TODO Normalize name to UTF8
         // TODO Verify world
 

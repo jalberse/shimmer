@@ -7,16 +7,15 @@ use log::warn;
 
 use crate::{
     bounding_box::Bounds2f,
-    camera,
     film::{Film, FilmI},
     filter::FilterI,
     frame::Frame,
     image::ImageMetadata,
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
     math::{lerp, radians},
     medium::Medium,
     options::{Options, RenderingCoordinateSystem},
-    paramdict::ParameterDictionary,
-    parser::FileLoc,
     ray::{AuxiliaryRays, Ray, RayDifferential, RayI},
     sampling::sample_uniform_disk_concentric,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},

@@ -1,7 +1,7 @@
 use crate::{
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
     options::Options,
-    paramdict::ParameterDictionary,
-    parser::FileLoc,
     vecmath::{Point2f, Point2i},
     Float,
 };
