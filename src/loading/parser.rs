@@ -581,8 +581,8 @@ mod tests {
     use crate::{
         colorspace::RgbColorSpace,
         loading::{
-            param::{self, ParamType},
-            paramdict::ParameterDictionary,
+            param::ParamType,
+            paramdict::{ParameterDictionary, ParsedParameter},
             parser_target::ParsedParameterVector,
         },
     };
@@ -709,6 +709,7 @@ Film \"rgb\"
                 assert_eq!(param, "canon_eos_5d_mkiv");
 
                 // TODO This is fine... let's do a different test that just tests Param to ParsedParam though. Can create them directly.
+                // Just to make clear how other vecs should be empty etc... Can also test when a param has more than one value.
             }
             _ => panic!("Unexpected element type"),
         }
@@ -748,5 +749,67 @@ LookAt 0 5.5 24 0 11 -10 0 1 0
         let next = parser.parse_next().unwrap();
 
         assert!(matches!(next, Element::ConcatTransform { .. }));
+    }
+
+    #[test]
+    fn param_to_parsed_param_int() {
+        // Note that Param doesn't store the [ and ] characters; it's stripped in tokenizing.
+        let param = Param::new("integer indices", "0 1 2 0 2 3").unwrap();
+        let param: ParsedParameter = param.into();
+
+        assert_eq!(param.name, "indices");
+        assert_eq!(param.param_type, "integer");
+        assert_eq!(param.looked_up, false);
+        assert_eq!(param.color_space, None);
+        assert!(param.bools.is_empty());
+        assert!(param.strings.is_empty());
+        assert!(param.floats.is_empty());
+        assert_eq!(param.ints, vec![0, 1, 2, 0, 2, 3]);
+    }
+
+    #[test]
+    fn param_to_parsed_param_float() {
+        // Note that Param doesn't store the [ and ] characters; it's stripped in tokenizing.
+        let param = Param::new("float values", "0.0 10.0 2 0.1 2.5 3.4").unwrap();
+        let param: ParsedParameter = param.into();
+
+        assert_eq!(param.name, "values");
+        assert_eq!(param.param_type, "float");
+        assert_eq!(param.looked_up, false);
+        assert_eq!(param.color_space, None);
+        assert!(param.bools.is_empty());
+        assert!(param.strings.is_empty());
+        assert_eq!(param.floats, vec![0.0, 10.0, 2.0, 0.1, 2.5, 3.4]);
+        assert!(param.ints.is_empty());
+    }
+
+    #[test]
+    fn param_to_parsed_param_bool() {
+        let param = Param::new("bool values", "true false true").unwrap();
+        let param: ParsedParameter = param.into();
+
+        assert_eq!(param.name, "values");
+        assert_eq!(param.param_type, "bool");
+        assert_eq!(param.looked_up, false);
+        assert_eq!(param.color_space, None);
+        assert_eq!(param.bools, vec![true, false, true]);
+        assert!(param.strings.is_empty());
+        assert!(param.floats.is_empty());
+        assert!(param.ints.is_empty());
+    }
+
+    #[test]
+    fn param_to_parsed_param_string() {
+        let param = Param::new("string values", "\"foo\" \"bar\" \"baz\"").unwrap();
+        let param: ParsedParameter = param.into();
+
+        assert_eq!(param.name, "values");
+        assert_eq!(param.param_type, "string");
+        assert_eq!(param.looked_up, false);
+        assert_eq!(param.color_space, None);
+        assert!(param.bools.is_empty());
+        assert_eq!(param.strings, vec!["foo", "bar", "baz"]);
+        assert!(param.floats.is_empty());
+        assert!(param.ints.is_empty());
     }
 }
