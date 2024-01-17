@@ -17,7 +17,7 @@ use crate::{
 
 use super::parser_target::ParserTarget;
 
-pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &Options) {
+pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &mut Options) {
     let mut parsers = Vec::new();
     parsers.push(Parser::new(data));
 
@@ -44,9 +44,7 @@ pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &Options)
         match element {
             Element::Include(path) => todo!("Support include directive"),
             Element::Import(_) => todo!("Support import directive"),
-            Element::Option(param) => {
-                todo!("Support option directive, reference documentation");
-            }
+            Element::Option(param) => target.option(param.name, param.value, options, loc),
             Element::Film { ty, params } => {
                 target.film(ty, params.into(), &mut string_interner, loc)
             }
