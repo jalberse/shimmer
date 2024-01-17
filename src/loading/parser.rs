@@ -707,9 +707,6 @@ Film \"rgb\"
                 assert_eq!(param, 150.0);
                 let param = dict.get_one_string("sensor", "".to_owned());
                 assert_eq!(param, "canon_eos_5d_mkiv");
-
-                // TODO This is fine... let's do a different test that just tests Param to ParsedParam though. Can create them directly.
-                // Just to make clear how other vecs should be empty etc... Can also test when a param has more than one value.
             }
             _ => panic!("Unexpected element type"),
         }
