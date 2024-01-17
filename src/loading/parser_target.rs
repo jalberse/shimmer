@@ -13,13 +13,10 @@ impl<'a> From<ParamList<'a>> for ParsedParameterVector {
     fn from(param_list: ParamList) -> Self {
         let mut params = ArrayVec::new();
 
-        for param in param_list.0.iter() {
-            // TODO I think we will have a conversion Param -> ParsedParam,
-            //  so do that for each and push.
-            // Now, the str in param_list is e.g. xresolution or "cropwindow" or "radius" -
-            //   it is in fact the same as param.name. We're not using a map in ParsedParameterVector,
-            //   so we can basically ignore that.
-            todo!()
+        for param in param_list.0.into_iter() {
+            // Ignore the string; it's just param.name.
+            let param: ParsedParameter = param.1.into();
+            params.push(param);
         }
 
         params

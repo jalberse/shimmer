@@ -66,7 +66,8 @@ impl<'a> Tokenizer<'a> {
 
     pub fn token(&self, start: usize, end: usize) -> Token<'a> {
         let token = Token::new(&self.str[start..end]);
-        dbg!(token)
+        // dbg!(token)
+        token
     }
 
     /// Return current offset within string.

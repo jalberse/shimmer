@@ -578,7 +578,14 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::loading::param::ParamType;
+    use crate::{
+        colorspace::RgbColorSpace,
+        loading::{
+            param::{self, ParamType},
+            paramdict::ParameterDictionary,
+            parser_target::ParsedParameterVector,
+        },
+    };
 
     use super::*;
 
@@ -680,7 +687,28 @@ Film \"rgb\"
 
                 let param = params.get("iso").unwrap();
                 assert_eq!(param.name, "iso");
-                assert_eq!(param.ty, ParamType::Float)
+                assert_eq!(param.ty, ParamType::Float);
+
+                // Test conversiont to ParsedParameter.
+                let params: ParsedParameterVector = params.into();
+                assert_eq!(params.len(), 5);
+                let mut dict = ParameterDictionary::new(
+                    params,
+                    RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+                );
+                assert_eq!(dict.params.len(), 5);
+                let param = dict.get_one_string("filename", "".to_owned());
+                assert_eq!(param, "crown.exr");
+                let param = dict.get_one_int("yresolution", 0);
+                assert_eq!(param, 1400);
+                let param = dict.get_one_int("xresolution", 0);
+                assert_eq!(param, 1000);
+                let param = dict.get_one_float("iso", 0.0);
+                assert_eq!(param, 150.0);
+                let param = dict.get_one_string("sensor", "".to_owned());
+                assert_eq!(param, "canon_eos_5d_mkiv");
+
+                // TODO This is fine... let's do a different test that just tests Param to ParsedParam though. Can create them directly.
             }
             _ => panic!("Unexpected element type"),
         }
