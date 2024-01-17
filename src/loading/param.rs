@@ -205,8 +205,6 @@ impl<'a> ParamList<'a> {
     }
 }
 
-// TODO Expand these tests to also convert to our ParsedParameter type, and verify we parse the values correctly.
-
 #[cfg(test)]
 mod tests {
     use super::*;
