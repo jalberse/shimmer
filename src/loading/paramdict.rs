@@ -788,6 +788,7 @@ impl ParameterDictionary {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct NamedTextures {
     pub float_textures: HashMap<String, Arc<FloatTexture>>,
     pub albedo_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,

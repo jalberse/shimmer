@@ -30,6 +30,7 @@ pub mod medium;
 pub mod options;
 pub mod primitive;
 pub mod ray;
+mod render;
 pub mod rgb_to_spectra;
 pub mod sampler;
 pub mod sampling;

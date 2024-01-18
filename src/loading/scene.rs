@@ -31,6 +31,8 @@ use log::warn;
 use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
+use super::paramdict::SpectrumType;
+
 // TODO If/when we make this multi-threaded, most of these will be within a Mutex.
 //      For now, code it sequentially.
 pub struct BasicScene {
@@ -197,7 +199,7 @@ impl BasicScene {
                 .expect("Unknown symbol"),
             render_from_texture,
             tex_dict,
-            texture.base.loc,
+            &texture.base.loc,
         );
 
         self.textures
@@ -255,7 +257,7 @@ impl BasicScene {
             &mut text_dict,
             crate::loading::paramdict::SpectrumType::Albedo,
             cached_spectra,
-            texture.base.loc,
+            &texture.base.loc,
         );
         self.textures
             .albedo_spectrum_textures
@@ -333,6 +335,90 @@ impl BasicScene {
         }
         let image = Box::new(image);
         self.normal_maps.insert(normal_map_filename, image);
+    }
+
+    pub fn create_textures(
+        &mut self,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        string_interner: &StringInterner,
+    ) -> NamedTextures {
+        // TODO Note that albedo spectrum and float textures were created
+        //  earlier; if we switch to asynch, we will want to resolve them here.
+
+        for tex in &self.async_spectrum_textures {
+            let render_from_texture = tex.1.render_from_object;
+
+            // These are all image textures, so nullptr is fine for the textures, as in float.
+            let mut tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone(), None);
+
+            let unbounded_tex = SpectrumTexture::create(
+                string_interner
+                    .resolve(tex.1.base.name)
+                    .expect("Unexpected symbol"),
+                render_from_texture,
+                &mut tex_dict,
+                SpectrumType::Unbounded,
+                cached_spectra,
+                &tex.1.base.loc,
+            );
+
+            let illum_tex = SpectrumTexture::create(
+                string_interner
+                    .resolve(tex.1.base.name)
+                    .expect("Unexpected symbol"),
+                render_from_texture,
+                &mut tex_dict,
+                SpectrumType::Illuminant,
+                cached_spectra,
+                &tex.1.base.loc,
+            );
+
+            self.textures
+                .unbounded_spectrum_textures
+                .insert(tex.0.to_owned(), Arc::new(unbounded_tex));
+            self.textures
+                .illuminant_spectrum_textures
+                .insert(tex.0.to_owned(), Arc::new(illum_tex));
+        }
+
+        for tex in &self.serial_float_textures {
+            let render_from_texture = tex.1.render_from_object;
+
+            // TODO Hm, we can't have  self.textures be Arc<NamedTextures> without interior mutability (as we're modifying it all over here).
+            // hmm... maybe we can create a new NamedTextures that's local and just append? Or something?
+            // Interior mutability isn't ~that~ bad, it just moves the check to runtime, but I'd prefer a better solution.
+            // Yeah the issue is it wouldn't get modified in the ParamDict (thought the paramdict does get changed, just not the textures field).
+            //  But it does get mutated in this fn as we add to it so we can't just pass a const Arc.
+            // TODO Maybe we can... not store the textures in the ParamDict?
+            //   Would it be fine to just pass it in where needed? Is it ~really~ necessary to store it with it?
+            //   Then we wouldn't have multiple ownership.
+            //   I think the only big disadvantage there is that you also need to pass it down the create() functions, to pass
+            //   when we resolve things that need textures.
+            //   That might be an advantage though - it removes the checks where we see if textures is none or some, which is a panic.
+
+            let tex_dict = TextureParameterDictionary::new(
+                tex.1.base.parameters.clone(),
+                Some(Arc::new(self.textures)),
+            );
+
+            let float_texture = FloatTexture::create(
+                string_interner
+                    .resolve(tex.1.base.name)
+                    .expect("Unexpected symbol"),
+                render_from_texture,
+                tex_dict,
+                &tex.1.base.loc,
+            );
+
+            self.textures
+                .float_textures
+                .insert(tex.0.to_owned(), Arc::new(float_texture));
+        }
+
+        // TODO Serial spectrum textures.
+        todo!("Not finished creating textures yet!");
+
+        self.textures.clone()
     }
 }
 

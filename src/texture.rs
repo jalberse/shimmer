@@ -31,7 +31,7 @@ impl FloatTexture {
         name: &str,
         render_from_texture: Transform,
         parameters: TextureParameterDictionary,
-        loc: FileLoc,
+        loc: &FileLoc,
     ) -> FloatTexture {
         let tex = match name {
             "constant" => {
@@ -71,7 +71,7 @@ impl FloatConstantTexture {
     pub fn create(
         _render_from_texture: Transform,
         mut parameters: TextureParameterDictionary,
-        _loc: FileLoc,
+        _loc: &FileLoc,
     ) -> FloatConstantTexture {
         let v = parameters.get_one_float("value", 1.0);
         FloatConstantTexture::new(v)
@@ -100,7 +100,7 @@ impl SpectrumTexture {
         parameters: &mut TextureParameterDictionary,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-        loc: FileLoc,
+        loc: &FileLoc,
     ) -> SpectrumTexture {
         let tex = match name {
             "constant" => {
@@ -154,7 +154,7 @@ impl SpectrumConstantTexture {
         parameters: &mut TextureParameterDictionary,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-        _loc: FileLoc,
+        _loc: &FileLoc,
     ) -> SpectrumConstantTexture {
         let one = Spectrum::Constant(ConstantSpectrum::new(1.0));
         let c = parameters
