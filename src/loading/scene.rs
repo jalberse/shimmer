@@ -401,9 +401,61 @@ impl BasicScene {
                 .insert(tex.0.to_owned(), Arc::new(float_texture));
         }
 
-        // TODO Serial spectrum textures.
-        todo!("Not finished creating textures yet!");
+        for tex in &self.serial_spectrum_textures {
+            let render_from_texture = tex.1.render_from_object;
 
+            let mut tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone());
+
+            // TODO Will need to pass self.textures to create() functions, so they can resolve textures.
+            // Not encessary right now as we only have the ConstantSpectrum texture.
+            let albedo_tex = SpectrumTexture::create(
+                string_interner
+                    .resolve(tex.1.base.name)
+                    .expect("Unexpected symbol"),
+                render_from_texture,
+                &mut tex_dict,
+                SpectrumType::Albedo,
+                cached_spectra,
+                &tex.1.base.loc,
+            );
+
+            let unbounded_tex = SpectrumTexture::create(
+                string_interner
+                    .resolve(tex.1.base.name)
+                    .expect("Unexpected symbol"),
+                render_from_texture,
+                &mut tex_dict,
+                SpectrumType::Unbounded,
+                cached_spectra,
+                &tex.1.base.loc,
+            );
+
+            let illum_tex = SpectrumTexture::create(
+                string_interner
+                    .resolve(tex.1.base.name)
+                    .expect("Unexpected symbol"),
+                render_from_texture,
+                &mut tex_dict,
+                SpectrumType::Illuminant,
+                cached_spectra,
+                &tex.1.base.loc,
+            );
+
+            self.textures
+                .albedo_spectrum_textures
+                .insert(tex.0.to_owned(), Arc::new(albedo_tex));
+            self.textures
+                .unbounded_spectrum_textures
+                .insert(tex.0.to_owned(), Arc::new(unbounded_tex));
+            self.textures
+                .illuminant_spectrum_textures
+                .insert(tex.0.to_owned(), Arc::new(illum_tex));
+        }
+
+        // TODO It would probably be better to not have to clone the textures here.
+        //  Can we return a reference?
+        //  Storing self.textures as Arc or Rc doesn't work since we need it mutable.
+        //  This is fine for now.
         self.textures.clone()
     }
 }
