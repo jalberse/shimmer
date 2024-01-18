@@ -191,8 +191,7 @@ impl BasicScene {
         // TODO Can make this async.
         let render_from_texture = texture.render_from_object;
 
-        // Pass None because the textures aren't needed for the float texture.
-        let tex_dict = TextureParameterDictionary::new(texture.base.parameters.clone(), None);
+        let tex_dict = TextureParameterDictionary::new(texture.base.parameters.clone());
         let float_texture = FloatTexture::create(
             string_interner
                 .resolve(texture.base.name)
@@ -247,7 +246,7 @@ impl BasicScene {
 
         let render_from_texture = texture.render_from_object;
         // None for the textures, as with float textures.
-        let mut text_dict = TextureParameterDictionary::new(texture.base.parameters.clone(), None);
+        let mut text_dict = TextureParameterDictionary::new(texture.base.parameters.clone());
         // Only create Albedo for now; will get other two types created in create_textures().
         let spectrum_texture = SpectrumTexture::create(
             string_interner
@@ -349,7 +348,7 @@ impl BasicScene {
             let render_from_texture = tex.1.render_from_object;
 
             // These are all image textures, so nullptr is fine for the textures, as in float.
-            let mut tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone(), None);
+            let mut tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone());
 
             let unbounded_tex = SpectrumTexture::create(
                 string_interner
@@ -384,23 +383,10 @@ impl BasicScene {
         for tex in &self.serial_float_textures {
             let render_from_texture = tex.1.render_from_object;
 
-            // TODO Hm, we can't have  self.textures be Arc<NamedTextures> without interior mutability (as we're modifying it all over here).
-            // hmm... maybe we can create a new NamedTextures that's local and just append? Or something?
-            // Interior mutability isn't ~that~ bad, it just moves the check to runtime, but I'd prefer a better solution.
-            // Yeah the issue is it wouldn't get modified in the ParamDict (thought the paramdict does get changed, just not the textures field).
-            //  But it does get mutated in this fn as we add to it so we can't just pass a const Arc.
-            // TODO Maybe we can... not store the textures in the ParamDict?
-            //   Would it be fine to just pass it in where needed? Is it ~really~ necessary to store it with it?
-            //   Then we wouldn't have multiple ownership.
-            //   I think the only big disadvantage there is that you also need to pass it down the create() functions, to pass
-            //   when we resolve things that need textures.
-            //   That might be an advantage though - it removes the checks where we see if textures is none or some, which is a panic.
+            let tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone());
 
-            let tex_dict = TextureParameterDictionary::new(
-                tex.1.base.parameters.clone(),
-                Some(Arc::new(self.textures)),
-            );
-
+            // TODO Will need to pass self.textures to create() functions, so they can resolve textures.
+            // Not encessary right now as we only have the FloatConstant texture.
             let float_texture = FloatTexture::create(
                 string_interner
                     .resolve(tex.1.base.name)

@@ -798,13 +798,11 @@ pub struct NamedTextures {
 
 pub struct TextureParameterDictionary {
     dict: ParameterDictionary,
-    /// Optional because it's not always needed, such as for a float texture.
-    textures: Option<Arc<NamedTextures>>,
 }
 
 impl TextureParameterDictionary {
-    pub fn new(dict: ParameterDictionary, textures: Option<Arc<NamedTextures>>) -> Self {
-        Self { dict, textures }
+    pub fn new(dict: ParameterDictionary) -> Self {
+        Self { dict }
     }
 
     pub fn get_one_float(&mut self, name: &str, default_value: Float) -> Float {
@@ -900,8 +898,13 @@ impl TextureParameterDictionary {
         self.dict.lookup_array::<StringParam>(name)
     }
 
-    pub fn get_float_texture(&mut self, name: &str, default_value: Float) -> Arc<FloatTexture> {
-        let tex = self.get_float_texture_or_none(name);
+    pub fn get_float_texture(
+        &mut self,
+        name: &str,
+        default_value: Float,
+        textures: &NamedTextures,
+    ) -> Arc<FloatTexture> {
+        let tex = self.get_float_texture_or_none(name, textures);
         if let Some(tex) = tex {
             return tex;
         } else {
@@ -911,7 +914,11 @@ impl TextureParameterDictionary {
         }
     }
 
-    pub fn get_float_texture_or_none(&mut self, name: &str) -> Option<Arc<FloatTexture>> {
+    pub fn get_float_texture_or_none(
+        &mut self,
+        name: &str,
+        textures: &NamedTextures,
+    ) -> Option<Arc<FloatTexture>> {
         let p = self.dict.params.iter_mut().find(|p| p.name == name)?;
         if p.param_type == "texture" {
             if p.strings.is_empty() {
@@ -928,11 +935,6 @@ impl TextureParameterDictionary {
             }
 
             p.looked_up = true;
-
-            if self.textures.is_none() {
-                panic!("Expected textures");
-            }
-            let textures = self.textures.as_ref().unwrap();
 
             let tex = textures.float_textures.get(p.strings[0].as_str());
             if let Some(tex) = tex {
@@ -956,8 +958,9 @@ impl TextureParameterDictionary {
         default_value: Option<Arc<Spectrum>>,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
     ) -> Option<Arc<SpectrumTexture>> {
-        let tex = self.get_spectrum_texture_or_none(name, spectrum_type, cached_spectra);
+        let tex = self.get_spectrum_texture_or_none(name, spectrum_type, cached_spectra, textures);
         if let Some(tex) = tex {
             return Some(tex);
         } else if let Some(default_value) = default_value {
@@ -974,11 +977,8 @@ impl TextureParameterDictionary {
         name: &str,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
     ) -> Option<Arc<SpectrumTexture>> {
-        if self.textures.is_none() {
-            panic!("Expected textures");
-        }
-        let textures = self.textures.as_ref().unwrap();
         let spectrum_textures = match spectrum_type {
             SpectrumType::Illuminant => &textures.illuminant_spectrum_textures,
             SpectrumType::Albedo => &textures.albedo_spectrum_textures,
