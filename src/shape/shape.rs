@@ -89,7 +89,13 @@ impl Shape {
                 vec![Arc::new(Shape::Sphere(sphere))]
             }
             "trianglemesh" => {
-                todo!()
+                let trianglemesh = Arc::new(Triangle::create_mesh(
+                    render_from_object,
+                    reverse_orientation,
+                    parameters,
+                    loc,
+                ));
+                Triangle::create_triangles(trianglemesh)
             }
             _ => {
                 panic!("Unknown Shape {}", name);
