@@ -1,4 +1,7 @@
 use crate::{
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
+    options::Options,
     vecmath::{Point2f, Point2i},
     Float,
 };
@@ -24,6 +27,23 @@ pub trait SamplerI {
 #[derive(Debug, Clone)]
 pub enum Sampler {
     Independent(IndependentSampler),
+}
+
+impl Sampler {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        full_res: Point2i,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> Sampler {
+        match name {
+            "independent" => {
+                Sampler::Independent(IndependentSampler::create(parameters, options, loc))
+            }
+            _ => panic!("Unknown sampler type!"),
+        }
+    }
 }
 
 impl SamplerI for Sampler {
@@ -67,6 +87,19 @@ pub struct IndependentSampler {
 }
 
 impl IndependentSampler {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        options: &Options,
+        file_loc: &FileLoc,
+    ) -> IndependentSampler {
+        let mut ns = parameters.get_one_int("pixelsamples", 4);
+        if let Some(pixel_samples) = options.pixel_samples {
+            ns = pixel_samples;
+        }
+        let seed = parameters.get_one_int("seed", options.seed) as u64;
+        IndependentSampler::new(seed, ns)
+    }
+
     pub fn new(seed: u64, samples_per_pixel: i32) -> IndependentSampler {
         IndependentSampler {
             seed,
@@ -100,23 +133,5 @@ impl SamplerI for IndependentSampler {
 
     fn get_pixel_2d(&mut self) -> Point2f {
         self.get_2d()
-    }
-}
-
-pub struct CameraSample {
-    p_film: Point2f,
-    p_lens: Point2f,
-    time: Float,
-    filter_wieght: Float,
-}
-
-impl Default for CameraSample {
-    fn default() -> Self {
-        Self {
-            p_film: Default::default(),
-            p_lens: Default::default(),
-            time: 0.0,
-            filter_wieght: 1.0,
-        }
     }
 }

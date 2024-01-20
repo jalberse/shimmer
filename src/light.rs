@@ -2,20 +2,32 @@
 // and implement them later as needed - but just a PointLight should be sufficient for now
 // to render early test scenes.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use log::warn;
 
 use crate::{
     bounding_box::Bounds3f,
+    camera::CameraTransform,
+    colorspace::RgbColorSpace,
+    file::resolve_filename,
     float::PI_F,
+    image::Image,
     interaction::{Interaction, SurfaceInteraction},
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
+    medium::Medium,
+    options::Options,
     ray::Ray,
+    sampling::{sample_uniform_sphere, uniform_hemisphere_pdf, uniform_sphere_pdf},
     shape::{Shape, ShapeI, ShapeSampleContext},
     spectra::{
-        sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
-        spectrum::SpectrumI, DenselySampledSpectrum, Spectrum,
+        sampled_spectrum::SampledSpectrum,
+        sampled_wavelengths::SampledWavelengths,
+        spectrum::{spectrum_to_photometric, SpectrumI},
+        DenselySampledSpectrum, Spectrum,
     },
+    texture::FloatTexture,
     transform::Transform,
     vecmath::{
         normal::Normal3,
@@ -46,9 +58,9 @@ pub trait LightI {
     /// the sampled point.
     fn sample_li(
         &self,
-        ctx: LightSampleContext,
+        ctx: &LightSampleContext,
         u: Point2f,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
         allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample>;
 
@@ -56,7 +68,7 @@ pub trait LightI {
     /// Assumes that a ray from ctx in the direction wi has already been found to intersect
     /// the light source. PDF is measured w.r.t. solid angle; 0 if the light is described
     /// by a Dirac delta function.
-    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float;
+    fn pdf_li(&self, ctx: &LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float;
 
     /// For area light sources, finds the radiance that is emitted back along the ray.
     /// Takes information about the intersection point and the outgoing direction.
@@ -78,7 +90,7 @@ pub trait LightI {
     fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum;
 
     /// Invoked prior to rendering, informs the lights of the scene bounds, which
-    /// may not be available whiel constructing the lights.
+    /// may not be available while constructing the lights.
     fn preprocess(&mut self, scene_bounds: &Bounds3f);
 
     // TODO bounds() method
@@ -92,6 +104,125 @@ pub trait LightI {
 pub enum Light {
     Point(PointLight),
     DiffuseAreaLight(DiffuseAreaLight),
+    UniformInfinite(UniformInfiniteLight),
+}
+
+impl Light {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        render_from_light: Transform,
+        camera_transform: &CameraTransform,
+        outside_medium: Option<Medium>,
+        loc: &FileLoc,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        options: &Options,
+    ) -> Light {
+        // Area lights handled in create_area().
+        let light = match name {
+            "point" => Light::Point(PointLight::create(
+                &render_from_light,
+                outside_medium,
+                parameters,
+                parameters.color_space.clone(),
+                loc,
+                cached_spectra,
+            )),
+            "infinite" => {
+                let color_space = parameters.color_space.clone();
+                let l = parameters.get_spectrum_array(
+                    "L",
+                    crate::loading::paramdict::SpectrumType::Illuminant,
+                    cached_spectra,
+                );
+                let mut scale = parameters.get_one_float("scale", 1.0);
+                let portal = parameters.get_point3f_array("portal");
+                let filename = resolve_filename(
+                    options,
+                    parameters
+                        .get_one_string("filename", "".to_owned())
+                        .as_str(),
+                );
+                let e_v = parameters.get_one_float("illuminance", -1.0);
+
+                if l.is_empty() && filename.is_empty() && portal.is_empty() {
+                    // Scale the light spectrum to be equivalent to 1 nit.
+                    scale /= spectrum_to_photometric(&color_space.illuminant);
+                    if e_v > 0.0 {
+                        // If the scene specifies desired illuminance, first calculate
+                        // the illuminance from a uniform hemispherical emission
+                        // of L_v then use this to scale the emission spectrum.
+                        let k_e = 4.0 * PI_F;
+                        scale *= e_v / k_e;
+                    }
+
+                    Light::UniformInfinite(UniformInfiniteLight::new(
+                        render_from_light,
+                        color_space.illuminant.clone(),
+                        scale,
+                    ))
+                } else if !l.is_empty() && portal.is_empty() {
+                    if !filename.is_empty() {
+                        panic!(
+                            "Can't specify both emission L and filename with ImageInfinitelight"
+                        );
+                    }
+
+                    scale /= spectrum_to_photometric(&l[0]);
+                    if e_v > 0.0 {
+                        let k_e = 4.0 * PI_F;
+                        scale *= e_v / k_e;
+                    }
+
+                    Light::UniformInfinite(UniformInfiniteLight::new(
+                        render_from_light,
+                        l[0].clone(),
+                        scale,
+                    ))
+                } else {
+                    // Either an image was provided or it's "L" with a portal
+                    todo!("Image infinite lights not yet implemented")
+                }
+            }
+            _ => {
+                panic!("Light {} unknown", name);
+            }
+        };
+
+        // TODO Report unused params
+
+        light
+    }
+
+    // TODO Add medium interface; will use medium_interface.outside for diffuse area light.
+    pub fn create_area(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        render_from_light: Transform,
+        shape: Arc<Shape>,
+        alpha: FloatTexture,
+        loc: &FileLoc,
+        options: &Options,
+    ) -> Light {
+        let area = match name {
+            "diffuse" => Light::DiffuseAreaLight(DiffuseAreaLight::create(
+                render_from_light,
+                None,
+                parameters,
+                parameters.color_space.clone(),
+                loc,
+                shape,
+                alpha,
+                options,
+            )),
+            _ => {
+                panic!("Area light {} unknown", name);
+            }
+        };
+
+        // TODO Report unused params
+        area
+    }
 }
 
 impl LightI for Light {
@@ -99,6 +230,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.phi(lambda),
             Light::DiffuseAreaLight(l) => l.phi(lambda),
+            Light::UniformInfinite(l) => l.phi(lambda),
         }
     }
 
@@ -106,26 +238,29 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.light_type(),
             Light::DiffuseAreaLight(l) => l.light_type(),
+            Light::UniformInfinite(l) => l.light_type(),
         }
     }
 
     fn sample_li(
         &self,
-        ctx: LightSampleContext,
+        ctx: &LightSampleContext,
         u: Point2f,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
         allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
         match self {
             Light::Point(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
             Light::DiffuseAreaLight(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+            Light::UniformInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
         }
     }
 
-    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float {
+    fn pdf_li(&self, ctx: &LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float {
         match self {
             Light::Point(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
             Light::DiffuseAreaLight(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
+            Light::UniformInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
         }
     }
 
@@ -140,6 +275,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.l(p, n, uv, w, lambda),
             Light::DiffuseAreaLight(l) => l.l(p, n, uv, w, lambda),
+            Light::UniformInfinite(l) => l.l(p, n, uv, w, lambda),
         }
     }
 
@@ -147,6 +283,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.le(ray, lambda),
             Light::DiffuseAreaLight(l) => l.le(ray, lambda),
+            Light::UniformInfinite(l) => l.le(ray, lambda),
         }
     }
 
@@ -154,6 +291,7 @@ impl LightI for Light {
         match self {
             Light::Point(l) => l.preprocess(scene_bounds),
             Light::DiffuseAreaLight(l) => l.preprocess(scene_bounds),
+            Light::UniformInfinite(l) => l.preprocess(scene_bounds),
         }
     }
 }
@@ -207,7 +345,7 @@ pub struct PointLight {
 }
 
 impl PointLight {
-    pub fn new(render_from_light: Transform, i: Spectrum, scale: Float) -> PointLight {
+    pub fn new(render_from_light: Transform, i: Arc<Spectrum>, scale: Float) -> PointLight {
         let base = LightBase {
             light_type: LightType::DeltaPosition,
             render_from_light,
@@ -217,6 +355,39 @@ impl PointLight {
             i: Arc::new(DenselySampledSpectrum::new(&i)),
             scale,
         }
+    }
+
+    pub fn create(
+        render_from_light: &Transform,
+        medium: Option<Medium>,
+        parameters: &mut ParameterDictionary,
+        color_space: Arc<RgbColorSpace>,
+        _loc: &FileLoc,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> PointLight {
+        let i = parameters
+            .get_one_spectrum(
+                "I",
+                Some(color_space.illuminant.clone()),
+                crate::loading::paramdict::SpectrumType::Illuminant,
+                cached_spectra,
+            )
+            .expect("PointLight requires I parameter");
+        let mut sc = parameters.get_one_float("scale", 1.0);
+
+        sc /= spectrum_to_photometric(&i);
+
+        let phi_v = parameters.get_one_float("power", -1.0);
+        if phi_v > 0.0 {
+            let k_e = 4.0 * PI_F;
+            sc *= phi_v / k_e;
+        }
+
+        let from = parameters.get_one_point3f("from", Point3f::ZERO);
+        let tf = Transform::translate(Vector3f::from(from));
+        let final_render_from_light = render_from_light * tf;
+
+        PointLight::new(final_render_from_light, i, sc)
     }
 }
 
@@ -234,9 +405,9 @@ impl LightI for PointLight {
     // entry point for the light interface.
     fn sample_li(
         &self,
-        ctx: LightSampleContext,
+        ctx: &LightSampleContext,
         _u: Point2f,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
         _allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
         let p = self.base.render_from_light.apply(&Point3f::ZERO);
@@ -257,7 +428,7 @@ impl LightI for PointLight {
 
     fn pdf_li(
         &self,
-        _ctx: LightSampleContext,
+        _ctx: &LightSampleContext,
         _wi: Vector3f,
         _allow_incomplete_pdf: bool,
     ) -> Float {
@@ -290,7 +461,7 @@ impl LightI for PointLight {
 #[derive(Debug, Clone)]
 pub struct DiffuseAreaLight {
     base: LightBase,
-    shape: Shape,
+    shape: Arc<Shape>,
     // TODO alpha: FloatTexture,
     area: Float,
     two_sided: bool,
@@ -305,7 +476,7 @@ impl DiffuseAreaLight {
         render_from_light: Transform,
         le: Arc<Spectrum>,
         scale: Float,
-        shape: Shape,
+        shape: Arc<Shape>,
         two_sided: bool,
     ) -> DiffuseAreaLight {
         let area = shape.area();
@@ -324,6 +495,64 @@ impl DiffuseAreaLight {
             scale,
         }
     }
+
+    pub fn create(
+        render_from_light: Transform,
+        medium: Option<Medium>,
+        parameters: &mut ParameterDictionary,
+        color_space: Arc<RgbColorSpace>,
+        loc: &FileLoc,
+        shape: Arc<Shape>,
+        alpha_tex: FloatTexture,
+        options: &Options,
+    ) -> DiffuseAreaLight {
+        let mut l = parameters.get_one_spectrum(
+            "L",
+            None,
+            crate::loading::paramdict::SpectrumType::Illuminant,
+            &mut HashMap::new(),
+        );
+        let mut scale = parameters.get_one_float("scale", 1.0);
+        let two_sides = parameters.get_one_bool("twosided", false);
+
+        let filename = resolve_filename(
+            options,
+            &parameters.get_one_string("filename", "".to_owned()),
+        );
+
+        let image: Option<Image> = None; // TODO Use this image; it's used in scaling below.
+        if !filename.is_empty() {
+            if l.is_some() {
+                panic!("Both L and filename specifed for diffuse area light");
+            }
+            todo!("Image area lights not yet implemented")
+        }
+
+        let l = if filename.is_empty() && l.is_none() {
+            color_space.illuminant.clone()
+        } else {
+            l.unwrap()
+        };
+
+        // Scale so that radiance is equivalent to 1 nit
+        scale /= spectrum_to_photometric(&l);
+
+        let phi_v = parameters.get_one_float("power", -1.0);
+        if phi_v > 0.0 {
+            let mut k_e = 1.0;
+
+            if image.is_some() {
+                todo!("Image area lights not yet implemented");
+            }
+
+            k_e *= if two_sides { 2.0 } else { 1.0 } * shape.area() * PI_F;
+
+            // Now multiply up scale to hit the target power
+            scale *= phi_v / k_e;
+        }
+
+        DiffuseAreaLight::new(render_from_light, l, scale, shape.clone(), two_sides)
+    }
 }
 
 impl LightI for DiffuseAreaLight {
@@ -340,11 +569,12 @@ impl LightI for DiffuseAreaLight {
 
     fn sample_li(
         &self,
-        ctx: LightSampleContext,
+        ctx: &LightSampleContext,
         u: Point2f,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
         _allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
+        // Sample point on shape for the diffuse area light.
         let shape_ctx = ShapeSampleContext::new(ctx.pi, ctx.n, ctx.ns, 0.0);
         let ss = self.shape.sample_with_context(&shape_ctx, u);
         if ss.is_none() {
@@ -355,8 +585,8 @@ impl LightI for DiffuseAreaLight {
             return None;
         }
         debug_assert!(!ss.pdf.is_nan());
-        // TODO set the medium interface of ss.
 
+        // TODO set the medium interface of ss.
         // TODO check against the alpha texture with alpha_masked().
 
         // Return LightLiSample for the sampled point on the shape.
@@ -368,7 +598,7 @@ impl LightI for DiffuseAreaLight {
         Some(LightLiSample::new(le, wi, ss.pdf, ss.intr))
     }
 
-    fn pdf_li(&self, ctx: LightSampleContext, wi: Vector3f, _allow_incomplete_pdf: bool) -> Float {
+    fn pdf_li(&self, ctx: &LightSampleContext, wi: Vector3f, _allow_incomplete_pdf: bool) -> Float {
         let shape_ctx = ShapeSampleContext::new(ctx.pi, ctx.n, ctx.ns, 0.0);
         self.shape.pdf_with_context(&shape_ctx, wi)
     }
@@ -398,6 +628,115 @@ impl LightI for DiffuseAreaLight {
 
     fn preprocess(&mut self, scene_bounds: &Bounds3f) {
         // Nothing to do here!
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UniformInfiniteLight {
+    base: LightBase,
+    l_emit: Arc<DenselySampledSpectrum>,
+    scale: Float,
+    scene_center: Point3f,
+    scene_radius: Float,
+}
+
+impl UniformInfiniteLight {
+    /// The scene center and radius are calculated in preprocess().
+    pub fn new(
+        render_from_light: Transform,
+        le: Arc<Spectrum>,
+        scale: Float,
+    ) -> UniformInfiniteLight {
+        let base = LightBase {
+            light_type: LightType::Infinite,
+            render_from_light,
+        };
+        UniformInfiniteLight {
+            base,
+            l_emit: Arc::new(DenselySampledSpectrum::new(le.as_ref())),
+            scale,
+            scene_center: Point3f::ZERO,
+            scene_radius: 0.0,
+        }
+    }
+}
+
+impl LightI for UniformInfiniteLight {
+    fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        3.0 * PI_F
+            * PI_F
+            * self.scene_radius
+            * self.scene_radius
+            * self.scale
+            * self.l_emit.sample(lambda)
+    }
+
+    fn light_type(&self) -> LightType {
+        self.base.light_type
+    }
+
+    fn sample_li(
+        &self,
+        ctx: &LightSampleContext,
+        u: Point2f,
+        lambda: &SampledWavelengths,
+        allow_incomplete_pdf: bool,
+    ) -> Option<LightLiSample> {
+        if allow_incomplete_pdf {
+            None
+        } else {
+            // Return uniform spherical sample for uniform infinite light.
+            let wi = sample_uniform_sphere(u);
+            let pdf = uniform_hemisphere_pdf();
+            Some(LightLiSample::new(
+                self.scale * self.l_emit.sample(lambda),
+                wi,
+                pdf,
+                Interaction::new(
+                    (ctx.p() + wi * (2.0 * self.scene_radius)).into(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                ),
+            ))
+        }
+    }
+
+    fn pdf_li(
+        &self,
+        _ctx: &LightSampleContext,
+        _wi: Vector3f,
+        allow_incomplete_pdf: bool,
+    ) -> Float {
+        if allow_incomplete_pdf {
+            0.0
+        } else {
+            uniform_sphere_pdf()
+        }
+    }
+
+    fn l(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        uv: Point2f,
+        w: Vector3f,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
+        self.base.l(p, n, uv, w, lambda)
+    }
+
+    /// Returns the emitted radiance along the given ray.
+    /// Since a Uniform Infinite Light emits the same amount for all rays, this is trivial.
+    fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
+        self.scale * self.l_emit.sample(lambda)
+    }
+
+    fn preprocess(&mut self, scene_bounds: &Bounds3f) {
+        let bounding_sphere = scene_bounds.bounding_sphere();
+        self.scene_center = bounding_sphere.center;
+        self.scene_radius = bounding_sphere.radius;
     }
 }
 

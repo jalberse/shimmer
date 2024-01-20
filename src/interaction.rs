@@ -8,7 +8,7 @@ use crate::{
     material::{Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
     math::DifferenceOfProducts,
     options::Options,
-    ray::{Ray, RayDifferential},
+    ray::{AuxiliaryRays, Ray, RayDifferential},
     sampler::{Sampler, SamplerI},
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     vecmath::{
@@ -66,11 +66,18 @@ impl Interaction {
     }
 
     pub fn spawn_ray(&self, d: Vector3f) -> RayDifferential {
+        // TODO get_medium() here.
         let ray = Ray::new(self.offset_ray_origin(d), d, None);
         RayDifferential {
             ray,
             auxiliary: None,
         }
+    }
+
+    pub fn spawn_ray_to_interaction(&self, it: &Interaction) -> Ray {
+        let mut r = Ray::spawn_ray_to_both_offset(self.pi, self.n, self.time, it.pi, it.n);
+        // TODO set medium
+        r
     }
 }
 
@@ -188,9 +195,7 @@ impl SurfaceInteraction {
 
         let bsdf = if options.force_diffuse {
             // TODO PBRT also checks if bsdf is null. PBRT does this alot with its
-            //   tagged pointers. We might want to have a "Null" variant of our equivalent enums
-            //   and check for that? We could wrap in Option, which perhaps expresses intent better,
-            //   but it also involves more memory consumption...
+            //   tagged pointers. We might want to wrap things in Option<> if this is possible.
 
             // Override bsdf with the diffuse equivalent
             let r = bsdf.rho_hd(
@@ -233,7 +238,7 @@ impl SurfaceInteraction {
         }) {
             let aux = ray.auxiliary.as_ref().unwrap();
             // Estimate screen-space change in pt using ray differentials
-            // Compute auxiliary intersecrtion points iwth plane, px and py
+            // Compute auxiliary intersecrtion points with plane, px and py
             let d = -self.interaction.n.dot_vector(&self.p().into());
             let tx = (-self.interaction.n.dot_vector(&aux.rx_origin.into()) - d)
                 / self.interaction.n.dot_vector(&aux.rx_direction);
@@ -269,7 +274,7 @@ impl SurfaceInteraction {
         let atb0y = self.dpdu.dot(&self.dpdy);
         let atb1y = self.dpdv.dot(&self.dpdy);
 
-        // COmpute u and v derivatives wrt x and y
+        // Compute u and v derivatives wrt x and y
         self.dudx = Float::difference_of_products(ata11, atb0x, ata01, atb1x) * inv_det;
         self.dvdx = Float::difference_of_products(ata00, atb1x, ata01, atb0x) * inv_det;
         self.dudy = Float::difference_of_products(ata11, atb0y, ata01, atb1y) * inv_det;
@@ -335,6 +340,28 @@ impl SurfaceInteraction {
             self.shading.dpdu /= 1e8;
             self.shading.dpdv /= 1e8;
         }
+    }
+
+    /// When a ray crosses to a new media that does not scatter light, spawn a ray
+    /// in the same direction as the original ray, and set up any ray differentials
+    /// so they continue in a straight line across the boundary.
+    pub fn skip_intersection(&mut self, ray: &mut RayDifferential, t: Float) {
+        let mut new_ray = self.interaction.spawn_ray(ray.ray.d);
+        new_ray.auxiliary = if let Some(aux) = &ray.auxiliary {
+            let rx_origin = aux.rx_origin + t * aux.rx_direction;
+            let ry_origin = aux.ry_origin + t * aux.ry_direction;
+            let rx_direction = aux.rx_direction;
+            let ry_direction = aux.ry_direction;
+            Some(AuxiliaryRays {
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            })
+        } else {
+            None
+        };
+        *ray = new_ray
     }
 }
 

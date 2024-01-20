@@ -1,10 +1,3 @@
-// TODO We'll probably iumplement either Middle or EqualCounts as SplitMethod first because they're easy,
-// but the others are more useful.
-// The BVHAggregate is defined in a different module because it's useful to split them, but they will
-//   also be in the Primitive enum and implement the PrimitiveI interface.
-// PBRT constructs with pointers first and then converts to a vec-based implementation.
-//   I could try to do the same I suppose, but I suspect we'll run into ownership issues.
-
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -25,8 +18,6 @@ use pdqselect;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SplitMethod {
-    // TODO Other split methods; Middle isn't very good, but simple for the first implementation.\
-    // EqualCounts is the next simplest.
     Middle,
     EqualCounts,
 }
@@ -145,9 +136,6 @@ impl PrimitiveI for BvhAggregate {
                 if node.n_primitives > 0 {
                     // Leaf node; intersect ray with primitives in the node
                     for i in 0..node.n_primitives {
-                        // TODO Actually, given this use case, let's not store the offset
-                        // in a variant. The runtime cost of the match while extremely small
-                        // is probably less important than saving the byte or whatever.
                         if self.primitives[node.primitive_offset + i as usize]
                             .as_ref()
                             .intersect_predicate(ray, t_max)
@@ -554,7 +542,7 @@ mod tests {
         ray::Ray,
         shape::{sphere::Sphere, Shape},
         spectra::{ConstantSpectrum, Spectrum},
-        texture::SpectrumConstantTexture,
+        texture::{SpectrumConstantTexture, SpectrumTexture},
         transform::Transform,
         vecmath::{normal::Normal3, Normal3f, Point3f, Vector3f},
         Float,
@@ -572,11 +560,11 @@ mod tests {
             radius,
             360.0,
         );
-        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
         let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
         let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
         let prim = Arc::new(Primitive::Simple(SimplePrimitive {
-            shape: Shape::Sphere(sphere),
+            shape: Arc::new(Shape::Sphere(sphere)),
             material,
         }));
         let expected_bounds = prim.as_ref().bounds();
@@ -600,11 +588,11 @@ mod tests {
             radius,
             360.0,
         );
-        let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
+        let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
         let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
         let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
         let prim = Arc::new(Primitive::Simple(SimplePrimitive {
-            shape: Shape::Sphere(sphere),
+            shape: Arc::new(Shape::Sphere(sphere)),
             material,
         }));
         let prims = vec![prim];
@@ -642,12 +630,11 @@ mod tests {
                 radius,
                 360.0,
             );
-            let cs = Spectrum::Constant(ConstantSpectrum::new(0.5));
-            let kd =
-                crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
+            let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
+            let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
             let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
             let prim = Arc::new(Primitive::Simple(SimplePrimitive {
-                shape: Shape::Sphere(sphere),
+                shape: Arc::new(Shape::Sphere(sphere)),
                 material,
             }));
             prims.push(prim);

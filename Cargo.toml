@@ -33,6 +33,9 @@ pdqselect = "0.1.1"
 rayon = "1.8.0"
 indicatif = {version = "*", features = ["rayon"]}
 thread_local = "1.1.7"
+string-interner = "0.14.0"
+png = "0.17.10"
+thiserror = "1.0.56"
 
 [dev-dependencies]
 float_next_after = "1.0.0"

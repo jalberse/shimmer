@@ -1,24 +1,30 @@
 use std::{
     ops::{AddAssign, Index, IndexMut, MulAssign},
+    path::Path,
     sync::Arc,
 };
 
+use log::{error, warn};
 use once_cell::sync::Lazy;
 
 use crate::{
     bounding_box::{Bounds2f, Bounds2i},
+    camera::CameraTransform,
     color::{white_balance, RGB, XYZ},
     colorspace::RgbColorSpace,
     filter::{Filter, FilterI},
     image::{Image, ImageMetadata, PixelFormat},
     interaction::SurfaceInteraction,
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
     math::linear_least_squares_3,
+    options::Options,
     spectra::{
         inner_product,
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{SpectrumI, LAMBDA_MAX, LAMBDA_MIN},
-        DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum,
+        DenselySampledSpectrum, NamedSpectrum, PiecewiseLinearSpectrum, Spectrum,
     },
     square_matrix::SquareMatrix,
     vec2d::Vec2d,
@@ -83,12 +89,34 @@ pub trait FilmI {
     fn get_filename(&self) -> &str;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Film {
     RgbFilm(RgbFilm),
 }
 
-impl Film {}
+impl Film {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        exposure_time: Float,
+        camera_transform: &CameraTransform,
+        filter: Filter,
+        loc: &FileLoc,
+        options: &Options,
+    ) -> Film {
+        match name {
+            "rgb" => Film::RgbFilm(RgbFilm::create(
+                parameters,
+                exposure_time,
+                filter,
+                parameters.color_space.clone(),
+                loc,
+                options,
+            )),
+            _ => panic!("{} Unknown film type {}", loc, name),
+        }
+    }
+}
 
 impl FilmI for Film {
     fn add_sample(
@@ -189,9 +217,202 @@ impl FilmI for Film {
     }
 }
 
-// Other structs wihch implement FilmI can have a FilmBase which
+struct FilmBaseParameters {
+    full_resolution: Point2i,
+    pixel_bounds: Bounds2i,
+    filter: Filter,
+    diagonal: Float,
+    // TODO should be an RC pointer instead maybe?
+    sensor: PixelSensor,
+    filename: String,
+}
+
+impl FilmBaseParameters {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        filter: Filter,
+        sensor: PixelSensor,
+        loc: &FileLoc,
+        options: &Options,
+    ) -> FilmBaseParameters {
+        let filename = parameters.get_one_string("filename", "".to_string());
+        let filename = if options.image_file.is_empty() {
+            if !filename.is_empty() {
+                warn!("Output filename supploed on command line {} will override filename in scene description file {}", options.image_file, filename);
+            }
+            options.image_file.clone()
+        } else if filename.is_empty() {
+            // TODO Change this to .exr when I add exr support
+            "shimmer.pfm".to_string()
+        } else {
+            filename
+        };
+
+        // TODO Fullscreen option, if we get to GUI.
+        let full_resolution = Point2i::new(
+            parameters.get_one_int("xresolution", 1280),
+            parameters.get_one_int("yresolution", 720),
+        );
+
+        let full_resolution = if options.quick_render {
+            Point2i::new(
+                i32::max(1, full_resolution.x / 4),
+                i32::max(1, full_resolution.y / 4),
+            )
+        } else {
+            full_resolution
+        };
+
+        let pixel_bounds = Bounds2i::new(Point2i::ZERO, full_resolution);
+
+        let pb = parameters.get_int_array("pixelbounds");
+        let pixel_bounds = if let Some(new_bounds) = options.pixel_bounds {
+            let intersect = new_bounds
+                .intersect(&pixel_bounds)
+                .expect("Pixel bounds extend past image!");
+            if intersect != new_bounds {
+                warn!(
+                    "{} Supplied pixel bounds extend beyond image, clamping",
+                    loc
+                );
+            }
+            if !pb.is_empty() {
+                warn!(
+                    "{} Both pixel bounds and crop window are specified; using crop window",
+                    loc
+                );
+            }
+            intersect
+        } else if !pb.is_empty() {
+            if pb.len() != 4 {
+                panic!(
+                    "{} Too many values ({}) supplied for pixel bounds, expected 4",
+                    loc,
+                    pb.len()
+                );
+            }
+            let new_bounds = Bounds2i::new(Point2i::new(pb[0], pb[2]), Point2i::new(pb[1], pb[3]));
+            let intersect = new_bounds
+                .intersect(&pixel_bounds)
+                .expect("Supplied bounds do not intersect with image!");
+            if intersect != new_bounds {
+                warn!(
+                    "{} Supplied pixel bounds extend beyond image resolution, clamping.",
+                    loc
+                );
+            }
+            intersect
+        } else {
+            pixel_bounds
+        };
+
+        // Compute pixel bounds based on crop
+        let cr = parameters.get_float_array("cropwindow");
+        let pixel_bounds = if let Some(crop) = options.crop_window {
+            let crop = if crop
+                .intersect(&Bounds2f::new(Point2f::ZERO, Point2f::ONE))
+                .expect("Expected some overlap")
+                != crop
+            {
+                error!(
+                    "{} Film crop window is not in [0,1]; did you mean to use pixel_bounds instead? Clamping to valid range.",
+                    loc
+                );
+                crop.intersect(&Bounds2f::new(Point2f::ZERO, Point2f::ONE))
+                    .expect("Expected some overlap")
+            } else {
+                crop
+            };
+            if !cr.is_empty() {
+                warn!(
+                    "{} Crop window on command line will override the one in the file",
+                    loc
+                );
+            }
+            if options.pixel_bounds.is_some() || !pb.is_empty() {
+                warn!(
+                    "{} Both pixel bounds and crop window specified; using crop window",
+                    loc
+                );
+            }
+            Bounds2i::new(
+                Point2i::new(
+                    Float::ceil(full_resolution.x as Float * crop.min.x) as i32,
+                    Float::ceil(full_resolution.y as Float * crop.min.y) as i32,
+                ),
+                Point2i::new(
+                    Float::ceil(full_resolution.x as Float * crop.max.x) as i32,
+                    Float::ceil(full_resolution.y as Float * crop.max.y) as i32,
+                ),
+            )
+        } else if !cr.is_empty() {
+            if options.pixel_bounds.is_some() {
+                warn!(
+                    "{} Ignoring cropwindow since pixel bounds were specified on command line",
+                    loc
+                );
+                pixel_bounds
+            } else if cr.len() == 4 {
+                if !pb.is_empty() {
+                    warn!(
+                        "{} Both pixel bounds and crop window specified; using crop window",
+                        loc
+                    );
+                }
+
+                let crop = Bounds2f::new(
+                    Point2f::new(
+                        Float::clamp(Float::min(cr[0], cr[1]), 0.0, 1.0),
+                        Float::clamp(Float::max(cr[0], cr[1]), 0.0, 1.0),
+                    ),
+                    Point2f::new(
+                        Float::clamp(Float::min(cr[2], cr[3]), 0.0, 1.0),
+                        Float::clamp(Float::max(cr[2], cr[3]), 0.0, 1.0),
+                    ),
+                );
+
+                Bounds2i::new(
+                    Point2i::new(
+                        Float::ceil(full_resolution.x as Float * crop.min.x) as i32,
+                        Float::ceil(full_resolution.y as Float * crop.min.y) as i32,
+                    ),
+                    Point2i::new(
+                        Float::ceil(full_resolution.x as Float * crop.max.x) as i32,
+                        Float::ceil(full_resolution.y as Float * crop.max.y) as i32,
+                    ),
+                )
+            } else {
+                error!(
+                    "{} {} Values provided for cropwindow, expected 4.",
+                    loc,
+                    cr.len()
+                );
+                pixel_bounds
+            }
+        } else {
+            pixel_bounds
+        };
+
+        if pixel_bounds.is_empty() {
+            panic!("{} Degenerate pixel bounds provided to film", loc);
+        }
+
+        let diagonal = parameters.get_one_float("diagonal", 35.0);
+
+        FilmBaseParameters {
+            full_resolution,
+            pixel_bounds,
+            filter,
+            diagonal,
+            sensor,
+            filename,
+        }
+    }
+}
+
+// Other structs which implement FilmI can have a FilmBase which
 // implements shared functionality.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FilmBase {
     pub full_resolution: Point2i,
     pub pixel_bounds: Bounds2i,
@@ -202,7 +423,6 @@ struct FilmBase {
 }
 
 impl FilmBase {
-    // TODO I think that the PixelSensor might need to become an Rc pointer.
     pub fn new(
         full_resolution: Point2i,
         pixel_bounds: Bounds2i,
@@ -238,7 +458,7 @@ impl FilmBase {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RgbFilm {
     base: FilmBase,
     color_space: Arc<RgbColorSpace>,
@@ -265,6 +485,35 @@ struct RgbFilmPixel {
 }
 
 impl RgbFilm {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        exposure_time: Float,
+        filter: Filter,
+        color_space: Arc<RgbColorSpace>,
+        loc: &FileLoc,
+        options: &Options,
+    ) -> RgbFilm {
+        let max_component_value = parameters.get_one_float("maxcomponentvalue", Float::INFINITY);
+        let write_fp16 = parameters.get_one_bool("savefp16", true);
+
+        let sensor = PixelSensor::create(parameters, color_space.clone(), exposure_time, loc);
+
+        let film_base_parameters =
+            FilmBaseParameters::create(parameters, filter, sensor, loc, options);
+
+        RgbFilm::new(
+            film_base_parameters.full_resolution,
+            film_base_parameters.pixel_bounds,
+            film_base_parameters.filter,
+            film_base_parameters.diagonal,
+            film_base_parameters.sensor,
+            &film_base_parameters.filename,
+            color_space,
+            max_component_value,
+            write_fp16,
+        )
+    }
+
     pub fn new(
         full_resolution: Point2i,
         pixel_bounds: Bounds2i,
@@ -465,7 +714,7 @@ impl FilmI for RgbFilm {
 
     fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()> {
         let image = self.get_image(metadata, splat_scale);
-        image.write(self.get_filename(), metadata)?;
+        image.write(Path::new(self.get_filename()), metadata)?;
         Ok(())
     }
 
@@ -507,7 +756,7 @@ impl FilmI for RgbFilm {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PixelSensor {
     pub xyz_from_sensor_rgb: SquareMatrix<3>,
     /// The red RGB matching function
@@ -521,6 +770,59 @@ pub struct PixelSensor {
 }
 
 impl PixelSensor {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        colorspace: Arc<RgbColorSpace>,
+        exposure_time: Float,
+        loc: &FileLoc,
+    ) -> PixelSensor {
+        let iso = parameters.get_one_float("iso", 100.0);
+        let white_balance_temp = parameters.get_one_float("whitebalance", 0.0);
+        let sensor_name = parameters.get_one_string("sensor", "cie1931".to_string());
+
+        // Pass through 0 for cie1931 if it's unspecified so that it doesn't do any white balancing.
+        // For actual sensors, 6500 is the default
+        let white_balance_temp = if sensor_name != "cie1931" && white_balance_temp == 0.0 {
+            6500.0
+        } else {
+            white_balance_temp
+        };
+
+        let imaging_ratio = exposure_time * iso / 100.0;
+
+        let white_balance_temp_to_pass = if white_balance_temp != 0.0 {
+            6500.0
+        } else {
+            white_balance_temp
+        };
+
+        let d_illum = DenselySampledSpectrum::d(white_balance_temp_to_pass);
+        let sensor_illum = if white_balance_temp != 0.0 {
+            Some(Spectrum::DenselySampled(d_illum))
+        } else {
+            None
+        };
+
+        if sensor_name == "cie1931" {
+            PixelSensor::new(&colorspace, &sensor_illum, imaging_ratio)
+        } else {
+            let r = Spectrum::get_named_spectrum(
+                NamedSpectrum::from_str(&(sensor_name.clone() + "_r"))
+                    .expect("{} Unknown sensor type"),
+            );
+            let g = Spectrum::get_named_spectrum(
+                NamedSpectrum::from_str(&(sensor_name.clone() + "_g"))
+                    .expect("{} Unknown sensor type"),
+            );
+            let b = Spectrum::get_named_spectrum(
+                NamedSpectrum::from_str(&(sensor_name + "_b")).expect("{} Unknown sensor type"),
+            );
+
+            // TODO TODO Should we handle None sensor_illum differently?
+            PixelSensor::new_with_rgb(r, g, b, &colorspace, &sensor_illum.unwrap(), imaging_ratio)
+        }
+    }
+
     /// Uses the XYZ matching functions for the pixel sensor's spectral response curves.
     /// This is a reasonable default.
     /// sensor_illum: If None is provided, no white balancing is done (it can be done in post-processing).
@@ -549,9 +851,9 @@ impl PixelSensor {
 
     /// Creates a new sensor given the RGB response curves.
     pub fn new_with_rgb(
-        r: &Spectrum,
-        g: &Spectrum,
-        b: &Spectrum,
+        r: Arc<Spectrum>,
+        g: Arc<Spectrum>,
+        b: Arc<Spectrum>,
         output_colorspace: &RgbColorSpace,
         sensor_illum: &Spectrum,
         imaging_ratio: Float,
@@ -579,7 +881,7 @@ impl PixelSensor {
 
         // compute xyz_output values for training swatches
         let mut xyz_output = [[0.0; 3]; NUM_SWATCH_REFLECTANCES];
-        let sensor_white_g = inner_product(sensor_illum, g);
+        let sensor_white_g = inner_product(sensor_illum, g.as_ref());
         let sensor_white_y = inner_product(sensor_illum, Spectrum::get_cie(crate::spectra::CIE::Y));
         for i in 0..NUM_SWATCH_REFLECTANCES {
             let s = &SWATCH_REFLECTANCES[i];

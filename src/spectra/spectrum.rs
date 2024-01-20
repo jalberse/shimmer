@@ -1,13 +1,18 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     color::{RgbSigmoidPolynomial, RGB},
     colorspace::RgbColorSpace,
+    file::read_float_file,
     math::{self, lerp},
-    spectra::cie::{CIE, CIE_Y_INTEGRAL},
+    spectra::{
+        cie::{CIE, CIE_Y_INTEGRAL, NUM_CIE_SAMPLES},
+        named_spectrum::{CIE_S0, CIE_S1, CIE_S2, CIE_S_LAMBDA},
+    },
     Float,
 };
 
+use log::warn;
 use once_cell::sync::Lazy;
 
 use super::{
@@ -87,24 +92,39 @@ impl SpectrumI for Spectrum {
 }
 
 impl Spectrum {
-    /// Gets a lazily-evaluated named spectrum.
-    pub fn get_named_spectrum(spectrum: NamedSpectrum) -> &'static Spectrum {
-        // TODO Maybe for this, rather than using once_cell, could we use static RwLock?
-        // https://www.cs.brandeis.edu/~cs146a/rust/doc-02-21-2015/std/sync/struct.StaticRwLock.html
-        // Since RwLock and Mutex are now const functions, we can define them as static during compile time,
-        // as long as the code involved can also be const.
-        // This way we don't need lazy evaluation, we can do it at compile time.
-        // Plus, I think it might be more efficient than the match, but that's not so important.
+    pub fn read_from_file(
+        filename: &str,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> Option<Arc<Spectrum>> {
+        // TODO sanitize/resolve filename with search directory?
+        let spectrum = cached_spectra.get(filename);
+        if let Some(spectrum) = spectrum {
+            return Some(spectrum.clone());
+        }
 
-        // PAPERDOC Embedded spectral data 4.5.3.
-        // Instead of a map on string keys (which requires evaluating the hash),
-        // we use an Enum with the names and match on it and return ref to static-lifetimed
-        // spectra. These are thread-safe read-only single-instance objects.
+        let pls = PiecewiseLinearSpectrum::read(filename);
+        if let Some(pls) = pls {
+            let spectrum = Arc::new(pls);
+            cached_spectra.insert(filename.to_string(), spectrum.clone());
+            Some(spectrum)
+        } else {
+            None
+        }
+    }
+
+    /// Gets a lazily-evaluated named spectrum.
+    pub fn get_named_spectrum(spectrum: NamedSpectrum) -> Arc<Spectrum> {
         match spectrum {
-            NamedSpectrum::StdIllumD65 => Lazy::force(&super::named_spectrum::STD_ILLUM_D65),
-            NamedSpectrum::IllumAcesD60 => Lazy::force(&super::named_spectrum::ILLUM_ACES_D60),
-            NamedSpectrum::GlassBk7 => Lazy::force(&super::named_spectrum::GLASS_BK7_ETA),
-            NamedSpectrum::GlassBaf10 => Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA),
+            NamedSpectrum::StdIllumD65 => {
+                Lazy::force(&super::named_spectrum::STD_ILLUM_D65).clone()
+            }
+            NamedSpectrum::IllumAcesD60 => {
+                Lazy::force(&super::named_spectrum::ILLUM_ACES_D60).clone()
+            }
+            NamedSpectrum::GlassBk7 => Lazy::force(&super::named_spectrum::GLASS_BK7_ETA).clone(),
+            NamedSpectrum::GlassBaf10 => {
+                Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA).clone()
+            }
         }
     }
 
@@ -189,6 +209,53 @@ impl DenselySampledSpectrum {
             lambda_max: lambda_max as i32,
         }
     }
+
+    pub fn d(temperature: Float) -> DenselySampledSpectrum {
+        // Convert temperature to cct
+        let cct = temperature * 1.4388 / 1.4380;
+
+        if cct < 4000.0 {
+            // CIE D ill-defined, use blackbody
+            let bb = BlackbodySpectrum::new(cct);
+            let blackbody = DenselySampledSpectrum::sample_function(
+                |lambda: Float| bb.get(lambda),
+                LAMBDA_MIN as usize,
+                LAMBDA_MAX as usize,
+            );
+            return blackbody;
+        }
+
+        // Convert CCT to xy
+        let x = if cct <= 7000.0 {
+            -4.607 * 1e9 / Float::powi(cct, 3)
+                + 2.9678 * 1e6 / cct * cct
+                + 0.09911 * 1e3 / cct
+                + 0.244063
+        } else {
+            -2.0064 * 1e9 / Float::powi(cct, 3)
+                + 1.9018 * 1e6 / cct * cct
+                + 0.24748 * 1e3 / cct
+                + 0.23704
+        };
+        let y = -3.0 * x * x + 2.870 * x - 0.275;
+
+        // Interpolate D spectrum
+        let m = 0.0241 + 0.2562 * x - 0.7341 * y;
+        let m1 = (-1.3515 - 1.7703 * x + 5.9114 * y) / m;
+        let m2 = (0.0300 - 31.4424 * x + 30.0717 * y) / m;
+
+        let mut values: Vec<Float> = Vec::with_capacity(NUM_CIE_SAMPLES);
+        for i in 0..NUM_CIE_SAMPLES {
+            values.push((CIE_S0[i] + CIE_S1[i] * m1 + CIE_S2[i] * m2) * 0.01);
+        }
+
+        let dpls = &Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
+            CIE_S_LAMBDA.as_slice(),
+            values.as_slice(),
+        ));
+
+        DenselySampledSpectrum::new(dpls)
+    }
 }
 
 impl SpectrumI for DenselySampledSpectrum {
@@ -237,14 +304,8 @@ pub struct PiecewiseLinearSpectrum {
 impl PiecewiseLinearSpectrum {
     /// Creates a piecewise linear spectrum from associated lambdas and values;
     /// these slices must be sorted.
-    pub fn new<const N: usize>(
-        lambdas: &[Float; N],
-        values: &[Float; N],
-    ) -> PiecewiseLinearSpectrum {
-        // PAPERDOC I think this is a good way to ensure lambdas.len() == values.len() at compile-time,
-        // rather than a runtime check as in PBRTv4. I'll need to see how it fairs in practice.
-        // I think you can do this in C++ too though.
-
+    pub fn new(lambdas: &[Float], values: &[Float]) -> PiecewiseLinearSpectrum {
+        debug_assert!(lambdas.len() == values.len());
         // TODO This follows PBRT, which also makes a copy; could it be beneficial to take ownership instead?
         // Note that we're taking a slice, which is read-only, so we perform a copy here.
         let mut l = vec![0.0; lambdas.len()];
@@ -294,15 +355,7 @@ impl PiecewiseLinearSpectrum {
             v.push(*v.last().unwrap());
         }
 
-        // PAPERDOC Interesting callsite as we enforce the slices must have the same length N.
-        // Note that N must propagate up through this function, then; but that should be okay for our case.
-        // This is enabled by const generics, which were added recently (in 2022?) to Rust.
-        // Note that the N, S arrangement is a bit awkward - but that could be avoided
-        // by not interleaving the data, which would honestly be better. But for convenience,
-        // let's do this for now.
-        // TODO switch off of interleaved data structures so we can just use one value N.
-        // This means changing the named spectra to have separate lambda and value arrays.
-        let mut spectrum = PiecewiseLinearSpectrum::new::<S>(
+        let mut spectrum = PiecewiseLinearSpectrum::new(
             lambda.as_slice().try_into().expect("Invalid length"),
             v.as_slice().try_into().expect("Invalid length"),
         );
@@ -318,6 +371,34 @@ impl PiecewiseLinearSpectrum {
         }
 
         spectrum
+    }
+
+    pub fn read(filename: &str) -> Option<Spectrum> {
+        let vals = read_float_file(filename);
+        if vals.is_empty() {
+            warn!("Unable to read spectrum file: {}", filename);
+            return None;
+        }
+
+        if vals.len() % 2 != 0 {
+            warn!("Extra value found in spectrum file: {}", filename);
+            return None;
+        }
+
+        let mut lambda: Vec<Float> = Vec::new();
+        let mut v: Vec<Float> = Vec::new();
+        for i in 0..(vals.len() / 2) {
+            if i > 0 && vals[2 * i] <= *lambda.last().unwrap() {
+                warn!("{}: Spectrum file invalid at the {} entry, wavelengths not increasing {} >= {}", filename, i, *lambda.last().unwrap(), vals[2* i]);
+                return None;
+            }
+            lambda.push(vals[2 * i]);
+            v.push(vals[2 * i + 1]);
+        }
+        Some(Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum {
+            lambdas: lambda,
+            values: v,
+        }))
     }
 
     pub fn scale(&mut self, s: Float) {

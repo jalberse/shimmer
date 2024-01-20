@@ -4,20 +4,18 @@ use half::f16;
 use std::{
     collections::HashMap,
     fs::File,
-    io::{self, BufWriter, Write},
+    io::{BufWriter, Write},
     ops::{Index, IndexMut},
+    path::Path,
     sync::Arc,
 };
 
 use crate::{
     bounding_box::Bounds2i,
-    color::{ColorEncoding, ColorEncodingI, RGB},
+    color::{ColorEncoding, ColorEncodingI, SRgbColorEncoding},
     colorspace::RgbColorSpace,
     float::Float,
-    math::lerp,
     square_matrix::SquareMatrix,
-    util::has_extension,
-    vec2d::Vec2d,
     vecmath::{Point2f, Point2i, Tuple2},
 };
 
@@ -675,14 +673,193 @@ impl Image {
         }
     }
 
-    pub fn write(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
+    pub fn read(path: &Path, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
+        // TODO Should return an IO Result instead likely.
+
+        // TODO Other file extension types.
+        if path.extension().unwrap().eq("png") {
+            return Self::read_png(path, encoding);
+        } else {
+            panic!("Unsupported file extension for {}", path.to_str().unwrap());
+        }
+    }
+
+    // TODO Test.
+    fn read_png(path: &Path, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
+        let encoding = if let Some(encoding) = encoding {
+            encoding
+        } else {
+            ColorEncoding::SRGB(SRgbColorEncoding {})
+        };
+
+        let mut decoder = png::Decoder::new(File::open(path).unwrap());
+        decoder.set_transformations(png::Transformations::IDENTITY);
+        let mut reader = decoder.read_info().unwrap();
+
+        let mut img_data = vec![0; reader.output_buffer_size()];
+        // Get the metadata info, and read the raw bytes into the buffer.
+        let info = reader.next_frame(&mut img_data).unwrap();
+
+        // Transform the raw bytes into an Image accounting for the format encoded in the header.
+        let image = match info.color_type {
+            png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha => match info.bit_depth {
+                png::BitDepth::Eight => Image::new_p8(
+                    img_data,
+                    Point2i::new(info.width as i32, info.height as i32),
+                    &["Y".to_owned()],
+                    encoding,
+                ),
+                png::BitDepth::Sixteen => {
+                    let mut image = Image::new(
+                        PixelFormat::Half,
+                        Point2i::new(info.width as i32, info.height as i32),
+                        &["Y".to_owned()],
+                        None,
+                    );
+                    for y in 0..info.height {
+                        for x in 0..info.width {
+                            let v = f16::from_le_bytes(
+                                img_data[(2 * (y * info.width + x)) as usize
+                                    ..(2 * (y * info.width + x) + 2) as usize]
+                                    .try_into()
+                                    .unwrap(),
+                            );
+                            let v: Float = v.into();
+                            let v = encoding.to_float_linear(v);
+                            image.set_channel(Point2i::new(x as i32, y as i32), 0, v);
+                        }
+                    }
+                    image
+                }
+                _ => panic!("Unsupported bit depth"),
+            },
+            png::ColorType::Rgb | png::ColorType::Rgba => {
+                let has_alpha = info.color_type == png::ColorType::Rgba;
+                match info.bit_depth {
+                    png::BitDepth::Eight => match has_alpha {
+                        true => Image::new_p8(
+                            img_data,
+                            Point2i::new(info.width as i32, info.height as i32),
+                            &[
+                                "R".to_owned(),
+                                "G".to_owned(),
+                                "B".to_owned(),
+                                "A".to_owned(),
+                            ],
+                            encoding,
+                        ),
+                        false => Image::new_p8(
+                            img_data,
+                            Point2i::new(info.width as i32, info.height as i32),
+                            &["R".to_owned(), "G".to_owned(), "B".to_owned()],
+                            encoding,
+                        ),
+                    },
+                    png::BitDepth::Sixteen => match has_alpha {
+                        true => {
+                            let mut image = Image::new(
+                                PixelFormat::Half,
+                                Point2i::new(info.width as i32, info.height as i32),
+                                &[
+                                    "R".to_owned(),
+                                    "G".to_owned(),
+                                    "B".to_owned(),
+                                    "A".to_owned(),
+                                ],
+                                None,
+                            );
+                            let mut idx = 0;
+                            for y in 0..info.height {
+                                for x in 0..info.width {
+                                    let r = f16::from_le_bytes(
+                                        img_data[idx..idx + 2].try_into().unwrap(),
+                                    );
+                                    let g = f16::from_le_bytes(
+                                        img_data[idx + 2..idx + 4].try_into().unwrap(),
+                                    );
+                                    let b = f16::from_le_bytes(
+                                        img_data[idx + 4..idx + 6].try_into().unwrap(),
+                                    );
+                                    let a = f16::from_le_bytes(
+                                        img_data[idx + 6..idx + 8].try_into().unwrap(),
+                                    );
+                                    let rgba = [r, g, b, a];
+                                    for c in 0..4 {
+                                        let cv = encoding.to_float_linear(rgba[c].into());
+                                        image.set_channel(
+                                            Point2i::new(x as i32, y as i32),
+                                            c,
+                                            cv.into(),
+                                        );
+                                    }
+                                    idx += 8;
+                                }
+                            }
+                            image
+                        }
+                        false => {
+                            let mut image = Image::new(
+                                PixelFormat::Half,
+                                Point2i::new(info.width as i32, info.height as i32),
+                                &["R".to_owned(), "G".to_owned(), "B".to_owned()],
+                                None,
+                            );
+                            let mut idx = 0;
+                            for y in 0..info.height {
+                                for x in 0..info.width {
+                                    let r = f16::from_le_bytes(
+                                        img_data[idx..idx + 2].try_into().unwrap(),
+                                    );
+                                    let g = f16::from_le_bytes(
+                                        img_data[idx + 2..idx + 4].try_into().unwrap(),
+                                    );
+                                    let b = f16::from_le_bytes(
+                                        img_data[idx + 4..idx + 6].try_into().unwrap(),
+                                    );
+                                    let rgb = [r, g, b];
+                                    for c in 0..3 {
+                                        let cv = encoding.to_float_linear(rgb[c].into());
+                                        image.set_channel(
+                                            Point2i::new(x as i32, y as i32),
+                                            c,
+                                            cv.into(),
+                                        );
+                                    }
+                                    idx += 6;
+                                }
+                            }
+                            image
+                        }
+                    },
+                    _ => panic!("Unsupported bit depth"),
+                }
+            }
+            png::ColorType::Indexed => panic!("Indexed PNGs are not supported!"),
+        };
+
+        let metadata = match info.color_type {
+            png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha => ImageMetadata::default(),
+            png::ColorType::Rgb | png::ColorType::Rgba => {
+                let mut metadata = ImageMetadata::default();
+                metadata.color_space = Some(
+                    RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+                );
+                metadata
+            }
+            png::ColorType::Indexed => panic!("Unspported indexed PNGs!"),
+        };
+
+        ImageAndMetadata { image, metadata }
+    }
+
+    pub fn write(&self, path: &Path, metadata: &ImageMetadata) -> std::io::Result<()> {
         // TODO There's additional logic we'll need here with other filetypes, but
         // this should be "OK" for writing PFM files.
 
         // TODO Add exr support.
 
-        if has_extension(filename, "pfm") {
-            return self.write_pfm(filename, metadata);
+        if path.extension().unwrap().eq("pfm") {
+            return self.write_pfm(path, metadata);
         } else {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -695,8 +872,8 @@ impl Image {
 
     /// Writes the PFM file format.
     /// https://netpbm.sourceforge.net/doc/pfm.html
-    fn write_pfm(&self, filename: &str, metadata: &ImageMetadata) -> std::io::Result<()> {
-        let file = File::create(filename)?;
+    fn write_pfm(&self, path: &Path, metadata: &ImageMetadata) -> std::io::Result<()> {
+        let file = File::create(path)?;
 
         if self.n_channels() != 3 {
             return Err(std::io::Error::new(

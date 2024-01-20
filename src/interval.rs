@@ -52,7 +52,7 @@ impl Interval {
             (v, v)
         } else {
             let low = sub_round_down(v, err);
-            let high = sub_round_up(v, err);
+            let high = add_round_up(v, err);
             (low, high)
         };
         Interval { low, high }

@@ -9,7 +9,7 @@
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
-            "environment": [],
+            "environment": [ {"name": "RAYON_NUM_THREADS", "value": "1"}],
             "externalConsole": true
         },
     ]

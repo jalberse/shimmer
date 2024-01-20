@@ -5,6 +5,7 @@ use crate::{
     float::gamma,
     frame::Frame,
     interaction::{Interaction, SurfaceInteraction, SurfaceInteractionShading},
+    math::radians,
     ray::{AuxiliaryRays, Ray, RayDifferential},
     square_matrix::{Determinant, Invertible, SquareMatrix},
     vecmath::{
@@ -16,11 +17,33 @@ use crate::{
     Float,
 };
 
+pub trait Transformable {
+    fn apply(&self, transform: &Transform) -> Self;
+}
+
+pub trait TransformableRay {
+    /// Applies the transformation, returning the transformed ray
+    /// and the new t_max, if provided. The t_max is adjusted to account for
+    /// error correction necessary for ray transformations.
+    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self;
+}
+
+pub trait InverseTransformable {
+    fn apply_inverse(&self, transform: &Transform) -> Self;
+}
+
+pub trait InverseTransformableRay {
+    /// Applies the inverse transformation, returning the transformed ray
+    /// and the new t_max, if provided. The t_max is adjusted to account for
+    /// error correction necessary for ray transformations.
+    fn apply_ray_inverse(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self;
+}
+
 // TODO Note that since transforms are relatively memory hungry, it can be good to
 // de-duplicate them in use. C.2.3 InternCache. We likely want something like that,
 // but for now we will abstain.
 
-#[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct Transform {
     m: SquareMatrix<4>,
     // Inverse of m
@@ -60,10 +83,6 @@ impl Transform {
         // This should hopefully be quite self-contained and any NaN poisoning would be
         // extremely obvious, so we'll accept it.
         Transform { m, m_inv }
-    }
-
-    pub fn from_2d(m: [[Float; 4]; 4]) -> Transform {
-        Self::new_calc_inverse(SquareMatrix::new(m))
     }
 
     pub fn from_frame(frame: &Frame) -> Transform {
@@ -297,6 +316,19 @@ impl Transform {
         }
     }
 
+    pub fn perspective(fov: Float, n: Float, f: Float) -> Transform {
+        let persp: SquareMatrix<4> = SquareMatrix {
+            m: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, f / (f - n), -f * n / (f - n)],
+                [0.0, 0.0, 1.0, 0.0],
+            ],
+        };
+        let inv_tan_ang = 1.0 / Float::tan(radians(fov) / 2.0);
+        Transform::scale(inv_tan_ang, inv_tan_ang, 1.0) * Transform::new_calc_inverse(persp)
+    }
+
     pub fn transpose(&self) -> Transform {
         Transform {
             m: self.m.transpose(),
@@ -325,6 +357,18 @@ impl Transform {
     pub fn apply_inv<T: InverseTransformable>(&self, val: &T) -> T {
         val.apply_inverse(&self)
     }
+
+    pub fn apply_ray<T: TransformableRay>(&self, val: &T, t_max: Option<&mut Float>) -> T {
+        val.apply_ray(&self, t_max)
+    }
+
+    pub fn apply_ray_inverse<T: InverseTransformableRay>(
+        &self,
+        val: &T,
+        t_max: Option<&mut Float>,
+    ) -> T {
+        val.apply_ray_inverse(&self, t_max)
+    }
 }
 
 impl Default for Transform {
@@ -336,6 +380,12 @@ impl Default for Transform {
     }
 }
 
+impl From<[[Float; 4]; 4]> for Transform {
+    fn from(value: [[Float; 4]; 4]) -> Self {
+        Self::new_calc_inverse(SquareMatrix::new(value))
+    }
+}
+
 // Allow composition of transformations!
 impl_op_ex!(*|t1: &Transform, t2: &Transform| -> Transform {
     Transform {
@@ -343,10 +393,6 @@ impl_op_ex!(*|t1: &Transform, t2: &Transform| -> Transform {
         m_inv: t2.m_inv * t1.m_inv,
     }
 });
-
-pub trait Transformable {
-    fn apply(&self, transform: &Transform) -> Self;
-}
 
 impl Transformable for Point3f {
     fn apply(&self, transform: &Transform) -> Self {
@@ -498,14 +544,17 @@ impl Transformable for Vector3fi {
     }
 }
 
-impl Transformable for Ray {
-    fn apply(&self, transform: &Transform) -> Self {
+impl TransformableRay for Ray {
+    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self {
         let o: Point3fi = transform.apply(&self.o).into();
         let d: Vector3f = transform.apply(&self.d);
         // Offset ray origin to edge of error bounds and compute t_max
         let length_squared = d.length_squared();
         let o: Point3fi = if length_squared > 0.0 {
             let dt = d.abs().dot(&o.error().into()) / length_squared;
+            if let Some(t_max) = t_max {
+                *t_max = *t_max - dt;
+            }
             o + (d * dt).into()
         } else {
             o
@@ -514,11 +563,10 @@ impl Transformable for Ray {
     }
 }
 
-impl Transformable for RayDifferential {
-    // TODO note we may also wanta version that calculates the new t_max, or add that to this one
-    fn apply(&self, transform: &Transform) -> Self {
+impl TransformableRay for RayDifferential {
+    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self {
         // Get the transformed base ray
-        let tr: Ray = transform.apply(&self.ray);
+        let tr = transform.apply_ray(&self.ray, t_max);
         // Get the transformed aux rays, if any
         let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &self.auxiliary {
             let rx_origin = transform.apply(&aux.rx_origin);
@@ -590,10 +638,6 @@ impl Transformable for SurfaceInteraction {
             dvdy: self.dvdy,
         }
     }
-}
-
-pub trait InverseTransformable {
-    fn apply_inverse(&self, transform: &Transform) -> Self;
 }
 
 impl InverseTransformable for Point3f {
@@ -686,13 +730,11 @@ impl InverseTransformable for Point3fi {
     }
 }
 
-impl InverseTransformable for Ray {
-    // TODO we likely want to include a t_max computation in here.
-    fn apply_inverse(&self, transform: &Transform) -> Self {
+impl InverseTransformableRay for Ray {
+    fn apply_ray_inverse(&self, transform: &Transform, t_max: Option<&mut Float>) -> Ray {
         let o: Point3fi = Point3fi::from(self.o).apply_inverse(transform);
         let d: Vector3f = self.d.apply_inverse(transform);
         // Offset ray origin to edge of error bounds
-        // TODO And compute t_max
         let length_squared = d.length_squared();
         let o = if length_squared > 0.0 {
             let o_error = Vector3f::new(
@@ -701,6 +743,9 @@ impl InverseTransformable for Ray {
                 o.z().width() / 2.0,
             );
             let dt = d.abs().dot(&o_error) / length_squared;
+            if let Some(t_max) = t_max {
+                *t_max = *t_max - dt;
+            }
             o + (d * dt).into()
         } else {
             o
@@ -709,10 +754,14 @@ impl InverseTransformable for Ray {
     }
 }
 
-impl InverseTransformable for RayDifferential {
-    fn apply_inverse(&self, transform: &Transform) -> Self {
+impl InverseTransformableRay for RayDifferential {
+    fn apply_ray_inverse(
+        &self,
+        transform: &Transform,
+        t_max: Option<&mut Float>,
+    ) -> RayDifferential {
         // Get the transformed base ray
-        let tr: Ray = transform.apply_inv(&self.ray);
+        let tr = transform.apply_ray_inverse(&self.ray, t_max);
         // Get the transformed aux rays, if any
         let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &self.auxiliary {
             let rx_origin = transform.apply_inv(&aux.rx_origin);
@@ -745,15 +794,6 @@ fn apply_point_helper(m: &SquareMatrix<4>, p: &Point3f) -> Point3f {
         // For efficiency, skips division if the weight is 1.
         Point3f::new(xp, yp, zp)
     } else {
-        // TODO We fail an assertion (now within the division, as PBRT does)
-        //   for wp != 0. So... Why do we get this, and they don't?
-        //   Well, our m[3] is all 0'd out, so wp is actually always zero (at least, for that matrix).
-        //   Am I constructing m wrong?
-        //   The very first time this is reached, we get the error.
-        //  I mean, I have tests for point transforms and they do fine?
-        // Hm yeah, well, the last column should *really* not be 0'd out - I would expect [0 0 0 1].
-        //  Am I getting it zero'd from the composition of matrices?
-        // ugh I guess look into this tomorrow.
         Point3f::new(xp, yp, zp) / wp
     }
 }
@@ -779,9 +819,12 @@ fn apply_normal_helper(m: &SquareMatrix<4>, n: &Normal3f) -> Normal3f {
 
 #[cfg(test)]
 mod tests {
+    use float_cmp::assert_approx_eq;
+
     use crate::{
         bounding_box::Bounds3f,
-        vecmath::{Normal3f, Point3f, Tuple3, Vector3f},
+        vecmath::{Normal3f, Normalize, Point3f, Tuple3, Vector3f},
+        Float,
     };
 
     use super::Transform;
@@ -919,5 +962,14 @@ mod tests {
         let r = Transform::rotate_from_to(&from, &to);
         let to_new = r.apply(&from);
         assert_eq!(to, to_new);
+
+        // Note that rotate_from_to() expects normalized vectors.
+        let from = Vector3f::new(0.1, 0.2, 0.3).normalize();
+        let to = Vector3f::new(0.4, 0.5, 0.6).normalize();
+        let r = Transform::rotate_from_to(&from, &to);
+        let to_new = r.apply(&from);
+        assert_approx_eq!(Float, to.x, to_new.x);
+        assert_approx_eq!(Float, to.y, to_new.y);
+        assert_approx_eq!(Float, to.z, to_new.z);
     }
 }

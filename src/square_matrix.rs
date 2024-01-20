@@ -18,7 +18,7 @@ pub trait Determinant {
 
 // PAPERDOC - PBRTv4 must implement ==, <, !=.
 //   In Rust, you can often derive a trait like so instead. Easier.
-#[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct SquareMatrix<const N: usize> {
     pub m: [[Float; N]; N],
 }
@@ -138,6 +138,21 @@ impl<const N: usize> Default for SquareMatrix<N> {
         for i in 0..N {
             for j in 0..N {
                 m[i][j] = if i == j { 1.0 } else { 0.0 };
+            }
+        }
+        Self::new(m)
+    }
+}
+
+impl<const N: usize> From<&[Float]> for SquareMatrix<N> {
+    fn from(value: &[Float]) -> Self {
+        // With generic const expression features (nightly), this could be
+        // a static check with From<[Float; N * N]>. I am trying not to use nightly much, though.
+        debug_assert!(value.len() == N * N);
+        let mut m: [[Float; N]; N] = [[0.0; N]; N];
+        for i in 0..N {
+            for j in 0..N {
+                m[i][j] = value[i * N + j];
             }
         }
         Self::new(m)

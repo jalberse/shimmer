@@ -17,7 +17,7 @@ use super::{
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct SampledSpectrum {
-    values: [Float; NUM_SPECTRUM_SAMPLES],
+    pub values: [Float; NUM_SPECTRUM_SAMPLES],
 }
 
 impl SampledSpectrum {

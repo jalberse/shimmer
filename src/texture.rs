@@ -1,9 +1,18 @@
+use std::{collections::HashMap, sync::Arc};
+
+use spectrum::ConstantSpectrum;
+
 use crate::{
     interaction::{Interaction, SurfaceInteraction},
+    loading::paramdict::{SpectrumType, TextureParameterDictionary},
+    loading::parser_target::FileLoc,
     spectra::{
-        sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
-        spectrum::SpectrumI, Spectrum,
+        sampled_spectrum::SampledSpectrum,
+        sampled_wavelengths::SampledWavelengths,
+        spectrum::{self, SpectrumI},
+        Spectrum,
     },
+    transform::Transform,
     vecmath::{Normal3f, Point2f, Point3f, Tuple2, Vector3f},
     Float,
 };
@@ -17,6 +26,30 @@ pub enum FloatTexture {
     Constant(FloatConstantTexture),
 }
 
+impl FloatTexture {
+    pub fn create(
+        name: &str,
+        render_from_texture: Transform,
+        parameters: TextureParameterDictionary,
+        loc: &FileLoc,
+    ) -> FloatTexture {
+        let tex = match name {
+            "constant" => {
+                let t = FloatConstantTexture::create(render_from_texture, parameters, loc);
+                FloatTexture::Constant(t)
+            }
+            _ => {
+                panic!("Texture {} unknown", name);
+            }
+        };
+
+        // TODO Track number of textures created for stats.
+        // TODO Report unused paramters.
+
+        tex
+    }
+}
+
 impl FloatTextureI for FloatTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         match self {
@@ -28,6 +61,21 @@ impl FloatTextureI for FloatTexture {
 #[derive(Debug)]
 pub struct FloatConstantTexture {
     value: Float,
+}
+
+impl FloatConstantTexture {
+    pub fn new(value: Float) -> Self {
+        Self { value }
+    }
+
+    pub fn create(
+        _render_from_texture: Transform,
+        mut parameters: TextureParameterDictionary,
+        _loc: &FileLoc,
+    ) -> FloatConstantTexture {
+        let v = parameters.get_one_float("value", 1.0);
+        FloatConstantTexture::new(v)
+    }
 }
 
 impl FloatTextureI for FloatConstantTexture {
@@ -45,6 +93,38 @@ pub enum SpectrumTexture {
     Constant(SpectrumConstantTexture),
 }
 
+impl SpectrumTexture {
+    pub fn create(
+        name: &str,
+        render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        loc: &FileLoc,
+    ) -> SpectrumTexture {
+        let tex = match name {
+            "constant" => {
+                let t = SpectrumConstantTexture::create(
+                    render_from_texture,
+                    parameters,
+                    spectrum_type,
+                    cached_spectra,
+                    loc,
+                );
+                SpectrumTexture::Constant(t)
+            }
+            _ => {
+                panic!("Texture {} unknown", name);
+            }
+        };
+
+        // TODO Track number of textures created for stats.
+        // TODO Report unused paramters.
+
+        tex
+    }
+}
+
 impl SpectrumTextureI for SpectrumTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         match self {
@@ -55,12 +135,32 @@ impl SpectrumTextureI for SpectrumTexture {
 
 #[derive(Debug)]
 pub struct SpectrumConstantTexture {
-    pub value: Spectrum,
+    pub value: Arc<Spectrum>,
 }
 
 impl SpectrumTextureI for SpectrumConstantTexture {
     fn evaluate(&self, _ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         self.value.sample(lambda)
+    }
+}
+
+impl SpectrumConstantTexture {
+    pub fn new(value: Arc<Spectrum>) -> Self {
+        Self { value }
+    }
+
+    pub fn create(
+        render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        _loc: &FileLoc,
+    ) -> SpectrumConstantTexture {
+        let one = Spectrum::Constant(ConstantSpectrum::new(1.0));
+        let c = parameters
+            .get_one_spectrum("value", Some(Arc::new(one)), spectrum_type, cached_spectra)
+            .unwrap();
+        SpectrumConstantTexture::new(c)
     }
 }
 

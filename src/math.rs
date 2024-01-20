@@ -10,6 +10,7 @@ use crate::{
 
 pub const INV_PI: Float = 0.31830988618379067154;
 pub const INV_2PI: Float = 0.15915494309189533577;
+pub const INV_4PI: Float = 0.07957747154594766788;
 pub const PI_OVER_4: Float = 0.78539816339744830961;
 pub const PI_OVER_2: Float = 1.57079632679489661923;
 

@@ -1,7 +1,7 @@
 use crate::{bounding_box::Bounds2i, vecmath::Point2i};
 
 /// Stores 2 dimensional data in a flat contiguous Vec.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Vec2d<T>
 where
     T: Default + Copy + Clone,

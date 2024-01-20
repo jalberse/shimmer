@@ -3,17 +3,26 @@
 // TODO circular camera (maybe, low priority)
 // TODO place Camera types into a Camera enum that impl CameraI (typical pattern).
 
+use log::warn;
+
 use crate::{
     bounding_box::Bounds2f,
     film::{Film, FilmI},
+    filter::FilterI,
+    frame::Frame,
     image::ImageMetadata,
-    math::lerp,
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
+    math::{lerp, radians},
     medium::Medium,
     options::{Options, RenderingCoordinateSystem},
     ray::{AuxiliaryRays, Ray, RayDifferential, RayI},
+    sampling::sample_uniform_disk_concentric,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
     transform::Transform,
-    vecmath::{normal::Normal3, Normal3f, Normalize, Point2f, Point3f, Tuple3, Vector3f},
+    vecmath::{
+        normal::Normal3, Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f,
+    },
     Float,
 };
 
@@ -56,6 +65,39 @@ pub trait CameraI {
 
 pub enum Camera {
     Orthographic(OrthographicCamera),
+    Perspective(PerspectiveCamera),
+}
+
+impl Camera {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        medium: Option<Medium>,
+        camera_transform: CameraTransform,
+        film: Film,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> Camera {
+        match name {
+            "perspective" => Camera::Perspective(PerspectiveCamera::create(
+                parameters,
+                camera_transform,
+                film,
+                medium,
+                options,
+                loc,
+            )),
+            "orthographic" => Camera::Orthographic(OrthographicCamera::create(
+                parameters,
+                camera_transform,
+                film,
+                medium,
+                options,
+                loc,
+            )),
+            _ => panic!("Camera type \"{}\" unknown.", name),
+        }
+    }
 }
 
 impl CameraI for Camera {
@@ -66,6 +108,7 @@ impl CameraI for Camera {
     ) -> Option<CameraRay> {
         match self {
             Camera::Orthographic(c) => c.generate_ray(sample, lambda),
+            Camera::Perspective(c) => c.generate_ray(sample, lambda),
         }
     }
 
@@ -76,36 +119,42 @@ impl CameraI for Camera {
     ) -> Option<CameraRayDifferential> {
         match self {
             Camera::Orthographic(c) => c.generate_ray_differential(sample, lambda),
+            Camera::Perspective(c) => c.generate_ray_differential(sample, lambda),
         }
     }
 
     fn get_film(&mut self) -> &mut Film {
         match self {
             Camera::Orthographic(c) => c.get_film(),
+            Camera::Perspective(c) => c.get_film(),
         }
     }
 
     fn get_film_const(&self) -> &Film {
         match self {
             Camera::Orthographic(c) => c.get_film_const(),
+            Camera::Perspective(c) => c.get_film_const(),
         }
     }
 
     fn sample_time(&self, u: Float) -> Float {
         match self {
             Camera::Orthographic(c) => c.sample_time(u),
+            Camera::Perspective(c) => c.sample_time(u),
         }
     }
 
     fn init_metadata(&self, metadata: &mut ImageMetadata) {
         match self {
             Camera::Orthographic(c) => c.init_metadata(metadata),
+            Camera::Perspective(c) => c.init_metadata(metadata),
         }
     }
 
     fn get_camera_transform(&self) -> &CameraTransform {
         match self {
             Camera::Orthographic(c) => c.get_camera_transform(),
+            Camera::Perspective(c) => c.get_camera_transform(),
         }
     }
 
@@ -119,11 +168,13 @@ impl CameraI for Camera {
     ) -> (Vector3f, Vector3f) {
         match self {
             Camera::Orthographic(c) => c.approximate_dp_dxy(p, n, time, samples_per_pixel, options),
+            Camera::Perspective(c) => c.approximate_dp_dxy(p, n, time, samples_per_pixel, options),
         }
     }
 }
 
 /// Shared implementation details for different kinds of cameras.
+#[derive(Debug, Clone)]
 struct CameraBase {
     camera_transform: CameraTransform,
     /// The time of the shutter opening
@@ -280,6 +331,7 @@ impl CameraBase {
         let down_z_from_camera =
             Transform::rotate_from_to(&Vector3f::from(p_camera).normalize(), &Vector3f::Z);
         let p_down_z = down_z_from_camera.apply(&p_camera);
+        // TODO Finding cases where n_down_z.z is 0, which propagates down to dpdx and dpdy being NaN.
         let n_down_z = down_z_from_camera.apply(&self.camera_from_render_n(n, time));
         let d = n_down_z.z * p_down_z.z;
 
@@ -311,6 +363,82 @@ impl CameraBase {
         let dpdy =
             spp_scale * self.render_from_camera_v(&down_z_from_camera.apply_inv(&(py - p_down_z)));
         (dpdx, dpdy)
+    }
+
+    pub fn find_minimum_differentials<T>(&mut self, camera: &T)
+    where
+        T: CameraI,
+    {
+        self.min_pos_differential_x =
+            Vector3f::new(Float::INFINITY, Float::INFINITY, Float::INFINITY);
+        self.min_pos_differential_y =
+            Vector3f::new(Float::INFINITY, Float::INFINITY, Float::INFINITY);
+        self.min_dir_differential_x =
+            Vector3f::new(Float::INFINITY, Float::INFINITY, Float::INFINITY);
+        self.min_dir_differential_y =
+            Vector3f::new(Float::INFINITY, Float::INFINITY, Float::INFINITY);
+
+        let mut sample = CameraSample {
+            p_film: Default::default(),
+            p_lens: Point2f::new(0.5, 0.5),
+            time: 0.5,
+            filter_weight: 1.0,
+        };
+        let lambda = SampledWavelengths::sample_visible(0.5);
+
+        let n = 512;
+        for i in 0..n {
+            sample.p_film.x =
+                i as Float / (n - 1) as Float * self.film.full_resolution().x as Float;
+            sample.p_film.y =
+                i as Float / (n - 1) as Float * self.film.full_resolution().y as Float;
+
+            let crd = camera.generate_ray_differential(&sample, &lambda);
+
+            if crd.is_none() {
+                continue;
+            }
+            let mut crd = crd.unwrap();
+
+            let ray = &mut crd.ray;
+
+            let dox = self.camera_from_render_v(
+                &(ray.auxiliary.as_ref().unwrap().rx_origin - ray.ray.o),
+                ray.ray.time,
+            );
+            if dox.length() < self.min_pos_differential_x.length() {
+                self.min_pos_differential_x = dox;
+            }
+            let doy = self.camera_from_render_v(
+                &(ray.auxiliary.as_ref().unwrap().ry_origin - ray.ray.o),
+                ray.ray.time,
+            );
+            if doy.length() < self.min_pos_differential_y.length() {
+                self.min_pos_differential_y = doy;
+            }
+
+            ray.ray.d = ray.ray.d.normalize();
+            ray.auxiliary.as_mut().unwrap().rx_direction =
+                ray.auxiliary.as_ref().unwrap().rx_direction.normalize();
+            ray.auxiliary.as_mut().unwrap().ry_direction =
+                ray.auxiliary.as_ref().unwrap().ry_direction.normalize();
+
+            let f = Frame::from_z(ray.ray.d);
+            let df = f.to_local_v(&ray.ray.d); // Should be (0, 0, 1)
+            let dxf = f
+                .to_local_v(&ray.auxiliary.as_ref().unwrap().rx_direction)
+                .normalize();
+            let dyf = f
+                .to_local_v(&ray.auxiliary.as_ref().unwrap().ry_direction)
+                .normalize();
+
+            if (dxf - df).length() < self.min_dir_differential_x.length() {
+                self.min_dir_differential_x = dxf - df;
+            }
+            if (dyf - df).length() < self.min_dir_differential_y.length() {
+                self.min_dir_differential_y = dyf - df;
+            }
+        }
     }
 }
 
@@ -359,9 +487,21 @@ pub struct CameraSample {
     pub filter_weight: Float,
 }
 
+impl Default for CameraSample {
+    fn default() -> Self {
+        Self {
+            p_film: Default::default(),
+            p_lens: Default::default(),
+            time: 0.0,
+            filter_weight: 1.0,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct CameraTransform {
     // TODO render_from_camera should be an AnimatedTransform when that's implemented,
-    //  along with any associated changes that entails.
+    //  along with any associated changes that entails (notably, handling the time)
     render_from_camera: Transform,
     world_from_render: Transform,
 }
@@ -399,10 +539,10 @@ impl CameraTransform {
         self.render_from_camera.apply(n)
     }
     pub fn render_from_camera_r(&self, r: &Ray) -> Ray {
-        self.render_from_camera.apply(r)
+        self.render_from_camera.apply_ray(r, None)
     }
     pub fn render_from_camera_rd(&self, r: &RayDifferential) -> RayDifferential {
-        self.render_from_camera.apply(r)
+        self.render_from_camera.apply_ray(r, None)
     }
 
     pub fn camera_from_render_p(&self, p: &Point3f, _time: Float) -> Point3f {
@@ -415,10 +555,10 @@ impl CameraTransform {
         self.render_from_camera.apply_inv(n)
     }
     pub fn camera_from_render_r(&self, r: &Ray, _time: Float) -> Ray {
-        self.render_from_camera.apply_inv(r)
+        self.render_from_camera.apply_ray_inverse(r, None)
     }
     pub fn camera_from_render_rd(&self, r: &RayDifferential, _time: Float) -> RayDifferential {
-        self.render_from_camera.apply_inv(r)
+        self.render_from_camera.apply_ray_inverse(r, None)
     }
 
     pub fn render_from_world_p(&self, p: &Point3f) -> Point3f {
@@ -443,6 +583,7 @@ impl CameraTransform {
 }
 
 /// Serves to provide shared functionality across orthographic and perspective cameras
+#[derive(Debug, Clone)]
 struct ProjectiveCameraBase {
     camera_base: CameraBase,
     screen_from_camera: Transform,
@@ -455,22 +596,18 @@ struct ProjectiveCameraBase {
 
 impl ProjectiveCameraBase {
     pub fn new(
-        camera_transform: CameraTransform,
-        shutter_open: Float,
-        shutter_close: Float,
-        film: Film,
-        medium: Option<Medium>,
+        camera_base_parameters: CameraBaseParameters,
         lens_radius: Float,
         focal_distance: Float,
         screen_from_camera: Transform,
         screen_window: Bounds2f,
     ) -> ProjectiveCameraBase {
         let camera_base = CameraBase {
-            camera_transform,
-            shutter_open,
-            shutter_close,
-            film,
-            medium,
+            camera_transform: camera_base_parameters.camera_transform,
+            shutter_open: camera_base_parameters.shutter_open,
+            shutter_close: camera_base_parameters.shutter_close,
+            film: camera_base_parameters.film,
+            medium: camera_base_parameters.medium,
             // These differentials can be set by the calling code. TODO - Can we improve this?
             min_pos_differential_x: Default::default(),
             min_pos_differential_y: Default::default(),
@@ -525,12 +662,55 @@ pub struct OrthographicCamera {
 }
 
 impl OrthographicCamera {
-    pub fn new(
+    pub fn create(
+        parameters: &mut ParameterDictionary,
         camera_transform: CameraTransform,
-        shutter_open: Float,
-        shutter_close: Float,
         film: Film,
         medium: Option<Medium>,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> OrthographicCamera {
+        let camera_base_paramters =
+            CameraBaseParameters::new(camera_transform, film, medium, parameters, loc);
+
+        let lens_radius = parameters.get_one_float("lensradius", 0.0);
+        let focal_distance = parameters.get_one_float("focaldistance", 1e6);
+        let frame = parameters.get_one_float(
+            "frameaspectratio",
+            camera_base_paramters.film.full_resolution().x as Float
+                / camera_base_paramters.film.full_resolution().y as Float,
+        );
+
+        let mut screen = if frame > 1.0 {
+            Bounds2f::new(Point2f::new(-frame, -1.0), Point2f::new(frame, 1.0))
+        } else {
+            Bounds2f::new(
+                Point2f::new(-1.0, -1.0 / frame),
+                Point2f::new(1.0, 1.0 / frame),
+            )
+        };
+        let sw = parameters.get_float_array("screenwindow");
+        if !sw.is_empty() {
+            if options.fullscreen {
+                warn!("screenwindow is ignored in fullscreen mode");
+            } else {
+                if sw.len() == 4 {
+                    screen = Bounds2f::new(Point2f::new(sw[0], sw[2]), Point2f::new(sw[1], sw[3]));
+                } else {
+                    warn!(
+                        "{} Expected four values for \"screenwindow\" parameter. Got {}.",
+                        loc,
+                        sw.len()
+                    );
+                }
+            }
+        }
+
+        OrthographicCamera::new(camera_base_paramters, lens_radius, focal_distance, screen)
+    }
+
+    pub fn new(
+        camera_base_parameters: CameraBaseParameters,
         lens_radius: Float,
         focal_distance: Float,
         screen_window: Bounds2f,
@@ -538,11 +718,7 @@ impl OrthographicCamera {
         let screen_from_camera = Transform::orthographic(0.0, 1.0);
 
         let mut projective_base = ProjectiveCameraBase::new(
-            camera_transform,
-            shutter_open,
-            shutter_close,
-            film,
-            medium,
+            camera_base_parameters,
             lens_radius,
             focal_distance,
             screen_from_camera,
@@ -646,5 +822,325 @@ impl CameraI for OrthographicCamera {
         self.projective_base
             .camera_base
             .approximate_dp_dxy(p, n, time, samples_per_pixel, options)
+    }
+}
+
+pub struct PerspectiveCamera {
+    projective_base: ProjectiveCameraBase,
+    dx_camera: Vector3f,
+    dy_camera: Vector3f,
+    cos_total_width: Float,
+    area: Float,
+}
+
+impl PerspectiveCamera {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        camera_transform: CameraTransform,
+        film: Film,
+        medium: Option<Medium>,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> PerspectiveCamera {
+        let camera_base_paramters =
+            CameraBaseParameters::new(camera_transform, film, medium, parameters, loc);
+
+        let lens_radius = parameters.get_one_float("lensradius", 0.0);
+        let focal_distance = parameters.get_one_float("focaldistance", 1e6);
+        let frame = parameters.get_one_float(
+            "frameaspectratio",
+            camera_base_paramters.film.full_resolution().x as Float
+                / camera_base_paramters.film.full_resolution().y as Float,
+        );
+        let mut screen = if frame > 1.0 {
+            Bounds2f::new(Point2f::new(-frame, -1.0), Point2f::new(frame, 1.0))
+        } else {
+            Bounds2f::new(
+                Point2f::new(-1.0, -1.0 / frame),
+                Point2f::new(1.0, 1.0 / frame),
+            )
+        };
+
+        let sw = parameters.get_float_array("screenwindow");
+        if !sw.is_empty() {
+            if options.fullscreen {
+                warn!("screenwindow is ignored in fullscreen mode");
+            } else {
+                if sw.len() == 4 {
+                    screen = Bounds2f::new(Point2f::new(sw[0], sw[2]), Point2f::new(sw[1], sw[3]));
+                } else {
+                    warn!(
+                        "Expeced four values for \"screenwindow\" parameter. Got {}.",
+                        sw.len()
+                    );
+                }
+            }
+        }
+
+        let fov = parameters.get_one_float("fov", 90.0);
+        PerspectiveCamera::new(
+            camera_base_paramters,
+            fov,
+            screen,
+            lens_radius,
+            focal_distance,
+        )
+    }
+
+    pub fn new(
+        camera_base_parameters: CameraBaseParameters,
+        fov: Float,
+        screen_window: Bounds2f,
+        lens_radius: Float,
+        focal_distance: Float,
+    ) -> PerspectiveCamera {
+        // TODO must calculate screen_from_camera
+        let screen_from_camera = Transform::perspective(fov, 1e-2, 1000.0);
+        let mut projective_base = ProjectiveCameraBase::new(
+            camera_base_parameters,
+            lens_radius,
+            focal_distance,
+            screen_from_camera,
+            screen_window,
+        );
+        // Compute differential changfes in origin for perspective camera rays;
+        // their origins are unchanges and the ray differentials differ only in their direction
+        // for perspective cameras. Compute the change in position on the near perspective plane
+        // in camera space wrt shifts in pixel locations.
+        let dx_camera = projective_base.camera_from_raster.apply(&Vector3f::X)
+            - projective_base.camera_from_raster.apply(&Vector3f::ZERO);
+        let dy_camera = projective_base.camera_from_raster.apply(&Vector3f::Y)
+            - projective_base.camera_from_raster.apply(&Vector3f::ZERO);
+
+        // Compute cos_total_width for perspective camera, the cosine of the maximum angle of the FOV.
+        // This is used in a few places, such as for culling points outside the FOV quickly.
+        let radius = Point2f::from(projective_base.camera_base.film.get_filter().radius());
+        let p_corner = Point3f::new(-radius.x, -radius.y, 0.0);
+        let w_corner_camera =
+            Vector3f::from(projective_base.camera_from_raster.apply(&p_corner)).normalize();
+        let cos_total_width = w_corner_camera.z;
+        debug_assert!(0.9999 * cos_total_width <= Float::cos(radians(fov / 2.0)));
+
+        // Compute image plane area at z == 1.0 for perspective
+        let res = projective_base.camera_base.film.full_resolution();
+        let mut p_min = projective_base.camera_from_raster.apply(&Point3f::ZERO);
+        let mut p_max = projective_base.camera_from_raster.apply(&Point3f::new(
+            res.x as Float,
+            res.y as Float,
+            0.0,
+        ));
+        p_min /= p_min.z;
+        p_max /= p_max.z;
+        let area = Float::abs((p_max.x - p_min.x) * (p_max.y - p_min.y));
+
+        let camera = PerspectiveCamera {
+            projective_base: projective_base.clone(),
+            dx_camera,
+            dy_camera,
+            cos_total_width,
+            area,
+        };
+
+        projective_base
+            .camera_base
+            .find_minimum_differentials(&camera);
+
+        // I dislike having to make the PerspectiveCamera twice, but we need to create it in order
+        // to (conveniently) use it to find its minimum differentials, and then
+        // make a new camera with those minimum differntials set. There are other approaches, but this is simple,
+        // if a bit inefficient.
+        // TODO - This approach could be improved.
+        PerspectiveCamera {
+            projective_base,
+            dx_camera,
+            dy_camera,
+            cos_total_width,
+            area,
+        }
+    }
+}
+
+impl CameraI for PerspectiveCamera {
+    fn generate_ray(
+        &self,
+        sample: &CameraSample,
+        _lambda: &SampledWavelengths,
+    ) -> Option<CameraRay> {
+        let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
+        let p_camera = self.projective_base.camera_from_raster.apply(&p_film);
+
+        let mut ray = Ray::new_with_time(
+            Point3f::ZERO,
+            Vector3f::from(p_camera).normalize(),
+            self.sample_time(sample.time),
+            self.projective_base.camera_base.medium,
+        );
+
+        // Modify ray for depth of field
+        if self.projective_base.lens_radius > 0.0 {
+            // Sample point on lens
+            let p_lens =
+                self.projective_base.lens_radius * sample_uniform_disk_concentric(sample.p_lens);
+
+            // Compute point on plane of focus
+            let ft = self.projective_base.focal_distance / ray.d.z;
+            let p_focus = ray.get(ft);
+
+            // Update ray for effect of lens
+            ray.o = Point3f::new(p_lens.x, p_lens.y, 0.0);
+            ray.d = (p_focus - ray.o).normalize();
+        }
+
+        Some(CameraRay {
+            ray: self.projective_base.camera_base.render_from_camera_r(&ray),
+            weight: SampledSpectrum::from_const(1.0),
+        })
+    }
+
+    fn generate_ray_differential(
+        &self,
+        sample: &CameraSample,
+        _lambda: &SampledWavelengths,
+    ) -> Option<CameraRayDifferential> {
+        let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
+        let p_camera = self.projective_base.camera_from_raster.apply(&p_film);
+
+        let dir = Vector3f::from(p_camera).normalize();
+        let mut base_ray = Ray::new_with_time(
+            Point3f::ZERO,
+            dir,
+            self.sample_time(sample.time),
+            self.projective_base.camera_base.medium,
+        );
+
+        // Modify base ray for depth of field
+        if self.projective_base.lens_radius > 0.0 {
+            // Sample point on lens
+            let p_lens =
+                self.projective_base.lens_radius * sample_uniform_disk_concentric(sample.p_lens);
+
+            // Compute point on plane of focus
+            let ft = self.projective_base.focal_distance / base_ray.d.z;
+            let p_focus = base_ray.get(ft);
+
+            // Update ray for effect of lens
+            base_ray.o = Point3f::new(p_lens.x, p_lens.y, 0.0);
+            base_ray.d = (p_focus - base_ray.o).normalize();
+        }
+
+        // Compute auxilliary rays
+        let aux_rays = if self.projective_base.lens_radius > 0.0 {
+            // Compute _PerspectiveCamera_ ray differentials accounting for lens
+            // Sample point on lens
+            let p_lens =
+                self.projective_base.lens_radius * sample_uniform_disk_concentric(sample.p_lens);
+
+            let dx = Vector3f::from(p_camera + self.dx_camera).normalize();
+            let ft = self.projective_base.focal_distance / dx.z;
+            let p_focus = Point3f::ZERO + ft * dx;
+            let rx_origin = Point3f::new(p_lens.x, p_lens.y, 0.0);
+            let rx_direction = (p_focus - rx_origin).normalize();
+
+            let dy = Vector3f::from(p_camera + self.dy_camera).normalize();
+            let ft = self.projective_base.focal_distance / dy.z;
+            let p_focus = Point3f::ZERO + ft * dy;
+            let ry_origin = Point3f::new(p_lens.x, p_lens.y, 0.0);
+            let ry_direction = (p_focus - ry_origin).normalize();
+
+            AuxiliaryRays {
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            }
+        } else {
+            let rx_origin = base_ray.o;
+            let ry_origin = base_ray.o;
+            let rx_direction = (Vector3f::from(p_camera) + self.dx_camera).normalize();
+            let ry_direction = (Vector3f::from(p_camera) + self.dy_camera).normalize();
+            AuxiliaryRays {
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            }
+        };
+        Some(CameraRayDifferential::new(
+            self.projective_base
+                .camera_base
+                .render_from_camera_rd(&RayDifferential {
+                    ray: base_ray,
+                    auxiliary: Some(aux_rays),
+                }),
+        ))
+    }
+
+    fn get_film(&mut self) -> &mut Film {
+        &mut self.projective_base.camera_base.film
+    }
+
+    fn get_film_const(&self) -> &Film {
+        self.projective_base.camera_base.get_film()
+    }
+
+    fn sample_time(&self, u: Float) -> Float {
+        self.projective_base.camera_base.sample_time(u)
+    }
+
+    fn init_metadata(&self, metadata: &mut ImageMetadata) {
+        self.projective_base.camera_base.init_metadata(metadata);
+        self.projective_base.init_metadata(metadata);
+    }
+
+    fn get_camera_transform(&self) -> &CameraTransform {
+        &self.projective_base.camera_base.camera_transform
+    }
+
+    fn approximate_dp_dxy(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        time: Float,
+        samples_per_pixel: i32,
+        options: &Options,
+    ) -> (Vector3f, Vector3f) {
+        self.projective_base
+            .camera_base
+            .approximate_dp_dxy(p, n, time, samples_per_pixel, options)
+    }
+}
+
+pub struct CameraBaseParameters {
+    pub camera_transform: CameraTransform,
+    pub shutter_open: Float,
+    pub shutter_close: Float,
+    pub film: Film,
+    pub medium: Option<Medium>,
+}
+
+impl CameraBaseParameters {
+    pub fn new(
+        camera_transform: CameraTransform,
+        film: Film,
+        medium: Option<Medium>,
+        parameters: &mut ParameterDictionary,
+        loc: &FileLoc,
+    ) -> CameraBaseParameters {
+        let mut shutter_open = parameters.get_one_float("shutteropen", 0.0);
+        let mut shutter_close = parameters.get_one_float("shutterclose", 1.0);
+        if shutter_close < shutter_open {
+            warn!(
+                "{} Shutter close time [{}] < shutter open [{}]. Swapping them.",
+                loc, shutter_close, shutter_open
+            );
+            std::mem::swap(&mut shutter_close, &mut shutter_open);
+        }
+        CameraBaseParameters {
+            camera_transform: camera_transform,
+            shutter_open,
+            shutter_close,
+            film,
+            medium,
+        }
     }
 }

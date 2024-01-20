@@ -177,12 +177,11 @@ impl ShapeSampleContext {
     }
 
     pub fn offset_ray_origin(&self, w: Vector3f) -> Point3f {
-        todo!() // TODO these function definitions are in 6.8.6; we can get to them later.
+        Ray::offset_ray_origin(self.pi, self.n, w)
     }
 
-    // TODO Could use a trait to "overload" offset_ray_origin() instead.
     pub fn offset_ray_origin_pt(&self, pt: Point3f) -> Point3f {
-        todo!()
+        self.offset_ray_origin(pt - self.p())
     }
 
     pub fn spawn_ray(&self, w: Vector3f) -> Ray {

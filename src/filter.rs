@@ -1,4 +1,6 @@
 use crate::{
+    loading::paramdict::ParameterDictionary,
+    loading::parser_target::FileLoc,
     math::lerp,
     vecmath::{Point2f, Tuple2, Vector2f},
     Float,
@@ -14,9 +16,18 @@ pub trait FilterI {
     fn sample(&self, u: Point2f) -> FilterSample;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Filter {
     BoxFilter(BoxFilter),
+}
+
+impl Filter {
+    pub fn create(name: &str, parameters: &mut ParameterDictionary, loc: &FileLoc) -> Filter {
+        match name {
+            "box" => Filter::BoxFilter(BoxFilter::create(parameters, loc)),
+            _ => panic!("Unknown filter type!"),
+        }
+    }
 }
 
 impl FilterI for Filter {
@@ -48,12 +59,20 @@ impl FilterI for Filter {
 /// Equivalent to not addressing filtering or reconstruction.
 /// Other filters tend to be better; its simplicity is computationally efficient.
 /// Equally weights all samples within a square region of an image.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoxFilter {
     radius: Vector2f,
 }
 
 impl BoxFilter {
+    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> BoxFilter {
+        let xw = parameters.get_one_float("xradius", 0.5);
+        let yw = parameters.get_one_float("yradius", 0.5);
+        BoxFilter {
+            radius: Vector2f { x: xw, y: yw },
+        }
+    }
+
     pub fn new(radius: Vector2f) -> BoxFilter {
         BoxFilter { radius }
     }

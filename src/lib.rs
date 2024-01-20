@@ -1,5 +1,7 @@
 // TODO these shouldn't all be public; reorganize.
 
+#![feature(get_mut_unchecked)]
+
 pub mod aggregate;
 pub mod bounding_box;
 pub mod bsdf;
@@ -9,6 +11,7 @@ pub mod color;
 pub mod colorspace;
 pub mod compensated_float;
 pub mod direction_cone;
+mod file;
 pub mod film;
 pub mod filter;
 pub mod float;
@@ -20,12 +23,14 @@ pub mod interval;
 pub mod is_nan;
 pub mod light;
 pub mod light_sampler;
+mod loading;
 pub mod material;
 pub mod math;
 pub mod medium;
 pub mod options;
 pub mod primitive;
 pub mod ray;
+mod render;
 pub mod rgb_to_spectra;
 pub mod sampler;
 pub mod sampling;

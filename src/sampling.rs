@@ -4,7 +4,7 @@ use crate::{
     camera::CameraSample,
     filter::{Filter, FilterI},
     float::{next_float_down, Float, PI_F},
-    math::{lerp, safe_sqrt, DifferenceOfProducts, INV_2PI, INV_PI, PI_OVER_2, PI_OVER_4},
+    math::{lerp, safe_sqrt, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4},
     options::Options,
     sampler::SamplerI,
     vecmath::{
@@ -119,6 +119,10 @@ pub fn sample_uniform_sphere(u: Point2f) -> Vector3f {
     }
 }
 
+pub fn uniform_sphere_pdf() -> Float {
+    INV_4PI
+}
+
 pub fn sample_uniform_hemisphere(u: Point2f) -> Vector3f {
     let z = u[0];
     let r = safe_sqrt(1.0 - z * z);
@@ -154,7 +158,7 @@ pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
     if u_offset.x == 0.0 && u_offset.y == 0.0 {
         return Point2f::ZERO;
     }
-    let (theta, r) = if u_offset.x.abs() > u_offset.y.abs() {
+    let (r, theta) = if u_offset.x.abs() > u_offset.y.abs() {
         (u_offset.x, PI_OVER_4 * (u_offset.y / u_offset.x))
     } else {
         (

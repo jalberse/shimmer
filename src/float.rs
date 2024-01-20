@@ -50,36 +50,39 @@ pub fn bits_to_float(ui: FloatAsBits) -> Float {
 
 /// Bump a floating-point value up to the next greater representable
 /// floating-point value.
-pub fn next_float_up(v: Float) -> Float {
+pub fn next_float_up(mut v: Float) -> Float {
     if v.is_infinite() && v > 0.0 {
-        v
-    } else {
-        let new_v = if v == -0.0 { 0.0 } else { v };
-        let mut ui: FloatAsBits = float_to_bits(new_v);
-        if new_v >= 0.0 {
-            ui += 1;
-        } else {
-            ui -= 1;
-        }
-        bits_to_float(ui)
+        return v;
     }
+    if v == -0.0 {
+        v = 0.0;
+    }
+
+    let mut ui: FloatAsBits = float_to_bits(v);
+    if v >= 0.0 {
+        ui += 1;
+    } else {
+        ui -= 1;
+    }
+    bits_to_float(ui)
 }
 
 /// Bump a floating-point value down to the next smaller representable
 /// floating-point value.
-pub fn next_float_down(v: Float) -> Float {
+pub fn next_float_down(mut v: Float) -> Float {
     if v.is_infinite() && v < 0.0 {
-        v
-    } else {
-        let new_v = if v == 0.0 { -0.0 } else { v };
-        let mut ui: FloatAsBits = float_to_bits(new_v);
-        if new_v > 0.0 {
-            ui -= 1;
-        } else {
-            ui += 1;
-        }
-        bits_to_float(ui)
+        return v;
     }
+    if v == 0.0 {
+        v = -0.0;
+    }
+    let mut ui: FloatAsBits = float_to_bits(v);
+    if v > 0.0 {
+        ui -= 1;
+    } else {
+        ui += 1;
+    }
+    bits_to_float(ui)
 }
 
 pub fn gamma(n: i32) -> Float {
