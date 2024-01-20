@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     ops::{Index, IndexMut},
     path::Path,
     sync::{atomic, Arc},
@@ -27,7 +28,7 @@ use crate::{
     Float,
 };
 
-use log::warn;
+use log::{debug, info, log, trace, warn};
 use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
@@ -458,6 +459,80 @@ impl BasicScene {
         //  This is fine for now.
         self.textures.clone()
     }
+
+    // Returns a vector of the lights, and a map from shape index to lights.
+    pub fn create_lights(
+        &self,
+        textures: &NamedTextures,
+        string_interner: &StringInterner,
+    ) -> (Vec<Light>, HashMap<usize, Vec<Light>>) {
+        let mut shape_index_to_area_lights = HashMap::new();
+        // TODO We'll want to handle media and alpha textures, but hold off for now.
+
+        let mut lights = Vec::new();
+
+        for i in 0..self.shapes.len() {
+            let shape = &self.shapes[i];
+
+            if shape.light_index == -1 {
+                continue;
+            }
+
+            let material_name = if !shape.material_name.is_empty() {
+                let material = self
+                    .named_materials
+                    .iter()
+                    .find(|m| m.0 == shape.material_name);
+                if material.is_none() {
+                    panic!(
+                        "{}: Couldn't find named material {}.",
+                        shape.base.loc, shape.material_name
+                    );
+                }
+                let material = material.unwrap();
+                assert!(
+                    material
+                        .1
+                        .parameters
+                        .get_one_string("type", "".to_owned())
+                        .len()
+                        > 0
+                );
+                material.1.parameters.get_one_string("type", "".to_owned())
+            } else {
+                assert!(
+                    shape.material_index >= 0
+                        && (shape.material_index as usize) < self.materials.len()
+                );
+                string_interner
+                    .resolve(self.materials[shape.material_index as usize].name)
+                    .unwrap()
+                    .to_owned()
+            };
+
+            if material_name == "interface" || material_name == "none" || material_name == "" {
+                warn!(
+                    "{}: Ignoring area light specification for shape with interface material",
+                    shape.base.loc
+                );
+                continue;
+            }
+
+            // TODO Create shape_objects
+
+            // TODO Create alpha_texture
+
+            // TODO create medium_interface
+
+            // TODO create
+        }
+        trace!("Finished area lights");
+
+        // TODO If we switch to asynch, we can consume the futures here.
+        // TODO Create non-area lights
+
+        todo!()
+    }
 }
 
 /// All objects in the scene are described by various *Entity classes.
@@ -497,7 +572,7 @@ pub struct ShapeSceneEntity {
     // TODO It should be one of these two - enum?
     // It just makes instatiation a bit more complex
     material_index: i32,
-    mateiral_name: String,
+    material_name: String,
     light_index: i32,
     inside_medium: String,
     outside_medium: String,
@@ -821,7 +896,7 @@ impl ParserTarget for BasicSceneBuilder {
                 object_from_render: Arc::new(object_from_render),
                 reverse_orientation: self.graphics_state.reverse_orientation,
                 material_index: self.graphics_state.current_material_index,
-                mateiral_name: self.graphics_state.current_named_material.clone(),
+                material_name: self.graphics_state.current_named_material.clone(),
                 light_index: area_light_index,
                 inside_medium: self.graphics_state.current_inside_medium.clone(),
                 outside_medium: self.graphics_state.current_outside_medium.clone(),

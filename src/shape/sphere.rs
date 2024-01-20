@@ -5,6 +5,7 @@ use crate::{
     frame::Frame,
     interaction::{Interaction, SurfaceInteraction},
     interval::Interval,
+    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
     math::{radians, safe_acos, safe_sqrt, DifferenceOfProducts, Sqrt},
     ray::Ray,
     sampling::sample_uniform_sphere,
@@ -44,6 +45,28 @@ pub struct Sphere {
 }
 
 impl Sphere {
+    pub fn create(
+        render_from_object: &Transform,
+        object_from_render: &Transform,
+        reverse_orientation: bool,
+        parameters: &ParameterDictionary,
+        loc: &FileLoc,
+    ) -> Sphere {
+        let radius = parameters.get_one_float("radius", 1.0);
+        let z_min = parameters.get_one_float("zmin", -radius);
+        let z_max = parameters.get_one_float("zmax", radius);
+        let phi_max = parameters.get_one_float("phimax", 360.0);
+        Sphere::new(
+            render_from_object.clone(),
+            object_from_render.clone(),
+            reverse_orientation,
+            radius,
+            z_min,
+            z_max,
+            phi_max,
+        )
+    }
+
     pub fn new(
         render_from_object: Transform,
         object_from_render: Transform,
