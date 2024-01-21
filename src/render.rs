@@ -19,6 +19,9 @@ pub fn render_cpu(scene: &mut BasicScene, options: &Options) {
     info!("Done creating lights.");
 
     // TODO Create materials
+    info!("Creating materials...");
+    let (named_materials, materials) = scene.create_materials(&textures, &string_interner, options);
+    info!("Done creating materials.");
 
     // TODO Create aggregate
 

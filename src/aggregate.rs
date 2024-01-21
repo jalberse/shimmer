@@ -561,8 +561,10 @@ mod tests {
             360.0,
         );
         let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
-        let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+            value: cs,
+        }));
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
         let prim = Arc::new(Primitive::Simple(SimplePrimitive {
             shape: Arc::new(Shape::Sphere(sphere)),
             material,
@@ -589,8 +591,10 @@ mod tests {
             360.0,
         );
         let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
-        let kd = crate::texture::SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+            value: cs,
+        }));
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
         let prim = Arc::new(Primitive::Simple(SimplePrimitive {
             shape: Arc::new(Shape::Sphere(sphere)),
             material,
@@ -631,8 +635,10 @@ mod tests {
                 360.0,
             );
             let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
-            let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+                value: cs,
+            }));
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
             let prim = Arc::new(Primitive::Simple(SimplePrimitive {
                 shape: Arc::new(Shape::Sphere(sphere)),
                 material,

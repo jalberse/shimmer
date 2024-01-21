@@ -127,8 +127,10 @@ fn one_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     )));
 
     let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
-    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+    let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+        value: cs,
+    }));
+    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
 
     let diffuse_sphere_primitive = GeometricPrimitive::new(sphere, material, None);
     let mut prims = Vec::new();
@@ -221,8 +223,10 @@ fn get_tri_mesh_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     ));
 
     let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
-    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+    let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+        value: cs,
+    }));
+    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
 
     let tris = Triangle::create_triangles(mesh);
     let prims = tris
@@ -327,8 +331,10 @@ fn get_triangular_mesh_test_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     ));
 
     let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.7)));
-    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+    let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+        value: cs,
+    }));
+    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
 
     let tris = Triangle::create_triangles(mesh);
     let mut prims = tris
@@ -436,8 +442,10 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             )));
 
             let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
-            let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+                value: cs,
+            }));
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
 
             let sphere_light_primitive =
                 GeometricPrimitive::new(sphere, material, Some(area_light.clone()));
@@ -468,8 +476,10 @@ fn get_random_sphere_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
             )));
 
             let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
-            let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+                value: cs,
+            }));
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
             let sphere_primitive =
                 Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
             sphere_prims.push(Arc::new(sphere_primitive));
@@ -519,8 +529,10 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         )));
 
         let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5)));
-        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+            value: cs,
+        }));
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
 
         let sphere_light_primitive =
             GeometricPrimitive::new(sphere, material, Some(area_light.clone()));
@@ -549,8 +561,10 @@ fn two_spheres_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
         )));
 
         let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
-        let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+        let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+            value: cs,
+        }));
+        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
         let sphere_primitive =
             Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
         sphere_prims.push(Arc::new(sphere_primitive));
@@ -610,8 +624,10 @@ fn two_triangles_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     ));
 
     let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.7)));
-    let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+    let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+        value: cs,
+    }));
+    let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
 
     let light_tris = Triangle::create_triangles(light_mesh);
 
@@ -702,8 +718,10 @@ fn get_random_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>)
             )));
 
             let cs = Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.6)));
-            let kd = SpectrumTexture::Constant(SpectrumConstantTexture { value: cs });
-            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd)));
+            let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
+                value: cs,
+            }));
+            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
             let sphere_primitive =
                 Primitive::Geometric(GeometricPrimitive::new(sphere, material, None));
             sphere_prims.push(Arc::new(sphere_primitive));

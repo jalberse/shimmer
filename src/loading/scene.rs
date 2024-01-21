@@ -17,6 +17,7 @@ use crate::{
     light::Light,
     loading::paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
     loading::parser_target::{FileLoc, ParsedParameterVector, ParserTarget},
+    material::Material,
     options::Options,
     sampler::Sampler,
     shape::Shape,
@@ -29,6 +30,7 @@ use crate::{
     Float,
 };
 
+use itertools::Itertools;
 use log::{debug, info, log, trace, warn};
 use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
@@ -50,7 +52,7 @@ pub struct BasicScene {
     named_materials: Vec<(String, SceneEntity)>,
     materials: Vec<SceneEntity>,
     area_lights: Vec<SceneEntity>,
-    normal_maps: HashMap<String, Box<Image>>,
+    normal_maps: HashMap<String, Arc<Image>>,
     serial_float_textures: Vec<(String, TextureSceneEntity)>,
     serial_spectrum_textures: Vec<(String, TextureSceneEntity)>,
     async_spectrum_textures: Vec<(String, TextureSceneEntity)>,
@@ -335,7 +337,7 @@ impl BasicScene {
                 filename.display()
             );
         }
-        let image = Box::new(image);
+        let image = Arc::new(image);
         self.normal_maps.insert(normal_map_filename, image);
     }
 
@@ -566,6 +568,86 @@ impl BasicScene {
         //   We can switch to make lights vec in this fn though when we parallelize,
         //   which obviates this issue.
         (self.lights.clone(), shape_index_to_area_lights)
+    }
+
+    /// Returns a tuple with a map of named materials, and a vec of unnamed materials.
+    pub fn create_materials(
+        &mut self,
+        textures: &NamedTextures,
+        string_interner: &StringInterner,
+        options: &Options,
+    ) -> (HashMap<String, Arc<Material>>, Vec<Arc<Material>>) {
+        // TODO Note that we'd create normal_maps here if/when we parallelize.
+        //  For now they're already been loaded into self.normal_maps.
+
+        let mut named_materials_out: HashMap<String, Arc<Material>> = HashMap::new();
+        for (name, material) in &mut self.named_materials {
+            if named_materials_out.iter().find(|nm| nm.0 == name).is_some() {
+                panic!("{}: Named material {} redefined.", material.loc, name);
+            }
+
+            let ty = material.parameters.get_one_string("type", "".to_owned());
+            if ty.is_empty() {
+                panic!("{}: No type specified for material {}", material.loc, name);
+            }
+
+            let filename = resolve_filename(
+                options,
+                &material
+                    .parameters
+                    .get_one_string("normalmap", "".to_owned()),
+            );
+            let normal_map = if filename.is_empty() {
+                None
+            } else {
+                let image = self.normal_maps.get(&filename);
+                if image.is_none() {
+                    panic!("{}: Normal map \"{}\" not found.", material.loc, filename);
+                }
+                Some(image.unwrap().clone())
+            };
+
+            let mut tex_dict = TextureParameterDictionary::new(material.parameters.clone());
+            let m = Arc::new(Material::create(
+                name,
+                &mut tex_dict,
+                textures,
+                normal_map,
+                &mut named_materials_out,
+                &material.loc,
+            ));
+            named_materials_out.insert(name.to_string(), m);
+        }
+
+        let mut materials_out = Vec::with_capacity(self.materials.len());
+        for mtl in &mut self.materials {
+            let filename = resolve_filename(
+                options,
+                &mtl.parameters.get_one_string("normalmap", "".to_owned()),
+            );
+            let normal_map = if filename.is_empty() {
+                None
+            } else {
+                let image = self.normal_maps.get(&filename);
+                if image.is_none() {
+                    panic!("{}: Normal map \"{}\" not found.", mtl.loc, filename);
+                }
+                Some(image.unwrap().clone())
+            };
+
+            let mut tex_dict = TextureParameterDictionary::new(mtl.parameters.clone());
+            let m = Arc::new(Material::create(
+                string_interner.resolve(mtl.name).unwrap(),
+                &mut tex_dict,
+                textures,
+                normal_map,
+                &mut named_materials_out,
+                &mtl.loc,
+            ));
+            materials_out.push(m);
+        }
+
+        (named_materials_out, materials_out)
     }
 }
 

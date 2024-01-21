@@ -1,10 +1,22 @@
+use std::{collections::HashMap, sync::Arc};
+
 use crate::{
     bsdf::BSDF,
     bxdf::{BxDF, DiffuseBxDF},
     image::Image,
     interaction::SurfaceInteraction,
-    spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
-    texture::{FloatTexture, FloatTextureI, SpectrumTexture, SpectrumTextureI, TextureEvalContext},
+    loading::{
+        paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary},
+        parser_target::FileLoc,
+    },
+    spectra::{
+        sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
+        ConstantSpectrum, Spectrum,
+    },
+    texture::{
+        FloatTexture, FloatTextureI, SpectrumConstantTexture, SpectrumTexture, SpectrumTextureI,
+        TextureEvalContext,
+    },
     vecmath::{Normal3f, Vector3f},
     Float,
 };
@@ -43,6 +55,25 @@ pub trait MaterialI {
 #[derive(Debug)]
 pub enum Material {
     Diffuse(DiffuseMaterial),
+}
+
+impl Material {
+    pub fn create(
+        name: &str,
+        parameters: &mut TextureParameterDictionary,
+        textures: &NamedTextures,
+        normal_map: Option<Arc<Image>>,
+        named_materials: &HashMap<String, Arc<Material>>,
+        loc: &FileLoc,
+    ) -> Material {
+        let material = match name {
+            "diffuse" => {
+                todo!()
+            }
+            _ => panic!("Material {} unknown.", name),
+        };
+        material
+    }
 }
 
 impl MaterialI for Material {
@@ -101,13 +132,48 @@ impl MaterialI for Material {
 
 #[derive(Debug)]
 pub struct DiffuseMaterial {
-    reflectance: SpectrumTexture,
-    // TODO Add normal map and bump map, and update the getters for those.
+    reflectance: Arc<SpectrumTexture>,
+    displacement: Option<Arc<FloatTexture>>,
+    normal_map: Option<Arc<Image>>,
 }
 
 impl DiffuseMaterial {
-    pub fn new(reflectance: SpectrumTexture) -> DiffuseMaterial {
-        DiffuseMaterial { reflectance }
+    pub fn create(
+        parameters: &mut TextureParameterDictionary,
+        textures: &NamedTextures,
+        normal_map: Option<Arc<Image>>,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        loc: &FileLoc,
+    ) -> DiffuseMaterial {
+        let reflectance = parameters.get_spectrum_texture(
+            "reflectance",
+            None,
+            SpectrumType::Albedo,
+            cached_spectra,
+            textures,
+        );
+        let reflectance = if let Some(reflectance) = reflectance {
+            reflectance
+        } else {
+            Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture::new(
+                Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5))),
+            )))
+        };
+        let displacement = Some(parameters.get_float_texture("displacement", 0.0, textures));
+
+        DiffuseMaterial::new(reflectance, displacement, normal_map)
+    }
+
+    pub fn new(
+        reflectance: Arc<SpectrumTexture>,
+        displacement: Option<Arc<FloatTexture>>,
+        normal_map: Option<Arc<Image>>,
+    ) -> DiffuseMaterial {
+        DiffuseMaterial {
+            reflectance,
+            displacement,
+            normal_map,
+        }
     }
 }
 
