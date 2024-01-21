@@ -463,7 +463,7 @@ impl BasicScene {
 
     // Returns a vector of the lights, and a map from shape index to lights.
     pub fn create_lights(
-        &self,
+        &mut self,
         textures: &NamedTextures,
         string_interner: &StringInterner,
         options: &Options,
@@ -474,16 +474,16 @@ impl BasicScene {
         let mut lights = Vec::new();
 
         for i in 0..self.shapes.len() {
-            let shape = &self.shapes[i];
+            let shape = &mut self.shapes[i];
 
             if shape.light_index == -1 {
                 continue;
             }
 
             let material_name = if !shape.material_name.is_empty() {
-                let material = self
+                let mut material = self
                     .named_materials
-                    .iter()
+                    .iter_mut()
                     .find(|m| m.0 == shape.material_name);
                 if material.is_none() {
                     panic!(
@@ -491,7 +491,7 @@ impl BasicScene {
                         shape.base.loc, shape.material_name
                     );
                 }
-                let material = material.unwrap();
+                let material = material.as_mut().unwrap();
                 assert!(
                     material
                         .1
@@ -525,7 +525,7 @@ impl BasicScene {
                 &shape.render_from_object,
                 &shape.object_from_render,
                 shape.reverse_orientation,
-                &shape.base.parameters,
+                &mut shape.base.parameters,
                 &textures.float_textures,
                 &shape.base.loc,
             );
@@ -534,29 +534,32 @@ impl BasicScene {
             let alpha = shape.base.parameters.get_one_float("alpha", 1.0);
             let alpha = Arc::new(FloatTexture::Constant(FloatConstantTexture::new(alpha)));
 
-            let shape_lights = Vec::new();
-            let area_light_entity = &self.area_lights[shape.light_index as usize];
+            // TODO create medium_interface
+
+            let mut shape_lights = Vec::new();
+            let area_light_entity = &mut self.area_lights[shape.light_index as usize];
             for ps in shape_objects.iter() {
-                let area = Light::create_area(
+                let area = Arc::new(Light::create_area(
                     string_interner.resolve(area_light_entity.name).unwrap(),
                     &mut area_light_entity.parameters,
                     shape.render_from_object,
                     ps.clone(),
-                    alpha,
+                    alpha.clone(),
                     &area_light_entity.loc,
                     options,
-                );
+                ));
+
+                lights.push(area.clone());
+                shape_lights.push(area);
             }
 
-            // TODO Create alpha_texture
-            // TODO create medium_interface
-
-            // TODO create
+            shape_index_to_area_lights.insert(i, shape_lights);
         }
         trace!("Finished area lights");
 
         // TODO If we switch to asynch, we can consume the futures here.
         // TODO Create non-area lights
+        //   Look at light_jobs and do that. We might do that serially, earlier though...
 
         todo!()
     }

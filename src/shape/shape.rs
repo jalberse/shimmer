@@ -73,7 +73,7 @@ impl Shape {
         render_from_object: &Transform,
         object_from_render: &Transform,
         reverse_orientation: bool,
-        parameters: &ParameterDictionary,
+        parameters: &mut ParameterDictionary,
         float_textures: &HashMap<String, Arc<FloatTexture>>,
         loc: &FileLoc,
     ) -> Vec<Arc<Shape>> {

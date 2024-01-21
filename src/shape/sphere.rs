@@ -49,7 +49,7 @@ impl Sphere {
         render_from_object: &Transform,
         object_from_render: &Transform,
         reverse_orientation: bool,
-        parameters: &ParameterDictionary,
+        parameters: &mut ParameterDictionary,
         loc: &FileLoc,
     ) -> Sphere {
         let radius = parameters.get_one_float("radius", 1.0);

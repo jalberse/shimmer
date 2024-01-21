@@ -56,7 +56,7 @@ impl Triangle {
     pub fn create_mesh(
         render_from_object: &Transform,
         reverse_orientation: bool,
-        parameters: &ParameterDictionary,
+        parameters: &mut ParameterDictionary,
         loc: &FileLoc,
     ) -> TriangleMesh {
         let mut vi = parameters.get_int_array("indices");
