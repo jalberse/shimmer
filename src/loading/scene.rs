@@ -532,13 +532,13 @@ impl BasicScene {
 
             // TODO Support an alpha texture if parameters.get_texture("alpha") is specified.
             let alpha = shape.base.parameters.get_one_float("alpha", 1.0);
-            let alpha = Arc::new(FloatConstantTexture::new(alpha));
+            let alpha = Arc::new(FloatTexture::Constant(FloatConstantTexture::new(alpha)));
 
             let shape_lights = Vec::new();
             let area_light_entity = &self.area_lights[shape.light_index as usize];
             for ps in shape_objects.iter() {
                 let area = Light::create_area(
-                    area_light_entity.name,
+                    string_interner.resolve(area_light_entity.name).unwrap(),
                     &mut area_light_entity.parameters,
                     shape.render_from_object,
                     ps.clone(),
@@ -593,8 +593,8 @@ impl SceneEntity {
 #[derive(Debug, Clone)]
 pub struct ShapeSceneEntity {
     base: SceneEntity,
-    render_from_object: Arc<Transform>,
-    object_from_render: Arc<Transform>,
+    render_from_object: Transform,
+    object_from_render: Transform,
     reverse_orientation: bool,
     // TODO It should be one of these two - enum?
     // It just makes instatiation a bit more complex
@@ -919,8 +919,8 @@ impl ParserTarget for BasicSceneBuilder {
 
             let entity = ShapeSceneEntity {
                 base: SceneEntity::new(name, loc, dict, string_interner),
-                render_from_object: Arc::new(render_from_object),
-                object_from_render: Arc::new(object_from_render),
+                render_from_object: render_from_object,
+                object_from_render: object_from_render,
                 reverse_orientation: self.graphics_state.reverse_orientation,
                 material_index: self.graphics_state.current_material_index,
                 material_name: self.graphics_state.current_named_material.clone(),
