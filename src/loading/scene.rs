@@ -59,7 +59,7 @@ pub struct BasicScene {
     // TODO When we switch to asynch, we will load all of these at once in parallel
     //   in create_textures(), create_lights() etc. For now, just load as we parse into this.
     textures: NamedTextures,
-    lights: Vec<Light>,
+    lights: Vec<Arc<Light>>,
 }
 
 impl BasicScene {
@@ -274,9 +274,10 @@ impl BasicScene {
     ) {
         // TODO Get medium, when I add mediums - will replace none below.
         // TODO Check for animated light and warn, when I add animated transforms.
-        // TODO Change to async
 
-        self.lights.push(Light::create(
+        // TODO Change to async, or otherwise parallelize (i.e. could place these
+        //  params into a vec, and consume that vec in a par_iter() in create_lights).
+        self.lights.push(Arc::new(Light::create(
             string_interner
                 .resolve(light.base.base.name)
                 .expect("Unknown symbol"),
@@ -287,7 +288,7 @@ impl BasicScene {
             &light.base.base.loc,
             cached_spectra,
             options,
-        ));
+        )));
     }
 
     /// Returns the new area light index.
@@ -467,7 +468,7 @@ impl BasicScene {
         textures: &NamedTextures,
         string_interner: &StringInterner,
         options: &Options,
-    ) -> (Vec<Light>, HashMap<usize, Vec<Light>>) {
+    ) -> (Vec<Arc<Light>>, HashMap<usize, Vec<Arc<Light>>>) {
         let mut shape_index_to_area_lights = HashMap::new();
         // TODO We'll want to handle media and alpha textures, but hold off for now.
 
@@ -557,11 +558,14 @@ impl BasicScene {
         }
         trace!("Finished area lights");
 
-        // TODO If we switch to asynch, we can consume the futures here.
-        // TODO Create non-area lights
-        //   Look at light_jobs and do that. We might do that serially, earlier though...
+        // TODO We could create other lights in parallel here;
+        //  for now, we are creating them in add_light() in self.lights.
+        self.lights.append(&mut lights);
 
-        todo!()
+        // TODO We'd rather move self.lights out rather than an expensive clone.
+        //   We can switch to make lights vec in this fn though when we parallelize,
+        //   which obviates this issue.
+        (self.lights.clone(), shape_index_to_area_lights)
     }
 }
 
