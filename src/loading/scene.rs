@@ -19,9 +19,10 @@ use crate::{
     loading::parser_target::{FileLoc, ParsedParameterVector, ParserTarget},
     options::Options,
     sampler::Sampler,
+    shape::Shape,
     spectra::spectrum,
     square_matrix::SquareMatrix,
-    texture::{FloatTexture, SpectrumTexture},
+    texture::{FloatConstantTexture, FloatTexture, SpectrumTexture},
     transform::Transform,
     util::normalize_arg,
     vecmath::{Point3f, Tuple3, Vector3f},
@@ -465,6 +466,7 @@ impl BasicScene {
         &self,
         textures: &NamedTextures,
         string_interner: &StringInterner,
+        options: &Options,
     ) -> (Vec<Light>, HashMap<usize, Vec<Light>>) {
         let mut shape_index_to_area_lights = HashMap::new();
         // TODO We'll want to handle media and alpha textures, but hold off for now.
@@ -518,10 +520,35 @@ impl BasicScene {
                 continue;
             }
 
-            // TODO Create shape_objects
+            let shape_objects = Shape::create(
+                string_interner.resolve(shape.base.name).unwrap(),
+                &shape.render_from_object,
+                &shape.object_from_render,
+                shape.reverse_orientation,
+                &shape.base.parameters,
+                &textures.float_textures,
+                &shape.base.loc,
+            );
+
+            // TODO Support an alpha texture if parameters.get_texture("alpha") is specified.
+            let alpha = shape.base.parameters.get_one_float("alpha", 1.0);
+            let alpha = Arc::new(FloatConstantTexture::new(alpha));
+
+            let shape_lights = Vec::new();
+            let area_light_entity = &self.area_lights[shape.light_index as usize];
+            for ps in shape_objects.iter() {
+                let area = Light::create_area(
+                    area_light_entity.name,
+                    &mut area_light_entity.parameters,
+                    shape.render_from_object,
+                    ps.clone(),
+                    alpha,
+                    &area_light_entity.loc,
+                    options,
+                );
+            }
 
             // TODO Create alpha_texture
-
             // TODO create medium_interface
 
             // TODO create
