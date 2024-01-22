@@ -9,6 +9,7 @@ use std::{
 
 use itertools::Itertools;
 use rand::Rng;
+use rayon::string;
 use shimmer::{
     float::PI_F,
     light::{DiffuseAreaLight, Light, UniformInfiniteLight},
@@ -27,17 +28,19 @@ use shimmer::{
     vecmath::{spherical::spherical_direction, Point3f, Tuple3, Vector3f},
     Float,
 };
+use string_interner::StringInterner;
 
 fn main() {
     // TODO Parse from command line.
     let mut options = Options::default();
     let file = fs::read_to_string("scenes/test.pbrt").unwrap();
     let scene = Box::new(BasicScene::default());
-    let mut scene_builder = BasicSceneBuilder::new(scene);
+    let mut string_interner = StringInterner::new();
+    let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner);
     parser::parse_str(&file, &mut scene_builder, &mut options);
     let scene = scene_builder.done();
 
-    render::render_cpu(scene, &options);
+    render::render_cpu(scene, &options, &mut string_interner);
 }
 
 fn one_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {

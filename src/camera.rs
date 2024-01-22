@@ -507,6 +507,15 @@ pub struct CameraTransform {
     world_from_render: Transform,
 }
 
+impl Default for CameraTransform {
+    fn default() -> Self {
+        Self {
+            render_from_camera: Transform::default(),
+            world_from_render: Transform::default(),
+        }
+    }
+}
+
 impl CameraTransform {
     pub fn new(world_from_camera: &Transform, options: &Options) -> CameraTransform {
         // TODO would need to update this for AnimatedTransform

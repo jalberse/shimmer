@@ -5,15 +5,18 @@ use string_interner::StringInterner;
 
 use crate::{loading::scene::BasicScene, options::Options};
 
-pub fn render_cpu(mut scene: Box<BasicScene>, options: &Options) {
+pub fn render_cpu(
+    mut scene: Box<BasicScene>,
+    options: &Options,
+    string_interner: &mut StringInterner,
+) {
     let mut cached_spectra = HashMap::new();
-    let mut string_interner = StringInterner::new();
 
     // TODO Create media from scene; use an empty map for now.
     let media = HashMap::new();
 
     info!("Creating textures...");
-    let textures = scene.create_textures(&mut cached_spectra, &mut string_interner);
+    let textures = scene.create_textures(&mut cached_spectra, string_interner);
     info!("Done creating textures.");
 
     info!("Creating lights...");

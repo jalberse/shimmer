@@ -37,7 +37,7 @@ use log::{trace, warn};
 use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
-use super::paramdict::SpectrumType;
+use super::{param::Param, paramdict::SpectrumType};
 
 // TODO If/when we make this multi-threaded, most of these will be within a Mutex.
 //      For now, code it sequentially.
@@ -1168,12 +1168,12 @@ pub struct BasicSceneBuilder {
     instance_names: HashSet<String>,
 
     current_material_index: i32,
-    sampler: Option<SceneEntity>,
-    film: Option<SceneEntity>,
-    integrator: Option<SceneEntity>,
-    filter: Option<SceneEntity>,
-    accelerator: Option<SceneEntity>,
-    camera: Option<CameraSceneEntity>,
+    sampler: SceneEntity,
+    film: SceneEntity,
+    integrator: SceneEntity,
+    filter: SceneEntity,
+    accelerator: SceneEntity,
+    camera: CameraSceneEntity,
 
     active_instance_definition: Option<ActiveInstanceDefinition>,
 }
@@ -1183,8 +1183,56 @@ impl BasicSceneBuilder {
     const END_TRANSFORM_BITS: u32 = 1 << 1;
     const ALL_TRANSFORM_BITS: u32 = (1 << MAX_TRANSFORMS) - 1;
 
-    pub fn new(scene: Box<BasicScene>) -> BasicSceneBuilder {
-        BasicSceneBuilder {
+    pub fn new(scene: Box<BasicScene>, string_interner: &mut StringInterner) -> BasicSceneBuilder {
+        // TODO Rather than Optional SceneEntities, we need to instantiate them here.
+        //   PBRT provides some defaults for their names, I guess...
+
+        // TODO Update default to zsobol
+        let sampler = SceneEntity {
+            name: string_interner.get_or_intern("independent"),
+            loc: FileLoc::default(),
+            parameters: ParameterDictionary::default(),
+        };
+
+        let film = SceneEntity {
+            name: string_interner.get_or_intern("rgb"),
+            loc: FileLoc::default(),
+            parameters: ParameterDictionary::new(
+                ParsedParameterVector::new(),
+                RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+            ),
+        };
+
+        // TODO Change default to volpath when available.
+        let integrator = SceneEntity {
+            name: string_interner.get_or_intern("simplepath"),
+            loc: FileLoc::default(),
+            parameters: Default::default(),
+        };
+
+        // TODO Update default to gaussian when available
+        let filter = SceneEntity {
+            name: string_interner.get_or_intern("box"),
+            loc: FileLoc::default(),
+            parameters: Default::default(),
+        };
+
+        let accelerator = SceneEntity {
+            name: string_interner.get_or_intern("bvh"),
+            loc: FileLoc::default(),
+            parameters: Default::default(),
+        };
+
+        let camera = CameraSceneEntity {
+            base: SceneEntity {
+                name: string_interner.get_or_intern("perspective"),
+                loc: FileLoc::default(),
+                parameters: Default::default(),
+            },
+            camera_transform: CameraTransform::default(),
+        };
+
+        let mut builder = BasicSceneBuilder {
             scene,
             current_block: BlockState::OptionsBlock,
             graphics_state: GraphicsState::default(),
@@ -1200,14 +1248,23 @@ impl BasicSceneBuilder {
             spectrum_texture_names: HashSet::new(),
             instance_names: HashSet::new(),
             current_material_index: 0,
-            sampler: None,
-            film: None,
-            integrator: None,
-            filter: None,
-            accelerator: None,
-            camera: None,
+            sampler,
+            film,
+            integrator,
+            filter,
+            accelerator,
+            camera,
             active_instance_definition: None,
-        }
+        };
+
+        let dict = ParameterDictionary::new(
+            ParsedParameterVector::new(),
+            RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+        );
+        let diffuse = SceneEntity::new("diffuse", FileLoc::default(), dict, string_interner);
+        builder.current_material_index = builder.scene.add_material(diffuse);
+
+        builder
     }
 
     /// Drops self, returning the scene.
@@ -1480,7 +1537,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.filter = Some(SceneEntity::new(name, loc, dict, string_interner));
+        self.filter = SceneEntity::new(name, loc, dict, string_interner);
     }
 
     fn film(
@@ -1492,7 +1549,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.film = Some(SceneEntity::new(film_type, loc, dict, string_interner));
+        self.film = SceneEntity::new(film_type, loc, dict, string_interner);
     }
 
     fn accelerator(
@@ -1504,7 +1561,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.accelerator = Some(SceneEntity::new(name, loc, dict, string_interner));
+        self.accelerator = SceneEntity::new(name, loc, dict, string_interner);
     }
 
     fn integrator(
@@ -1516,7 +1573,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.integrator = Some(SceneEntity::new(name, loc, dict, string_interner));
+        self.integrator = SceneEntity::new(name, loc, dict, string_interner);
     }
 
     fn camera(
@@ -1538,10 +1595,10 @@ impl ParserTarget for BasicSceneBuilder {
 
         self.render_from_world = camera_transform.render_from_world();
 
-        self.camera = Some(CameraSceneEntity {
+        self.camera = CameraSceneEntity {
             base: SceneEntity::new(name, loc, dict, string_interner),
             camera_transform,
-        });
+        };
     }
 
     fn make_named_medium(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc) {
@@ -1561,7 +1618,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.sampler = Some(SceneEntity::new(name, loc, dict, string_interner));
+        self.sampler = SceneEntity::new(name, loc, dict, string_interner);
     }
 
     fn world_begin(
@@ -1580,12 +1637,12 @@ impl ParserTarget for BasicSceneBuilder {
 
         // Pass pre-world-begin entities to the scene
         self.scene.set_options(
-            self.filter.as_ref().unwrap().clone(),
-            self.film.as_ref().unwrap().clone(),
-            self.camera.as_ref().unwrap().clone(),
-            self.sampler.as_ref().unwrap().clone(),
-            self.integrator.as_ref().unwrap().clone(),
-            self.accelerator.as_ref().unwrap().clone(),
+            self.filter.clone(),
+            self.film.clone(),
+            self.camera.clone(),
+            self.sampler.clone(),
+            self.integrator.clone(),
+            self.accelerator.clone(),
             string_interner,
             options,
         );
