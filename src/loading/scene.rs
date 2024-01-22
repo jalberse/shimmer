@@ -355,6 +355,9 @@ impl BasicScene {
 
     fn load_normal_map(&mut self, parameters: &mut ParameterDictionary) {
         let normal_map_filename = parameters.get_one_string("normalmap", "".to_string());
+        if normal_map_filename.is_empty() {
+            return;
+        }
         let filename = Path::new(&normal_map_filename);
         if !filename.exists() {
             warn!("Normal map \"{}\" not found.", filename.display());
