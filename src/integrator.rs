@@ -10,12 +10,14 @@ use crate::{
     bounding_box::Bounds2i,
     bxdf::BxDFReflTransFlags,
     camera::{Camera, CameraI},
+    colorspace::RgbColorSpace,
     film::{FilmI, VisibleSurface},
     float::PI_F,
     image::ImageMetadata,
     interaction::Interaction,
     light::{Light, LightI, LightSampleContext, LightType},
     light_sampler::{LightSamplerI, UniformLightSampler},
+    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
     options::Options,
     primitive::{Primitive, PrimitiveI},
     ray::{Ray, RayDifferential},
@@ -30,6 +32,32 @@ use crate::{
     Float,
 };
 
+pub fn create_integrator(
+    name: &str,
+    parameters: &mut ParameterDictionary,
+    camera: Camera,
+    sampler: Sampler,
+    aggregate: Arc<Primitive>,
+    lights: Arc<Vec<Arc<Light>>>,
+    color_space: Arc<RgbColorSpace>,
+    loc: &FileLoc,
+) -> Box<dyn IntegratorI> {
+    let integrator = match name {
+        "simplepath" => Box::new(ImageTileIntegrator::create_simple_path_integrator(
+            parameters, camera, sampler, aggregate, lights, loc,
+        )),
+        "randomwalk" => Box::new(ImageTileIntegrator::create_random_walk_integrator(
+            parameters, camera, sampler, aggregate, lights, loc,
+        )),
+        _ => {
+            panic!("Unknown integrator {}", name);
+        }
+    };
+
+    // TODO report unused params
+    integrator
+}
+
 struct FilmSample {
     p_film: Point2i,
     l: SampledSpectrum,
@@ -38,15 +66,15 @@ struct FilmSample {
     weight: Float,
 }
 
-pub trait Integrator {
+pub trait IntegratorI {
     fn render(&mut self, options: &Options);
 }
 
 /// Integrators can have an IntegratorBase that provides shared data and functionality.
 pub struct IntegratorBase {
-    aggregate: Primitive,
+    aggregate: Arc<Primitive>,
     /// Contains both finite and infinite lights
-    lights: Vec<Arc<Light>>,
+    lights: Arc<Vec<Arc<Light>>>,
     /// Stores an additional copy of any infinite lights in their own vector.
     infinite_lights: Vec<Arc<Light>>,
 }
@@ -56,7 +84,7 @@ impl IntegratorBase {
 
     /// Creates an IntegratorBase from the given aggregate and lights.
     /// Also does pre-processing for the lights.
-    pub fn new(aggregate: Primitive, mut lights: Vec<Arc<Light>>) -> IntegratorBase {
+    pub fn new(aggregate: Arc<Primitive>, mut lights: Arc<Vec<Arc<Light>>>) -> IntegratorBase {
         let scene_bounds = aggregate.bounds();
 
         // TODO Is there a better alternative here that does not require get_mut_unchecked?
@@ -68,24 +96,26 @@ impl IntegratorBase {
         // 2. Defer wrapping the Lights in Arc until after this pre-processing step. But that would mean only
         //    keeping one copy - maybe we keep one copy of the area_light Arc in the aggregate (we could use get_mut() for that,
         //    which is stable), and then keep one copy of all other lights (point, infinite) in the lights vector.
+        //    Plus the lights in the light sampler.
         //    Then we can pre-process those while there's only one reference, and then copy the lights from the aggregate
         //    into the lights list (thereby making the second reference for those).
-        // I think that option 2 is probably best. We can just add a fn to the aggregate that returns the area lights,
+        // We almost certainly want to take advantage of interior mutability for this
+        //  instead; https://ricardomartins.cc/2016/06/08/interior-mutability
 
-        for light in &mut lights {
-            // Unsafe get_mut_unchecked() - If any other Arc or Weak pointers to the same allocation exist,
-            // then they must not be dereferenced or have active borrows for the duration.
-            // That should be okay here, because the only other Arcs to the same allocations
-            // are the ones in the aggregate (specifically area lights in geometry primitives),
-            // which we're not touching here.
-            unsafe {
+        // Unsafe get_mut_unchecked() - If any other Arc or Weak pointers to the same allocation exist,
+        // then they must not be dereferenced or have active borrows for the duration.
+        // That should be okay here, because the only other references to this same light
+        // should be in the aggregate and in the light sampler, which shouldn't
+        // be processed in parallel with this.
+        unsafe {
+            for light in Arc::get_mut_unchecked(&mut lights).iter_mut() {
                 Arc::get_mut_unchecked(light).preprocess(&scene_bounds);
             }
         }
 
         let mut infinite_lights = Vec::new();
 
-        for light in &lights {
+        for light in lights.as_ref() {
             if light.light_type() == LightType::Infinite {
                 infinite_lights.push(light.clone());
             }
@@ -127,9 +157,63 @@ pub struct ImageTileIntegrator {
 }
 
 impl ImageTileIntegrator {
+    pub fn create_simple_path_integrator(
+        parameters: &mut ParameterDictionary,
+        camera: Camera,
+        sampler: Sampler,
+        aggregate: Arc<Primitive>,
+        lights: Arc<Vec<Arc<Light>>>,
+        _loc: &FileLoc,
+    ) -> ImageTileIntegrator {
+        let max_depth = parameters.get_one_int("maxdepth", 5);
+        let sample_lights = parameters.get_one_bool("samplelights", true);
+        let sample_bsdf = parameters.get_one_bool("samplebsdf", true);
+        let light_sampler = UniformLightSampler {
+            lights: lights.clone(),
+        };
+
+        let pixel_sample_evaluator = PixelSampleEvaluator::SimplePath(SimplePathIntegrator {
+            max_depth,
+            sample_lights,
+            sample_bsdf,
+            light_sampler,
+        });
+
+        // TODO I dislike having to clone the sampler and camera.
+        ImageTileIntegrator::new(
+            aggregate,
+            lights,
+            camera.clone(),
+            sampler.clone(),
+            pixel_sample_evaluator,
+        )
+    }
+
+    pub fn create_random_walk_integrator(
+        parameters: &mut ParameterDictionary,
+        camera: Camera,
+        sampler: Sampler,
+        aggregate: Arc<Primitive>,
+        lights: Arc<Vec<Arc<Light>>>,
+        _loc: &FileLoc,
+    ) -> ImageTileIntegrator {
+        let max_depth = parameters.get_one_int("maxdepth", 5);
+        let pixel_sample_evaluator =
+            PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth });
+
+        // TODO I dislike having to clone the sampler and camera.
+        ImageTileIntegrator::new(
+            aggregate,
+            lights,
+            camera.clone(),
+            sampler.clone(),
+            pixel_sample_evaluator,
+        )
+    }
+
     pub fn new(
-        aggregate: Primitive,
-        lights: Vec<Arc<Light>>,
+        aggregate: Arc<Primitive>,
+        lights: Arc<Vec<Arc<Light>>>,
         camera: Camera,
         sampler: Sampler,
         pixel_sample_evaluator: PixelSampleEvaluator,
@@ -143,7 +227,7 @@ impl ImageTileIntegrator {
     }
 }
 
-impl Integrator for ImageTileIntegrator {
+impl IntegratorI for ImageTileIntegrator {
     fn render(&mut self, options: &Options) {
         let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();

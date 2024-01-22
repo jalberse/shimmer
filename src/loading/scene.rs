@@ -1,13 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hash,
     ops::{Index, IndexMut},
     path::Path,
     sync::{atomic, Arc},
 };
 
 use crate::{
-    aggregate::{self, create_accelerator, BvhAggregate},
+    aggregate::{create_accelerator, BvhAggregate},
     camera::{Camera, CameraI, CameraTransform},
     color::LinearColorEncoding,
     colorspace::RgbColorSpace,
@@ -15,6 +14,7 @@ use crate::{
     film::{Film, FilmI},
     filter::Filter,
     image::Image,
+    integrator::{create_integrator, IntegratorI},
     light::Light,
     loading::paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
     loading::parser_target::{FileLoc, ParsedParameterVector, ParserTarget},
@@ -33,8 +33,7 @@ use crate::{
     Float,
 };
 
-use itertools::Itertools;
-use log::{debug, info, log, trace, warn};
+use log::{trace, warn};
 use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
@@ -68,8 +67,16 @@ pub struct BasicScene {
 }
 
 impl BasicScene {
-    pub fn get_camera(&self) -> &Camera {
-        &self.camera
+    pub fn get_camera(&self) -> Camera {
+        self.camera.clone()
+    }
+
+    pub fn get_film(&self) -> Film {
+        self.film.clone()
+    }
+
+    pub fn get_sampler(&self) -> Sampler {
+        self.sampler.clone()
     }
 
     pub fn set_options(
@@ -473,7 +480,7 @@ impl BasicScene {
         textures: &NamedTextures,
         string_interner: &StringInterner,
         options: &Options,
-    ) -> (Vec<Arc<Light>>, HashMap<usize, Vec<Arc<Light>>>) {
+    ) -> (Arc<Vec<Arc<Light>>>, HashMap<usize, Vec<Arc<Light>>>) {
         let mut shape_index_to_area_lights = HashMap::new();
         // TODO We'll want to handle media and alpha textures, but hold off for now.
 
@@ -570,7 +577,7 @@ impl BasicScene {
         // TODO We'd rather move self.lights out rather than an expensive clone.
         //   We can switch to make lights vec in this fn though when we parallelize,
         //   which obviates this issue.
-        (self.lights.clone(), shape_index_to_area_lights)
+        (Arc::new(self.lights.clone()), shape_index_to_area_lights)
     }
 
     /// Returns a tuple with a map of named materials, and a vec of unnamed materials.
@@ -815,6 +822,26 @@ impl BasicScene {
         trace!("Finished top-level accelerator");
 
         aggregate
+    }
+
+    pub fn create_integrator(
+        &mut self,
+        camera: Camera,
+        sampler: Sampler,
+        accelerator: Arc<Primitive>,
+        lights: Arc<Vec<Arc<Light>>>,
+        string_interner: &StringInterner,
+    ) -> Box<dyn IntegratorI> {
+        create_integrator(
+            string_interner.resolve(self.integrator.name).unwrap(),
+            &mut self.integrator.parameters,
+            camera,
+            sampler,
+            accelerator,
+            lights,
+            self.film_color_space.clone(),
+            &self.integrator.loc,
+        )
     }
 }
 

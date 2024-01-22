@@ -61,7 +61,7 @@ impl LightSamplerI for LightSampler {
 /// Simplest possible light sampler; samples all lights with uniform probability.
 /// In practice, other light samplers should be used.
 pub struct UniformLightSampler {
-    pub lights: Vec<Arc<Light>>,
+    pub lights: Arc<Vec<Arc<Light>>>,
 }
 
 impl LightSamplerI for UniformLightSampler {

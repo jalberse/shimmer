@@ -13,7 +13,7 @@ use shimmer::{
     filter::{BoxFilter, Filter},
     float::PI_F,
     integrator::{
-        ImageTileIntegrator, Integrator, PixelSampleEvaluator, RandomWalkIntegrator,
+        ImageTileIntegrator, IntegratorI, PixelSampleEvaluator, RandomWalkIntegrator,
         SimplePathIntegrator,
     },
     light::{DiffuseAreaLight, Light, UniformInfiniteLight},
@@ -45,11 +45,13 @@ fn main() {
 
     let (prims, lights) = get_tri_mesh_inf_light_scene();
 
-    let bvh = Primitive::BvhAggregate(BvhAggregate::new(
+    let lights = Arc::new(lights);
+
+    let bvh = Arc::new(Primitive::BvhAggregate(BvhAggregate::new(
         prims,
         1,
         shimmer::aggregate::SplitMethod::Middle,
-    ));
+    )));
 
     let sampler = Sampler::Independent(IndependentSampler::new(0, 50));
     let full_resolution = Point2i::new(500, 500);

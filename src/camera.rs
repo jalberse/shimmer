@@ -63,6 +63,7 @@ pub trait CameraI {
     ) -> (Vector3f, Vector3f);
 }
 
+#[derive(Debug, Clone)]
 pub enum Camera {
     Orthographic(OrthographicCamera),
     Perspective(PerspectiveCamera),
@@ -655,6 +656,7 @@ impl ProjectiveCameraBase {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct OrthographicCamera {
     projective_base: ProjectiveCameraBase,
     dx_camera: Vector3f,
@@ -825,6 +827,7 @@ impl CameraI for OrthographicCamera {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PerspectiveCamera {
     projective_base: ProjectiveCameraBase,
     dx_camera: Vector3f,

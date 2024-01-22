@@ -25,7 +25,7 @@ pub fn render_cpu(scene: &mut BasicScene, options: &Options) {
     let (named_materials, materials) = scene.create_materials(&textures, &string_interner, options);
     info!("Done creating materials.");
 
-    let accel = scene.create_aggregate(
+    let accelerator = scene.create_aggregate(
         &textures,
         &shape_index_to_area_lights,
         &media,
@@ -34,13 +34,16 @@ pub fn render_cpu(scene: &mut BasicScene, options: &Options) {
         &string_interner,
     );
 
-    // TODO Get camera
-    // TODO Get film
-    // TODO Get sampler
+    let camera = scene.get_camera();
+    // let film = scene.get_film();
+    let sampler = scene.get_sampler();
 
-    // TODO Create integrator
+    // TODO Can check various options here, give warnings, etc.
 
-    // TODO Render
+    let mut integrator =
+        scene.create_integrator(camera, sampler, accelerator, lights, &string_interner);
+
+    integrator.render(options);
 
     todo!("render_cpu")
 }
