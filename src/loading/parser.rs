@@ -140,10 +140,6 @@ pub fn parse_str<T: ParserTarget>(
             }
         }
     }
-
-    // TODO By this point our BasicSceneBuilder should be done, maybe we need to call some method to finalze.
-    // But then we can return the scene and stuff.
-    todo!()
 }
 
 /// Parsed directive.
