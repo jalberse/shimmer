@@ -738,7 +738,7 @@ impl ParameterDictionary {
 
     fn lookup_array<P: ParameterType>(&mut self, name: &str) -> Vec<P::ReturnType> {
         for p in &mut self.params {
-            if p.name == name || p.param_type == P::TYPE_NAME {
+            if p.name == name && p.param_type == P::TYPE_NAME {
                 let mut looked_up = p.looked_up;
                 let to_return = Self::return_array(
                     P::get_values(p),
