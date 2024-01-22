@@ -1,5 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
+use itertools::Diff;
+
 use crate::{
     bsdf::BSDF,
     bxdf::{BxDF, DiffuseBxDF},
@@ -64,12 +66,17 @@ impl Material {
         textures: &NamedTextures,
         normal_map: Option<Arc<Image>>,
         named_materials: &HashMap<String, Arc<Material>>,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: &FileLoc,
     ) -> Material {
         let material = match name {
-            "diffuse" => {
-                todo!()
-            }
+            "diffuse" => Material::Diffuse(DiffuseMaterial::create(
+                parameters,
+                textures,
+                normal_map,
+                &mut HashMap::new(),
+                loc,
+            )),
             _ => panic!("Material {} unknown.", name),
         };
         material
@@ -143,7 +150,7 @@ impl DiffuseMaterial {
         textures: &NamedTextures,
         normal_map: Option<Arc<Image>>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-        loc: &FileLoc,
+        _loc: &FileLoc,
     ) -> DiffuseMaterial {
         let reflectance = parameters.get_spectrum_texture(
             "reflectance",

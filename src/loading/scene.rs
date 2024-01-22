@@ -614,6 +614,7 @@ impl BasicScene {
         &mut self,
         textures: &NamedTextures,
         string_interner: &StringInterner,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
     ) -> (HashMap<String, Arc<Material>>, Vec<Arc<Material>>) {
         // TODO Note that we'd create normal_maps here if/when we parallelize.
@@ -653,6 +654,7 @@ impl BasicScene {
                 textures,
                 normal_map,
                 &mut named_materials_out,
+                cached_spectra,
                 &material.loc,
             ));
             named_materials_out.insert(name.to_string(), m);
@@ -681,6 +683,7 @@ impl BasicScene {
                 textures,
                 normal_map,
                 &mut named_materials_out,
+                cached_spectra,
                 &mtl.loc,
             ));
             materials_out.push(m);

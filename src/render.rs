@@ -24,7 +24,8 @@ pub fn render_cpu(
     info!("Done creating lights.");
 
     info!("Creating materials...");
-    let (named_materials, materials) = scene.create_materials(&textures, &string_interner, options);
+    let (named_materials, materials) =
+        scene.create_materials(&textures, &string_interner, cached_spectra, options);
     info!("Done creating materials.");
 
     let accelerator = scene.create_aggregate(
