@@ -47,6 +47,4 @@ pub fn render_cpu(
         scene.create_integrator(camera, sampler, accelerator, lights, &string_interner);
 
     integrator.render(options);
-
-    todo!("render_cpu")
 }

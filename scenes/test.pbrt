@@ -5,10 +5,15 @@ Camera "perspective" "float fov" 90
 
 Sampler "independent"
 Integrator "simplepath"
-Film "rgb" "string filename" "simple.png"
+Film "rgb" "string filename" "simple.pfm"
      "integer xresolution" [400] "integer yresolution" [400]
 
 WorldBegin
 
 # uniform blue-ish illumination from all directions
 LightSource "infinite" "rgb L" [ .4 .45 .5 ]
+
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ .7 .2 .2 ]
+  Shape "sphere" "float radius" 1
+AttributeEnd

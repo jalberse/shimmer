@@ -50,6 +50,8 @@ fn main() {
     render::render_cpu(scene, &options, &mut string_interner, &mut cached_spectra);
 }
 
+// TODO Delete these test scenes; we will define our test scenes in .pbrt files from now on, thankfully.
+
 fn one_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
     // Create some random lights
     let render_from_object = Transform::translate(Vector3f {

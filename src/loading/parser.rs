@@ -140,6 +140,8 @@ pub fn parse_str<T: ParserTarget>(
             }
         }
     }
+
+    target.end_of_files();
 }
 
 /// Parsed directive.
