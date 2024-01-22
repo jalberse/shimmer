@@ -1112,7 +1112,7 @@ impl Default for GraphicsState {
             reverse_orientation: Default::default(),
             color_space: RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
             ctm: Default::default(),
-            active_transform_bits: Default::default(),
+            active_transform_bits: BasicSceneBuilder::ALL_TRANSFORM_BITS,
             transform_start_time: 0.0,
             transform_end_time: 1.0,
         }
@@ -1592,6 +1592,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
 
+        // TODO Our graphics_state.ctm is the identity matrix. That's... wrong. It should be the output of look_at()?
         let camera_from_world = &self.graphics_state.ctm;
         let world_from_camera = TransformSet::inverse(&camera_from_world);
         // TODO Animated transform
