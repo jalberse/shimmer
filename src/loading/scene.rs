@@ -42,15 +42,15 @@ use super::paramdict::SpectrumType;
 // TODO If/when we make this multi-threaded, most of these will be within a Mutex.
 //      For now, code it sequentially.
 pub struct BasicScene {
-    pub integrator: SceneEntity,
-    pub accelerator: SceneEntity,
-    pub film_color_space: Arc<RgbColorSpace>,
+    pub integrator: Option<SceneEntity>,
+    pub accelerator: Option<SceneEntity>,
+    pub film_color_space: Option<Arc<RgbColorSpace>>,
     pub shapes: Vec<ShapeSceneEntity>,
     pub instances: Vec<InstanceSceneEntity>,
     pub instance_definitions: Vec<InstanceDefinitionSceneEntity>,
-    camera: Camera,
-    film: Film,
-    sampler: Sampler,
+    camera: Option<Camera>,
+    film: Option<Film>,
+    sampler: Option<Sampler>,
     named_materials: Vec<(String, SceneEntity)>,
     materials: Vec<SceneEntity>,
     area_lights: Vec<SceneEntity>,
@@ -66,16 +66,42 @@ pub struct BasicScene {
     lights: Vec<Arc<Light>>,
 }
 
+impl Default for BasicScene {
+    fn default() -> Self {
+        Self {
+            integrator: Default::default(),
+            accelerator: Default::default(),
+            film_color_space: Default::default(),
+            shapes: Default::default(),
+            instances: Default::default(),
+            instance_definitions: Default::default(),
+            camera: Default::default(),
+            film: Default::default(),
+            sampler: Default::default(),
+            named_materials: Default::default(),
+            materials: Default::default(),
+            area_lights: Default::default(),
+            normal_maps: Default::default(),
+            serial_float_textures: Default::default(),
+            serial_spectrum_textures: Default::default(),
+            async_spectrum_textures: Default::default(),
+            loading_texture_filenames: Default::default(),
+            textures: Default::default(),
+            lights: Default::default(),
+        }
+    }
+}
+
 impl BasicScene {
-    pub fn get_camera(&self) -> Camera {
+    pub fn get_camera(&self) -> Option<Camera> {
         self.camera.clone()
     }
 
-    pub fn get_film(&self) -> Film {
+    pub fn get_film(&self) -> Option<Film> {
         self.film.clone()
     }
 
-    pub fn get_sampler(&self) -> Sampler {
+    pub fn get_sampler(&self) -> Option<Sampler> {
         self.sampler.clone()
     }
 
@@ -90,9 +116,9 @@ impl BasicScene {
         string_interner: &StringInterner,
         options: &Options,
     ) {
-        self.film_color_space = film.parameters.color_space.clone();
-        self.integrator = integ;
-        self.accelerator = accel;
+        self.film_color_space = Some(film.parameters.color_space.clone());
+        self.integrator = Some(integ);
+        self.accelerator = Some(accel);
 
         let filt = Filter::create(
             &string_interner
@@ -112,7 +138,7 @@ impl BasicScene {
             );
         }
 
-        self.film = Film::create(
+        self.film = Some(Film::create(
             &string_interner.resolve(film.name).unwrap(),
             &mut film.parameters,
             exposure_time,
@@ -120,26 +146,26 @@ impl BasicScene {
             filt,
             &film.loc,
             options,
-        );
+        ));
 
-        let res = self.film.full_resolution();
-        self.sampler = Sampler::create(
+        let res = self.film.as_ref().unwrap().full_resolution();
+        self.sampler = Some(Sampler::create(
             &string_interner.resolve(sampler.name).unwrap(),
             &mut sampler.parameters,
             res,
             options,
             &mut sampler.loc,
-        );
+        ));
 
-        self.camera = Camera::create(
+        self.camera = Some(Camera::create(
             &string_interner.resolve(camera.base.name).unwrap(),
             &mut camera.base.parameters,
             None,
             camera.camera_transform,
-            self.film.clone(),
+            self.film.as_ref().unwrap().clone(),
             options,
             &mut camera.base.loc,
-        );
+        ));
     }
 
     fn add_named_material(&mut self, name: &str, mut material: SceneEntity) {
@@ -295,7 +321,7 @@ impl BasicScene {
                 .expect("Unknown symbol"),
             &mut light.base.base.parameters,
             light.base.render_from_object,
-            self.get_camera().get_camera_transform(),
+            self.get_camera().unwrap().get_camera_transform(),
             None,
             &light.base.base.loc,
             cached_spectra,
@@ -815,9 +841,11 @@ impl BasicScene {
 
         trace!("Starting top-level accelerator");
         let aggregate = Arc::new(create_accelerator(
-            string_interner.resolve(self.accelerator.name).unwrap(),
+            string_interner
+                .resolve(self.accelerator.as_ref().unwrap().name)
+                .unwrap(),
             primitives,
-            &mut self.accelerator.parameters,
+            &mut self.accelerator.as_mut().unwrap().parameters,
         ));
         trace!("Finished top-level accelerator");
 
@@ -833,14 +861,15 @@ impl BasicScene {
         string_interner: &StringInterner,
     ) -> Box<dyn IntegratorI> {
         create_integrator(
-            string_interner.resolve(self.integrator.name).unwrap(),
-            &mut self.integrator.parameters,
+            string_interner
+                .resolve(self.integrator.as_ref().unwrap().name)
+                .unwrap(),
+            &mut self.integrator.as_mut().unwrap().parameters,
             camera,
             sampler,
             accelerator,
             lights,
-            self.film_color_space.clone(),
-            &self.integrator.loc,
+            self.film_color_space.as_ref().unwrap().clone(),
         )
     }
 }
@@ -1139,12 +1168,12 @@ pub struct BasicSceneBuilder {
     instance_names: HashSet<String>,
 
     current_material_index: i32,
-    sampler: SceneEntity,
-    film: SceneEntity,
-    integrator: SceneEntity,
-    filter: SceneEntity,
-    accelerator: SceneEntity,
-    camera: CameraSceneEntity,
+    sampler: Option<SceneEntity>,
+    film: Option<SceneEntity>,
+    integrator: Option<SceneEntity>,
+    filter: Option<SceneEntity>,
+    accelerator: Option<SceneEntity>,
+    camera: Option<CameraSceneEntity>,
 
     active_instance_definition: Option<ActiveInstanceDefinition>,
 }
@@ -1153,6 +1182,38 @@ impl BasicSceneBuilder {
     const START_TRANSFORM_BITS: u32 = 1 << 0;
     const END_TRANSFORM_BITS: u32 = 1 << 1;
     const ALL_TRANSFORM_BITS: u32 = (1 << MAX_TRANSFORMS) - 1;
+
+    pub fn new(scene: Box<BasicScene>) -> BasicSceneBuilder {
+        BasicSceneBuilder {
+            scene,
+            current_block: BlockState::OptionsBlock,
+            graphics_state: GraphicsState::default(),
+            named_coordinate_systems: HashMap::new(),
+            render_from_world: Transform::default(),
+            pushed_graphics_states: Vec::new(),
+            push_stack: Vec::new(),
+            shapes: Vec::new(),
+            instance_uses: Vec::new(),
+            named_material_names: HashSet::new(),
+            medium_names: HashSet::new(),
+            float_texture_names: HashSet::new(),
+            spectrum_texture_names: HashSet::new(),
+            instance_names: HashSet::new(),
+            current_material_index: 0,
+            sampler: None,
+            film: None,
+            integrator: None,
+            filter: None,
+            accelerator: None,
+            camera: None,
+            active_instance_definition: None,
+        }
+    }
+
+    /// Drops self, returning the scene.
+    pub fn done(self) -> Box<BasicScene> {
+        self.scene
+    }
 
     fn render_from_object(&self) -> Transform {
         // TODO Want to create a version for AnimatedTransform that uses both of ctm.
@@ -1419,7 +1480,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.filter = SceneEntity::new(name, loc, dict, string_interner);
+        self.filter = Some(SceneEntity::new(name, loc, dict, string_interner));
     }
 
     fn film(
@@ -1431,7 +1492,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.film = SceneEntity::new(film_type, loc, dict, string_interner);
+        self.film = Some(SceneEntity::new(film_type, loc, dict, string_interner));
     }
 
     fn accelerator(
@@ -1443,7 +1504,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.accelerator = SceneEntity::new(name, loc, dict, string_interner);
+        self.accelerator = Some(SceneEntity::new(name, loc, dict, string_interner));
     }
 
     fn integrator(
@@ -1455,7 +1516,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.integrator = SceneEntity::new(name, loc, dict, string_interner);
+        self.integrator = Some(SceneEntity::new(name, loc, dict, string_interner));
     }
 
     fn camera(
@@ -1477,10 +1538,10 @@ impl ParserTarget for BasicSceneBuilder {
 
         self.render_from_world = camera_transform.render_from_world();
 
-        self.camera = CameraSceneEntity {
+        self.camera = Some(CameraSceneEntity {
             base: SceneEntity::new(name, loc, dict, string_interner),
             camera_transform,
-        };
+        });
     }
 
     fn make_named_medium(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc) {
@@ -1500,7 +1561,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO Verify options
-        self.sampler = SceneEntity::new(name, loc, dict, string_interner);
+        self.sampler = Some(SceneEntity::new(name, loc, dict, string_interner));
     }
 
     fn world_begin(
@@ -1519,12 +1580,12 @@ impl ParserTarget for BasicSceneBuilder {
 
         // Pass pre-world-begin entities to the scene
         self.scene.set_options(
-            self.filter.clone(),
-            self.film.clone(),
-            self.camera.clone(),
-            self.sampler.clone(),
-            self.integrator.clone(),
-            self.accelerator.clone(),
+            self.filter.as_ref().unwrap().clone(),
+            self.film.as_ref().unwrap().clone(),
+            self.camera.as_ref().unwrap().clone(),
+            self.sampler.as_ref().unwrap().clone(),
+            self.integrator.as_ref().unwrap().clone(),
+            self.accelerator.as_ref().unwrap().clone(),
             string_interner,
             options,
         );

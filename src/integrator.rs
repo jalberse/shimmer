@@ -40,14 +40,13 @@ pub fn create_integrator(
     aggregate: Arc<Primitive>,
     lights: Arc<Vec<Arc<Light>>>,
     color_space: Arc<RgbColorSpace>,
-    loc: &FileLoc,
 ) -> Box<dyn IntegratorI> {
     let integrator = match name {
         "simplepath" => Box::new(ImageTileIntegrator::create_simple_path_integrator(
-            parameters, camera, sampler, aggregate, lights, loc,
+            parameters, camera, sampler, aggregate, lights,
         )),
         "randomwalk" => Box::new(ImageTileIntegrator::create_random_walk_integrator(
-            parameters, camera, sampler, aggregate, lights, loc,
+            parameters, camera, sampler, aggregate, lights,
         )),
         _ => {
             panic!("Unknown integrator {}", name);
@@ -163,7 +162,6 @@ impl ImageTileIntegrator {
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<Vec<Arc<Light>>>,
-        _loc: &FileLoc,
     ) -> ImageTileIntegrator {
         let max_depth = parameters.get_one_int("maxdepth", 5);
         let sample_lights = parameters.get_one_bool("samplelights", true);
@@ -195,7 +193,6 @@ impl ImageTileIntegrator {
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<Vec<Arc<Light>>>,
-        _loc: &FileLoc,
     ) -> ImageTileIntegrator {
         let max_depth = parameters.get_one_int("maxdepth", 5);
         let pixel_sample_evaluator =

@@ -796,6 +796,17 @@ pub struct NamedTextures {
     pub illuminant_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
 }
 
+impl Default for NamedTextures {
+    fn default() -> Self {
+        Self {
+            float_textures: Default::default(),
+            albedo_spectrum_textures: Default::default(),
+            unbounded_spectrum_textures: Default::default(),
+            illuminant_spectrum_textures: Default::default(),
+        }
+    }
+}
+
 pub struct TextureParameterDictionary {
     dict: ParameterDictionary,
 }

@@ -5,7 +5,7 @@ use string_interner::StringInterner;
 
 use crate::{loading::scene::BasicScene, options::Options};
 
-pub fn render_cpu(scene: &mut BasicScene, options: &Options) {
+pub fn render_cpu(mut scene: Box<BasicScene>, options: &Options) {
     let mut cached_spectra = HashMap::new();
     let mut string_interner = StringInterner::new();
 
@@ -34,9 +34,9 @@ pub fn render_cpu(scene: &mut BasicScene, options: &Options) {
         &string_interner,
     );
 
-    let camera = scene.get_camera();
+    let camera = scene.get_camera().unwrap();
     // let film = scene.get_film();
-    let sampler = scene.get_sampler();
+    let sampler = scene.get_sampler().unwrap();
 
     // TODO Can check various options here, give warnings, etc.
 

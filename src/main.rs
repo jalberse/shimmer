@@ -1,113 +1,43 @@
+// TODO We can likely get rid of this nightly requirement by using
+//  interior mutability instead.
 #![feature(get_mut_unchecked)]
 
-use std::sync::Arc;
+use std::{
+    fs::{self},
+    sync::Arc,
+};
 
 use itertools::Itertools;
 use rand::Rng;
 use shimmer::{
-    aggregate::BvhAggregate,
-    bounding_box::{Bounds2f, Bounds2i},
-    camera::{Camera, CameraBaseParameters, CameraTransform, PerspectiveCamera},
-    colorspace::RgbColorSpace,
-    film::{Film, PixelSensor, RgbFilm},
-    filter::{BoxFilter, Filter},
     float::PI_F,
-    integrator::{
-        ImageTileIntegrator, IntegratorI, PixelSampleEvaluator, RandomWalkIntegrator,
-        SimplePathIntegrator,
-    },
     light::{DiffuseAreaLight, Light, UniformInfiniteLight},
-    light_sampler::UniformLightSampler,
+    loading::{
+        parser,
+        scene::{BasicScene, BasicSceneBuilder},
+    },
     material::{DiffuseMaterial, Material},
     options::Options,
     primitive::{GeometricPrimitive, Primitive},
-    sampler::{IndependentSampler, Sampler},
+    render::{self},
     shape::{sphere::Sphere, Shape, Triangle, TriangleMesh},
     spectra::{spectrum::spectrum_to_photometric, ConstantSpectrum, Spectrum},
     texture::{SpectrumConstantTexture, SpectrumTexture},
     transform::Transform,
-    vecmath::{
-        spherical::spherical_direction, Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f,
-        Vector3f,
-    },
+    vecmath::{spherical::spherical_direction, Point3f, Tuple3, Vector3f},
     Float,
 };
 
 fn main() {
-    // TODO The flow will be -
-    // parse_str() (or later, parse_files()).
-    //   This will create a BasicSceneBuilder, and do calls on it as it parses.
-    //   It will create the BasicScene by the time its done.
-    // then call render_cpu() (new function) passing the BasicScene.
-    // Inside render_cpu(), we call e.g. BasicScene::create_materials() and such to get
-    //    the materials, lights, aggregates, shapes, integrator etc from the SceneEntities.
-    // Finally at the end of render_cpu, we'll call the integrator's render() function.
+    // TODO Parse from command line.
+    let mut options = Options::default();
+    let file = fs::read_to_string("scenes/test.pbrt").unwrap();
+    let scene = Box::new(BasicScene::default());
+    let mut scene_builder = BasicSceneBuilder::new(scene);
+    parser::parse_str(&file, &mut scene_builder, &mut options);
+    let scene = scene_builder.done();
 
-    let (prims, lights) = get_tri_mesh_inf_light_scene();
-
-    let lights = Arc::new(lights);
-
-    let bvh = Arc::new(Primitive::BvhAggregate(BvhAggregate::new(
-        prims,
-        1,
-        shimmer::aggregate::SplitMethod::Middle,
-    )));
-
-    let sampler = Sampler::Independent(IndependentSampler::new(0, 50));
-    let full_resolution = Point2i::new(500, 500);
-    let filter = Filter::BoxFilter(BoxFilter::new(Vector2f::new(0.5, 0.5)));
-    let film = RgbFilm::new(
-        full_resolution,
-        Bounds2i::new(Point2i::new(0, 0), full_resolution),
-        filter,
-        1.0,
-        PixelSensor::default(),
-        "fix_interval_high.pfm",
-        RgbColorSpace::get_named(shimmer::colorspace::NamedColorSpace::SRGB).clone(),
-        Float::INFINITY,
-        false,
-    );
-    let options = Options::default();
-    let camera_from_world = Transform::look_at(
-        &Point3f::new(0.0, 0.0, 0.0),
-        &Point3f::new(0.0, 0.0, -1.0),
-        &Vector3f::Y,
-    );
-
-    let camera_base_parameters = CameraBaseParameters {
-        camera_transform: CameraTransform::new(&camera_from_world.inverse(), &options),
-        shutter_open: 0.0,
-        shutter_close: 1.0,
-        film: Film::RgbFilm(film),
-        medium: None,
-    };
-
-    let camera = Camera::Perspective(PerspectiveCamera::new(
-        camera_base_parameters,
-        90.0,
-        Bounds2f::new(Point2f::new(-1.0, -1.0), Point2f::new(1.0, 1.0)),
-        0.0,
-        1e6,
-    ));
-
-    let light_sampler = UniformLightSampler {
-        lights: lights.clone(),
-    };
-
-    let simple_path_pixel_evaluator = PixelSampleEvaluator::SimplePath(SimplePathIntegrator {
-        max_depth: 8,
-        sample_lights: true,
-        sample_bsdf: true,
-        light_sampler,
-    });
-
-    let random_walk_pixel_evaluator =
-        PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth: 8 });
-
-    let mut integrator =
-        ImageTileIntegrator::new(bvh, lights, camera, sampler, random_walk_pixel_evaluator);
-
-    integrator.render(&options);
+    render::render_cpu(scene, &options);
 }
 
 fn one_sphere_inf_light_scene() -> (Vec<Arc<Primitive>>, Vec<Arc<Light>>) {
