@@ -731,7 +731,7 @@ impl ParameterDictionary {
 
         let mut v = Vec::with_capacity(n);
         for i in 0..n {
-            v[i] = convert(&values[n_per_item as usize * i..], &loc);
+            v.push(convert(&values[n_per_item as usize * i..], &loc));
         }
         v
     }
