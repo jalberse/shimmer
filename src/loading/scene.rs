@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::{
+    aggregate::{self, create_accelerator, BvhAggregate},
     camera::{Camera, CameraI, CameraTransform},
     color::LinearColorEncoding,
     colorspace::RgbColorSpace,
@@ -18,7 +19,9 @@ use crate::{
     loading::paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
     loading::parser_target::{FileLoc, ParsedParameterVector, ParserTarget},
     material::Material,
+    medium::Medium,
     options::Options,
+    primitive::{GeometricPrimitive, Primitive, SimplePrimitive, TransformedPrimitive},
     sampler::Sampler,
     shape::Shape,
     spectra::spectrum,
@@ -648,6 +651,170 @@ impl BasicScene {
         }
 
         (named_materials_out, materials_out)
+    }
+
+    pub fn create_aggregate(
+        &mut self,
+        textures: &NamedTextures,
+        shape_index_to_area_lights: &HashMap<usize, Vec<Arc<Light>>>,
+        media: &HashMap<String, Arc<Medium>>,
+        named_materials: &HashMap<String, Arc<Material>>,
+        materials: &[Arc<Material>],
+        string_interner: &StringInterner,
+    ) -> Arc<Primitive> {
+        // TODO We'll need lambdas for find_medium and get_alpha_texture.
+
+        let create_primitives_for_shapes =
+            |shapes: &mut [ShapeSceneEntity]| -> Vec<Arc<Primitive>> {
+                let mut shape_vectors: Vec<Vec<Arc<Shape>>> = vec![Vec::new(); shapes.len()];
+                // TODO parallelize
+                for i in 0..shapes.len() {
+                    let sh = &mut shapes[i];
+                    shape_vectors[i] = Shape::create(
+                        string_interner.resolve(sh.base.name).unwrap(),
+                        &sh.render_from_object,
+                        &sh.object_from_render,
+                        sh.reverse_orientation,
+                        &mut sh.base.parameters,
+                        &textures.float_textures,
+                        &sh.base.loc,
+                    );
+                }
+
+                let mut primitives = Vec::new();
+                for i in 0..shapes.len() {
+                    let sh = &mut shapes[i];
+                    let shapes = &shape_vectors[i];
+                    if shapes.is_empty() {
+                        continue;
+                    }
+
+                    // TODO get alpha texture here
+
+                    let mtl = if !sh.material_name.is_empty() {
+                        named_materials
+                            .get(sh.material_name.as_str())
+                            .expect("No material name defined")
+                    } else {
+                        assert!(
+                            sh.material_index >= 0
+                                && (sh.material_index as usize) < materials.len()
+                        );
+                        &materials[sh.material_index as usize]
+                    };
+
+                    // TODO Create medium interface
+
+                    let area_lights = shape_index_to_area_lights.get(&i);
+                    for j in 0..shapes.len() {
+                        // Possibly create area light for shape
+                        let area = if sh.light_index != -1 && area_lights.is_some() {
+                            let area_light = area_lights.unwrap();
+                            Some(area_light[j].clone())
+                        } else {
+                            None
+                        };
+
+                        // TODO Also check against !mi.is_medium_transition() and alpha_tex.is_none()
+                        if area.is_none() {
+                            let prim = Arc::new(Primitive::Simple(SimplePrimitive {
+                                shape: shapes[j].clone(),
+                                material: mtl.clone(),
+                            }));
+                            primitives.push(prim);
+                        } else {
+                            let prim = Arc::new(Primitive::Geometric(GeometricPrimitive::new(
+                                shapes[j].clone(),
+                                mtl.clone(),
+                                area,
+                            )));
+                            primitives.push(prim);
+                        }
+                    }
+                }
+                primitives
+            };
+
+        trace!("Starting shapes");
+        let mut primitives = create_primitives_for_shapes(&mut self.shapes);
+
+        self.shapes.clear();
+        self.shapes.shrink_to_fit();
+
+        // TODO Animated shapes, when added.
+        trace!("Finished shapes");
+
+        trace!("Starting instances");
+        // TODO Can we use a SymbolU32 here for the key instead of String?
+        let mut instance_definitions: HashMap<String, Option<Arc<Primitive>>> = HashMap::new();
+        for inst in &mut self.instance_definitions {
+            let mut instance_primitives = create_primitives_for_shapes(&mut inst.shapes);
+            // TODO animated instance primitives
+
+            let instance_primitives = if instance_primitives.len() > 1 {
+                // TODO Use a better split method
+                let bvh = BvhAggregate::new(
+                    instance_primitives,
+                    1,
+                    crate::aggregate::SplitMethod::Middle,
+                );
+                vec![Arc::new(Primitive::BvhAggregate(bvh))]
+            } else {
+                instance_primitives
+            };
+
+            if instance_primitives.is_empty() {
+                instance_definitions
+                    .insert(string_interner.resolve(inst.name).unwrap().to_owned(), None);
+            } else {
+                instance_definitions.insert(
+                    string_interner.resolve(inst.name).unwrap().to_owned(),
+                    Some(instance_primitives[0].clone()),
+                );
+            }
+            todo!()
+        }
+
+        // Don't need these anymore, we've created them as primitives.
+        self.instance_definitions.clear();
+        self.instance_definitions.shrink_to_fit();
+
+        // Use those instance definitions to create actual instances
+        for inst in &self.instances {
+            let instance = instance_definitions
+                .get(string_interner.resolve(inst.name).unwrap())
+                .expect("Unknown instance name");
+
+            if instance.is_none() {
+                continue;
+            }
+
+            let instance = instance.as_ref().unwrap();
+
+            // TODO Handle animated instances
+            let prim = Arc::new(Primitive::Transformed(TransformedPrimitive::new(
+                instance.clone(),
+                inst.render_from_instance,
+            )));
+            primitives.push(prim);
+        }
+
+        // Likewise don't need the instance scene entities anymore, as we've made them
+        // as primitives.
+        self.instances.clear();
+        self.instances.shrink_to_fit();
+
+        trace!("Finished instances");
+
+        trace!("Starting top-level accelerator");
+        let aggregate = Arc::new(create_accelerator(
+            string_interner.resolve(self.accelerator.name).unwrap(),
+            primitives,
+            &mut self.accelerator.parameters,
+        ));
+        trace!("Finished top-level accelerator");
+
+        aggregate
     }
 }
 

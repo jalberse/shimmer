@@ -141,7 +141,7 @@ pub struct TransformedPrimitive {
 
 impl TransformedPrimitive {
     pub fn new(
-        primitive: &Arc<Primitive>,
+        primitive: Arc<Primitive>,
         render_from_primitive: Transform,
     ) -> TransformedPrimitive {
         TransformedPrimitive {

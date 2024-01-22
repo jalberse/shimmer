@@ -7,6 +7,7 @@ use itertools::{partition, Itertools};
 
 use crate::{
     bounding_box::Bounds3f,
+    loading::paramdict::ParameterDictionary,
     primitive::{Primitive, PrimitiveI},
     ray::Ray,
     shape::ShapeIntersection,
@@ -15,6 +16,20 @@ use crate::{
 };
 
 use pdqselect;
+
+pub fn create_accelerator(
+    name: &str,
+    prims: Vec<Arc<Primitive>>,
+    parameters: &mut ParameterDictionary,
+) -> Primitive {
+    let accel = match name {
+        "bvh" => Primitive::BvhAggregate(BvhAggregate::create(prims, parameters)),
+        _ => panic!("Accelerator {} unknown.", name),
+    };
+
+    // TODO report unused parameters.
+    accel
+}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SplitMethod {
@@ -27,6 +42,24 @@ pub struct BvhAggregate {
     primitives: Vec<Arc<Primitive>>,
     split_method: SplitMethod,
     nodes: Vec<LinearBvhNode>,
+}
+
+impl BvhAggregate {
+    pub fn create(
+        prims: Vec<Arc<Primitive>>,
+        parameters: &mut ParameterDictionary,
+    ) -> BvhAggregate {
+        // TODO Change default to SAH, when implemented.
+        let split_method_name = parameters.get_one_string("splitmethod", "middle".to_string());
+        let split_method = match split_method_name.as_str() {
+            "middle" => SplitMethod::Middle,
+            "equal" => SplitMethod::EqualCounts,
+            _ => panic!("Unknown split method {}", split_method_name),
+        };
+
+        let max_prims_in_node = parameters.get_one_int("maxnodeprims", 4) as usize;
+        BvhAggregate::new(prims, max_prims_in_node, split_method)
+    }
 }
 
 impl PrimitiveI for BvhAggregate {
