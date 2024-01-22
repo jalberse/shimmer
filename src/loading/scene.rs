@@ -6,6 +6,7 @@ use std::{
 };
 
 use crate::{
+    aggregate::{create_accelerator, BvhAggregate},
     camera::{Camera, CameraI, CameraTransform},
     color::LinearColorEncoding,
     colorspace::RgbColorSpace,
@@ -13,42 +14,47 @@ use crate::{
     film::{Film, FilmI},
     filter::Filter,
     image::Image,
+    integrator::{create_integrator, IntegratorI},
     light::Light,
     loading::paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
     loading::parser_target::{FileLoc, ParsedParameterVector, ParserTarget},
+    material::Material,
+    medium::Medium,
     options::Options,
+    primitive::{GeometricPrimitive, Primitive, SimplePrimitive, TransformedPrimitive},
     sampler::Sampler,
+    shape::Shape,
     spectra::spectrum,
     square_matrix::SquareMatrix,
-    texture::{FloatTexture, SpectrumTexture},
+    texture::{FloatConstantTexture, FloatTexture, SpectrumTexture},
     transform::Transform,
     util::normalize_arg,
     vecmath::{Point3f, Tuple3, Vector3f},
     Float,
 };
 
-use log::warn;
+use log::{trace, warn};
 use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
-use super::paramdict::SpectrumType;
+use super::{param::Param, paramdict::SpectrumType};
 
 // TODO If/when we make this multi-threaded, most of these will be within a Mutex.
 //      For now, code it sequentially.
 pub struct BasicScene {
-    pub integrator: SceneEntity,
-    pub accelerator: SceneEntity,
-    pub film_color_space: Arc<RgbColorSpace>,
+    pub integrator: Option<SceneEntity>,
+    pub accelerator: Option<SceneEntity>,
+    pub film_color_space: Option<Arc<RgbColorSpace>>,
     pub shapes: Vec<ShapeSceneEntity>,
     pub instances: Vec<InstanceSceneEntity>,
     pub instance_definitions: Vec<InstanceDefinitionSceneEntity>,
-    camera: Camera,
-    film: Film,
-    sampler: Sampler,
+    camera: Option<Camera>,
+    film: Option<Film>,
+    sampler: Option<Sampler>,
     named_materials: Vec<(String, SceneEntity)>,
     materials: Vec<SceneEntity>,
     area_lights: Vec<SceneEntity>,
-    normal_maps: HashMap<String, Box<Image>>,
+    normal_maps: HashMap<String, Arc<Image>>,
     serial_float_textures: Vec<(String, TextureSceneEntity)>,
     serial_spectrum_textures: Vec<(String, TextureSceneEntity)>,
     async_spectrum_textures: Vec<(String, TextureSceneEntity)>,
@@ -57,12 +63,46 @@ pub struct BasicScene {
     // TODO When we switch to asynch, we will load all of these at once in parallel
     //   in create_textures(), create_lights() etc. For now, just load as we parse into this.
     textures: NamedTextures,
-    lights: Vec<Light>,
+    lights: Vec<Arc<Light>>,
+}
+
+impl Default for BasicScene {
+    fn default() -> Self {
+        Self {
+            integrator: Default::default(),
+            accelerator: Default::default(),
+            film_color_space: Default::default(),
+            shapes: Default::default(),
+            instances: Default::default(),
+            instance_definitions: Default::default(),
+            camera: Default::default(),
+            film: Default::default(),
+            sampler: Default::default(),
+            named_materials: Default::default(),
+            materials: Default::default(),
+            area_lights: Default::default(),
+            normal_maps: Default::default(),
+            serial_float_textures: Default::default(),
+            serial_spectrum_textures: Default::default(),
+            async_spectrum_textures: Default::default(),
+            loading_texture_filenames: Default::default(),
+            textures: Default::default(),
+            lights: Default::default(),
+        }
+    }
 }
 
 impl BasicScene {
-    pub fn get_camera(&self) -> &Camera {
-        &self.camera
+    pub fn get_camera(&self) -> Option<Camera> {
+        self.camera.clone()
+    }
+
+    pub fn get_film(&self) -> Option<Film> {
+        self.film.clone()
+    }
+
+    pub fn get_sampler(&self) -> Option<Sampler> {
+        self.sampler.clone()
     }
 
     pub fn set_options(
@@ -76,9 +116,9 @@ impl BasicScene {
         string_interner: &StringInterner,
         options: &Options,
     ) {
-        self.film_color_space = film.parameters.color_space.clone();
-        self.integrator = integ;
-        self.accelerator = accel;
+        self.film_color_space = Some(film.parameters.color_space.clone());
+        self.integrator = Some(integ);
+        self.accelerator = Some(accel);
 
         let filt = Filter::create(
             &string_interner
@@ -98,7 +138,7 @@ impl BasicScene {
             );
         }
 
-        self.film = Film::create(
+        self.film = Some(Film::create(
             &string_interner.resolve(film.name).unwrap(),
             &mut film.parameters,
             exposure_time,
@@ -106,26 +146,26 @@ impl BasicScene {
             filt,
             &film.loc,
             options,
-        );
+        ));
 
-        let res = self.film.full_resolution();
-        self.sampler = Sampler::create(
+        let res = self.film.as_ref().unwrap().full_resolution();
+        self.sampler = Some(Sampler::create(
             &string_interner.resolve(sampler.name).unwrap(),
             &mut sampler.parameters,
             res,
             options,
             &mut sampler.loc,
-        );
+        ));
 
-        self.camera = Camera::create(
+        self.camera = Some(Camera::create(
             &string_interner.resolve(camera.base.name).unwrap(),
             &mut camera.base.parameters,
             None,
             camera.camera_transform,
-            self.film.clone(),
+            self.film.as_ref().unwrap().clone(),
             options,
             &mut camera.base.loc,
-        );
+        ));
     }
 
     fn add_named_material(&mut self, name: &str, mut material: SceneEntity) {
@@ -272,20 +312,21 @@ impl BasicScene {
     ) {
         // TODO Get medium, when I add mediums - will replace none below.
         // TODO Check for animated light and warn, when I add animated transforms.
-        // TODO Change to async
 
-        self.lights.push(Light::create(
+        // TODO Change to async, or otherwise parallelize (i.e. could place these
+        //  params into a vec, and consume that vec in a par_iter() in create_lights).
+        self.lights.push(Arc::new(Light::create(
             string_interner
                 .resolve(light.base.base.name)
                 .expect("Unknown symbol"),
             &mut light.base.base.parameters,
             light.base.render_from_object,
-            self.get_camera().get_camera_transform(),
+            self.get_camera().unwrap().get_camera_transform(),
             None,
             &light.base.base.loc,
             cached_spectra,
             options,
-        ));
+        )));
     }
 
     /// Returns the new area light index.
@@ -314,6 +355,9 @@ impl BasicScene {
 
     fn load_normal_map(&mut self, parameters: &mut ParameterDictionary) {
         let normal_map_filename = parameters.get_one_string("normalmap", "".to_string());
+        if normal_map_filename.is_empty() {
+            return;
+        }
         let filename = Path::new(&normal_map_filename);
         if !filename.exists() {
             warn!("Normal map \"{}\" not found.", filename.display());
@@ -332,7 +376,7 @@ impl BasicScene {
                 filename.display()
             );
         }
-        let image = Box::new(image);
+        let image = Arc::new(image);
         self.normal_maps.insert(normal_map_filename, image);
     }
 
@@ -458,6 +502,382 @@ impl BasicScene {
         //  This is fine for now.
         self.textures.clone()
     }
+
+    // Returns a vector of the lights, and a map from shape index to lights.
+    pub fn create_lights(
+        &mut self,
+        textures: &NamedTextures,
+        string_interner: &StringInterner,
+        options: &Options,
+    ) -> (Arc<Vec<Arc<Light>>>, HashMap<usize, Vec<Arc<Light>>>) {
+        let mut shape_index_to_area_lights = HashMap::new();
+        // TODO We'll want to handle media and alpha textures, but hold off for now.
+
+        let mut lights = Vec::new();
+
+        for i in 0..self.shapes.len() {
+            let shape = &mut self.shapes[i];
+
+            if shape.light_index == -1 {
+                continue;
+            }
+
+            let material_name = if !shape.material_name.is_empty() {
+                let mut material = self
+                    .named_materials
+                    .iter_mut()
+                    .find(|m| m.0 == shape.material_name);
+                if material.is_none() {
+                    panic!(
+                        "{}: Couldn't find named material {}.",
+                        shape.base.loc, shape.material_name
+                    );
+                }
+                let material = material.as_mut().unwrap();
+                assert!(
+                    material
+                        .1
+                        .parameters
+                        .get_one_string("type", "".to_owned())
+                        .len()
+                        > 0
+                );
+                material.1.parameters.get_one_string("type", "".to_owned())
+            } else {
+                assert!(
+                    shape.material_index >= 0
+                        && (shape.material_index as usize) < self.materials.len()
+                );
+                string_interner
+                    .resolve(self.materials[shape.material_index as usize].name)
+                    .unwrap()
+                    .to_owned()
+            };
+
+            if material_name == "interface" || material_name == "none" || material_name == "" {
+                warn!(
+                    "{}: Ignoring area light specification for shape with interface material",
+                    shape.base.loc
+                );
+                continue;
+            }
+
+            let shape_objects = Shape::create(
+                string_interner.resolve(shape.base.name).unwrap(),
+                &shape.render_from_object,
+                &shape.object_from_render,
+                shape.reverse_orientation,
+                &mut shape.base.parameters,
+                &textures.float_textures,
+                &shape.base.loc,
+            );
+
+            // TODO Support an alpha texture if parameters.get_texture("alpha") is specified.
+            let alpha = shape.base.parameters.get_one_float("alpha", 1.0);
+            let alpha = Arc::new(FloatTexture::Constant(FloatConstantTexture::new(alpha)));
+
+            // TODO create medium_interface
+
+            let mut shape_lights = Vec::new();
+            let area_light_entity = &mut self.area_lights[shape.light_index as usize];
+            for ps in shape_objects.iter() {
+                let area = Arc::new(Light::create_area(
+                    string_interner.resolve(area_light_entity.name).unwrap(),
+                    &mut area_light_entity.parameters,
+                    shape.render_from_object,
+                    ps.clone(),
+                    alpha.clone(),
+                    &area_light_entity.loc,
+                    options,
+                ));
+
+                lights.push(area.clone());
+                shape_lights.push(area);
+            }
+
+            shape_index_to_area_lights.insert(i, shape_lights);
+        }
+        trace!("Finished area lights");
+
+        // TODO We could create other lights in parallel here;
+        //  for now, we are creating them in add_light() in self.lights.
+        self.lights.append(&mut lights);
+
+        // TODO We'd rather move self.lights out rather than an expensive clone.
+        //   We can switch to make lights vec in this fn though when we parallelize,
+        //   which obviates this issue.
+        (Arc::new(self.lights.clone()), shape_index_to_area_lights)
+    }
+
+    /// Returns a tuple with a map of named materials, and a vec of unnamed materials.
+    pub fn create_materials(
+        &mut self,
+        textures: &NamedTextures,
+        string_interner: &StringInterner,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        options: &Options,
+    ) -> (HashMap<String, Arc<Material>>, Vec<Arc<Material>>) {
+        // TODO Note that we'd create normal_maps here if/when we parallelize.
+        //  For now they're already been loaded into self.normal_maps.
+
+        let mut named_materials_out: HashMap<String, Arc<Material>> = HashMap::new();
+        for (name, material) in &mut self.named_materials {
+            if named_materials_out.iter().find(|nm| nm.0 == name).is_some() {
+                panic!("{}: Named material {} redefined.", material.loc, name);
+            }
+
+            let ty = material.parameters.get_one_string("type", "".to_owned());
+            if ty.is_empty() {
+                panic!("{}: No type specified for material {}", material.loc, name);
+            }
+
+            let filename = resolve_filename(
+                options,
+                &material
+                    .parameters
+                    .get_one_string("normalmap", "".to_owned()),
+            );
+            let normal_map = if filename.is_empty() {
+                None
+            } else {
+                let image = self.normal_maps.get(&filename);
+                if image.is_none() {
+                    panic!("{}: Normal map \"{}\" not found.", material.loc, filename);
+                }
+                Some(image.unwrap().clone())
+            };
+
+            let mut tex_dict = TextureParameterDictionary::new(material.parameters.clone());
+            let m = Arc::new(Material::create(
+                name,
+                &mut tex_dict,
+                textures,
+                normal_map,
+                &mut named_materials_out,
+                cached_spectra,
+                &material.loc,
+            ));
+            named_materials_out.insert(name.to_string(), m);
+        }
+
+        let mut materials_out = Vec::with_capacity(self.materials.len());
+        for mtl in &mut self.materials {
+            let filename = resolve_filename(
+                options,
+                &mtl.parameters.get_one_string("normalmap", "".to_owned()),
+            );
+            let normal_map = if filename.is_empty() {
+                None
+            } else {
+                let image = self.normal_maps.get(&filename);
+                if image.is_none() {
+                    panic!("{}: Normal map \"{}\" not found.", mtl.loc, filename);
+                }
+                Some(image.unwrap().clone())
+            };
+
+            let mut tex_dict = TextureParameterDictionary::new(mtl.parameters.clone());
+            let m = Arc::new(Material::create(
+                string_interner.resolve(mtl.name).unwrap(),
+                &mut tex_dict,
+                textures,
+                normal_map,
+                &mut named_materials_out,
+                cached_spectra,
+                &mtl.loc,
+            ));
+            materials_out.push(m);
+        }
+
+        (named_materials_out, materials_out)
+    }
+
+    pub fn create_aggregate(
+        &mut self,
+        textures: &NamedTextures,
+        shape_index_to_area_lights: &HashMap<usize, Vec<Arc<Light>>>,
+        media: &HashMap<String, Arc<Medium>>,
+        named_materials: &HashMap<String, Arc<Material>>,
+        materials: &[Arc<Material>],
+        string_interner: &StringInterner,
+    ) -> Arc<Primitive> {
+        // TODO We'll need lambdas for find_medium and get_alpha_texture.
+
+        let create_primitives_for_shapes =
+            |shapes: &mut [ShapeSceneEntity]| -> Vec<Arc<Primitive>> {
+                let mut shape_vectors: Vec<Vec<Arc<Shape>>> = vec![Vec::new(); shapes.len()];
+                // TODO parallelize
+                for i in 0..shapes.len() {
+                    let sh = &mut shapes[i];
+                    shape_vectors[i] = Shape::create(
+                        string_interner.resolve(sh.base.name).unwrap(),
+                        &sh.render_from_object,
+                        &sh.object_from_render,
+                        sh.reverse_orientation,
+                        &mut sh.base.parameters,
+                        &textures.float_textures,
+                        &sh.base.loc,
+                    );
+                }
+
+                let mut primitives = Vec::new();
+                for i in 0..shapes.len() {
+                    let sh = &mut shapes[i];
+                    let shapes = &shape_vectors[i];
+                    if shapes.is_empty() {
+                        continue;
+                    }
+
+                    // TODO get alpha texture here
+
+                    let mtl = if !sh.material_name.is_empty() {
+                        named_materials
+                            .get(sh.material_name.as_str())
+                            .expect("No material name defined")
+                    } else {
+                        assert!(
+                            sh.material_index >= 0
+                                && (sh.material_index as usize) < materials.len()
+                        );
+                        &materials[sh.material_index as usize]
+                    };
+
+                    // TODO Create medium interface
+
+                    let area_lights = shape_index_to_area_lights.get(&i);
+                    for j in 0..shapes.len() {
+                        // Possibly create area light for shape
+                        let area = if sh.light_index != -1 && area_lights.is_some() {
+                            let area_light = area_lights.unwrap();
+                            Some(area_light[j].clone())
+                        } else {
+                            None
+                        };
+
+                        // TODO Also check against !mi.is_medium_transition() and alpha_tex.is_none()
+                        if area.is_none() {
+                            let prim = Arc::new(Primitive::Simple(SimplePrimitive {
+                                shape: shapes[j].clone(),
+                                material: mtl.clone(),
+                            }));
+                            primitives.push(prim);
+                        } else {
+                            let prim = Arc::new(Primitive::Geometric(GeometricPrimitive::new(
+                                shapes[j].clone(),
+                                mtl.clone(),
+                                area,
+                            )));
+                            primitives.push(prim);
+                        }
+                    }
+                }
+                primitives
+            };
+
+        trace!("Starting shapes");
+        let mut primitives = create_primitives_for_shapes(&mut self.shapes);
+
+        self.shapes.clear();
+        self.shapes.shrink_to_fit();
+
+        // TODO Animated shapes, when added.
+        trace!("Finished shapes");
+
+        trace!("Starting instances");
+        // TODO Can we use a SymbolU32 here for the key instead of String?
+        let mut instance_definitions: HashMap<String, Option<Arc<Primitive>>> = HashMap::new();
+        for inst in &mut self.instance_definitions {
+            let mut instance_primitives = create_primitives_for_shapes(&mut inst.shapes);
+            // TODO animated instance primitives
+
+            let instance_primitives = if instance_primitives.len() > 1 {
+                // TODO Use a better split method
+                let bvh = BvhAggregate::new(
+                    instance_primitives,
+                    1,
+                    crate::aggregate::SplitMethod::Middle,
+                );
+                vec![Arc::new(Primitive::BvhAggregate(bvh))]
+            } else {
+                instance_primitives
+            };
+
+            if instance_primitives.is_empty() {
+                instance_definitions
+                    .insert(string_interner.resolve(inst.name).unwrap().to_owned(), None);
+            } else {
+                instance_definitions.insert(
+                    string_interner.resolve(inst.name).unwrap().to_owned(),
+                    Some(instance_primitives[0].clone()),
+                );
+            }
+            todo!()
+        }
+
+        // Don't need these anymore, we've created them as primitives.
+        self.instance_definitions.clear();
+        self.instance_definitions.shrink_to_fit();
+
+        // Use those instance definitions to create actual instances
+        for inst in &self.instances {
+            let instance = instance_definitions
+                .get(string_interner.resolve(inst.name).unwrap())
+                .expect("Unknown instance name");
+
+            if instance.is_none() {
+                continue;
+            }
+
+            let instance = instance.as_ref().unwrap();
+
+            // TODO Handle animated instances
+            let prim = Arc::new(Primitive::Transformed(TransformedPrimitive::new(
+                instance.clone(),
+                inst.render_from_instance,
+            )));
+            primitives.push(prim);
+        }
+
+        // Likewise don't need the instance scene entities anymore, as we've made them
+        // as primitives.
+        self.instances.clear();
+        self.instances.shrink_to_fit();
+
+        trace!("Finished instances");
+
+        trace!("Starting top-level accelerator");
+        let aggregate = Arc::new(create_accelerator(
+            string_interner
+                .resolve(self.accelerator.as_ref().unwrap().name)
+                .unwrap(),
+            primitives,
+            &mut self.accelerator.as_mut().unwrap().parameters,
+        ));
+        trace!("Finished top-level accelerator");
+
+        aggregate
+    }
+
+    pub fn create_integrator(
+        &mut self,
+        camera: Camera,
+        sampler: Sampler,
+        accelerator: Arc<Primitive>,
+        lights: Arc<Vec<Arc<Light>>>,
+        string_interner: &StringInterner,
+    ) -> Box<dyn IntegratorI> {
+        create_integrator(
+            string_interner
+                .resolve(self.integrator.as_ref().unwrap().name)
+                .unwrap(),
+            &mut self.integrator.as_mut().unwrap().parameters,
+            camera,
+            sampler,
+            accelerator,
+            lights,
+            self.film_color_space.as_ref().unwrap().clone(),
+        )
+    }
 }
 
 /// All objects in the scene are described by various *Entity classes.
@@ -491,13 +911,13 @@ impl SceneEntity {
 #[derive(Debug, Clone)]
 pub struct ShapeSceneEntity {
     base: SceneEntity,
-    render_from_object: Arc<Transform>,
-    object_from_render: Arc<Transform>,
+    render_from_object: Transform,
+    object_from_render: Transform,
     reverse_orientation: bool,
     // TODO It should be one of these two - enum?
     // It just makes instatiation a bit more complex
     material_index: i32,
-    mateiral_name: String,
+    material_name: String,
     light_index: i32,
     inside_medium: String,
     outside_medium: String,
@@ -692,7 +1112,7 @@ impl Default for GraphicsState {
             reverse_orientation: Default::default(),
             color_space: RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
             ctm: Default::default(),
-            active_transform_bits: Default::default(),
+            active_transform_bits: BasicSceneBuilder::ALL_TRANSFORM_BITS,
             transform_start_time: 0.0,
             transform_end_time: 1.0,
         }
@@ -769,6 +1189,95 @@ impl BasicSceneBuilder {
     const END_TRANSFORM_BITS: u32 = 1 << 1;
     const ALL_TRANSFORM_BITS: u32 = (1 << MAX_TRANSFORMS) - 1;
 
+    pub fn new(scene: Box<BasicScene>, string_interner: &mut StringInterner) -> BasicSceneBuilder {
+        // TODO Rather than Optional SceneEntities, we need to instantiate them here.
+        //   PBRT provides some defaults for their names, I guess...
+
+        // TODO Update default to zsobol
+        let sampler = SceneEntity {
+            name: string_interner.get_or_intern("independent"),
+            loc: FileLoc::default(),
+            parameters: ParameterDictionary::default(),
+        };
+
+        let film = SceneEntity {
+            name: string_interner.get_or_intern("rgb"),
+            loc: FileLoc::default(),
+            parameters: ParameterDictionary::new(
+                ParsedParameterVector::new(),
+                RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+            ),
+        };
+
+        // TODO Change default to volpath when available.
+        let integrator = SceneEntity {
+            name: string_interner.get_or_intern("simplepath"),
+            loc: FileLoc::default(),
+            parameters: Default::default(),
+        };
+
+        // TODO Update default to gaussian when available
+        let filter = SceneEntity {
+            name: string_interner.get_or_intern("box"),
+            loc: FileLoc::default(),
+            parameters: Default::default(),
+        };
+
+        let accelerator = SceneEntity {
+            name: string_interner.get_or_intern("bvh"),
+            loc: FileLoc::default(),
+            parameters: Default::default(),
+        };
+
+        let camera = CameraSceneEntity {
+            base: SceneEntity {
+                name: string_interner.get_or_intern("perspective"),
+                loc: FileLoc::default(),
+                parameters: Default::default(),
+            },
+            camera_transform: CameraTransform::default(),
+        };
+
+        let mut builder = BasicSceneBuilder {
+            scene,
+            current_block: BlockState::OptionsBlock,
+            graphics_state: GraphicsState::default(),
+            named_coordinate_systems: HashMap::new(),
+            render_from_world: Transform::default(),
+            pushed_graphics_states: Vec::new(),
+            push_stack: Vec::new(),
+            shapes: Vec::new(),
+            instance_uses: Vec::new(),
+            named_material_names: HashSet::new(),
+            medium_names: HashSet::new(),
+            float_texture_names: HashSet::new(),
+            spectrum_texture_names: HashSet::new(),
+            instance_names: HashSet::new(),
+            current_material_index: 0,
+            sampler,
+            film,
+            integrator,
+            filter,
+            accelerator,
+            camera,
+            active_instance_definition: None,
+        };
+
+        let dict = ParameterDictionary::new(
+            ParsedParameterVector::new(),
+            RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
+        );
+        let diffuse = SceneEntity::new("diffuse", FileLoc::default(), dict, string_interner);
+        builder.current_material_index = builder.scene.add_material(diffuse);
+
+        builder
+    }
+
+    /// Drops self, returning the scene.
+    pub fn done(self) -> Box<BasicScene> {
+        self.scene
+    }
+
     fn render_from_object(&self) -> Transform {
         // TODO Want to create a version for AnimatedTransform that uses both of ctm.
         self.render_from_world * self.graphics_state.ctm[0]
@@ -817,11 +1326,11 @@ impl ParserTarget for BasicSceneBuilder {
 
             let entity = ShapeSceneEntity {
                 base: SceneEntity::new(name, loc, dict, string_interner),
-                render_from_object: Arc::new(render_from_object),
-                object_from_render: Arc::new(object_from_render),
+                render_from_object: render_from_object,
+                object_from_render: object_from_render,
                 reverse_orientation: self.graphics_state.reverse_orientation,
                 material_index: self.graphics_state.current_material_index,
-                mateiral_name: self.graphics_state.current_named_material.clone(),
+                material_name: self.graphics_state.current_named_material.clone(),
                 light_index: area_light_index,
                 inside_medium: self.graphics_state.current_inside_medium.clone(),
                 outside_medium: self.graphics_state.current_outside_medium.clone(),
@@ -1083,6 +1592,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
 
+        // TODO Our graphics_state.ctm is the identity matrix. That's... wrong. It should be the output of look_at()?
         let camera_from_world = &self.graphics_state.ctm;
         let world_from_camera = TransformSet::inverse(&camera_from_world);
         // TODO Animated transform

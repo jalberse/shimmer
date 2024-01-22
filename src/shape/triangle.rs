@@ -1,10 +1,13 @@
 use std::{mem::size_of, sync::Arc};
 
+use itertools::Itertools;
+
 use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
     float::gamma,
     interaction::{Interaction, SurfaceInteraction},
+    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
     math::{difference_of_products_float_vec, DifferenceOfProducts},
     ray::Ray,
     sampling::{
@@ -12,6 +15,7 @@ use crate::{
         sample_uniform_triangle,
     },
     shape::ShapeIntersection,
+    transform::Transform,
     vecmath::{
         normal::Normal3,
         point::{Point3, Point3fi},
@@ -48,6 +52,79 @@ pub struct Triangle {
 impl Triangle {
     const MIN_SPHERICAL_SAMPLE_AREA: Float = 3e-4;
     const MAX_SPHERICAL_SAMPLE_AREA: Float = 6.22;
+
+    pub fn create_mesh(
+        render_from_object: &Transform,
+        reverse_orientation: bool,
+        parameters: &mut ParameterDictionary,
+        loc: &FileLoc,
+    ) -> TriangleMesh {
+        let mut vi = parameters.get_int_array("indices");
+        let p = parameters.get_point3f_array("P");
+        let uvs = parameters.get_point2f_array("uv");
+
+        if vi.is_empty() {
+            if p.len() == 3 {
+                vi = vec![0, 1, 2];
+            } else {
+                panic!("Vertex indices 'indices' not provided with trianglemesh shape");
+            }
+        } else if vi.len() % 3 != 0 {
+            panic!("Number of vertex indices 'indices' not multiple of 3 as expected");
+            // TODO Could just pop excess and warn?
+        }
+
+        if p.is_empty() {
+            panic!("Vertex positions 'P' not provided with trianglemesh shape");
+        }
+
+        if !uvs.is_empty() && uvs.len() != p.len() {
+            panic!("Number of vertex positions 'P' and vertex UVs 'uv' do not match");
+            // TODO Could just discard UVs instead of panicing? And warn?
+        }
+
+        // TODO now s...
+        let s = parameters.get_vector3f_array("S");
+        if !s.is_empty() && s.len() != p.len() {
+            panic!("Number of vertex positions 'P' and vertex tangents 'S' do not match");
+            // TODO Could just discard instead of panicing? And warn?
+        }
+
+        let n = parameters.get_normal3f_array("N");
+        if !n.is_empty() && n.len() != p.len() {
+            panic!("Number of vertex positions 'P' and vertex normals 'N' do not match");
+            // TODO Could just discard instead of panicing? And warn?
+        }
+
+        for i in 0..vi.len() {
+            if vi[i] as usize >= p.len() {
+                panic!(
+                    "Vertex index {} out of bounds 'P' array length {}",
+                    vi[i],
+                    p.len()
+                );
+            }
+        }
+
+        let face_indices = parameters.get_int_array("faceIndices");
+        if !face_indices.is_empty() && face_indices.len() != vi.len() / 3 {
+            panic!(
+                "Number of face indices 'faceIndices' and vertex indices 'indices' do not match"
+            );
+            // TODO Could just discard instead of panicing? And warn?
+        }
+
+        TriangleMesh::new(
+            render_from_object,
+            reverse_orientation,
+            vi.into_iter().map(|i| i as usize).collect_vec(),
+            p,
+            s,
+            n,
+            uvs,
+            face_indices.into_iter().map(|i| i as usize).collect_vec(),
+        )
+    }
 
     pub fn create_triangles(mesh: Arc<TriangleMesh>) -> Vec<Arc<Shape>> {
         let mut tris = Vec::with_capacity(mesh.n_triangles);

@@ -1,7 +1,7 @@
 //! Directives parser.
 // Adapted from pbrt4 crate under apache license.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use string_interner::StringInterner;
 
@@ -12,17 +12,21 @@ use crate::{
     loading::token::{Directive, Token},
     loading::tokenizer::Tokenizer,
     options::Options,
+    spectra::Spectrum,
     Float,
 };
 
 use super::parser_target::ParserTarget;
 
-pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &mut Options) {
+pub fn parse_str<T: ParserTarget>(
+    data: &str,
+    target: &mut T,
+    options: &mut Options,
+    string_interner: &mut StringInterner,
+    cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+) {
     let mut parsers = Vec::new();
     parsers.push(Parser::new(data));
-
-    let mut string_interner = StringInterner::default();
-    let mut cached_spectra = HashMap::new();
 
     while let Some(parser) = parsers.last_mut() {
         // Fetch next element
@@ -45,26 +49,24 @@ pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &mut Opti
             Element::Include(path) => todo!("Support include directive"),
             Element::Import(_) => todo!("Support import directive"),
             Element::Option(param) => target.option(param.name, param.value, options, loc),
-            Element::Film { ty, params } => {
-                target.film(ty, params.into(), &mut string_interner, loc)
-            }
+            Element::Film { ty, params } => target.film(ty, params.into(), string_interner, loc),
             Element::ColorSpace { ty } => target.color_space(ty, loc),
             Element::Camera { ty, params } => {
-                target.camera(ty, params.into(), &mut string_interner, loc, options)
+                target.camera(ty, params.into(), string_interner, loc, options)
             }
             Element::Sampler { ty, params } => {
-                target.sampler(ty, params.into(), &mut string_interner, loc)
+                target.sampler(ty, params.into(), string_interner, loc)
             }
             Element::Integrator { ty, params } => {
-                target.integrator(ty, params.into(), &mut string_interner, loc)
+                target.integrator(ty, params.into(), string_interner, loc)
             }
             Element::Accelerator { ty, params } => {
-                target.accelerator(ty, params.into(), &mut string_interner, loc)
+                target.accelerator(ty, params.into(), string_interner, loc)
             }
             Element::CoordinateSystem { name } => target.coordinate_system(name, loc),
             Element::CoordSysTransform { name } => target.coordinate_sys_transform(name, loc),
             Element::PixelFilter { name, params } => {
-                target.pixel_filter(name, params.into(), &mut string_interner, loc)
+                target.pixel_filter(name, params.into(), string_interner, loc)
             }
             Element::Identity => target.identity(loc),
             Element::Translate { v } => target.translate(v[0], v[1], v[2], loc),
@@ -84,7 +86,7 @@ pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &mut Opti
                 _ => todo!("Unknown active transform type"),
             },
             Element::ReverseOrientation => target.reverse_orientation(loc),
-            Element::WorldBegin => target.world_begin(&mut string_interner, loc, options),
+            Element::WorldBegin => target.world_begin(string_interner, loc, options),
             Element::AttributeBegin => target.attribute_begin(loc),
             Element::AttributeEnd => target.attribute_end(loc),
             Element::Attribute {
@@ -94,19 +96,19 @@ pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &mut Opti
             Element::LightSource { ty, params } => target.light_source(
                 ty,
                 params.into(),
-                &mut string_interner,
+                string_interner,
                 loc,
-                &mut cached_spectra,
+                cached_spectra,
                 options,
             ),
             Element::AreaLightSource { ty, params } => {
                 target.area_light_source(ty, params.into(), loc)
             }
             Element::Material { ty, params } => {
-                target.material(ty, params.into(), &mut string_interner, loc)
+                target.material(ty, params.into(), string_interner, loc)
             }
             Element::MakeNamedMaterial { name, params } => {
-                target.make_named_material(name, params.into(), &mut string_interner, loc)
+                target.make_named_material(name, params.into(), string_interner, loc)
             }
             Element::NamedMaterial { name } => target.named_material(name, loc),
             Element::Texture {
@@ -119,19 +121,17 @@ pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &mut Opti
                 ty,
                 class,
                 params.into(),
-                &mut string_interner,
+                string_interner,
                 loc,
                 options,
-                &mut cached_spectra,
+                cached_spectra,
             ),
             Element::Shape { name, params } => {
-                target.shape(name, params.into(), &mut string_interner, loc)
+                target.shape(name, params.into(), string_interner, loc)
             }
-            Element::ObjectBegin { name } => target.object_begin(name, loc, &mut string_interner),
+            Element::ObjectBegin { name } => target.object_begin(name, loc, string_interner),
             Element::ObjectEnd => target.object_end(loc),
-            Element::ObjectInstance { name } => {
-                target.object_instance(name, loc, &mut string_interner)
-            }
+            Element::ObjectInstance { name } => target.object_instance(name, loc, string_interner),
             Element::MakeNamedMedium { name, params } => {
                 target.make_named_medium(name, params.into(), loc)
             }
@@ -141,9 +141,7 @@ pub fn parse_str<T: ParserTarget>(data: &str, target: &mut T, options: &mut Opti
         }
     }
 
-    // TODO By this point our BasicSceneBuilder should be done, maybe we need to call some method to finalze.
-    // But then we can return the scene and stuff.
-    todo!()
+    target.end_of_files();
 }
 
 /// Parsed directive.

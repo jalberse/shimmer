@@ -200,7 +200,7 @@ impl Light {
         parameters: &mut ParameterDictionary,
         render_from_light: Transform,
         shape: Arc<Shape>,
-        alpha: FloatTexture,
+        alpha: Arc<FloatTexture>,
         loc: &FileLoc,
         options: &Options,
     ) -> Light {
@@ -503,7 +503,7 @@ impl DiffuseAreaLight {
         color_space: Arc<RgbColorSpace>,
         loc: &FileLoc,
         shape: Arc<Shape>,
-        alpha_tex: FloatTexture,
+        alpha_tex: Arc<FloatTexture>,
         options: &Options,
     ) -> DiffuseAreaLight {
         let mut l = parameters.get_one_spectrum(

@@ -23,6 +23,7 @@ pub enum Filter {
 
 impl Filter {
     pub fn create(name: &str, parameters: &mut ParameterDictionary, loc: &FileLoc) -> Filter {
+        // TODO Failing because the name is rgb? Picking it up from the Film, maybe?
         match name {
             "box" => Filter::BoxFilter(BoxFilter::create(parameters, loc)),
             _ => panic!("Unknown filter type!"),

@@ -316,6 +316,7 @@ impl From<ImageChannelValues> for [Float; 3] {
 
 /// Stores a 2D array of pixel values where each pixel stores
 /// a fixed unmber of scalar-valued channels (e.g. RGB is three channels).
+#[derive(Debug)]
 pub struct Image {
     format: PixelFormat,
     resolution: Point2i,

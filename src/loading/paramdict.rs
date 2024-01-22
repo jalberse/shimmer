@@ -731,14 +731,14 @@ impl ParameterDictionary {
 
         let mut v = Vec::with_capacity(n);
         for i in 0..n {
-            v[i] = convert(&values[n_per_item as usize * i..], &loc);
+            v.push(convert(&values[n_per_item as usize * i..], &loc));
         }
         v
     }
 
     fn lookup_array<P: ParameterType>(&mut self, name: &str) -> Vec<P::ReturnType> {
         for p in &mut self.params {
-            if p.name == name || p.param_type == P::TYPE_NAME {
+            if p.name == name && p.param_type == P::TYPE_NAME {
                 let mut looked_up = p.looked_up;
                 let to_return = Self::return_array(
                     P::get_values(p),
@@ -794,6 +794,17 @@ pub struct NamedTextures {
     pub albedo_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
     pub unbounded_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
     pub illuminant_spectrum_textures: HashMap<String, Arc<SpectrumTexture>>,
+}
+
+impl Default for NamedTextures {
+    fn default() -> Self {
+        Self {
+            float_textures: Default::default(),
+            albedo_spectrum_textures: Default::default(),
+            unbounded_spectrum_textures: Default::default(),
+            illuminant_spectrum_textures: Default::default(),
+        }
+    }
 }
 
 pub struct TextureParameterDictionary {

@@ -63,6 +63,7 @@ pub trait CameraI {
     ) -> (Vector3f, Vector3f);
 }
 
+#[derive(Debug, Clone)]
 pub enum Camera {
     Orthographic(OrthographicCamera),
     Perspective(PerspectiveCamera),
@@ -506,6 +507,15 @@ pub struct CameraTransform {
     world_from_render: Transform,
 }
 
+impl Default for CameraTransform {
+    fn default() -> Self {
+        Self {
+            render_from_camera: Transform::default(),
+            world_from_render: Transform::default(),
+        }
+    }
+}
+
 impl CameraTransform {
     pub fn new(world_from_camera: &Transform, options: &Options) -> CameraTransform {
         // TODO would need to update this for AnimatedTransform
@@ -655,6 +665,7 @@ impl ProjectiveCameraBase {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct OrthographicCamera {
     projective_base: ProjectiveCameraBase,
     dx_camera: Vector3f,
@@ -825,6 +836,7 @@ impl CameraI for OrthographicCamera {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PerspectiveCamera {
     projective_base: ProjectiveCameraBase,
     dx_camera: Vector3f,

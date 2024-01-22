@@ -1,8 +1,13 @@
+use std::{collections::HashMap, sync::Arc};
+
 use crate::{
     bounding_box::Bounds3f,
     direction_cone::DirectionCone,
     interaction::{Interaction, SurfaceInteraction},
+    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
     ray::Ray,
+    texture::FloatTexture,
+    transform::Transform,
     vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},
     Float,
 };
@@ -60,6 +65,45 @@ pub trait ShapeI {
 pub enum Shape {
     Sphere(Sphere),
     Triangle(Triangle),
+}
+
+impl Shape {
+    pub fn create(
+        name: &str,
+        render_from_object: &Transform,
+        object_from_render: &Transform,
+        reverse_orientation: bool,
+        parameters: &mut ParameterDictionary,
+        float_textures: &HashMap<String, Arc<FloatTexture>>,
+        loc: &FileLoc,
+    ) -> Vec<Arc<Shape>> {
+        let shapes = match name {
+            "sphere" => {
+                let sphere = Sphere::create(
+                    render_from_object,
+                    object_from_render,
+                    reverse_orientation,
+                    parameters,
+                    loc,
+                );
+                vec![Arc::new(Shape::Sphere(sphere))]
+            }
+            "trianglemesh" => {
+                let trianglemesh = Arc::new(Triangle::create_mesh(
+                    render_from_object,
+                    reverse_orientation,
+                    parameters,
+                    loc,
+                ));
+                Triangle::create_triangles(trianglemesh)
+            }
+            _ => {
+                panic!("Unknown Shape {}", name);
+            }
+        };
+
+        shapes
+    }
 }
 
 impl ShapeI for Shape {

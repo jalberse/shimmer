@@ -16,8 +16,8 @@ use log::warn;
 use once_cell::sync::Lazy;
 
 use super::{
-    sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths, NamedSpectrum,
-    NUM_SPECTRUM_SAMPLES,
+    cie::NUM_CIES_SAMPLES, sampled_spectrum::SampledSpectrum,
+    sampled_wavelengths::SampledWavelengths, NamedSpectrum, NUM_SPECTRUM_SAMPLES,
 };
 
 /// Nanometers. Minimum of visible range of light.
@@ -244,8 +244,8 @@ impl DenselySampledSpectrum {
         let m1 = (-1.3515 - 1.7703 * x + 5.9114 * y) / m;
         let m2 = (0.0300 - 31.4424 * x + 30.0717 * y) / m;
 
-        let mut values: Vec<Float> = Vec::with_capacity(NUM_CIE_SAMPLES);
-        for i in 0..NUM_CIE_SAMPLES {
+        let mut values: Vec<Float> = Vec::with_capacity(NUM_CIES_SAMPLES);
+        for i in 0..NUM_CIES_SAMPLES {
             values.push((CIE_S0[i] + CIE_S1[i] * m1 + CIE_S2[i] * m2) * 0.01);
         }
 

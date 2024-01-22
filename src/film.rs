@@ -236,7 +236,7 @@ impl FilmBaseParameters {
         options: &Options,
     ) -> FilmBaseParameters {
         let filename = parameters.get_one_string("filename", "".to_string());
-        let filename = if options.image_file.is_empty() {
+        let filename = if !options.image_file.is_empty() {
             if !filename.is_empty() {
                 warn!("Output filename supploed on command line {} will override filename in scene description file {}", options.image_file, filename);
             }
@@ -790,7 +790,7 @@ impl PixelSensor {
 
         let imaging_ratio = exposure_time * iso / 100.0;
 
-        let white_balance_temp_to_pass = if white_balance_temp != 0.0 {
+        let white_balance_temp_to_pass = if white_balance_temp == 0.0 {
             6500.0
         } else {
             white_balance_temp
