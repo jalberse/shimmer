@@ -32,10 +32,11 @@ use string_interner::StringInterner;
 
 fn main() {
     // TODO Parse from command line.
+
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
     let mut options = Options::default();
-    let file = fs::read_to_string("scenes/test.pbrt").unwrap();
+    let file = fs::read_to_string("scenes/cornell.pbrt").unwrap();
     let scene = Box::new(BasicScene::default());
     let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner);
     parser::parse_str(
