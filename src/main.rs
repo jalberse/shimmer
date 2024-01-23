@@ -9,7 +9,6 @@ use std::{
 
 use itertools::Itertools;
 use rand::Rng;
-use rayon::string;
 use shimmer::{
     float::PI_F,
     light::{DiffuseAreaLight, Light, UniformInfiniteLight},
@@ -36,7 +35,7 @@ fn main() {
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
     let mut options = Options::default();
-    let file = fs::read_to_string("scenes/bunny.pbrt").unwrap();
+    let file = fs::read_to_string("scenes/cornell_bunny.pbrt").unwrap();
     let scene = Box::new(BasicScene::default());
     let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner);
     parser::parse_str(

@@ -17,3 +17,4 @@ AttributeBegin
   Material "diffuse" "rgb reflectance" [ .7 .2 .2 ]
   Shape "sphere" "float radius" 1
 AttributeEnd
+
