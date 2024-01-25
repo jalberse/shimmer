@@ -46,7 +46,7 @@ pub fn parse_str<T: ParserTarget>(
         //  We'd like to do that at some point, and then pass it here. It will make error messages better.
         let loc = Default::default();
         match element {
-            Element::Include(path) => todo!("Support include directive"),
+            Element::Include(_path) => todo!("Support include directive"),
             Element::Import(_) => todo!("Support import directive"),
             Element::Option(param) => target.option(param.name, param.value, options, loc),
             Element::Film { ty, params } => target.film(ty, params.into(), string_interner, loc),

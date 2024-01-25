@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{
     camera::CameraSample,
     filter::{Filter, FilterI},

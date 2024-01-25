@@ -1,10 +1,7 @@
 use itertools::Itertools;
 use log::warn;
 
-use crate::{
-    options::{self, Options},
-    Float,
-};
+use crate::{options::Options, Float};
 
 use std::fs;
 

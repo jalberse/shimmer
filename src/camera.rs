@@ -841,8 +841,8 @@ pub struct PerspectiveCamera {
     projective_base: ProjectiveCameraBase,
     dx_camera: Vector3f,
     dy_camera: Vector3f,
-    cos_total_width: Float,
-    area: Float,
+    _cos_total_width: Float, // TODO Will be used in the future
+    _area: Float,            // TODO Will be used in the future
 }
 
 impl PerspectiveCamera {
@@ -949,8 +949,8 @@ impl PerspectiveCamera {
             projective_base: projective_base.clone(),
             dx_camera,
             dy_camera,
-            cos_total_width,
-            area,
+            _cos_total_width: cos_total_width,
+            _area: area,
         };
 
         projective_base
@@ -966,8 +966,8 @@ impl PerspectiveCamera {
             projective_base,
             dx_camera,
             dy_camera,
-            cos_total_width,
-            area,
+            _cos_total_width: cos_total_width,
+            _area: area,
         }
     }
 }

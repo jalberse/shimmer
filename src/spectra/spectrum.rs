@@ -6,7 +6,7 @@ use crate::{
     file::read_float_file,
     math::{self, lerp},
     spectra::{
-        cie::{CIE, CIE_Y_INTEGRAL, NUM_CIE_SAMPLES},
+        cie::{CIE, CIE_Y_INTEGRAL},
         named_spectrum::{CIE_S0, CIE_S1, CIE_S2, CIE_S_LAMBDA},
     },
     Float,

@@ -37,7 +37,7 @@ use log::{trace, warn};
 use spectrum::Spectrum;
 use string_interner::{symbol::SymbolU32, StringInterner};
 
-use super::{param::Param, paramdict::SpectrumType};
+use super::paramdict::SpectrumType;
 
 // TODO If/when we make this multi-threaded, most of these will be within a Mutex.
 //      For now, code it sequentially.
@@ -180,7 +180,8 @@ impl BasicScene {
         (self.materials.len() - 1) as i32
     }
 
-    fn add_medium(&mut self, medium: SceneEntity) {
+    #[allow(dead_code)] // TODO This fn
+    fn add_medium(&mut self, _medium: SceneEntity) {
         todo!()
     }
 
@@ -696,7 +697,7 @@ impl BasicScene {
         &mut self,
         textures: &NamedTextures,
         shape_index_to_area_lights: &HashMap<usize, Vec<Arc<Light>>>,
-        media: &HashMap<String, Arc<Medium>>,
+        _media: &HashMap<String, Arc<Medium>>, // TODO This will be used in future aggregate creation.
         named_materials: &HashMap<String, Arc<Material>>,
         materials: &[Arc<Material>],
         string_interner: &StringInterner,
@@ -787,7 +788,7 @@ impl BasicScene {
         // TODO Can we use a SymbolU32 here for the key instead of String?
         let mut instance_definitions: HashMap<String, Option<Arc<Primitive>>> = HashMap::new();
         for inst in &mut self.instance_definitions {
-            let mut instance_primitives = create_primitives_for_shapes(&mut inst.shapes);
+            let instance_primitives = create_primitives_for_shapes(&mut inst.shapes);
             // TODO animated instance primitives
 
             let instance_primitives = if instance_primitives.len() > 1 {
@@ -919,8 +920,8 @@ pub struct ShapeSceneEntity {
     material_index: i32,
     material_name: String,
     light_index: i32,
-    inside_medium: String,
-    outside_medium: String,
+    _inside_medium: String,
+    _outside_medium: String,
 }
 
 #[derive(Debug, Clone)]
@@ -956,7 +957,7 @@ pub type TextureSceneEntity = TransformedSceneEntity;
 
 pub struct LightSceneEntity {
     base: TransformedSceneEntity,
-    medium: String,
+    _medium: String,
 }
 
 impl LightSceneEntity {
@@ -972,7 +973,7 @@ impl LightSceneEntity {
             TransformedSceneEntity::new(name, parameters, string_interner, loc, render_from_light);
         LightSceneEntity {
             base,
-            medium: medium.to_owned(),
+            _medium: medium.to_owned(),
         }
     }
 }
@@ -980,7 +981,7 @@ impl LightSceneEntity {
 #[derive(Debug, Clone)]
 pub struct InstanceSceneEntity {
     name: SymbolU32,
-    loc: FileLoc,
+    _loc: FileLoc,
     render_from_instance: Transform,
     // TODO Possibly aniamted transform
 }
@@ -994,7 +995,7 @@ impl InstanceSceneEntity {
     ) -> Self {
         Self {
             name: string_interner.get_or_intern(name),
-            loc,
+            _loc: loc,
             render_from_instance,
         }
     }
@@ -1003,7 +1004,7 @@ impl InstanceSceneEntity {
 pub struct InstanceDefinitionSceneEntity {
     // TODO we will need a stringinterner on this, same as in SceneEntity
     name: SymbolU32,
-    loc: FileLoc,
+    _loc: FileLoc,
     shapes: Vec<ShapeSceneEntity>,
     // TODO aniamted_shapes: Vec<AnimatedShapeSceneEntity>,
 }
@@ -1012,7 +1013,7 @@ impl InstanceDefinitionSceneEntity {
     pub fn new(name: &str, loc: FileLoc, string_interner: &mut StringInterner) -> Self {
         Self {
             name: string_interner.get_or_intern(name),
-            loc,
+            _loc: loc,
             shapes: Default::default(),
         }
     }
@@ -1168,7 +1169,7 @@ pub struct BasicSceneBuilder {
     instance_uses: Vec<InstanceSceneEntity>,
 
     named_material_names: HashSet<String>,
-    medium_names: HashSet<String>,
+    _medium_names: HashSet<String>,
     float_texture_names: HashSet<String>,
     spectrum_texture_names: HashSet<String>,
     instance_names: HashSet<String>,
@@ -1249,7 +1250,7 @@ impl BasicSceneBuilder {
             shapes: Vec::new(),
             instance_uses: Vec::new(),
             named_material_names: HashSet::new(),
-            medium_names: HashSet::new(),
+            _medium_names: HashSet::new(),
             float_texture_names: HashSet::new(),
             spectrum_texture_names: HashSet::new(),
             instance_names: HashSet::new(),
@@ -1332,8 +1333,8 @@ impl ParserTarget for BasicSceneBuilder {
                 material_index: self.graphics_state.current_material_index,
                 material_name: self.graphics_state.current_named_material.clone(),
                 light_index: area_light_index,
-                inside_medium: self.graphics_state.current_inside_medium.clone(),
-                outside_medium: self.graphics_state.current_outside_medium.clone(),
+                _inside_medium: self.graphics_state.current_inside_medium.clone(),
+                _outside_medium: self.graphics_state.current_outside_medium.clone(),
             };
             if let Some(active_instance_definition) = &mut self.active_instance_definition {
                 active_instance_definition.entity.shapes.push(entity)
@@ -1496,7 +1497,7 @@ impl ParserTarget for BasicSceneBuilder {
             })
     }
 
-    fn coordinate_system(&mut self, name: &str, loc: FileLoc) {
+    fn coordinate_system(&mut self, name: &str, _loc: FileLoc) {
         // TODO Normalize name to UTF-8.
         self.named_coordinate_systems
             .insert(name.to_owned(), self.graphics_state.ctm.clone());
@@ -1608,11 +1609,11 @@ impl ParserTarget for BasicSceneBuilder {
         };
     }
 
-    fn make_named_medium(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc) {
+    fn make_named_medium(&mut self, _name: &str, _params: ParsedParameterVector, _loc: FileLoc) {
         todo!("Mediums not yet implemented; can't make named medium.")
     }
 
-    fn medium_interface(&mut self, inside_name: &str, outside_name: &str, loc: FileLoc) {
+    fn medium_interface(&mut self, _inside_name: &str, _outside_name: &str, _loc: FileLoc) {
         todo!("Mediums not yet implemented; can't create medium interface.")
     }
 
@@ -1631,7 +1632,7 @@ impl ParserTarget for BasicSceneBuilder {
     fn world_begin(
         &mut self,
         string_interner: &mut StringInterner,
-        loc: FileLoc,
+        _loc: FileLoc,
         options: &Options,
     ) {
         self.current_block = BlockState::WorldBlock;

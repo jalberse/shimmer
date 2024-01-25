@@ -57,7 +57,7 @@ impl Triangle {
         render_from_object: &Transform,
         reverse_orientation: bool,
         parameters: &mut ParameterDictionary,
-        loc: &FileLoc,
+        _loc: &FileLoc,
     ) -> TriangleMesh {
         let mut vi = parameters.get_int_array("indices");
         let p = parameters.get_point3f_array("P");

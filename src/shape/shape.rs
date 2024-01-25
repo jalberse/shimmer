@@ -74,7 +74,7 @@ impl Shape {
         object_from_render: &Transform,
         reverse_orientation: bool,
         parameters: &mut ParameterDictionary,
-        float_textures: &HashMap<String, Arc<FloatTexture>>,
+        _float_textures: &HashMap<String, Arc<FloatTexture>>, // TODO will be used in future
         loc: &FileLoc,
     ) -> Vec<Arc<Shape>> {
         let shapes = match name {
@@ -228,7 +228,7 @@ impl ShapeSampleContext {
         self.offset_ray_origin(pt - self.p())
     }
 
-    pub fn spawn_ray(&self, w: Vector3f) -> Ray {
+    pub fn spawn_ray(&self, _w: Vector3f) -> Ray {
         todo!()
     }
 }

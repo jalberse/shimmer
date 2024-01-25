@@ -1,12 +1,9 @@
-use bitflags::bitflags;
-use itertools::Diff;
-
 use crate::{
     float::PI_F,
     math::INV_PI,
     sampling::{
         cosine_hemisphere_pdf, sample_cosine_hemisphere, sample_uniform_hemisphere,
-        sample_uniform_sphere, uniform_hemisphere_pdf,
+        uniform_hemisphere_pdf,
     },
     spectra::sampled_spectrum::SampledSpectrum,
     vecmath::{
@@ -16,6 +13,7 @@ use crate::{
     },
     Float,
 };
+use bitflags::bitflags;
 
 /// The BxDF Interface.
 pub trait BxDFI {

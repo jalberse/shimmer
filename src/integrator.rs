@@ -17,7 +17,7 @@ use crate::{
     interaction::Interaction,
     light::{Light, LightI, LightSampleContext, LightType},
     light_sampler::{LightSamplerI, UniformLightSampler},
-    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
+    loading::paramdict::ParameterDictionary,
     options::Options,
     primitive::{Primitive, PrimitiveI},
     ray::{Ray, RayDifferential},

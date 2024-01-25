@@ -50,7 +50,7 @@ impl Sphere {
         object_from_render: &Transform,
         reverse_orientation: bool,
         parameters: &mut ParameterDictionary,
-        loc: &FileLoc,
+        _loc: &FileLoc,
     ) -> Sphere {
         let radius = parameters.get_one_float("radius", 1.0);
         let z_min = parameters.get_one_float("zmin", -radius);

@@ -1,14 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
-use itertools::Diff;
-
 use crate::{
     bsdf::BSDF,
     bxdf::{BxDF, DiffuseBxDF},
     image::Image,
     interaction::SurfaceInteraction,
     loading::{
-        paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary},
+        paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary},
         parser_target::FileLoc,
     },
     spectra::{

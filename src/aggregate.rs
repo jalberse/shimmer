@@ -38,9 +38,9 @@ pub enum SplitMethod {
 }
 
 pub struct BvhAggregate {
-    max_prims_in_node: usize,
+    _max_prims_in_node: usize,
     primitives: Vec<Arc<Primitive>>,
-    split_method: SplitMethod,
+    _split_method: SplitMethod,
     nodes: Vec<LinearBvhNode>,
 }
 
@@ -285,9 +285,9 @@ impl BvhAggregate {
             .collect_vec();
 
         BvhAggregate {
-            max_prims_in_node: usize::min(255, max_prims_in_node),
+            _max_prims_in_node: usize::min(255, max_prims_in_node),
             primitives,
-            split_method,
+            _split_method: split_method,
             nodes,
         }
     }
@@ -564,7 +564,7 @@ impl BvhBuildNode {
 
 #[cfg(test)]
 mod tests {
-    use std::{rc::Rc, sync::Arc};
+    use std::sync::Arc;
 
     use float_cmp::assert_approx_eq;
 
@@ -607,8 +607,8 @@ mod tests {
         let bvh = BvhAggregate::new(prims, 1, crate::aggregate::SplitMethod::Middle);
         // The BVH boudning box should match the bounding box of the primitive
         assert_eq!(expected_bounds, bvh.bounds());
-        assert_eq!(1, bvh.max_prims_in_node);
-        assert_eq!(SplitMethod::Middle, bvh.split_method);
+        assert_eq!(1, bvh._max_prims_in_node);
+        assert_eq!(SplitMethod::Middle, bvh._split_method);
     }
 
     #[test]
