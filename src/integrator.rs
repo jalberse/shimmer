@@ -46,6 +46,12 @@ pub enum Integrator {
 /// and the integrator-dependent li() function for the radiance along a given ray.
 /// These are used by an integrator which handles the full image, such as an ImageTileIntegrator.
 trait RayIntegratorI {
+    // TODO If we have a LightPath integrator (starting from light sources),
+    // it would also need an evaluate_pixel_sample() function to be called from the ImageTileIntegrator.
+    // So maybe including this in the RayIntegratorI is not the best idea, and it should be a separate
+    // EvaluatePixelSampleI trait instead (as we had before).
+    // We'll keep this here for now though, since it's convenient to share code and we'll mostly be
+    // working with ray-based integrators for now.
     fn evaluate_pixel_sample(
         &self,
         base: &IntegratorBase,
