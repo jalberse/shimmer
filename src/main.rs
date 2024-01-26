@@ -9,14 +9,14 @@ use std::{
 
 use clap::Parser;
 use shimmer::{
-    bounding_box::Bounds2f,
+    bounding_box::{Bounds2f, Bounds2i},
     loading::{
         parser,
         scene::{BasicScene, BasicSceneBuilder},
     },
     options::Options,
     render::{self},
-    vecmath::{Point2f, Tuple2},
+    vecmath::{Point2f, Point2i, Tuple2},
     Float,
 };
 use string_interner::StringInterner;
@@ -30,9 +30,17 @@ struct Args {
     #[arg(short, long, num_args = 4, default_values = vec!["0.0", "1.0", "0.0", "1.0"])]
     crop_window: Vec<Float>,
 
+    /// Specify image crop window w.r.t. pixel coordinates. <x0 x1 y0 y1>
+    #[arg(short, long, num_args = 4)]
+    pixel_bounds: Vec<i32>,
+
     /// Convert all materials to be diffuse
     #[arg(short, long)]
     force_diffuse: bool,
+
+    /// Set random number generator seed
+    #[arg(short, long, default_value = "0")]
+    seed: i32,
 }
 
 fn main() {
@@ -44,6 +52,11 @@ fn main() {
         Point2f::new(cli.crop_window[1], cli.crop_window[3]),
     ));
     options.force_diffuse = cli.force_diffuse;
+    options.seed = cli.seed;
+    options.pixel_bounds = Some(Bounds2i::new(
+        Point2i::new(cli.pixel_bounds[0], cli.pixel_bounds[2]),
+        Point2i::new(cli.pixel_bounds[1], cli.pixel_bounds[3]),
+    ));
 
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
