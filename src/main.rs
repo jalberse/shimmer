@@ -29,6 +29,10 @@ struct Args {
     /// Specify an image crop window w.r.t. [0,1]^2. <x0 x1 y0 y1>
     #[arg(short, long, num_args = 4, default_values = vec!["0.0", "1.0", "0.0", "1.0"])]
     crop_window: Vec<Float>,
+
+    /// Convert all materials to be diffuse
+    #[arg(short, long)]
+    force_diffuse: bool,
 }
 
 fn main() {
@@ -39,6 +43,7 @@ fn main() {
         Point2f::new(cli.crop_window[0], cli.crop_window[2]),
         Point2f::new(cli.crop_window[1], cli.crop_window[3]),
     ));
+    options.force_diffuse = cli.force_diffuse;
 
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
