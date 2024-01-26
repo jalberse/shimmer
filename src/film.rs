@@ -238,7 +238,7 @@ impl FilmBaseParameters {
         let filename = parameters.get_one_string("filename", "".to_string());
         let filename = if !options.image_file.is_empty() {
             if !filename.is_empty() {
-                warn!("Output filename supploed on command line {} will override filename in scene description file {}", options.image_file, filename);
+                warn!("Output filename supplied on command line {} will override filename in scene description file {}", options.image_file, filename);
             }
             options.image_file.clone()
         } else if filename.is_empty() {

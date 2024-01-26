@@ -26,6 +26,10 @@ use string_interner::StringInterner;
 struct Args {
     scene_file: String,
 
+    /// Write the final image to the given filename.
+    #[arg(short, long)]
+    outfile: String,
+
     /// Specify an image crop window w.r.t. [0,1]^2. <x0 x1 y0 y1>
     #[arg(short, long, num_args = 4, default_values = vec!["0.0", "1.0", "0.0", "1.0"])]
     crop_window: Vec<Float>,
@@ -57,6 +61,7 @@ fn main() {
         Point2i::new(cli.pixel_bounds[0], cli.pixel_bounds[2]),
         Point2i::new(cli.pixel_bounds[1], cli.pixel_bounds[3]),
     ));
+    options.image_file = cli.outfile;
 
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
