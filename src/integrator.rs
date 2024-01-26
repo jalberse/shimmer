@@ -32,6 +32,155 @@ use crate::{
     Float,
 };
 
+/// The principal trait of this module;
+/// An integrator renders the scene.
+pub trait IntegratorI {
+    fn render(&mut self, options: &Options);
+}
+
+pub enum Integrator {
+    ImageTileIntegrator(ImageTileIntegrator),
+}
+
+/// The RayIntegratorI interface provides the shared evaluate_pixel_sample() function,
+/// and the integrator-dependent li() function for the radiance along a given ray.
+/// These are used by an integrator which handles the full image, such as an ImageTileIntegrator.
+trait RayIntegratorI {
+    fn evaluate_pixel_sample(
+        &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        p_pixel: Point2i,
+        sample_index: i32,
+        sampler: &mut Sampler,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> FilmSample {
+        // Sample wavelengths for the ray
+        let lu = if options.disable_wavelength_jitter {
+            0.5
+        } else {
+            sampler.get_1d()
+        };
+        let lambda = camera.get_film_const().sample_wavelengths(lu);
+
+        // Initialize camera_sample for the current sample
+        let filter = camera.get_film_const().get_filter();
+        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
+
+        let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
+
+        let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
+            debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
+            debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
+
+            // TODO Scale camera ray differentials based on image sampling rate.
+            let ray_diff_scale = Float::max(
+                0.125,
+                1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
+            );
+            if !options.disable_pixel_jitter {
+                camera_ray.ray.scale_differentials(ray_diff_scale);
+            }
+
+            // Evaluate radiance along the camera ray
+            let visible_surface = if camera.get_film_const().uses_visible_surface() {
+                Some(VisibleSurface::default())
+            } else {
+                None
+            };
+
+            let l = camera_ray.weight
+                * self.li(
+                    base,
+                    camera,
+                    &mut camera_ray.ray,
+                    &lambda,
+                    sampler,
+                    &visible_surface,
+                    scratch_buffer,
+                    options,
+                );
+
+            if l.has_nan() {
+                // TODO log error, set SampledSpectrum l to 0.
+                // Use env_logger.
+            } else if l.y(&lambda).is_infinite() {
+                // TODO log error, set SampledSpectrum l to 0
+            }
+
+            (l, visible_surface)
+        } else {
+            (
+                SampledSpectrum::from_const(0.0),
+                Some(VisibleSurface::default()),
+            )
+        };
+
+        FilmSample {
+            p_film: p_pixel,
+            l,
+            lambda,
+            visible_surface,
+            weight: camera_sample.filter_weight,
+        }
+    }
+
+    fn li(
+        &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        ray: &mut RayDifferential,
+        lambda: &SampledWavelengths,
+        sampler: &mut Sampler,
+        _visible_surface: &Option<VisibleSurface>,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> SampledSpectrum;
+}
+
+pub enum RayIntegrator {
+    RandomWalk(RandomWalkIntegrator),
+    SimplePath(SimplePathIntegrator),
+}
+
+impl RayIntegratorI for RayIntegrator {
+    fn li(
+        &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        ray: &mut RayDifferential,
+        lambda: &SampledWavelengths,
+        sampler: &mut Sampler,
+        visible_surface: &Option<VisibleSurface>,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> SampledSpectrum {
+        match self {
+            RayIntegrator::RandomWalk(integrator) => integrator.li(
+                base,
+                camera,
+                ray,
+                lambda,
+                sampler,
+                visible_surface,
+                scratch_buffer,
+                options,
+            ),
+            RayIntegrator::SimplePath(integrator) => integrator.li(
+                base,
+                camera,
+                ray,
+                lambda,
+                sampler,
+                visible_surface,
+                scratch_buffer,
+                options,
+            ),
+        }
+    }
+}
+
 pub fn create_integrator(
     name: &str,
     parameters: &mut ParameterDictionary,
@@ -63,10 +212,6 @@ struct FilmSample {
     lambda: SampledWavelengths,
     visible_surface: Option<VisibleSurface>,
     weight: Float,
-}
-
-pub trait IntegratorI {
-    fn render(&mut self, options: &Options);
 }
 
 /// Integrators can have an IntegratorBase that provides shared data and functionality.
@@ -152,7 +297,7 @@ pub struct ImageTileIntegrator {
     camera: Camera,
     sampler_prototype: Sampler,
 
-    pixel_sample_evaluator: PixelSampleEvaluator,
+    ray_integrator: RayIntegrator,
 }
 
 impl ImageTileIntegrator {
@@ -170,7 +315,7 @@ impl ImageTileIntegrator {
             lights: lights.clone(),
         };
 
-        let pixel_sample_evaluator = PixelSampleEvaluator::SimplePath(SimplePathIntegrator {
+        let pixel_sample_evaluator = RayIntegrator::SimplePath(SimplePathIntegrator {
             max_depth,
             sample_lights,
             sample_bsdf,
@@ -195,8 +340,7 @@ impl ImageTileIntegrator {
         lights: Arc<Vec<Arc<Light>>>,
     ) -> ImageTileIntegrator {
         let max_depth = parameters.get_one_int("maxdepth", 5);
-        let pixel_sample_evaluator =
-            PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth });
+        let pixel_sample_evaluator = RayIntegrator::RandomWalk(RandomWalkIntegrator { max_depth });
 
         // TODO I dislike having to clone the sampler and camera.
         ImageTileIntegrator::new(
@@ -213,13 +357,13 @@ impl ImageTileIntegrator {
         lights: Arc<Vec<Arc<Light>>>,
         camera: Camera,
         sampler: Sampler,
-        pixel_sample_evaluator: PixelSampleEvaluator,
+        pixel_sample_evaluator: RayIntegrator,
     ) -> ImageTileIntegrator {
         ImageTileIntegrator {
             base: IntegratorBase::new(aggregate, lights),
             camera,
             sampler_prototype: sampler,
-            pixel_sample_evaluator,
+            ray_integrator: pixel_sample_evaluator,
         }
     }
 }
@@ -253,7 +397,7 @@ impl IntegratorI for ImageTileIntegrator {
 
                     // Initialize or get thread-local objects.
                     let scratch_buffer =
-                        scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(256)));
+                        scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(65536)));
                     let sampler =
                         sampler_tl.get_or(|| RefCell::new(self.sampler_prototype.clone()));
 
@@ -264,16 +408,15 @@ impl IntegratorI for ImageTileIntegrator {
                                 sampler
                                     .borrow_mut()
                                     .start_pixel_sample(p_pixel, sample_index, 0);
-                                let film_sample =
-                                    self.pixel_sample_evaluator.evaluate_pixel_sample(
-                                        &self.base,
-                                        &self.camera,
-                                        p_pixel,
-                                        sample_index,
-                                        &mut sampler.borrow_mut(),
-                                        &mut scratch_buffer.borrow_mut(),
-                                        options,
-                                    );
+                                let film_sample = self.ray_integrator.evaluate_pixel_sample(
+                                    &self.base,
+                                    &self.camera,
+                                    p_pixel,
+                                    sample_index,
+                                    &mut sampler.borrow_mut(),
+                                    &mut scratch_buffer.borrow_mut(),
+                                    options,
+                                );
                                 samples.push(film_sample);
                                 // Note that this does not call drop() on anything allocated in
                                 // the scratch buffer. If we allocate anything on the heap, we gotta clean
@@ -314,155 +457,16 @@ impl IntegratorI for ImageTileIntegrator {
     }
 }
 
-// TODO We don't need this to be a trait necessarily.
-//   If we're just matching inside the PixelSampleEvaluator enum's impl,
-//   then we can have each one take their own parameters for evaluate_pixel_sample().
-//   We don't actually need the trait, just the match.
-// We also want to share the evaluate_pixel_sample implementation, thought.
-trait PixelSampleEvaluatorI {
-    fn evaluate_pixel_sample(
-        &self,
-        base: &IntegratorBase,
-        camera: &Camera,
-        p_pixel: Point2i,
-        sample_index: i32,
-        sampler: &mut Sampler,
-        scratch_buffer: &mut Bump,
-        options: &Options,
-    ) -> FilmSample;
-}
-
-pub enum PixelSampleEvaluator {
-    RandomWalk(RandomWalkIntegrator),
-    SimplePath(SimplePathIntegrator),
-}
-
-impl PixelSampleEvaluatorI for PixelSampleEvaluator {
-    fn evaluate_pixel_sample(
-        &self,
-        base: &IntegratorBase,
-        camera: &Camera,
-        p_pixel: Point2i,
-        sample_index: i32,
-        sampler: &mut Sampler,
-        scratch_buffer: &mut Bump,
-        options: &Options,
-    ) -> FilmSample {
-        match self {
-            PixelSampleEvaluator::RandomWalk(integrator) => integrator.evaluate_pixel_sample(
-                base,
-                camera,
-                p_pixel,
-                sample_index,
-                sampler,
-                scratch_buffer,
-                options,
-            ),
-            PixelSampleEvaluator::SimplePath(integrator) => integrator.evaluate_pixel_sample(
-                base,
-                camera,
-                p_pixel,
-                sample_index,
-                sampler,
-                scratch_buffer,
-                options,
-            ),
-        }
-    }
-}
-
 pub struct RandomWalkIntegrator {
     pub max_depth: i32,
 }
 
-impl PixelSampleEvaluatorI for RandomWalkIntegrator {
-    fn evaluate_pixel_sample(
+impl RayIntegratorI for &RandomWalkIntegrator {
+    fn li(
         &self,
         base: &IntegratorBase,
         camera: &Camera,
-        p_pixel: Point2i,
-        sample_index: i32,
-        sampler: &mut Sampler,
-        scratch_buffer: &mut Bump,
-        options: &Options,
-    ) -> FilmSample {
-        // Sample wavelengths for the ray
-        let lu = if options.disable_wavelength_jitter {
-            0.5
-        } else {
-            sampler.get_1d()
-        };
-        let lambda = camera.get_film_const().sample_wavelengths(lu);
-
-        // Initialize camera_sample for the current sample
-        let filter = camera.get_film_const().get_filter();
-        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
-
-        let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
-
-        let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
-            debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
-            debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
-
-            // TODO Scale camera ray differentials based on image sampling rate.
-            let ray_diff_scale = Float::max(
-                0.125,
-                1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
-            );
-            if !options.disable_pixel_jitter {
-                camera_ray.ray.scale_differentials(ray_diff_scale);
-            }
-
-            // Evaluate radiance along the camera ray
-            let visible_surface = if camera.get_film_const().uses_visible_surface() {
-                Some(VisibleSurface::default())
-            } else {
-                None
-            };
-
-            let l = camera_ray.weight
-                * self.li(
-                    base,
-                    camera,
-                    &camera_ray.ray,
-                    &lambda,
-                    sampler,
-                    &visible_surface,
-                    scratch_buffer,
-                    options,
-                );
-
-            if l.has_nan() {
-                // TODO log error, set SampledSpectrum l to 0.
-                // Use env_logger.
-            } else if l.y(&lambda).is_infinite() {
-                // TODO log error, set SampledSpectrum l to 0
-            }
-
-            (l, visible_surface)
-        } else {
-            (
-                SampledSpectrum::from_const(0.0),
-                Some(VisibleSurface::default()),
-            )
-        };
-
-        FilmSample {
-            p_film: p_pixel,
-            l,
-            lambda,
-            visible_surface,
-            weight: camera_sample.filter_weight,
-        }
-    }
-}
-
-impl RandomWalkIntegrator {
-    pub fn li(
-        &self,
-        base: &IntegratorBase,
-        camera: &Camera,
-        ray: &RayDifferential,
+        ray: &mut RayDifferential,
         lambda: &SampledWavelengths,
         sampler: &mut Sampler,
         _visible_surface: &Option<VisibleSurface>,
@@ -480,7 +484,9 @@ impl RandomWalkIntegrator {
             options,
         )
     }
+}
 
+impl RandomWalkIntegrator {
     /// Depth is the *current depth* of the recursive call to this.
     /// It's not to be confused with the max depth of the walk.
     fn li_random_walk(
@@ -575,92 +581,8 @@ pub struct SimplePathIntegrator {
     pub light_sampler: UniformLightSampler,
 }
 
-// TODO This should be shared between SimplePathIntegrator and RandomWalkIntegrator.
-impl PixelSampleEvaluatorI for SimplePathIntegrator {
-    fn evaluate_pixel_sample(
-        &self,
-        base: &IntegratorBase,
-        camera: &Camera,
-        p_pixel: Point2i,
-        sample_index: i32,
-        sampler: &mut Sampler,
-        scratch_buffer: &mut Bump,
-        options: &Options,
-    ) -> FilmSample {
-        // Sample wavelengths for the ray
-        let lu = if options.disable_wavelength_jitter {
-            0.5
-        } else {
-            sampler.get_1d()
-        };
-        let lambda = camera.get_film_const().sample_wavelengths(lu);
-
-        // Initialize camera_sample for the current sample
-        let filter = camera.get_film_const().get_filter();
-        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
-
-        let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
-
-        let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
-            debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
-            debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
-
-            // TODO Scale camera ray differentials absed on image sampling rate.
-            let ray_diff_scale = Float::max(
-                0.125,
-                1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
-            );
-            if !options.disable_pixel_jitter {
-                camera_ray.ray.scale_differentials(ray_diff_scale);
-            }
-
-            // Evaluate radiance along the camera ray
-            let visible_surface = if camera.get_film_const().uses_visible_surface() {
-                Some(VisibleSurface::default())
-            } else {
-                None
-            };
-
-            let l = camera_ray.weight
-                * self.li(
-                    base,
-                    camera,
-                    &mut camera_ray.ray,
-                    &lambda,
-                    sampler,
-                    &visible_surface,
-                    scratch_buffer,
-                    options,
-                );
-
-            if l.has_nan() {
-                // TODO log error, set SampledSpectrum l to 0.
-                // Use env_logger.
-            } else if l.y(&lambda).is_infinite() {
-                // TODO log error, set SampledSpectrum l to 0
-            }
-
-            (l, visible_surface)
-        } else {
-            (
-                SampledSpectrum::from_const(0.0),
-                Some(VisibleSurface::default()),
-            )
-        };
-
-        FilmSample {
-            p_film: p_pixel,
-            l,
-            lambda,
-            visible_surface,
-            weight: camera_sample.filter_weight,
-        }
-    }
-}
-
-impl SimplePathIntegrator {
-    /// Returns an estimate of the radiance along the provided ray.
-    pub fn li(
+impl RayIntegratorI for SimplePathIntegrator {
+    fn li(
         &self,
         base: &IntegratorBase,
         camera: &Camera,
