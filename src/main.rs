@@ -2,7 +2,10 @@
 //  interior mutability instead.
 #![feature(get_mut_unchecked)]
 
-use std::fs::{self};
+use std::{
+    fs::{self},
+    time::Instant,
+};
 
 use clap::Parser;
 use shimmer::{
@@ -24,6 +27,8 @@ struct Args {
 fn main() {
     let cli = Args::parse();
 
+    // TODO Output time to render. Get consistent with timer in pbrt.
+
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
     let mut options = Options::default();
@@ -39,5 +44,12 @@ fn main() {
     );
     let scene = scene_builder.done();
 
+    let start_time = Instant::now();
     render::render_cpu(scene, &options, &mut string_interner, &mut cached_spectra);
+    let elapsed = start_time.elapsed();
+    println!(
+        "Render time: {}.{:03} seconds",
+        elapsed.as_secs(),
+        elapsed.subsec_millis()
+    );
 }
