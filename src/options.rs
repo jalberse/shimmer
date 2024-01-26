@@ -5,6 +5,7 @@ use crate::{
     Float,
 };
 
+#[derive(clap::ValueEnum, Debug, Clone)]
 pub enum RenderingCoordinateSystem {
     Camera,
     CameraWorld,
@@ -18,18 +19,18 @@ pub struct Options {
     pub disable_pixel_jitter: bool,
     pub disable_wavelength_jitter: bool,
     pub force_diffuse: bool,
-    pub image_file: String,
+    pub image_file: Option<String>,
     pub quick_render: bool,
     pub pixel_bounds: Option<Bounds2i>,
     pub crop_window: Option<Bounds2f>,
     pub pixel_samples: Option<i32>,
     pub fullscreen: bool,
     pub displacement_edge_scale: Float,
-    pub mse_reference_image: String,
-    pub mse_reference_output: String,
+    pub mse_reference_image: Option<String>,
+    pub mse_reference_output: Option<String>,
     pub record_pixel_statistics: bool,
     pub wavefront: bool,
-    pub search_directory: PathBuf,
+    pub search_directory: Option<PathBuf>,
 }
 
 impl Default for Options {
@@ -41,18 +42,18 @@ impl Default for Options {
             disable_pixel_jitter: false,
             disable_wavelength_jitter: false,
             force_diffuse: false,
-            image_file: "".to_string(),
+            image_file: None,
             quick_render: false,
             pixel_bounds: None,
             crop_window: None,
             pixel_samples: None,
             fullscreen: false,
             displacement_edge_scale: 1.0,
-            mse_reference_image: "".to_string(),
-            mse_reference_output: "".to_string(),
+            mse_reference_image: None,
+            mse_reference_output: None,
             record_pixel_statistics: false,
             wavefront: false,
-            search_directory: PathBuf::new(),
+            search_directory: None,
         }
     }
 }

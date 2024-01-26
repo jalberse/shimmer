@@ -236,11 +236,11 @@ impl FilmBaseParameters {
         options: &Options,
     ) -> FilmBaseParameters {
         let filename = parameters.get_one_string("filename", "".to_string());
-        let filename = if !options.image_file.is_empty() {
+        let filename = if let Some(image_file) = options.image_file.as_ref() {
             if !filename.is_empty() {
-                warn!("Output filename supplied on command line {} will override filename in scene description file {}", options.image_file, filename);
+                warn!("Output filename supplied on command line {} will override filename in scene description file {}", image_file, filename);
             }
-            options.image_file.clone()
+            image_file.clone()
         } else if filename.is_empty() {
             // TODO Change this to .exr when I add exr support
             "shimmer.pfm".to_string()
