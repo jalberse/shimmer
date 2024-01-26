@@ -104,7 +104,12 @@ impl MaterialI for Material {
         lambda: &SampledWavelengths,
     ) -> BSDF {
         // PAPERDOC - PBRT's implementation of GetBsdf() involves some semi-arcane C++.
-        // Rust's associated types makes this implementation much simpler.
+        // We avoid arcane-looking code, but aren't at parity - if we just implement bsdf for each
+        // variant, then we violate DRY. Ideally we'd like to move the implementation we have for Diffuse
+        // (which should be the same except for the types involved) into the MaterialI trait as a default implementation.
+        // But I'm not sure if we can use an associated *variant*, not just an associated type?
+        // Look into it.
+        // I want to revisit this for using scratch_buffer anyways...
         match self {
             Material::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
