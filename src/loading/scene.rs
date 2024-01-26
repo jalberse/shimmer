@@ -1372,13 +1372,13 @@ impl ParserTarget for BasicSceneBuilder {
                 if value.len() < 3 || !value.starts_with("\"") || !value.ends_with('\"') {
                     panic!("{} Expected quotes string for option value {}", loc, value);
                 }
-                options.mse_reference_image = value[1..value.len() - 1].to_owned();
+                options.mse_reference_image = Some(value[1..value.len() - 1].to_owned());
             }
             "msereferenceout" => {
                 if value.len() < 3 || !value.starts_with("\"") || !value.ends_with('\"') {
                     panic!("{} Expected quotes string for option value {}", loc, value);
                 }
-                options.mse_reference_output = value[1..value.len() - 1].to_owned();
+                options.mse_reference_output = Some(value[1..value.len() - 1].to_owned());
             }
             "rendercoordsys" => {
                 if value.len() < 3 || !value.starts_with("\"") || !value.ends_with("\"") {
