@@ -3,6 +3,7 @@ use crate::{
     vecmath::{normal::Normal3, vector::Vector3, Normal3f, Vector3f},
     Float,
 };
+use num::complex::Complex;
 
 #[inline]
 pub fn reflect(wo: Vector3f, n: Normal3f) -> Vector3f {
@@ -65,4 +66,23 @@ pub fn fresnel_dialectric(cos_theta_i: Float, mut eta: Float) -> Float {
     let r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
 
     0.5 * (r_parl * r_parl + r_perp * r_perp)
+}
+
+#[inline]
+/// Used for conductors.
+/// cos_theta_i: Cosine of the angle between the incident direction and the normal.
+/// eta: The relative IOR. The real component describes the decrease in the speed of light,
+/// while the imaginary component describes the decay of light as it travels deeper into the material.
+/// output: Unpolorized fresnel reflection of the interface
+pub fn fresnel_complex(cos_theta_i: Float, eta: Complex<Float>) -> Float {
+    let cos_theta_i = Float::clamp(cos_theta_i, 0.0, 1.0);
+
+    let sin2_theta_i = 1.0 - cos_theta_i * cos_theta_i;
+    let sin2_theta_t = sin2_theta_i / (eta * eta);
+    let cos_theta_t = Complex::sqrt(1.0 - sin2_theta_t);
+
+    let r_parl = (eta * cos_theta_i - cos_theta_t) / (eta * cos_theta_i + cos_theta_t);
+    let r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
+
+    Complex::norm_sqr(&r_parl) + Complex::norm_sqr(&r_perp) / 2.0
 }
