@@ -423,7 +423,7 @@ impl SpectrumI for PiecewiseLinearSpectrum {
         debug_assert!(lambda >= self.lambdas[o] && lambda <= self.lambdas[o + 1]);
 
         let t = (lambda - self.lambdas[o]) / (self.lambdas[o + 1] - self.lambdas[o]);
-        lerp(t, &self.values[o], &self.values[o + 1])
+        lerp(t, self.values[o], self.values[o + 1])
     }
 
     fn max_value(&self) -> Float {
@@ -867,7 +867,7 @@ mod tests {
         let n = 900000;
         for _ in 0..n {
             let u = between.sample(&mut rng);
-            let lambda = lerp::<Float>(u, &LAMBDA_MIN, &LAMBDA_MAX);
+            let lambda = lerp::<Float>(u, LAMBDA_MIN, LAMBDA_MAX);
             let pdf = 1.0 / (LAMBDA_MAX - LAMBDA_MIN);
             unifsum += (Spectrum::get_cie(CIE::X).get(lambda)
                 + Spectrum::get_cie(CIE::Z).get(lambda)

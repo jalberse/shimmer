@@ -39,19 +39,19 @@ pub trait Vector2:
     type ElementType: TupleElement;
 
     /// Compute the dot product.
-    fn dot(&self, v: &Self) -> Self::ElementType;
+    fn dot(&self, v: Self) -> Self::ElementType;
 
     /// Compute the dot product and take the absolute value.
-    fn abs_dot(&self, v: &Self) -> Self::ElementType;
+    fn abs_dot(&self, v: Self) -> Self::ElementType;
 
     /// Find the andle between this vector and another vector.
     /// Both vectors must be normalized.
-    fn angle_between(&self, v: &Self) -> Float;
+    fn angle_between(&self, v: Self) -> Float;
 
     /// Create a new vector orthogonal to w.
     /// w must be normalized.
     /// See PBRTv4 3.2
-    fn gram_schmidt(&self, w: &Self) -> Self;
+    fn gram_schmidt(&self, w: Self) -> Self;
 }
 
 pub trait Vector3:
@@ -74,43 +74,43 @@ pub trait Vector3:
     type AssociatedNormalType: Normal3;
 
     /// Compute the dot product.
-    fn dot(&self, v: &Self) -> Self::ElementType;
+    fn dot(&self, v: Self) -> Self::ElementType;
 
     /// Dot this vector with a normal.
-    fn dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType;
+    fn dot_normal(&self, n: Self::AssociatedNormalType) -> Self::ElementType;
 
     /// Compute the dot product and take the absolute value.
-    fn abs_dot(&self, v: &Self) -> Self::ElementType;
+    fn abs_dot(&self, v: Self) -> Self::ElementType;
 
     /// Dot this vector with a normal and take its absolute value.
-    fn abs_dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType;
+    fn abs_dot_normal(&self, n: Self::AssociatedNormalType) -> Self::ElementType;
 
     /// Take the cross product of this and a vector v.
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
-    fn cross(&self, v: &Self) -> Self;
+    fn cross(&self, v: Self) -> Self;
 
     /// Take the cross product of this and a normal n.
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
-    fn cross_normal(&self, n: &Self::AssociatedNormalType) -> Self;
+    fn cross_normal(&self, n: Self::AssociatedNormalType) -> Self;
 
     /// Find the andle between this vector and another vector.
     /// Both vectors must be normalized.
-    fn angle_between(&self, v: &Self) -> Float;
+    fn angle_between(&self, v: Self) -> Float;
 
     /// Find the angle between this vector and a normal
     /// Both vectors must be normalized.
-    fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float;
+    fn angle_between_normal(&self, n: Self::AssociatedNormalType) -> Float;
 
     /// Create a new vector orthogonal to w.
     /// w must be normalized.
     /// See PBRTv4 3.2
-    fn gram_schmidt(&self, w: &Self) -> Self;
+    fn gram_schmidt(&self, w: Self) -> Self;
 
-    fn face_forward(&self, v2: &Self) -> Self;
+    fn face_forward(&self, v2: Self) -> Self;
 
-    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self;
+    fn face_forward_n(&self, n: Self::AssociatedNormalType) -> Self;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ impl Tuple2<i32> for Vector2i {
         self.y
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         lerp(t, a, b)
     }
 
@@ -184,23 +184,23 @@ impl Vector2 for Vector2i {
     type ElementType = i32;
 
     /// Compute the dot product.
-    fn dot(&self, v: &Self) -> i32 {
-        dot2i(self, v)
+    fn dot(&self, v: Self) -> i32 {
+        dot2i(*self, v)
     }
 
     /// Compute the dot product and take the absolute value.
-    fn abs_dot(&self, v: &Self) -> i32 {
-        abs_dot2i(self, v)
+    fn abs_dot(&self, v: Self) -> i32 {
+        abs_dot2i(*self, v)
     }
 
-    fn angle_between(&self, v: &Self) -> Float {
-        angle_between2(&Vector2f::from(self), &Vector2f::from(v))
+    fn angle_between(&self, v: Self) -> Float {
+        angle_between2(Vector2f::from(self), Vector2f::from(v))
     }
 
     /// Create a new vector orthogonal to w.
     /// w must be normalized.
     /// See PBRTv4 3.2
-    fn gram_schmidt(&self, w: &Self) -> Self {
+    fn gram_schmidt(&self, w: Self) -> Self {
         self - self.dot(w) * w
     }
 }
@@ -436,7 +436,7 @@ impl Tuple3<i32> for Vector3i {
         self.z
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         lerp(t, a, b)
     }
 
@@ -470,60 +470,60 @@ impl Vector3 for Vector3i {
     type AssociatedNormalType = Normal3i;
 
     /// Compute the dot product
-    fn dot(&self, v: &Self) -> i32 {
-        dot3i(self, v)
+    fn dot(&self, v: Self) -> i32 {
+        dot3i(*self, v)
     }
 
     /// Dot this vector with a normal.
-    fn dot_normal(&self, n: &Normal3i) -> i32 {
-        dot3i(self, n)
+    fn dot_normal(&self, n: Normal3i) -> i32 {
+        dot3i(*self, n)
     }
 
     /// Compute the dot product and take the absolute value.
-    fn abs_dot(&self, v: &Self) -> i32 {
-        abs_dot3i(self, v)
+    fn abs_dot(&self, v: Self) -> i32 {
+        abs_dot3i(*self, v)
     }
 
     /// Dot this vector with a normal and take the absolute value.
-    fn abs_dot_normal(&self, n: &Normal3i) -> i32 {
-        abs_dot3i(self, n)
+    fn abs_dot_normal(&self, n: Normal3i) -> i32 {
+        abs_dot3i(*self, n)
     }
 
     /// Take the cross product of this and a vector v
-    fn cross(&self, v: &Self) -> Self {
+    fn cross(&self, v: Self) -> Self {
         // Integer vectors do not need to use EFT methods for accuracy.
-        cross_i32(self, v)
+        cross_i32(*self, v)
     }
 
     /// Take the cross product of this and a normal n
-    fn cross_normal(&self, n: &Normal3i) -> Self {
-        cross_i32(self, n)
+    fn cross_normal(&self, n: Normal3i) -> Self {
+        cross_i32(*self, n)
     }
 
-    fn angle_between(&self, v: &Self) -> Float {
-        angle_between(&Vector3f::from(self), &Vector3f::from(v))
+    fn angle_between(&self, v: Self) -> Float {
+        angle_between(Vector3f::from(self), Vector3f::from(v))
     }
 
-    fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float {
+    fn angle_between_normal(&self, n: Self::AssociatedNormalType) -> Float {
         angle_between::<Vector3f, Normal3f, Vector3f, Float>(
-            &Vector3f::from(self),
-            &Normal3f::from(n),
+            Vector3f::from(self),
+            Normal3f::from(n),
         )
     }
 
     /// Create a new vector orthogonal to w.
     /// w must be normalized.
     /// See PBRTv4 3.2
-    fn gram_schmidt(&self, w: &Self) -> Self {
+    fn gram_schmidt(&self, w: Self) -> Self {
         self - self.dot(w) * w
     }
 
-    fn face_forward(&self, v2: &Self) -> Self {
-        face_forward(self, v2)
+    fn face_forward(&self, v2: Self) -> Self {
+        face_forward(*self, v2)
     }
 
-    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
-        face_forward(self, n)
+    fn face_forward_n(&self, n: Self::AssociatedNormalType) -> Self {
+        face_forward(*self, n)
     }
 }
 
@@ -764,7 +764,7 @@ impl Tuple2<Float> for Vector2f {
         self.y
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         lerp(t, a, b)
     }
 
@@ -789,23 +789,23 @@ impl Vector2 for Vector2f {
     type ElementType = Float;
 
     /// Compute the dot product.
-    fn dot(&self, v: &Self) -> Float {
-        dot2(self, v)
+    fn dot(&self, v: Self) -> Float {
+        dot2(*self, v)
     }
 
     /// Compute the dot product and take the absolute value.
-    fn abs_dot(&self, v: &Self) -> Float {
-        abs_dot2(self, v)
+    fn abs_dot(&self, v: Self) -> Float {
+        abs_dot2(*self, v)
     }
 
-    fn angle_between(&self, v: &Self) -> Float {
-        angle_between2(self, v)
+    fn angle_between(&self, v: Self) -> Float {
+        angle_between2(*self, v)
     }
 
     /// Create a new vector orthogonal to w.
     /// w must be normalized.
     /// See PBRTv4 3.2
-    fn gram_schmidt(&self, w: &Self) -> Self {
+    fn gram_schmidt(&self, w: Self) -> Self {
         self - self.dot(w) * w
     }
 }
@@ -826,7 +826,7 @@ impl IndexMut<usize> for Vector2f {
 
 impl HasNan for Vector2f {
     fn has_nan(&self) -> bool {
-        has_nan2(self)
+        has_nan2(*self)
     }
 }
 
@@ -925,6 +925,15 @@ impl From<(Float, Float)> for Vector2f {
 impl From<Vector2f> for (Float, Float) {
     fn from(value: Vector2f) -> Self {
         (value.x, value.y)
+    }
+}
+
+impl From<Vector2i> for Vector2f {
+    fn from(value: Vector2i) -> Self {
+        Vector2f {
+            x: value.x as Float,
+            y: value.y as Float,
+        }
     }
 }
 
@@ -1050,7 +1059,7 @@ impl Tuple3<Float> for Vector3f {
         self.z
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         lerp(t, a, b)
     }
 
@@ -1084,64 +1093,64 @@ impl Vector3 for Vector3f {
     type AssociatedNormalType = Normal3f;
 
     /// Compute the dot product.
-    fn dot(&self, v: &Self) -> Float {
-        dot3(self, v)
+    fn dot(&self, v: Self) -> Float {
+        dot3(*self, v)
     }
 
     /// Dot this vector with a normal.
-    fn dot_normal(&self, n: &Normal3f) -> Float {
-        dot3(self, n)
+    fn dot_normal(&self, n: Normal3f) -> Float {
+        dot3(*self, n)
     }
 
     /// Compute the dot product and take the absolute value.
-    fn abs_dot(&self, v: &Self) -> Float {
-        abs_dot3(self, v)
+    fn abs_dot(&self, v: Self) -> Float {
+        abs_dot3(*self, v)
     }
 
     /// Dot this vector with a normal and take its absolute value.
-    fn abs_dot_normal(&self, n: &Normal3f) -> Float {
-        abs_dot3(self, n)
+    fn abs_dot_normal(&self, n: Normal3f) -> Float {
+        abs_dot3(*self, n)
     }
 
     /// Take the cross product of this and a vector v.
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
-    fn cross(&self, v: &Self) -> Self {
-        cross::<Vector3f, Vector3f, Vector3f, Float>(self, v)
+    fn cross(&self, v: Self) -> Self {
+        cross::<Vector3f, Vector3f, Vector3f, Float>(*self, v)
     }
 
     /// Take the cross product of this and a normal n.
     /// Uses an EFT method for calculating the value with minimal error without
     /// casting to f64. See PBRTv4 3.3.2.
-    fn cross_normal(&self, n: &Normal3f) -> Self {
-        cross::<Vector3f, Normal3f, Vector3f, Float>(self, n)
+    fn cross_normal(&self, n: Normal3f) -> Self {
+        cross::<Vector3f, Normal3f, Vector3f, Float>(*self, n)
     }
 
     /// Find the andle between this vector and another vector.
     /// Both vectors must be normalized.
-    fn angle_between(&self, v: &Self) -> Float {
-        angle_between(self, v)
+    fn angle_between(&self, v: Self) -> Float {
+        angle_between(*self, v)
     }
 
     /// Find the angle between this vector and a normal
     /// Both vectors must be normalized.
-    fn angle_between_normal(&self, n: &Normal3f) -> Float {
-        angle_between::<Vector3f, Normal3f, Vector3f, Float>(self, n)
+    fn angle_between_normal(&self, n: Normal3f) -> Float {
+        angle_between::<Vector3f, Normal3f, Vector3f, Float>(*self, n)
     }
 
     /// Create a new vector orthogonal to w.
     /// w must be normalized.
     /// See PBRTv4 3.2
-    fn gram_schmidt(&self, w: &Self) -> Self {
+    fn gram_schmidt(&self, w: Self) -> Self {
         self - self.dot(w) * w
     }
 
-    fn face_forward(&self, v2: &Self) -> Self {
-        face_forward(self, v2)
+    fn face_forward(&self, v2: Self) -> Self {
+        face_forward(*self, v2)
     }
 
-    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
-        face_forward(self, n)
+    fn face_forward_n(&self, n: Self::AssociatedNormalType) -> Self {
+        face_forward(*self, n)
     }
 }
 
@@ -1161,7 +1170,7 @@ impl IndexMut<usize> for Vector3f {
 
 impl HasNan for Vector3f {
     fn has_nan(&self) -> bool {
-        has_nan3(self)
+        has_nan3(*self)
     }
 }
 
@@ -1284,6 +1293,12 @@ impl From<&Vector3i> for Vector3f {
     }
 }
 
+impl From<Vector3i> for Vector3f {
+    fn from(value: Vector3i) -> Self {
+        Self::new(value.x as Float, value.y as Float, value.z as Float)
+    }
+}
+
 impl From<Vector3fi> for Vector3f {
     fn from(value: Vector3fi) -> Self {
         Vector3f {
@@ -1364,11 +1379,11 @@ impl Tuple3<Interval> for Vector3fi {
         &mut self.z
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         Self {
-            x: lerp(t, &a.x, &b.x),
-            y: lerp(t, &a.y, &b.y),
-            z: lerp(t, &a.z, &b.z),
+            x: lerp(t, a.x, b.x),
+            y: lerp(t, a.y, b.y),
+            z: lerp(t, a.z, b.z),
         }
     }
 }
@@ -1378,50 +1393,50 @@ impl Vector3 for Vector3fi {
 
     type AssociatedNormalType = Normal3fi;
 
-    fn dot(&self, v: &Self) -> Self::ElementType {
-        dot3(self, v)
+    fn dot(&self, v: Self) -> Self::ElementType {
+        dot3(*self, v)
     }
 
-    fn dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType {
-        dot3(self, n)
+    fn dot_normal(&self, n: Self::AssociatedNormalType) -> Self::ElementType {
+        dot3(*self, n)
     }
 
-    fn abs_dot(&self, v: &Self) -> Self::ElementType {
-        abs_dot3(self, v)
+    fn abs_dot(&self, v: Self) -> Self::ElementType {
+        abs_dot3(*self, v)
     }
 
-    fn abs_dot_normal(&self, n: &Self::AssociatedNormalType) -> Self::ElementType {
-        abs_dot3(self, n)
+    fn abs_dot_normal(&self, n: Self::AssociatedNormalType) -> Self::ElementType {
+        abs_dot3(*self, n)
     }
 
-    fn cross(&self, v: &Self) -> Self {
-        cross::<Vector3fi, Vector3fi, Vector3fi, Interval>(self, v)
+    fn cross(&self, v: Self) -> Self {
+        cross::<Vector3fi, Vector3fi, Vector3fi, Interval>(*self, v)
     }
 
-    fn cross_normal(&self, n: &Self::AssociatedNormalType) -> Self {
-        cross::<Vector3fi, Normal3fi, Vector3fi, Interval>(self, n)
+    fn cross_normal(&self, n: Self::AssociatedNormalType) -> Self {
+        cross::<Vector3fi, Normal3fi, Vector3fi, Interval>(*self, n)
     }
 
-    fn angle_between(&self, v: &Self) -> Float {
-        angle_between::<Vector3fi, Vector3fi, Vector3fi, Interval>(self, v)
+    fn angle_between(&self, v: Self) -> Float {
+        angle_between::<Vector3fi, Vector3fi, Vector3fi, Interval>(*self, v)
     }
 
-    fn angle_between_normal(&self, n: &Self::AssociatedNormalType) -> Float {
-        angle_between::<Vector3fi, Normal3fi, Vector3fi, Interval>(self, n)
+    fn angle_between_normal(&self, n: Self::AssociatedNormalType) -> Float {
+        angle_between::<Vector3fi, Normal3fi, Vector3fi, Interval>(*self, n)
     }
 
-    fn gram_schmidt(&self, w: &Self) -> Self {
+    fn gram_schmidt(&self, w: Self) -> Self {
         // TODO should make a generic version. It should cover both Vector2 and Vector3.
         // Can do that when we rework this whole module, though.
         self - self.dot(w) * w
     }
 
-    fn face_forward(&self, v2: &Self) -> Self {
-        face_forward(self, v2)
+    fn face_forward(&self, v2: Self) -> Self {
+        face_forward(*self, v2)
     }
 
-    fn face_forward_n(&self, n: &Self::AssociatedNormalType) -> Self {
-        face_forward(self, n)
+    fn face_forward_n(&self, n: Self::AssociatedNormalType) -> Self {
+        face_forward(*self, n)
     }
 }
 
@@ -1613,82 +1628,82 @@ mod tests {
     fn vector_vector_dot() {
         let v1 = Vector3f::new(0.0, 1.0, 2.0);
         let v2 = Vector3f::new(3.0, 4.0, 5.0);
-        assert_eq!(14.0, v1.dot(&v2));
+        assert_eq!(14.0, v1.dot(v2));
 
         let v1 = Vector3i::new(0, 1, 2);
         let v2 = Vector3i::new(3, 4, 5);
-        assert_eq!(14, v1.dot(&v2));
+        assert_eq!(14, v1.dot(v2));
 
         let v1 = Vector2f::new(0.0, 1.0);
         let v2 = Vector2f::new(2.0, 3.0);
-        assert_eq!(3.0, v1.dot(&v2));
+        assert_eq!(3.0, v1.dot(v2));
 
         let v1 = Vector2i::new(0, 1);
         let v2 = Vector2i::new(2, 3);
-        assert_eq!(3, v1.dot(&v2));
+        assert_eq!(3, v1.dot(v2));
     }
 
     #[test]
     fn vector_normal_dot() {
         let v1 = Vector3f::new(0.0, 1.0, 2.0);
         let n = Normal3f::new(3.0, 4.0, 5.0);
-        assert_eq!(14.0, v1.dot_normal(&n));
+        assert_eq!(14.0, v1.dot_normal(n));
 
         let v1 = Vector3i::new(0, 1, 2);
         let n = Normal3i::new(3, 4, 5);
-        assert_eq!(14, v1.dot_normal(&n));
+        assert_eq!(14, v1.dot_normal(n));
     }
 
     #[test]
     fn vector_vector_abs_dot() {
         let v1 = Vector3f::new(0.0, 1.0, 2.0);
         let v2 = -Vector3f::new(3.0, 4.0, 5.0);
-        assert_eq!(14.0, v1.abs_dot(&v2));
+        assert_eq!(14.0, v1.abs_dot(v2));
 
         let v1 = Vector3i::new(0, 1, 2);
         let v2 = -Vector3i::new(3, 4, 5);
-        assert_eq!(14, v1.abs_dot(&v2));
+        assert_eq!(14, v1.abs_dot(v2));
 
         let v1 = Vector2f::new(0.0, 1.0);
         let v2 = -Vector2f::new(2.0, 3.0);
-        assert_eq!(3.0, v1.abs_dot(&v2));
+        assert_eq!(3.0, v1.abs_dot(v2));
 
         let v1 = Vector2i::new(0, 1);
         let v2 = -Vector2i::new(2, 3);
-        assert_eq!(3, v1.abs_dot(&v2));
+        assert_eq!(3, v1.abs_dot(v2));
     }
 
     #[test]
     fn vector_normal_abs_dot() {
         let v1 = Vector3f::new(0.0, 1.0, 2.0);
         let n = -Normal3f::new(3.0, 4.0, 5.0);
-        assert_eq!(14.0, v1.abs_dot_normal(&n));
+        assert_eq!(14.0, v1.abs_dot_normal(n));
 
         let v1 = Vector3i::new(0, 1, 2);
         let n = -Normal3i::new(3, 4, 5);
-        assert_eq!(14, v1.abs_dot_normal(&n));
+        assert_eq!(14, v1.abs_dot_normal(n));
     }
 
     #[test]
     fn vector_vector_cross() {
         let v1 = Vector3i::new(3, -3, 1);
         let v2 = Vector3i::new(4, 9, 2);
-        assert_eq!(Vector3i::new(-15, -2, 39), v1.cross(&v2));
+        assert_eq!(Vector3i::new(-15, -2, 39), v1.cross(v2));
 
         let v1 = Vector3f::new(3.0, -3.0, 1.0);
         let v2 = Vector3f::new(4.0, 9.0, 2.0);
-        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross(&v2));
+        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross(v2));
     }
 
     #[test]
     fn vector_normal_cross() {
         let v1 = Vector3i::new(3, -3, 1);
         let n = Normal3i::new(4, 9, 2);
-        assert_eq!(Vector3i::new(-15, -2, 39), v1.cross_normal(&n));
+        assert_eq!(Vector3i::new(-15, -2, 39), v1.cross_normal(n));
 
         let v1 = Vector3f::new(3.0, -3.0, 1.0);
         let n = Normal3f::new(4.0, 9.0, 2.0);
-        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross_normal(&n));
+        assert_eq!(Vector3f::new(-15.0, -2.0, 39.0), v1.cross_normal(n));
     }
 
     #[test]
@@ -1696,7 +1711,7 @@ mod tests {
         let v1 = Vector3f::new(1.0, 2.0, 3.0).normalize();
         let v2 = Vector3f::new(3.0, 4.0, 5.0).normalize();
 
-        assert_eq!(0.18623877, v1.angle_between(&v2));
+        assert_eq!(0.18623877, v1.angle_between(v2));
     }
 
     #[test]
@@ -1704,7 +1719,7 @@ mod tests {
         let v = Vector3f::new(1.0, 2.0, 3.0).normalize();
         let n = Normal3f::new(3.0, 4.0, 5.0).normalize();
 
-        assert_eq!(0.18623877, v.angle_between_normal(&n));
+        assert_eq!(0.18623877, v.angle_between_normal(n));
     }
 
     #[test]
@@ -1727,7 +1742,7 @@ mod tests {
         let v1 = Vector3f::new(1.0, -1.0, 1.0);
         let v2 = Vector3f::new(1.0, 0.0, 1.0);
 
-        let v2_schmidted = v2.gram_schmidt(&v1.normalize());
+        let v2_schmidted = v2.gram_schmidt(v1.normalize());
 
         let expected_x: Float = 1.0 / 3.0;
         let expected_y: Float = 2.0 / 3.0;
@@ -1787,45 +1802,45 @@ mod tests {
     fn vector_lerp() {
         let v1 = Vector3f::new(0.0, 0.0, 0.0);
         let v2 = Vector3f::new(1.0, 10.0, 100.0);
-        assert_eq!(Vector3f::new(0.5, 5.0, 50.0), Tuple3::lerp(0.5, &v1, &v2))
+        assert_eq!(Vector3f::new(0.5, 5.0, 50.0), Tuple3::lerp(0.5, v1, v2))
     }
 
     #[test]
     fn vector_min() {
         let v1 = Vector3f::new(100.0, 0.0, 0.0);
         let v2 = Vector3f::new(0.0, 10.0, 100.0);
-        assert_eq!(Vector3f::new(0.0, 0.0, 0.0), Tuple3::min(&v1, &v2));
+        assert_eq!(Vector3f::new(0.0, 0.0, 0.0), Tuple3::min(v1, v2));
 
         let v1 = Vector3i::new(100, 0, 0);
         let v2 = Vector3i::new(0, 10, 100);
-        assert_eq!(Vector3i::new(0, 0, 0), Tuple3::min(&v1, &v2));
+        assert_eq!(Vector3i::new(0, 0, 0), Tuple3::min(v1, v2));
 
         let v1 = Vector2f::new(100.0, 0.0);
         let v2 = Vector2f::new(0.0, 10.0);
-        assert_eq!(Vector2f::new(0.0, 0.0), Tuple2::min(&v1, &v2));
+        assert_eq!(Vector2f::new(0.0, 0.0), Tuple2::min(v1, v2));
 
         let v1 = Vector2i::new(100, 0);
         let v2 = Vector2i::new(0, 10);
-        assert_eq!(Vector2i::new(0, 0), Tuple2::min(&v1, &v2));
+        assert_eq!(Vector2i::new(0, 0), Tuple2::min(v1, v2));
     }
 
     #[test]
     fn vector_max() {
         let v1 = Vector3f::new(100.0, 0.0, 0.0);
         let v2 = Vector3f::new(0.0, 10.0, 100.0);
-        assert_eq!(Vector3f::new(100.0, 10.0, 100.0), Tuple3::max(&v1, &v2));
+        assert_eq!(Vector3f::new(100.0, 10.0, 100.0), Tuple3::max(v1, v2));
 
         let v1 = Vector3i::new(100, 0, 0);
         let v2 = Vector3i::new(0, 10, 100);
-        assert_eq!(Vector3i::new(100, 10, 100), Tuple3::max(&v1, &v2));
+        assert_eq!(Vector3i::new(100, 10, 100), Tuple3::max(v1, v2));
 
         let v1 = Vector2f::new(100.0, 0.0);
         let v2 = Vector2f::new(0.0, 10.0);
-        assert_eq!(Vector2f::new(100.0, 10.0), Tuple2::max(&v1, &v2));
+        assert_eq!(Vector2f::new(100.0, 10.0), Tuple2::max(v1, v2));
 
         let v1 = Vector2i::new(100, 0);
         let v2 = Vector2i::new(0, 10);
-        assert_eq!(Vector2i::new(100, 10), Tuple2::max(&v1, &v2));
+        assert_eq!(Vector2i::new(100, 10), Tuple2::max(v1, v2));
     }
 
     #[test]

@@ -250,7 +250,7 @@ impl CameraBase {
 
     /// u - the fraction between the shutter open and shutter close.
     pub fn sample_time(&self, u: Float) -> Float {
-        lerp(u, &self.shutter_open, &self.shutter_close)
+        lerp(u, self.shutter_open, self.shutter_close)
     }
 
     pub fn generate_ray_differential<T: CameraI>(
@@ -342,14 +342,14 @@ impl CameraBase {
             Vector3f::Z + self.min_dir_differential_x,
             None,
         );
-        let tx = -(n_down_z.dot_vector(&x_ray.o.into()) - d) / n_down_z.dot_vector(&x_ray.d);
+        let tx = -(n_down_z.dot_vector(x_ray.o.into()) - d) / n_down_z.dot_vector(x_ray.d);
         let y_ray = Ray::new(
             Point3f::ZERO + self.min_pos_differential_y,
             Vector3f::Z + self.min_dir_differential_y,
             None,
         );
 
-        let ty = -(n_down_z.dot_vector(&y_ray.o.into()) - d) / n_down_z.dot_vector(&y_ray.d);
+        let ty = -(n_down_z.dot_vector(y_ray.o.into()) - d) / n_down_z.dot_vector(y_ray.d);
         let px = x_ray.get(tx);
         let py = y_ray.get(ty);
 

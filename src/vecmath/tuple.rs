@@ -136,10 +136,10 @@ where
     // which do implement Add<Self>. Though you could make an argument that Points should
     // not be able to be lerp'd if they can't be summed, but it's useful to be able to
     // interpolate points even if we typically can't want to allow summing them.
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self;
+    fn lerp(t: Float, a: Self, b: Self) -> Self;
 
     // Take the componentwise minimum of the two tuples.
-    fn min(a: &Self, b: &Self) -> Self {
+    fn min(a: Self, b: Self) -> Self {
         Self::new(
             T::min(a.x(), b.x()),
             T::min(a.y(), b.y()),
@@ -148,7 +148,7 @@ where
     }
 
     // Take the componentwise minimum of the two tuples.
-    fn max(a: &Self, b: &Self) -> Self {
+    fn max(a: Self, b: Self) -> Self {
         Self::new(
             T::max(a.x(), b.x()),
             T::max(a.y(), b.y()),
@@ -285,15 +285,15 @@ where
         Self::new(self.x().floor(), self.y().floor())
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self;
+    fn lerp(t: Float, a: Self, b: Self) -> Self;
 
     // Take the componentwise minimum of the two tuples.
-    fn min(a: &Self, b: &Self) -> Self {
+    fn min(a: Self, b: Self) -> Self {
         Self::new(T::min(a.x(), b.x()), T::min(a.y(), b.y()))
     }
 
     // Take the componentwise maximum of the two tuples.
-    fn max(a: &Self, b: &Self) -> Self {
+    fn max(a: Self, b: Self) -> Self {
         Self::new(T::max(a.x(), b.x()), T::max(a.y(), b.y()))
     }
 

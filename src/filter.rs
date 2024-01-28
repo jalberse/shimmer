@@ -98,8 +98,8 @@ impl FilterI for BoxFilter {
 
     fn sample(&self, u: Point2f) -> FilterSample {
         let p = Point2f::new(
-            lerp(u[0], &-self.radius.x, &self.radius.x),
-            lerp(u[1], &-self.radius.y, &self.radius.y),
+            lerp(u[0], -self.radius.x, self.radius.x),
+            lerp(u[1], -self.radius.y, self.radius.y),
         );
         FilterSample { p, weight: 1.0 }
     }

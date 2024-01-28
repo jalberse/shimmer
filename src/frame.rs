@@ -12,12 +12,12 @@ impl Frame {
     }
 
     pub fn from_xz(x: Vector3f, z: Vector3f) -> Frame {
-        let y = z.cross(&x);
+        let y = z.cross(x);
         Frame::new(x, y, z)
     }
 
     pub fn from_xy(x: Vector3f, y: Vector3f) -> Frame {
-        let z = x.cross(&y);
+        let z = x.cross(y);
         Frame::new(x, y, z)
     }
 
@@ -37,14 +37,14 @@ impl Frame {
     }
 
     pub fn to_local_v(&self, v: &Vector3f) -> Vector3f {
-        Vector3f::new(v.dot(&self.x), v.dot(&self.y), v.dot(&self.z))
+        Vector3f::new(v.dot(self.x), v.dot(self.y), v.dot(self.z))
     }
 
     pub fn to_local_n(&self, n: &Normal3f) -> Normal3f {
         Normal3f::new(
-            n.dot_vector(&self.x),
-            n.dot_vector(&self.y),
-            n.dot_vector(&self.z),
+            n.dot_vector(self.x),
+            n.dot_vector(self.y),
+            n.dot_vector(self.z),
         )
     }
 

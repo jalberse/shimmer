@@ -33,7 +33,7 @@ impl SampledWavelengths {
         let mut lambda = [0.0; NUM_SPECTRUM_SAMPLES];
 
         // Sample first wavelength using u
-        lambda[0] = lerp(u, &lambda_min, &lambda_max);
+        lambda[0] = lerp(u, lambda_min, lambda_max);
 
         // Initialzie lambda for remaining wavelengths
         let delta = (lambda_max - lambda_min) / (NUM_SPECTRUM_SAMPLES as Float);

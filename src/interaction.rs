@@ -115,7 +115,7 @@ impl SurfaceInteraction {
         flip_normal: bool,
     ) -> SurfaceInteraction {
         let normal_sign = if flip_normal { -1.0 } else { 1.0 };
-        let normal = normal_sign * Normal3f::from(dpdu.cross(&dpdv).normalize());
+        let normal = normal_sign * Normal3f::from(dpdu.cross(dpdv).normalize());
         let interaction = Interaction::new(pi, normal, uv, wo, time);
         SurfaceInteraction {
             interaction,
@@ -233,19 +233,19 @@ impl SurfaceInteraction {
         }
 
         if ray.auxiliary.as_ref().is_some_and(|aux| {
-            self.interaction.n.dot_vector(&aux.rx_direction) != 0.0
-                && self.interaction.n.dot_vector(&aux.ry_direction) != 0.0
+            self.interaction.n.dot_vector(aux.rx_direction) != 0.0
+                && self.interaction.n.dot_vector(aux.ry_direction) != 0.0
         }) {
             let aux = ray.auxiliary.as_ref().unwrap();
             // Estimate screen-space change in pt using ray differentials
             // Compute auxiliary intersecrtion points with plane, px and py
-            let d = -self.interaction.n.dot_vector(&self.p().into());
-            let tx = (-self.interaction.n.dot_vector(&aux.rx_origin.into()) - d)
-                / self.interaction.n.dot_vector(&aux.rx_direction);
+            let d = -self.interaction.n.dot_vector(self.p().into());
+            let tx = (-self.interaction.n.dot_vector(aux.rx_origin.into()) - d)
+                / self.interaction.n.dot_vector(aux.rx_direction);
             debug_assert!(tx.is_finite() && !tx.is_nan());
             let px = aux.rx_origin + tx * aux.rx_direction;
-            let ty = (-self.interaction.n.dot_vector(&aux.ry_origin.into()) - d)
-                / self.interaction.n.dot_vector(&aux.ry_direction);
+            let ty = (-self.interaction.n.dot_vector(aux.ry_origin.into()) - d)
+                / self.interaction.n.dot_vector(aux.ry_direction);
             debug_assert!(ty.is_finite() && !ty.is_nan());
             let py = aux.ry_origin + ty * aux.ry_direction;
 
@@ -263,16 +263,16 @@ impl SurfaceInteraction {
         }
 
         // Estimate screen-space changes in (u, v).
-        let ata00 = self.dpdu.dot(&self.dpdu);
-        let ata01 = self.dpdu.dot(&self.dpdv);
-        let ata11 = self.dpdv.dot(&self.dpdv);
+        let ata00 = self.dpdu.dot(self.dpdu);
+        let ata01 = self.dpdu.dot(self.dpdv);
+        let ata11 = self.dpdv.dot(self.dpdv);
         let inv_det = 1.0 / Float::difference_of_products(ata00, ata11, ata01, ata01);
         let inv_det = if inv_det.is_finite() { inv_det } else { 0.0 };
 
-        let atb0x = self.dpdu.dot(&self.dpdx);
-        let atb1x = self.dpdv.dot(&self.dpdx);
-        let atb0y = self.dpdu.dot(&self.dpdy);
-        let atb1y = self.dpdv.dot(&self.dpdy);
+        let atb0x = self.dpdu.dot(self.dpdx);
+        let atb1x = self.dpdv.dot(self.dpdx);
+        let atb0y = self.dpdu.dot(self.dpdy);
+        let atb1y = self.dpdv.dot(self.dpdy);
 
         // Compute u and v derivatives wrt x and y
         self.dudx = Float::difference_of_products(ata11, atb0x, ata01, atb1x) * inv_det;
@@ -326,9 +326,9 @@ impl SurfaceInteraction {
         self.shading.n = ns;
         debug_assert_ne!(self.shading.n, Normal3f::ZERO);
         if orientation_is_authoritative {
-            self.interaction.n = self.interaction.n.face_forward(&self.shading.n);
+            self.interaction.n = self.interaction.n.face_forward(self.shading.n);
         } else {
-            self.shading.n = self.shading.n.face_forward(&self.interaction.n);
+            self.shading.n = self.shading.n.face_forward(self.interaction.n);
         }
 
         self.shading.dpdu = dpdus;

@@ -50,7 +50,7 @@ impl DirectionCone {
     pub fn bound_subtended_directions(b: &Bounds3f, p: Point3f) -> DirectionCone {
         let bounding_sphere = b.bounding_sphere();
         // Check if the point is inside the bounding sphere
-        if p.distance_squared(&bounding_sphere.center)
+        if p.distance_squared(bounding_sphere.center)
             < bounding_sphere.radius * bounding_sphere.radius
         {
             return DirectionCone::entire_sphere();
@@ -58,7 +58,7 @@ impl DirectionCone {
         // Compute and return the DirectionCone for the bounding sphere
         let w = (bounding_sphere.center - p).normalize();
         let sin2_theta_max = bounding_sphere.radius * bounding_sphere.radius
-            / bounding_sphere.center.distance_squared(&p);
+            / bounding_sphere.center.distance_squared(p);
 
         let cos_theta_max = safe_sqrt(1.0 - sin2_theta_max);
         DirectionCone::new(w, cos_theta_max)
@@ -70,7 +70,7 @@ impl DirectionCone {
 
     /// Returns true if the vector w is within the bounding direction
     pub fn inside(&self, w: Vector3f) -> bool {
-        !self.is_empty() && self.w.dot(&w.normalize()) >= self.cos_theta
+        !self.is_empty() && self.w.dot(w.normalize()) >= self.cos_theta
     }
 
     pub fn union(&self, other: &DirectionCone) -> DirectionCone {
@@ -84,7 +84,7 @@ impl DirectionCone {
         // Handle the case where one cone is inside the other
         let theta_a = safe_acos(self.cos_theta);
         let theta_b = safe_acos(other.cos_theta);
-        let theta_d = self.w.angle_between(&other.w);
+        let theta_d = self.w.angle_between(other.w);
         if Float::min(theta_d + theta_b, PI_F) <= theta_a {
             return self.clone();
         }
@@ -98,7 +98,7 @@ impl DirectionCone {
         }
         // Find the merged cones' axis and return the cone union
         let theta_r = theta_o - theta_a;
-        let wr = self.w.cross(&other.w);
+        let wr = self.w.cross(other.w);
         if wr.length_squared() == 0.0 {
             return DirectionCone::entire_sphere();
         }

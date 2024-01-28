@@ -33,8 +33,8 @@ where
 {
     pub fn new(p1: P, p2: P) -> Self {
         Self {
-            min: Tuple2::min(&p1, &p2),
-            max: Tuple2::max(&p1, &p2),
+            min: Tuple2::min(p1, p2),
+            max: Tuple2::max(p1, p2),
             phantom_vector: PhantomData,
         }
     }
@@ -53,9 +53,9 @@ where
         P::new(self[corner & 1].x(), self[(corner & 2 != 0) as usize].y())
     }
 
-    pub fn union_point(&self, p: &P) -> Self {
-        let min = Tuple2::min(&self.min, &p);
-        let max = Tuple2::max(&self.max, &p);
+    pub fn union_point(&self, p: P) -> Self {
+        let min = Tuple2::min(self.min, p);
+        let max = Tuple2::max(self.max, p);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
         Self {
@@ -66,8 +66,8 @@ where
     }
 
     pub fn union(&self, other: &Self) -> Self {
-        let min = Tuple2::min(&self.min, &other.min);
-        let max = Tuple2::max(&self.max, &other.max);
+        let min = Tuple2::min(self.min, other.min);
+        let max = Tuple2::max(self.max, other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
         Self {
@@ -80,8 +80,8 @@ where
     /// None if the bounds do not intersect.
     /// Else, the intersection of the two bounds.
     pub fn intersect(&self, other: &Self) -> Option<Self> {
-        let min = Tuple2::max(&self.min, &other.min);
-        let max = Tuple2::min(&self.max, &other.max);
+        let min = Tuple2::max(self.min, other.min);
+        let max = Tuple2::min(self.max, other.max);
 
         if min.x() >= max.x() || min.y() >= max.y() {
             return None;
@@ -175,13 +175,13 @@ where
         P::new(
             P::ElementType::from_float(lerp(
                 t.x().into_float(),
-                &self.min.x().into_float(),
-                &self.max.x().into_float(),
+                self.min.x().into_float(),
+                self.max.x().into_float(),
             )),
             P::ElementType::from_float(lerp(
                 t.y().into_float(),
-                &self.min.y().into_float(),
-                &self.max.y().into_float(),
+                self.min.y().into_float(),
+                self.max.y().into_float(),
             )),
         )
     }
@@ -259,8 +259,8 @@ where
 {
     pub fn new(p1: P, p2: P) -> Self {
         Self {
-            min: Tuple3::min(&p1, &p2),
-            max: Tuple3::max(&p1, &p2),
+            min: Tuple3::min(p1, p2),
+            max: Tuple3::max(p1, p2),
             phantom_vector: PhantomData,
         }
     }
@@ -283,9 +283,9 @@ where
         )
     }
 
-    pub fn union_point(&self, p: &P) -> Self {
-        let min = Tuple3::min(&self.min, &p);
-        let max = Tuple3::max(&self.max, &p);
+    pub fn union_point(&self, p: P) -> Self {
+        let min = Tuple3::min(self.min, p);
+        let max = Tuple3::max(self.max, p);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
         Self {
@@ -296,8 +296,8 @@ where
     }
 
     pub fn union(&self, other: &Self) -> Self {
-        let min = Tuple3::min(&self.min, &other.min);
-        let max = Tuple3::max(&self.max, &other.max);
+        let min = Tuple3::min(self.min, other.min);
+        let max = Tuple3::max(self.max, other.max);
         // Set values directly to maintain degeneracy and avoid infinite extents.
         // See PBRTv4 pg 99.
         Self {
@@ -310,8 +310,8 @@ where
     /// None if the bounds do not intersect.
     /// Else, the intersection of the two bounds.
     pub fn intersect(&self, other: &Self) -> Option<Self> {
-        let min = Tuple3::max(&self.min, &other.min);
-        let max = Tuple3::min(&self.max, &other.max);
+        let min = Tuple3::max(self.min, other.min);
+        let max = Tuple3::min(self.max, other.max);
 
         // PAPERDOC - PBRTv4 has an IsEmpty() function that must be called after this
         // function in case the bounds don't intersect; but that intent is not clear
@@ -426,18 +426,18 @@ where
         P::new(
             P::ElementType::from_float(lerp(
                 t.x().into_float(),
-                &self.min.x().into_float(),
-                &self.max.x().into_float(),
+                self.min.x().into_float(),
+                self.max.x().into_float(),
             )),
             P::ElementType::from_float(lerp(
                 t.y().into_float(),
-                &self.min.y().into_float(),
-                &self.max.y().into_float(),
+                self.min.y().into_float(),
+                self.max.y().into_float(),
             )),
             P::ElementType::from_float(lerp(
                 t.z().into_float(),
-                &self.min.z().into_float(),
-                &self.max.z().into_float(),
+                self.min.z().into_float(),
+                self.max.z().into_float(),
             )),
         )
     }
@@ -467,7 +467,7 @@ where
     pub fn bounding_sphere(&self) -> Sphere<P, P::ElementType> {
         let center: P = (self.min + V::from(self.max)) / P::ElementType::from_i32(2);
         let radius: P::ElementType = if self.inside(&center) {
-            center.distance(&self.max)
+            center.distance(self.max)
         } else {
             P::ElementType::from_i32(0)
         };
@@ -709,7 +709,7 @@ mod tests {
         let max = Point2i::new(1, 1);
         let bounds = Bounds2i::new(min, max);
         let new_point = Point2i::new(-1, -1);
-        let union = bounds.union_point(&new_point);
+        let union = bounds.union_point(new_point);
         assert_eq!(Point2i::new(-1, -1), union.min);
         assert_eq!(Point2i::new(1, 1), union.max);
     }
@@ -720,7 +720,7 @@ mod tests {
         let max = Point3i::new(1, 1, 1);
         let bounds = Bounds3i::new(min, max);
         let new_point = Point3i::new(-1, -1, -1);
-        let union = bounds.union_point(&new_point);
+        let union = bounds.union_point(new_point);
         assert_eq!(Point3i::new(-1, -1, -1), union.min);
         assert_eq!(Point3i::new(1, 1, 1), union.max);
     }

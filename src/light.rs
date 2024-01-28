@@ -412,7 +412,7 @@ impl LightI for PointLight {
     ) -> Option<LightLiSample> {
         let p = self.base.render_from_light.apply(&Point3f::ZERO);
         let wi = (p - ctx.p()).normalize();
-        let li = self.scale * self.i.sample(&lambda) / p.distance_squared(&ctx.p());
+        let li = self.scale * self.i.sample(&lambda) / p.distance_squared(ctx.p());
         // TODO I do think this is correct compared to PBRT,
         // but I don't love just leaving many fields default().
         // Can we represent this better? Option?
@@ -612,7 +612,7 @@ impl LightI for DiffuseAreaLight {
         lambda: &SampledWavelengths,
     ) -> SampledSpectrum {
         // Check for zero emitted radiance from point on area light
-        if !self.two_sided && n.dot_vector(&w) < 0.0 {
+        if !self.two_sided && n.dot_vector(w) < 0.0 {
             return SampledSpectrum::from_const(0.0);
         }
         // TODO Check alpha mask with alpha texture and UV.

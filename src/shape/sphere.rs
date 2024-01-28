@@ -144,7 +144,7 @@ impl Sphere {
         // Compute sphere hit position and phi
         let mut p_hit = Point3f::from(oi) + Float::from(t_shape_hit) * Vector3f::from(di);
         // Refine sphere intersection point
-        p_hit *= self.radius / p_hit.distance(&Point3f::ZERO);
+        p_hit *= self.radius / p_hit.distance(Point3f::ZERO);
 
         if p_hit.x == 0.0 && p_hit.y == 0.0 {
             p_hit.x = 1e-5 * self.radius;
@@ -170,7 +170,7 @@ impl Sphere {
             // Compute sphere hit position and phi
             p_hit = Point3f::from(oi) + Float::from(t_shape_hit) * Vector3f::from(di);
             // Refine sphere intersection point
-            p_hit *= self.radius / p_hit.distance(&Point3f::ZERO);
+            p_hit *= self.radius / p_hit.distance(Point3f::ZERO);
 
             if p_hit.x == 0.0 && p_hit.y == 0.0 {
                 p_hit.x = 1e-5 * self.radius;
@@ -231,13 +231,13 @@ impl Sphere {
             * (self.theta_z_max - self.theta_z_min))
             * Vector3f::new(p_hit.x(), p_hit.y(), p_hit.z());
         // Compute coefficients for fundamental forms
-        let e1 = dpdu.dot(&dpdu);
-        let f1 = dpdu.dot(&dpdv);
-        let g1 = dpdv.dot(&dpdv);
-        let n = dpdu.cross(&dpdv).normalize();
-        let e = n.dot(&d2pduu);
-        let f = n.dot(&d2pduv);
-        let g = n.dot(&d2pdvv);
+        let e1 = dpdu.dot(dpdu);
+        let f1 = dpdu.dot(dpdv);
+        let g1 = dpdv.dot(dpdv);
+        let n = dpdu.cross(dpdv).normalize();
+        let e = n.dot(d2pduu);
+        let f = n.dot(d2pduv);
+        let g = n.dot(d2pdvv);
 
         // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
         let egf2 = Float::difference_of_products(e1, g1, f1, f1);
@@ -304,7 +304,7 @@ impl ShapeI for Sphere {
     fn sample(&self, u: Point2f) -> Option<ShapeSample> {
         let mut p_obj: Point3f = Point3f::ZERO + sample_uniform_sphere(u) * self.radius;
         // Reproject p_obj to sphere surface and compute p_obj_error
-        p_obj *= self.radius / p_obj.distance(&Point3f::ZERO);
+        p_obj *= self.radius / p_obj.distance(Point3f::ZERO);
         let p_obj_error: Vector3f = gamma(5) * Vector3f::from(p_obj).abs();
 
         // Compute surface normal for sphere sample and return shape sample
@@ -340,7 +340,7 @@ impl ShapeI for Sphere {
         let p_center: Point3f = self.render_from_object.apply(&Point3f::ZERO);
         let p_origin: Point3f = ctx.offset_ray_origin_pt(p_center);
         // Sample uniformly on sphere if $\pt{}$ is inside it
-        if p_origin.distance_squared(&p_center) <= self.radius * self.radius {
+        if p_origin.distance_squared(p_center) <= self.radius * self.radius {
             // Sample shape by area and compute incident direction _wi_
             let mut ss = self.sample(u).expect("Sphere sample() failed!");
             ss.intr.time = ctx.time;
@@ -351,7 +351,7 @@ impl ShapeI for Sphere {
             let wi = wi.normalize();
 
             // Convert area sampling PDF in _ss_ to solid angle measure
-            ss.pdf /= ss.intr.n.abs_dot_vector(&-wi) / ctx.p().distance_squared(&ss.intr.p());
+            ss.pdf /= ss.intr.n.abs_dot_vector(-wi) / ctx.p().distance_squared(ss.intr.p());
             if ss.pdf.is_infinite() {
                 return None;
             }
@@ -360,7 +360,7 @@ impl ShapeI for Sphere {
 
         // Sample sphere uniformly inside subtended cone
         // Compute quantities related to the $\theta_\roman{max}$ for cone
-        let sin_theta_max: Float = self.radius / ctx.p().distance(&p_center);
+        let sin_theta_max: Float = self.radius / ctx.p().distance(p_center);
         let sin2_theta_max: Float = sin_theta_max * sin_theta_max;
         let cos_theta_max: Float = safe_sqrt(1.0 - sin2_theta_max);
         let mut one_minus_cos_theta_max: Float = 1.0 - cos_theta_max;
@@ -424,7 +424,7 @@ impl ShapeI for Sphere {
     fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vector3f) -> Float {
         let p_center = self.render_from_object.apply(&Point3f::ZERO);
         let p_origin = ctx.offset_ray_origin_pt(p_center);
-        if p_origin.distance_squared(&p_center) <= self.radius * self.radius {
+        if p_origin.distance_squared(p_center) <= self.radius * self.radius {
             // Return solid angle PDF for point inside sphere
             // Intersect sample ray with shape geometry
             let ray = ctx.spawn_ray(wi);
@@ -436,8 +436,8 @@ impl ShapeI for Sphere {
 
             // Compute PDF in solid angle measure from shape intersection point
             let pdf = (1.0 / self.area())
-                / isect.intr.interaction.n.abs_dot_vector(&-wi)
-                / ctx.p().distance_squared(&isect.intr.p());
+                / isect.intr.interaction.n.abs_dot_vector(-wi)
+                / ctx.p().distance_squared(isect.intr.p());
             if pdf.is_infinite() {
                 return 0.0;
             } else {
@@ -445,7 +445,7 @@ impl ShapeI for Sphere {
             }
         }
         // Compute general solid angle sphere PDF
-        let sin2_theta_max = self.radius * self.radius / ctx.p().distance_squared(&p_center);
+        let sin2_theta_max = self.radius * self.radius / ctx.p().distance_squared(p_center);
         let cos_theta_max = safe_sqrt(1.0 - sin2_theta_max);
         let mut one_minus_cos_theta_max = 1.0 - cos_theta_max;
         // Compute more accurate _oneMinusCosThetaMax_ for small solid angle

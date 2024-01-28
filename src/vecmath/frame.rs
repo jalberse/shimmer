@@ -16,16 +16,16 @@ impl Frame {
         debug_assert!(Float::abs(x.length_squared() - 1.0) < 1e-4);
         debug_assert!(Float::abs(y.length_squared() - 1.0) < 1e-4);
         debug_assert!(Float::abs(z.length_squared() - 1.0) < 1e-4);
-        debug_assert!(x.abs_dot(&y) < 1e-4);
-        debug_assert!(y.abs_dot(&z) < 1e-4);
-        debug_assert!(z.abs_dot(&x) < 1e-4);
+        debug_assert!(x.abs_dot(y) < 1e-4);
+        debug_assert!(y.abs_dot(z) < 1e-4);
+        debug_assert!(z.abs_dot(x) < 1e-4);
         Frame { x, y, z }
     }
 
     pub fn from_xz(x: Vector3f, z: Vector3f) -> Frame {
         Frame {
             x,
-            y: z.cross(&x),
+            y: z.cross(x),
             z,
         }
     }
@@ -34,7 +34,7 @@ impl Frame {
         Frame {
             x,
             y,
-            z: x.cross(&y),
+            z: x.cross(y),
         }
     }
 
@@ -55,9 +55,9 @@ impl Frame {
 
     pub fn to_local(&self, v: Vector3f) -> Vector3f {
         Vector3f {
-            x: v.dot(&self.x),
-            y: v.dot(&self.y),
-            z: v.dot(&self.z),
+            x: v.dot(self.x),
+            y: v.dot(self.y),
+            z: v.dot(self.z),
         }
     }
 
@@ -65,9 +65,9 @@ impl Frame {
     // requires improving dot() in a similar manner. Traits as a better alternative to overloading.
     pub fn to_local_n(&self, n: Normal3f) -> Normal3f {
         Normal3f {
-            x: n.dot_vector(&self.x),
-            y: n.dot_vector(&self.y),
-            z: n.dot_vector(&self.z),
+            x: n.dot_vector(self.x),
+            y: n.dot_vector(self.y),
+            z: n.dot_vector(self.z),
         }
     }
 }

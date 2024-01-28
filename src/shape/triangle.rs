@@ -178,7 +178,7 @@ impl Triangle {
         p2: Point3f,
     ) -> Option<TriangleIntersection> {
         // Return no intersection if the triangle is degenerate
-        if (p2 - p0).cross(&(p1 - p0)).length_squared() == 0.0 {
+        if (p2 - p0).cross(p1 - p0).length_squared() == 0.0 {
             return None;
         }
 
@@ -336,8 +336,8 @@ impl Triangle {
             (Vector3f::ZERO, Vector3f::ZERO)
         };
         // Handle degenerate triaangle uv parameterization or partial derivatives
-        let (dpdu, dpdv) = if degenerate_uv || dpdu.cross(&dpdv).length_squared() == 0.0 {
-            let mut ng = (p2 - p0).cross(&(p1 - p0));
+        let (dpdu, dpdv) = if degenerate_uv || dpdu.cross(dpdv).length_squared() == 0.0 {
+            let mut ng = (p2 - p0).cross(p1 - p0);
             if ng.length_squared() == 0.0 {
                 // TODO This could be better if we made Vector3 more generic s.t. we could just say Vector3<f64>
                 // and call its cross implementation.
@@ -404,7 +404,7 @@ impl Triangle {
 
         // Set final surface normal and shading geometry for triangle
         // Override seruface normal in isect for triangle
-        isect.shading.n = dp02.cross(&dp12).normalize().into();
+        isect.shading.n = dp02.cross(dp12).normalize().into();
         isect.interaction.n = isect.shading.n;
         if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
             isect.shading.n = -isect.shading.n;
@@ -441,9 +441,9 @@ impl Triangle {
             };
 
             // Compute shading bitangent ts for triangle and adjust ss
-            let ts = ns.cross(&ss);
+            let ts = ns.cross(ss);
             let (ss, ts) = if ts.length_squared() > 0.0 {
-                (ts.cross_normal(&ns), ts)
+                (ts.cross_normal(ns), ts)
             } else {
                 Vector3f::from(ns).coordinate_system()
             };
@@ -467,7 +467,7 @@ impl Triangle {
                     // rays reflected from triangles with degenerate
                     // parameterizations are still reasonable.
                     let dn = Vector3f::from(self.mesh.n[v[2]] - self.mesh.n[v[0]])
-                        .cross(&Vector3f::from(self.mesh.n[v[1]] - self.mesh.n[v[0]]));
+                        .cross(Vector3f::from(self.mesh.n[v[1]] - self.mesh.n[v[0]]));
                     if dn.length_squared() == 0.0 {
                         (Normal3f::ZERO, Normal3f::ZERO)
                     } else {
@@ -507,17 +507,17 @@ impl Triangle {
 impl ShapeI for Triangle {
     fn bounds(&self) -> Bounds3f {
         let (p0, p1, p2) = self.get_points();
-        Bounds3f::new(p0, p1).union_point(&p2)
+        Bounds3f::new(p0, p1).union_point(p2)
     }
 
     fn normal_bounds(&self) -> crate::direction_cone::DirectionCone {
         let v = self.get_vertex_indices();
         let (p0, p1, p2) = self.get_points();
-        let n = (p1 - p0).cross(&(p2 - p0)).normalize();
+        let n = (p1 - p0).cross(p2 - p0).normalize();
         // Ensure correct orientation of geometric normal for normal bounds
         let n = if !self.mesh.n.is_empty() {
             let ns = self.mesh.n[v[0]] + self.mesh.n[v[1]] + self.mesh.n[v[2]];
-            n.face_forward_n(&ns)
+            n.face_forward_n(ns)
         } else if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
             -n
         } else {
@@ -542,7 +542,7 @@ impl ShapeI for Triangle {
 
     fn area(&self) -> Float {
         let (p0, p1, p2) = self.get_points();
-        0.5 * (p1 - p0).cross(&(p2 - p0)).length()
+        0.5 * (p1 - p0).cross(p2 - p0).length()
     }
 
     fn sample(&self, u: crate::vecmath::Point2f) -> Option<ShapeSample> {
@@ -554,13 +554,13 @@ impl ShapeI for Triangle {
         let p = b0 * p0 + (b1 * p1).into() + (b2 * p2).into();
 
         // Compute surface normal for sampled point on triangle.
-        let n: Normal3f = (p1 - p0).cross(&(p2 - p0)).normalize().into();
+        let n: Normal3f = (p1 - p0).cross(p2 - p0).normalize().into();
         let n = if self.mesh.n.is_empty() {
             n * -1.0
         } else {
             let ns: Normal3f =
                 b0 * self.mesh.n[v[0]] + b1 * self.mesh.n[v[1]] + b2 * self.mesh.n[v[2]];
-            n.face_forward(&ns)
+            n.face_forward(ns)
         };
 
         // Compute (u,v) for sampled point on triangle.
@@ -613,7 +613,7 @@ impl ShapeI for Triangle {
             let wi = wi.normalize();
 
             // Convert area sampling pdf in ss to solid angle measure.
-            ss.pdf /= ss.intr.n.abs_dot_vector(&(-wi)) / ctx.p().distance_squared(&ss.intr.p());
+            ss.pdf /= ss.intr.n.abs_dot_vector(-wi) / ctx.p().distance_squared(ss.intr.p());
             if ss.pdf.is_infinite() {
                 return None;
             }
@@ -634,10 +634,10 @@ impl ShapeI for Triangle {
                 (p2 - rp).normalize(),
             ];
             let w = [
-                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[1])),
-                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[1])),
-                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[0])),
-                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[2])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(wi[1])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(wi[1])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(wi[0])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(wi[2])),
             ];
             let u = sample_bilinear(u, &w);
             debug_assert!(u[0] >= 0.0 && u[0] <= 1.0 && u[1] >= 0.0 && u[1] <= 1.0);
@@ -660,10 +660,10 @@ impl ShapeI for Triangle {
         // Return ShapeSample for solid angle sampled point on triangle.
         let p = b[0] * p0 + (b[1] * p1).into() + (b[2] * p2).into();
         // Compute surface normal for sampled point on triangle
-        let n: Normal3f = (p1 - p0).cross(&(p2 - p0)).normalize().into();
+        let n: Normal3f = (p1 - p0).cross(p2 - p0).normalize().into();
         let n = if !self.mesh.n.is_empty() {
             let ns = b[0] * self.mesh.n[v[0]] + b[1] * self.mesh.n[v[1]] + b[2] * self.mesh.n[v[2]];
-            n.face_forward(&ns)
+            n.face_forward(ns)
         } else if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
             n * -1.0
         } else {
@@ -713,8 +713,8 @@ impl ShapeI for Triangle {
 
             // Compute PDF in solid angle measure from shape intersection point
             let pdf = (1.0 / self.area())
-                / (isect.intr.interaction.n.abs_dot_vector(&-wi)
-                    / ctx.p().distance_squared(&isect.intr.p()));
+                / (isect.intr.interaction.n.abs_dot_vector(-wi)
+                    / ctx.p().distance_squared(isect.intr.p()));
             if pdf.is_infinite() {
                 return 0.0;
             }
@@ -733,10 +733,10 @@ impl ShapeI for Triangle {
                 (p2 - rp).normalize(),
             ];
             let w = [
-                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[1])),
-                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[1])),
-                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[0])),
-                Float::max(0.01, ctx.ns.abs_dot_vector(&wi[2])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(wi[1])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(wi[1])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(wi[0])),
+                Float::max(0.01, ctx.ns.abs_dot_vector(wi[2])),
             ];
             pdf *= bilinear_pdf(u, &w);
         }

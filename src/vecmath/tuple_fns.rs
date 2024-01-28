@@ -11,7 +11,7 @@ use crate::{
 
 use super::{tuple::TupleElement, Length, Tuple2, Tuple3};
 
-pub fn has_nan3<V, T>(v: &V) -> bool
+pub fn has_nan3<V, T>(v: V) -> bool
 where
     V: Tuple3<T>,
     T: TupleElement,
@@ -19,7 +19,7 @@ where
     v.x().is_nan() || v.y().is_nan() || v.z().is_nan()
 }
 
-pub fn has_nan2<V, T>(v: &V) -> bool
+pub fn has_nan2<V, T>(v: V) -> bool
 where
     V: Tuple2<T>,
     T: TupleElement,
@@ -37,7 +37,7 @@ where
 /// V1: A vector (e.g. Vector3f or a Normal3f).
 /// V2: A vector (e.g. Vector3f or a Normal3f).
 /// V3: The type of the output cross product.
-pub fn cross<V1, V2, V3, E>(v1: &V1, v2: &V2) -> V3
+pub fn cross<V1, V2, V3, E>(v1: V1, v2: V2) -> V3
 where
     V1: Tuple3<E>,
     V2: Tuple3<E>,
@@ -51,7 +51,7 @@ where
     )
 }
 
-pub fn cross_i32<V1, V2, V3>(v1: &V1, v2: &V2) -> V3
+pub fn cross_i32<V1, V2, V3>(v1: V1, v2: V2) -> V3
 where
     V1: Tuple3<i32>,
     V2: Tuple3<i32>,
@@ -65,7 +65,7 @@ where
 }
 
 /// Take the dot product of two vectors.
-pub fn dot3<V1, V2, E>(v: &V1, w: &V2) -> E
+pub fn dot3<V1, V2, E>(v: V1, w: V2) -> E
 where
     V1: Tuple3<E>,
     V2: Tuple3<E>,
@@ -78,7 +78,7 @@ where
 }
 
 /// Take the dot product of two vectors.
-pub fn dot3i<V1, V2>(v: &V1, w: &V2) -> i32
+pub fn dot3i<V1, V2>(v: V1, w: V2) -> i32
 where
     V1: Tuple3<i32>,
     V2: Tuple3<i32>,
@@ -90,7 +90,7 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-pub fn abs_dot3<V1, V2, E>(v: &V1, w: &V2) -> E
+pub fn abs_dot3<V1, V2, E>(v: V1, w: V2) -> E
 where
     V1: Tuple3<E>,
     V2: Tuple3<E>,
@@ -100,7 +100,7 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-pub fn abs_dot3i<V1, V2>(v: &V1, w: &V2) -> i32
+pub fn abs_dot3i<V1, V2>(v: V1, w: V2) -> i32
 where
     V1: Tuple3<i32>,
     V2: Tuple3<i32>,
@@ -109,7 +109,7 @@ where
 }
 
 /// Take the dot product of two vectors.
-pub fn dot2<V1, V2>(v: &V1, w: &V2) -> Float
+pub fn dot2<V1, V2>(v: V1, w: V2) -> Float
 where
     V1: Tuple2<Float>,
     V2: Tuple2<Float>,
@@ -120,7 +120,7 @@ where
 }
 
 /// Take the dot product of two vectors.
-pub fn dot2i<V1, V2>(v: &V1, w: &V2) -> i32
+pub fn dot2i<V1, V2>(v: V1, w: V2) -> i32
 where
     V1: Tuple2<i32>,
     V2: Tuple2<i32>,
@@ -131,7 +131,7 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-pub fn abs_dot2<V1, V2>(v: &V1, w: &V2) -> Float
+pub fn abs_dot2<V1, V2>(v: V1, w: V2) -> Float
 where
     V1: Tuple2<Float>,
     V2: Tuple2<Float>,
@@ -140,7 +140,7 @@ where
 }
 
 /// Take the dot product of two vectors then take the absolute value.
-pub fn abs_dot2i<V1, V2>(v: &V1, w: &V2) -> i32
+pub fn abs_dot2i<V1, V2>(v: V1, w: V2) -> i32
 where
     V1: Tuple2<i32>,
     V2: Tuple2<i32>,
@@ -159,13 +159,13 @@ where
 /// V3: The resulting type from adding or subtracting V1 and V2.
 ///   That is typically a Vector3f.
 ///   We just use the third type to be able to specify that that is the case.
-pub fn angle_between<'a, V1, V2, V3, E>(v1: &'a V1, v2: &'a V2) -> Float
+pub fn angle_between<V1, V2, V3, E>(v1: V1, v2: V2) -> Float
 where
     V1: Tuple3<E>,
     V2: Tuple3<E>,
     V3: Tuple3<E> + Length<E>,
-    &'a V1: Add<&'a V2, Output = V3>,
-    &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,
+    V1: Add<V2, Output = V3>,
+    V2: Add<V1, Output = V3> + Sub<V1, Output = V3>,
     E: TupleElement + MulAdd + DifferenceOfProducts + Into<Float>,
 {
     // TODO This function could also report an Interval for interval types e.g. two Vector3fi.
@@ -182,13 +182,13 @@ where
     }
 }
 
-pub fn angle_between2<'a, V1, V2, V3>(v1: &'a V1, v2: &'a V2) -> Float
+pub fn angle_between2<V1, V2, V3>(v1: V1, v2: V2) -> Float
 where
     V1: Tuple2<Float>,
     V2: Tuple2<Float>,
     V3: Tuple2<Float> + Length<Float>,
-    &'a V1: Add<&'a V2, Output = V3>,
-    &'a V2: Add<&'a V1, Output = V3> + Sub<&'a V1, Output = V3>,
+    V1: Add<V2, Output = V3>,
+    V2: Add<V1, Output = V3> + Sub<V1, Output = V3>,
 {
     debug_assert!(!v1.has_nan());
     debug_assert!(!v2.has_nan());
@@ -199,15 +199,15 @@ where
     }
 }
 
-pub fn face_forward<T1, T2, E>(a: &T1, b: &T2) -> T1
+pub fn face_forward<T1, T2, E>(a: T1, b: T2) -> T1
 where
     T1: Tuple3<E> + Neg<Output = T1>,
     T2: Tuple3<E>,
     E: TupleElement + MulAdd + DifferenceOfProducts + IsNeg,
 {
     if dot3(a, b).is_neg() {
-        -*a
+        -a
     } else {
-        *a
+        a
     }
 }

@@ -1011,8 +1011,8 @@ impl VisibleSurface {
         let set = true;
         let p = si.p();
         let wo = si.interaction.wo;
-        let n = si.interaction.n.face_forward_v(&wo);
-        let ns = si.shading.n.face_forward_v(&wo);
+        let n = si.interaction.n.face_forward_v(wo);
+        let ns = si.shading.n.face_forward_v(wo);
         let uv = si.interaction.uv;
         let time = si.interaction.time;
         let dpdx = si.dpdx;
