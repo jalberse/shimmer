@@ -5,11 +5,13 @@ use crate::{
         cosine_hemisphere_pdf, sample_cosine_hemisphere, sample_uniform_hemisphere,
         uniform_hemisphere_pdf,
     },
+    scattering::{fresnel_complex_spectral, reflect, TrowbridgeReitzDistribution},
     spectra::sampled_spectrum::SampledSpectrum,
     vecmath::{
         point::Point2f,
         spherical::{abs_cos_theta, same_hemisphere},
-        Vector3f,
+        vector::Vector3,
+        Length, Normal3f, Normalize, Tuple3, Vector3f,
     },
     Float,
 };
@@ -106,12 +108,14 @@ pub trait BxDFI {
 
 pub enum BxDF {
     Diffuse(DiffuseBxDF),
+    Conductor(ConductorBxDF),
 }
 
 impl BxDFI for BxDF {
     fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
         match self {
             BxDF::Diffuse(v) => v.f(wo, wi, mode),
+            BxDF::Conductor(v) => v.f(wo, wi, mode),
         }
     }
 
@@ -125,6 +129,7 @@ impl BxDFI for BxDF {
     ) -> Option<BSDFSample> {
         match self {
             BxDF::Diffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::Conductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
 
@@ -137,12 +142,14 @@ impl BxDFI for BxDF {
     ) -> Float {
         match self {
             BxDF::Diffuse(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::Conductor(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
 
     fn flags(&self) -> BxDFFLags {
         match self {
             BxDF::Diffuse(v) => v.flags(),
+            BxDF::Conductor(v) => v.flags(),
         }
     }
 }
@@ -214,6 +221,138 @@ impl BxDFI for DiffuseBxDF {
             BxDFFLags::UNSET
         } else {
             BxDFFLags::DIFFUSE_REFLECTION
+        }
+    }
+}
+
+pub struct ConductorBxDF {
+    mf_distribution: TrowbridgeReitzDistribution,
+    eta: SampledSpectrum,
+    k: SampledSpectrum,
+}
+
+impl ConductorBxDF {
+    pub fn new(
+        mf_distribution: TrowbridgeReitzDistribution,
+        eta: SampledSpectrum,
+        k: SampledSpectrum,
+    ) -> ConductorBxDF {
+        ConductorBxDF {
+            mf_distribution,
+            eta,
+            k,
+        }
+    }
+
+    pub fn regularize(&mut self) {
+        self.mf_distribution.regularize()
+    }
+}
+
+impl BxDFI for ConductorBxDF {
+    fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
+        if !same_hemisphere(wo, wi) {
+            return SampledSpectrum::from_const(0.0);
+        }
+        if self.mf_distribution.effectively_smooth() {
+            return SampledSpectrum::from_const(0.0);
+        }
+
+        // Evaluate rough conductor BRDF
+        // Compute cosins and wm for conductor BRDF
+        let cos_theta_o = abs_cos_theta(wo);
+        let cos_theta_i = abs_cos_theta(wi);
+        if cos_theta_i == 0.0 || cos_theta_o == 0.0 {
+            return SampledSpectrum::from_const(0.0);
+        }
+        let wm = wi + wo;
+        if wm.length_squared() == 0.0 {
+            return SampledSpectrum::from_const(0.0);
+        }
+
+        let wm = wm.normalize();
+
+        // Evaluate fresnel factor f for conductor BRDF
+        let f = fresnel_complex_spectral(wo.abs_dot(wm), self.eta, self.k);
+
+        self.mf_distribution.d(wm) * f * self.mf_distribution.g(wo, wi)
+            / (4.0 * cos_theta_o * cos_theta_i)
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        _uc: Float,
+        u: Point2f,
+        _mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        if (sample_flags.bits() & BxDFReflTransFlags::REFLECTION.bits()) == 0 {
+            return None;
+        }
+        if self.mf_distribution.effectively_smooth() {
+            // Sample perfect specular conductor BRDF
+            let wi = Vector3f::new(-wo.x, -wo.y, wo.z);
+            let f =
+                fresnel_complex_spectral(abs_cos_theta(wi), self.eta, self.k) / abs_cos_theta(wi);
+            return Some(BSDFSample::new(f, wi, 1.0, BxDFFLags::SPECULAR_REFLECTION));
+        }
+        // Sample rough conductor BRDF
+        // Sample microfacet normal wm and reflected direction wi
+        if wo.z == 0.0 {
+            return None;
+        }
+        let wm = self.mf_distribution.sample_wm(wo, u);
+        let wi = reflect(wo, wm.into());
+        if !same_hemisphere(wo, wi) {
+            return None;
+        }
+
+        // Compute PDF of wi for microfacet reflection
+        let pdf = self.mf_distribution.pdf(wo, wm) / (4.0 * wo.abs_dot(wm));
+
+        let cos_theta_o = abs_cos_theta(wo);
+        let cos_theta_i = abs_cos_theta(wi);
+        if cos_theta_i == 0.0 || cos_theta_o == 0.0 {
+            return None;
+        }
+
+        // Evaluate fresnel factor f for conductor BRDF
+        let f = fresnel_complex_spectral(wo.abs_dot(wm), self.eta, self.k);
+
+        let f = self.mf_distribution.d(wm) * f * self.mf_distribution.g(wo, wi)
+            / (4.0 * cos_theta_o * cos_theta_i);
+        Some(BSDFSample::new(f, wi, pdf, BxDFFLags::GLOSSY_REFLECTION))
+    }
+
+    fn pdf(
+        &self,
+        wo: Vector3f,
+        wi: Vector3f,
+        _mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        if sample_flags.bits() & BxDFReflTransFlags::REFLECTION.bits() == 0
+            || !same_hemisphere(wo, wi)
+            || self.mf_distribution.effectively_smooth()
+        {
+            return 0.0;
+        }
+
+        // Evaluate sampling PDF of rough conductor BRDF
+        let wm = wo + wi;
+        if wm.length_squared() == 0.0 {
+            return 0.0;
+        }
+        let wm = wm.normalize().face_forward_n(Normal3f::Z);
+        self.mf_distribution.pdf(wo, wm) / (4.0 * wo.abs_dot(wm))
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        if self.mf_distribution.effectively_smooth() {
+            BxDFFLags::SPECULAR_REFLECTION
+        } else {
+            BxDFFLags::GLOSSY_REFLECTION
         }
     }
 }
