@@ -1,5 +1,6 @@
 use crate::{
     math::safe_sqrt,
+    spectra::{sampled_spectrum::SampledSpectrum, NUM_SPECTRUM_SAMPLES},
     vecmath::{normal::Normal3, vector::Vector3, Normal3f, Vector3f},
     Float,
 };
@@ -68,12 +69,12 @@ pub fn fresnel_dialectric(cos_theta_i: Float, mut eta: Float) -> Float {
     0.5 * (r_parl * r_parl + r_perp * r_perp)
 }
 
-#[inline]
 /// Used for conductors.
 /// cos_theta_i: Cosine of the angle between the incident direction and the normal.
 /// eta: The relative IOR. The real component describes the decrease in the speed of light,
 /// while the imaginary component describes the decay of light as it travels deeper into the material.
 /// output: Unpolorized fresnel reflection of the interface
+#[inline]
 pub fn fresnel_complex(cos_theta_i: Float, eta: Complex<Float>) -> Float {
     let cos_theta_i = Float::clamp(cos_theta_i, 0.0, 1.0);
 
@@ -85,4 +86,19 @@ pub fn fresnel_complex(cos_theta_i: Float, eta: Complex<Float>) -> Float {
     let r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
 
     Complex::norm_sqr(&r_parl) + Complex::norm_sqr(&r_perp) / 2.0
+}
+
+/// Wrapper around fresnel_complex() which takes spectrally varying complex IORs split into
+/// the eta and k values.
+#[inline]
+pub fn fresnel_complex_spectral(
+    cos_theta_i: Float,
+    eta: SampledSpectrum,
+    k: SampledSpectrum,
+) -> SampledSpectrum {
+    let mut s = [0.0; NUM_SPECTRUM_SAMPLES];
+    for i in 0..NUM_SPECTRUM_SAMPLES {
+        s[i] = fresnel_complex(cos_theta_i, Complex::new(eta[i], k[i]));
+    }
+    SampledSpectrum::new(s)
 }

@@ -14,4 +14,4 @@ pub use spectrum::DenselySampledSpectrum;
 pub use spectrum::PiecewiseLinearSpectrum;
 pub use spectrum::Spectrum;
 
-const NUM_SPECTRUM_SAMPLES: usize = 4;
+pub const NUM_SPECTRUM_SAMPLES: usize = 4;
