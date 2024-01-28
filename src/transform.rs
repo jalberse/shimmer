@@ -254,9 +254,8 @@ impl Transform {
         for i in 0..3 {
             for j in 0..3 {
                 let kronecker = if i == j { 1.0 } else { 0.0 };
-                r.m[i][j] =
-                    kronecker - 2.0 / u.dot(&u) * u[i] * u[j] - 2.0 / v.dot(&v) * v[i] * v[j]
-                        + 4.0 * u.dot(&v) / (u.dot(&u) * v.dot(&v)) * v[i] * u[j];
+                r.m[i][j] = kronecker - 2.0 / u.dot(u) * u[i] * u[j] - 2.0 / v.dot(v) * v[i] * v[j]
+                    + 4.0 * u.dot(v) / (u.dot(u) * v.dot(v)) * v[i] * u[j];
             }
         }
 
@@ -290,8 +289,8 @@ impl Transform {
         world_from_camera.m[3][3] = 1.0;
 
         let dir = (look_at - pos).normalize();
-        let right = up.normalize().cross(&dir).normalize();
-        let new_up = dir.cross(&right);
+        let right = up.normalize().cross(dir).normalize();
+        let new_up = dir.cross(right);
 
         world_from_camera.m[0][0] = right.x;
         world_from_camera.m[1][0] = right.y;
@@ -551,7 +550,7 @@ impl TransformableRay for Ray {
         // Offset ray origin to edge of error bounds and compute t_max
         let length_squared = d.length_squared();
         let o: Point3fi = if length_squared > 0.0 {
-            let dt = d.abs().dot(&o.error().into()) / length_squared;
+            let dt = d.abs().dot(o.error().into()) / length_squared;
             if let Some(t_max) = t_max {
                 *t_max = *t_max - dt;
             }
@@ -595,7 +594,7 @@ impl Transformable for Bounds3f {
         );
 
         for i in 2..8 {
-            out = out.union_point(&transform.apply(&self.corner(i)));
+            out = out.union_point(transform.apply(&self.corner(i)));
         }
 
         out
@@ -621,7 +620,7 @@ impl Transformable for SurfaceInteraction {
             dndu: t.apply(&self.dndu),
             dndv: t.apply(&self.dndv),
             shading: SurfaceInteractionShading {
-                n: t.apply(&self.shading.n).normalize().face_forward(&n),
+                n: t.apply(&self.shading.n).normalize().face_forward(n),
                 dpdu: t.apply(&self.shading.dpdu),
                 dpdv: t.apply(&self.shading.dpdv),
                 dndu: t.apply(&self.shading.dndu),
@@ -742,7 +741,7 @@ impl InverseTransformableRay for Ray {
                 o.y().width() / 2.0,
                 o.z().width() / 2.0,
             );
-            let dt = d.abs().dot(&o_error) / length_squared;
+            let dt = d.abs().dot(o_error) / length_squared;
             if let Some(t_max) = t_max {
                 *t_max = *t_max - dt;
             }

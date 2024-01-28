@@ -164,7 +164,7 @@ impl PrimitiveI for TransformedPrimitive {
         debug_assert!(si.t_hit <= 1.001 * t_max);
 
         si.intr = self.render_from_primitive.apply(&si.intr);
-        debug_assert!(si.intr.interaction.n.dot(&si.intr.shading.n) >= 0.0);
+        debug_assert!(si.intr.interaction.n.dot(si.intr.shading.n) >= 0.0);
 
         Some(si)
     }

@@ -640,7 +640,7 @@ mod tests {
         assert!(si.is_some());
         let si = si.unwrap();
         // The normal should be in the negative X direction (we're hitting a sphere head-on in the positive X direction)
-        assert_approx_eq!(Float, si.intr.shading.n.dot(&Normal3f::NEG_X), 1.0);
+        assert_approx_eq!(Float, si.intr.shading.n.dot(Normal3f::NEG_X), 1.0);
         // Ray started at -5, radius is 1, so it hits at 4.0.
         assert_approx_eq!(Float, si.t_hit, 4.0);
         // The hit should be at just about (-1, 0, 0)
@@ -688,7 +688,7 @@ mod tests {
         assert!(si.is_some());
         let si = si.unwrap();
         // The normal should be in the negative X direction (we're hitting a sphere head-on in the positive X direction)
-        assert_approx_eq!(Float, si.intr.shading.n.dot(&Normal3f::NEG_X), 1.0);
+        assert_approx_eq!(Float, si.intr.shading.n.dot(Normal3f::NEG_X), 1.0);
         // Ray started at -10, radius is 1 pushing the closest sphere's position to -3.5 - 1.0 == -4.5, so it hits at 5.5.
         assert_approx_eq!(Float, si.t_hit, 5.5, epsilon = 0.00001);
         // The hit should be at just about (-4.5, 0, 0), as center is at (-3.5, 0, 0) and it has a radius of 1.

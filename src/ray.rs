@@ -51,9 +51,9 @@ impl Ray {
 
     pub fn offset_ray_origin(pi: Point3fi, n: Normal3f, w: Vector3f) -> Point3f {
         // Find vector offset to corner of error bounds and compute initial p0
-        let d = n.abs().dot_vector(&pi.error());
+        let d = n.abs().dot_vector(pi.error());
         let mut offset = d * Vector3f::from(n);
-        if w.dot_normal(&n) < 0.0 {
+        if w.dot_normal(n) < 0.0 {
             offset = -offset;
         }
         let mut po = Point3f::from(pi) + offset;

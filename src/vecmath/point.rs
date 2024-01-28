@@ -31,9 +31,9 @@ pub trait Point2:
     type ElementType: TupleElement;
     type AssociatedVectorType: Vector2 + From<Self>;
 
-    fn distance(&self, p: &Self) -> Float;
+    fn distance(&self, p: Self) -> Float;
 
-    fn distance_squared(&self, p: &Self) -> Float;
+    fn distance_squared(&self, p: Self) -> Float;
 }
 
 pub trait Point3:
@@ -52,9 +52,9 @@ pub trait Point3:
     type ElementType: TupleElement;
     type AssociatedVectorType: Vector3 + From<Self>;
 
-    fn distance(&self, p: &Self) -> Self::ElementType;
+    fn distance(&self, p: Self) -> Self::ElementType;
 
-    fn distance_squared(&self, p: &Self) -> Self::ElementType;
+    fn distance_squared(&self, p: Self) -> Self::ElementType;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,10 +102,10 @@ impl Tuple2<i32> for Point2i {
         self.y
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         Point2i {
-            x: math::lerp(t, &(a.x as Float), &(b.x as Float)) as i32,
-            y: math::lerp(t, &(a.y as Float), &(b.y as Float)) as i32,
+            x: math::lerp(t, a.x as Float, b.x as Float) as i32,
+            y: math::lerp(t, a.y as Float, b.y as Float) as i32,
         }
     }
 
@@ -130,12 +130,12 @@ impl Point2 for Point2i {
     type ElementType = i32;
     type AssociatedVectorType = Vector2i;
 
-    fn distance(&self, p: &Self) -> Float {
+    fn distance(&self, p: Self) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length() as Float
     }
 
-    fn distance_squared(&self, p: &Self) -> Float {
+    fn distance_squared(&self, p: Self) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length_squared() as Float
     }
@@ -351,11 +351,11 @@ impl Tuple3<i32> for Point3i {
         self.z
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         Point3i {
-            x: math::lerp(t, &(a.x as Float), &(b.x as Float)) as i32,
-            y: math::lerp(t, &(a.y as Float), &(b.y as Float)) as i32,
-            z: math::lerp(t, &(a.z as Float), &(b.z as Float)) as i32,
+            x: math::lerp(t, a.x as Float, b.x as Float) as i32,
+            y: math::lerp(t, a.y as Float, b.y as Float) as i32,
+            z: math::lerp(t, a.z as Float, b.z as Float) as i32,
         }
     }
 
@@ -388,11 +388,11 @@ impl Point3 for Point3i {
     type ElementType = i32;
     type AssociatedVectorType = Vector3i;
 
-    fn distance(&self, p: &Self) -> i32 {
+    fn distance(&self, p: Self) -> i32 {
         (self - p).length()
     }
 
-    fn distance_squared(&self, p: &Self) -> i32 {
+    fn distance_squared(&self, p: Self) -> i32 {
         (self - p).length_squared()
     }
 }
@@ -593,10 +593,10 @@ impl Tuple2<Float> for Point2f {
         self.y
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         Point2f {
-            x: lerp(t, &a.x, &b.x),
-            y: lerp(t, &a.y, &b.y),
+            x: lerp(t, a.x, b.x),
+            y: lerp(t, a.y, b.y),
         }
     }
 
@@ -621,12 +621,12 @@ impl Point2 for Point2f {
     type ElementType = Float;
     type AssociatedVectorType = Vector2f;
 
-    fn distance(&self, p: &Point2f) -> Float {
+    fn distance(&self, p: Point2f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length()
     }
 
-    fn distance_squared(&self, p: &Point2f) -> Float {
+    fn distance_squared(&self, p: Point2f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length_squared()
     }
@@ -648,7 +648,7 @@ impl IndexMut<usize> for Point2f {
 
 impl HasNan for Point2f {
     fn has_nan(&self) -> bool {
-        has_nan2(self)
+        has_nan2(*self)
     }
 }
 
@@ -834,11 +834,11 @@ impl Tuple3<Float> for Point3f {
         self.z
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         Self {
-            x: math::lerp(t, &a.x, &b.x),
-            y: math::lerp(t, &a.y, &b.y),
-            z: math::lerp(t, &a.z, &b.z),
+            x: math::lerp(t, a.x, b.x),
+            y: math::lerp(t, a.y, b.y),
+            z: math::lerp(t, a.z, b.z),
         }
     }
 
@@ -871,12 +871,12 @@ impl Point3 for Point3f {
     type ElementType = Float;
     type AssociatedVectorType = Vector3f;
 
-    fn distance(&self, p: &Point3f) -> Float {
+    fn distance(&self, p: Point3f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length()
     }
 
-    fn distance_squared(&self, p: &Point3f) -> Float {
+    fn distance_squared(&self, p: Point3f) -> Float {
         debug_assert!(!self.has_nan());
         (self - p).length_squared()
     }
@@ -898,7 +898,7 @@ impl IndexMut<usize> for Point3f {
 
 impl HasNan for Point3f {
     fn has_nan(&self) -> bool {
-        has_nan3(self)
+        has_nan3(*self)
     }
 }
 
@@ -1066,11 +1066,11 @@ impl Tuple3<Interval> for Point3fi {
         &mut self.z
     }
 
-    fn lerp(t: Float, a: &Self, b: &Self) -> Self {
+    fn lerp(t: Float, a: Self, b: Self) -> Self {
         Point3fi {
-            x: lerp(t, &a.x, &b.x),
-            y: lerp(t, &a.y, &b.y),
-            z: lerp(t, &a.z, &b.z),
+            x: lerp(t, a.x, b.x),
+            y: lerp(t, a.y, b.y),
+            z: lerp(t, a.z, b.z),
         }
     }
 }
@@ -1084,12 +1084,12 @@ impl Point3 for Point3fi {
 
     type AssociatedVectorType = Vector3fi;
 
-    fn distance(&self, p: &Self) -> Self::ElementType {
+    fn distance(&self, p: Self) -> Self::ElementType {
         debug_assert!(!self.has_nan());
         (self - p).length()
     }
 
-    fn distance_squared(&self, p: &Self) -> Self::ElementType {
+    fn distance_squared(&self, p: Self) -> Self::ElementType {
         debug_assert!(!self.has_nan());
         (self - p).length_squared()
     }
@@ -1225,14 +1225,14 @@ mod tests {
     fn point_point_distance() {
         let p1 = Point2f::new(0.0, 0.0);
         let p2 = Point2f::new(3.0, 4.0);
-        assert_eq!(5.0, p1.distance(&p2));
+        assert_eq!(5.0, p1.distance(p2));
     }
 
     #[test]
     fn point_point_distance_squared() {
         let p1 = Point2f::new(0.0, 0.0);
         let p2 = Point2f::new(3.0, 4.0);
-        assert_eq!(25.0, p1.distance_squared(&p2));
+        assert_eq!(25.0, p1.distance_squared(p2));
     }
 
     #[test]
@@ -1448,7 +1448,7 @@ mod tests {
     fn point2i_lerp() {
         let p1 = Point2i::new(0, 10);
         let p2 = Point2i::new(10, 20);
-        assert_eq!(Point2i::new(5, 15), Point2i::lerp(0.5, &p1, &p2));
+        assert_eq!(Point2i::new(5, 15), Point2i::lerp(0.5, p1, p2));
     }
 
     #[test]
@@ -1462,8 +1462,8 @@ mod tests {
     fn point2i_distance() {
         let p1 = Point2i::ZERO;
         let p2 = Point2i::new(3, 4);
-        assert_eq!(5.0, p1.distance(&p2));
-        assert_eq!(25.0, p1.distance_squared(&p2));
+        assert_eq!(5.0, p1.distance(p2));
+        assert_eq!(25.0, p1.distance_squared(p2));
     }
 
     #[test]
@@ -1508,7 +1508,7 @@ mod tests {
     fn point3f_lerp() {
         let p1 = Point3f::new(0.0, 100.0, 1000.0);
         let p2 = Point3f::new(10.0, 200.0, 2000.0);
-        let p3 = Point3f::lerp(0.5, &p1, &p2);
+        let p3 = Point3f::lerp(0.5, p1, p2);
         assert_eq!(5.0, p3[0]);
         assert_eq!(150.0, p3[1]);
         assert_eq!(1500.0, p3[2]);

@@ -3,7 +3,7 @@ use crate::{float::PI_F, math::safe_acos, Float};
 use super::{vector::Vector3, Tuple3, Vector3f};
 
 pub fn spherical_triangle_area(a: Vector3f, b: Vector3f, c: Vector3f) -> Float {
-    Float::abs(2.0 * Float::atan2(a.dot(&b.cross(&c)), 1.0 + a.dot(&b) + a.dot(&c) + b.dot(&c)))
+    Float::abs(2.0 * Float::atan2(a.dot(b.cross(c)), 1.0 + a.dot(b) + a.dot(c) + b.dot(c)))
 }
 pub fn spherical_direction(sin_theta: Float, cos_theta: Float, phi: Float) -> Vector3f {
     Vector3f::new(

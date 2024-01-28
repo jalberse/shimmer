@@ -535,7 +535,7 @@ impl RandomWalkIntegrator {
             return le;
         }
         let f = f.unwrap();
-        let fcos = f * wp.abs_dot_normal(&isect.shading.n);
+        let fcos = f * wp.abs_dot_normal(isect.shading.n);
 
         // Recursively trace ray to estimate incident radiance at surface
         let ray = isect.interaction.spawn_ray(wp);
@@ -756,7 +756,7 @@ impl SimplePathIntegrator {
                     break;
                 }
                 let bs = bs.unwrap();
-                beta *= bs.f * bs.wi.abs_dot_normal(&isect.shading.n) / bs.pdf;
+                beta *= bs.f * bs.wi.abs_dot_normal(isect.shading.n) / bs.pdf;
                 specular_bounce = bs.is_specular();
                 *ray = isect.interaction.spawn_ray(bs.wi);
             } else {
@@ -770,12 +770,11 @@ impl SimplePathIntegrator {
                     let wi = sample_uniform_hemisphere(sampler.get_2d());
                     let pdf = uniform_hemisphere_pdf();
                     let wi = if (flags.is_reflective()
-                        && wo.dot_normal(&isect.interaction.n)
-                            * wi.dot_normal(&isect.interaction.n)
+                        && wo.dot_normal(isect.interaction.n) * wi.dot_normal(isect.interaction.n)
                             < 0.0)
                         || (flags.is_transmissive()
-                            && wo.dot_normal(&isect.interaction.n)
-                                * wi.dot_normal(&isect.interaction.n)
+                            && wo.dot_normal(isect.interaction.n)
+                                * wi.dot_normal(isect.interaction.n)
                                 > 0.0)
                     {
                         -wi
@@ -787,7 +786,7 @@ impl SimplePathIntegrator {
                 beta *= bsdf
                     .f(wo, wi, crate::bxdf::TransportMode::Radiance)
                     .unwrap()
-                    * wi.abs_dot_normal(&isect.shading.n)
+                    * wi.abs_dot_normal(isect.shading.n)
                     / pdf;
                 specular_bounce = false;
                 *ray = isect.interaction.spawn_ray(wi);
