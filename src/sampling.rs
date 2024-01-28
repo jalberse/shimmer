@@ -167,6 +167,12 @@ pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
     r * Point2f::new(Float::cos(theta), Float::sin(theta))
 }
 
+pub fn sample_uniform_disk_polar(u: Point2f) -> Point2f {
+    let r = Float::sqrt(u[0]);
+    let theta = 2.0 * PI_F * u[1];
+    Point2f::new(r * Float::cos(theta), r * Float::sin(theta))
+}
+
 pub fn get_camera_sample<T: SamplerI>(
     sampler: &mut T,
     p_pixel: Point2i,

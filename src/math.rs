@@ -14,6 +14,11 @@ pub const INV_4PI: Float = 0.07957747154594766788;
 pub const PI_OVER_4: Float = 0.78539816339744830961;
 pub const PI_OVER_2: Float = 1.57079632679489661923;
 
+#[inline]
+pub fn sqr(x: Float) -> Float {
+    x * x
+}
+
 pub trait Sqrt {
     fn sqrt(self) -> Self;
 }
