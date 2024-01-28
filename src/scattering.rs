@@ -111,7 +111,7 @@ pub fn fresnel_complex_spectral(
 }
 
 /// Encapsulates the microfacet distribution function according to the Trowbridge-Reitz model.
-struct TrowbridgeReitzDistribution {
+pub struct TrowbridgeReitzDistribution {
     alpha_x: Float,
     alpha_y: Float,
 }
