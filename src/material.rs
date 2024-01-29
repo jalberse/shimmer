@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     bsdf::BSDF,
-    bxdf::{BxDF, ConductorBxDF, DialectricBxDF, DiffuseBxDF},
+    bxdf::{BxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF},
     image::Image,
     interaction::SurfaceInteraction,
     loading::{
@@ -58,7 +58,7 @@ pub trait MaterialI {
 pub enum Material {
     Diffuse(DiffuseMaterial),
     Conductor(ConductorMaterial),
-    Dialectric(DialectricMaterial),
+    Dielectric(DielectricMaterial),
 }
 
 impl Material {
@@ -86,7 +86,7 @@ impl Material {
                 cached_spectra,
                 textures,
             )),
-            "dialectric" => Material::Dialectric(DialectricMaterial::create(
+            "dielectric" => Material::Dielectric(DielectricMaterial::create(
                 parameters,
                 normal_map,
                 loc,
@@ -113,7 +113,7 @@ impl MaterialI for Material {
         match self {
             Material::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
             Material::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
-            Material::Dialectric(m) => BxDF::Dialectric(m.get_bxdf(tex_eval, ctx, lambda)),
+            Material::Dielectric(m) => BxDF::Dielectric(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -133,7 +133,7 @@ impl MaterialI for Material {
         match self {
             Material::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
             Material::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
-            Material::Dialectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            Material::Dielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -141,7 +141,7 @@ impl MaterialI for Material {
         match self {
             Material::Diffuse(m) => m.can_evaluate_textures(tex_eval),
             Material::Conductor(m) => m.can_evaluate_textures(tex_eval),
-            Material::Dialectric(m) => m.can_evaluate_textures(tex_eval),
+            Material::Dielectric(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
@@ -149,7 +149,7 @@ impl MaterialI for Material {
         match self {
             Material::Diffuse(m) => m.get_normal_map(),
             Material::Conductor(m) => m.get_normal_map(),
-            Material::Dialectric(m) => m.get_normal_map(),
+            Material::Dielectric(m) => m.get_normal_map(),
         }
     }
 
@@ -157,7 +157,7 @@ impl MaterialI for Material {
         match self {
             Material::Diffuse(m) => m.get_displacement(),
             Material::Conductor(m) => m.get_displacement(),
-            Material::Dialectric(m) => m.get_displacement(),
+            Material::Dielectric(m) => m.get_displacement(),
         }
     }
 
@@ -165,7 +165,7 @@ impl MaterialI for Material {
         match self {
             Material::Diffuse(m) => m.has_subsurface_scattering(),
             Material::Conductor(m) => m.has_subsurface_scattering(),
-            Material::Dialectric(m) => m.has_subsurface_scattering(),
+            Material::Dielectric(m) => m.has_subsurface_scattering(),
         }
     }
 }
@@ -462,7 +462,7 @@ impl MaterialI for ConductorMaterial {
 }
 
 #[derive(Debug)]
-pub struct DialectricMaterial {
+pub struct DielectricMaterial {
     displacement: Option<Arc<FloatTexture>>,
     normal_map: Option<Arc<Image>>,
     u_roughness: Arc<FloatTexture>,
@@ -471,14 +471,14 @@ pub struct DialectricMaterial {
     eta: Arc<Spectrum>,
 }
 
-impl DialectricMaterial {
+impl DielectricMaterial {
     pub fn create(
         parameters: &mut TextureParameterDictionary,
         normal_map: Option<Arc<Image>>,
         _loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> DialectricMaterial {
+    ) -> DielectricMaterial {
         let eta = if !parameters.get_float_array("eta").is_empty() {
             Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(
                 parameters.get_float_array("eta")[0],
@@ -504,7 +504,7 @@ impl DialectricMaterial {
         let displacement = parameters.get_float_texture_or_none("displacement", textures);
         let remap_roughness = parameters.get_one_bool("remaproughness", true);
 
-        DialectricMaterial::new(
+        DielectricMaterial::new(
             displacement,
             normal_map,
             u_roughness,
@@ -533,8 +533,8 @@ impl DialectricMaterial {
     }
 }
 
-impl MaterialI for DialectricMaterial {
-    type ConcreteBxDF = DialectricBxDF;
+impl MaterialI for DielectricMaterial {
+    type ConcreteBxDF = DielectricBxDF;
 
     fn get_bxdf<T: TextureEvaluatorI>(
         &self,
@@ -561,7 +561,7 @@ impl MaterialI for DialectricMaterial {
             sampled_eta = 1.0;
         }
 
-        // Create microfacet distribution for dialectric material
+        // Create microfacet distribution for dielectric material
         let mut u_rough = tex_eval.evaluate_float(&self.u_roughness, &ctx.tex_ctx);
         let mut v_rough = tex_eval.evaluate_float(&self.v_roughness, &ctx.tex_ctx);
         if self.remap_roughness {
@@ -569,7 +569,7 @@ impl MaterialI for DialectricMaterial {
             v_rough = TrowbridgeReitzDistribution::roughness_to_alpha(v_rough);
         }
         let distrib = TrowbridgeReitzDistribution::new(u_rough, v_rough);
-        DialectricBxDF::new(sampled_eta, distrib)
+        DielectricBxDF::new(sampled_eta, distrib)
     }
 
     fn get_bsdf<T: TextureEvaluatorI>(
@@ -579,7 +579,7 @@ impl MaterialI for DialectricMaterial {
         lambda: &mut SampledWavelengths,
     ) -> BSDF {
         let bxdf = self.get_bxdf(tex_eval, ctx, lambda);
-        BSDF::new(ctx.ns, ctx.dpdus, crate::bxdf::BxDF::Dialectric(bxdf))
+        BSDF::new(ctx.ns, ctx.dpdus, crate::bxdf::BxDF::Dielectric(bxdf))
     }
 
     fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool {

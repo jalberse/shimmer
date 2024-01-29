@@ -5,13 +5,13 @@ Rotate -5 0 0 1
 Camera "perspective"
     "float fov" [ 39 ]
 Film "rgb"
-    "string filename" [ "killeroo-simple.pfm" ]
-    "integer yresolution" [ 200 ]
-    "integer xresolution" [ 200 ]
+    "string filename" [ "killeroo-simple-conductor-1000x1000-100spp.pfm" ]
+    "integer yresolution" [ 480 ]
+    "integer xresolution" [ 480 ]
 #Sampler "halton"
 #    "integer pixelsamples" [ 256 ]
 Sampler "independent"
-  "integer pixelsamples" 50
+  "integer pixelsamples" 100
 Integrator "simplepath"
 
 WorldBegin
@@ -46,12 +46,10 @@ AttributeEnd
 AttributeBegin
     Scale 0.5 0.5 0.5
     Rotate -60 0 0 1
-    Material "diffuse"
-        "rgb reflectance" [ 0.4 0.2 0.2 ]
+    Material "conductor"
     Translate 100 200 -140
     Include "geometry/killeroo.pbrt"
-    Material "diffuse"
-        "rgb reflectance" [ 0.4 0.5 0.4 ]
+    Material "conductor"
     Translate -200 0 0
     Include "geometry/killeroo.pbrt"
 AttributeEnd

@@ -51,9 +51,9 @@ pub fn refract(wi: Vector3f, mut n: Normal3f, mut eta: Float) -> Option<(Vector3
 
 /// cos_theta_i: Cosine of the angle between the incident direction and the normal.
 /// eta: Relative index of refraction.
-/// output: Unpolorized fresnel reflection of a dialectric interface
+/// output: Unpolorized fresnel reflection of a dielectric interface
 #[inline]
-pub fn fresnel_dialectric(cos_theta_i: Float, mut eta: Float) -> Float {
+pub fn fresnel_dielectric(cos_theta_i: Float, mut eta: Float) -> Float {
     let mut cos_theta_i = Float::clamp(cos_theta_i, -1.0, 1.0);
 
     // Potentially flip interface orientation

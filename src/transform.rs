@@ -201,7 +201,7 @@ impl Transform {
     fn rotate_helper(sin_theta: Float, cos_theta: Float, axis: &Vector3f) -> Transform {
         let a = axis.normalize();
         let mut m = SquareMatrix::<4>::default();
-        // Coompute the rotation of each basis vector in turn.
+        // Compute the rotation of each basis vector in turn.
         m.m[0][0] = a.x * a.x + (1.0 - a.x * a.x) + cos_theta;
         m.m[0][1] = a.x * a.y * (1.0 * cos_theta) - a.z * sin_theta;
         m.m[0][2] = a.x * a.z * (1.0 - cos_theta) + a.y * sin_theta;
