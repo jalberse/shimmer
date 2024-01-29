@@ -112,6 +112,7 @@ pub enum BxDF {
     Diffuse(DiffuseBxDF),
     Conductor(ConductorBxDF),
     Dialectric(DialectricBxDF),
+    ThinDialectric(ThinDialectricBxDF),
 }
 
 impl BxDFI for BxDF {
@@ -120,6 +121,7 @@ impl BxDFI for BxDF {
             BxDF::Diffuse(v) => v.f(wo, wi, mode),
             BxDF::Conductor(v) => v.f(wo, wi, mode),
             BxDF::Dialectric(v) => v.f(wo, wi, mode),
+            BxDF::ThinDialectric(v) => v.f(wo, wi, mode),
         }
     }
 
@@ -135,6 +137,7 @@ impl BxDFI for BxDF {
             BxDF::Diffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::Conductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::Dialectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::ThinDialectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
 
@@ -149,6 +152,7 @@ impl BxDFI for BxDF {
             BxDF::Diffuse(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::Conductor(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::Dialectric(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::ThinDialectric(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
 
@@ -157,6 +161,7 @@ impl BxDFI for BxDF {
             BxDF::Diffuse(v) => v.flags(),
             BxDF::Conductor(v) => v.flags(),
             BxDF::Dialectric(v) => v.flags(),
+            BxDF::ThinDialectric(v) => v.flags(),
         }
     }
 }
@@ -633,6 +638,88 @@ impl BxDFI for DialectricBxDF {
             BxDFFLags::GLOSSY
         };
         flags | mf
+    }
+}
+
+pub struct ThinDialectricBxDF {
+    eta: Float,
+}
+
+impl ThinDialectricBxDF {
+    pub fn new(eta: Float) -> ThinDialectricBxDF {
+        ThinDialectricBxDF { eta }
+    }
+}
+
+impl BxDFI for ThinDialectricBxDF {
+    fn f(&self, _wo: Vector3f, _wi: Vector3f, _mode: TransportMode) -> SampledSpectrum {
+        SampledSpectrum::from_const(0.0)
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        uc: Float,
+        _u: Point2f,
+        _mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        let mut r = fresnel_dialectric(abs_cos_theta(wo), self.eta);
+        let mut t = 1.0 - r;
+        // Compute r and t accounting for scattering between interfaces
+        if r < 1.0 {
+            r += sqr(t) * r / (1.0 - sqr(r));
+            t = 1.0 - r;
+        }
+
+        // Compute probabilities pr and pt for sampling reflection and transmission
+        let mut pr = r;
+        let mut pt = t;
+        if sample_flags.bits() & BxDFReflTransFlags::REFLECTION.bits() == 0 {
+            pr = 0.0;
+        }
+        if sample_flags.bits() & BxDFReflTransFlags::TRANSMISSION.bits() == 0 {
+            pt = 0.0;
+        }
+        if pr == 0.0 && pt == 0.0 {
+            return None;
+        }
+
+        if uc < pr / (pr + pt) {
+            // Sample perfect specular reflection BSDF
+            let wi = Vector3f::new(-wo.x, -wo.y, wo.z);
+            let fr = SampledSpectrum::from_const(r / abs_cos_theta(wi));
+            Some(BSDFSample::new(
+                fr,
+                wi,
+                pr / (pr + pt),
+                BxDFFLags::SPECULAR_REFLECTION,
+            ))
+        } else {
+            // Sample perfect specular transmission BSDF
+            let wi = -wo;
+            let ft = SampledSpectrum::from_const(t / abs_cos_theta(wi));
+            Some(BSDFSample::new(
+                ft,
+                wi,
+                pt / (pr + pt),
+                BxDFFLags::SPECULAR_TRANSMISSION,
+            ))
+        }
+    }
+
+    fn pdf(
+        &self,
+        _wo: Vector3f,
+        _wi: Vector3f,
+        _mode: TransportMode,
+        _sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        0.0
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        BxDFFLags::REFLECTION | BxDFFLags::TRANSMISSION | BxDFFLags::SPECULAR
     }
 }
 
