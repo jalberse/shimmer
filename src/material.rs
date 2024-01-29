@@ -153,7 +153,6 @@ impl MaterialI for Material {
         }
     }
 
-    // TODO Rename to get_displacement()?
     fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
         match self {
             Material::Diffuse(m) => m.get_displacement(),
