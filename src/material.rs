@@ -247,13 +247,11 @@ impl MaterialI for DiffuseMaterial {
     }
 
     fn get_normal_map(&self) -> Option<Arc<Image>> {
-        // TODO we should add this later.
-        None
+        self.normal_map.clone()
     }
 
     fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
-        // TODO we should add this later.
-        None
+        self.displacement.clone()
     }
 
     fn has_subsurface_scattering(&self) -> bool {
