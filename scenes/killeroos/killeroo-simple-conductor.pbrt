@@ -5,7 +5,7 @@ Rotate -5 0 0 1
 Camera "perspective"
     "float fov" [ 39 ]
 Film "rgb"
-    "string filename" [ "killeroo-simple-conductor-1000x1000-100spp.pfm" ]
+    "string filename" [ "killeroo-simple-conductor.pfm" ]
     "integer yresolution" [ 480 ]
     "integer xresolution" [ 480 ]
 #Sampler "halton"
