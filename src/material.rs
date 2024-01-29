@@ -2,16 +2,18 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     bsdf::BSDF,
-    bxdf::{BxDF, DiffuseBxDF},
+    bxdf::{BxDF, ConductorBxDF, DiffuseBxDF},
     image::Image,
     interaction::SurfaceInteraction,
     loading::{
         paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary},
         parser_target::FileLoc,
     },
+    math::Sqrt,
+    scattering::TrowbridgeReitzDistribution,
     spectra::{
         sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
-        ConstantSpectrum, Spectrum,
+        ConstantSpectrum, NamedSpectrum, Spectrum,
     },
     texture::{
         FloatTexture, FloatTextureI, SpectrumConstantTexture, SpectrumTexture, SpectrumTextureI,
@@ -43,9 +45,9 @@ pub trait MaterialI {
 
     fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool;
 
-    fn get_normal_map(&self) -> Option<Image>;
+    fn get_normal_map(&self) -> Option<Arc<Image>>;
 
-    fn get_bump_map(&self) -> Option<FloatTexture>;
+    fn get_displacement(&self) -> Option<Arc<FloatTexture>>;
 
     fn has_subsurface_scattering(&self) -> bool;
 }
@@ -55,6 +57,7 @@ pub trait MaterialI {
 #[derive(Debug)]
 pub enum Material {
     Diffuse(DiffuseMaterial),
+    Conductor(ConductorMaterial),
 }
 
 impl Material {
@@ -75,6 +78,13 @@ impl Material {
                 &mut HashMap::new(),
                 loc,
             )),
+            "conductor" => Material::Conductor(ConductorMaterial::create(
+                parameters,
+                normal_map,
+                loc,
+                &mut HashMap::new(),
+                textures,
+            )),
             _ => panic!("Material {} unknown.", name),
         };
         material
@@ -94,6 +104,7 @@ impl MaterialI for Material {
     ) -> Self::ConcreteBxDF {
         match self {
             Material::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
+            Material::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -112,30 +123,36 @@ impl MaterialI for Material {
         // I want to revisit this for using scratch_buffer anyways...
         match self {
             Material::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            Material::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
     fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool {
         match self {
             Material::Diffuse(m) => m.can_evaluate_textures(tex_eval),
+            Material::Conductor(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
-    fn get_normal_map(&self) -> Option<Image> {
+    fn get_normal_map(&self) -> Option<Arc<Image>> {
         match self {
             Material::Diffuse(m) => m.get_normal_map(),
+            Material::Conductor(m) => m.get_normal_map(),
         }
     }
 
-    fn get_bump_map(&self) -> Option<FloatTexture> {
+    // TODO Rename to get_displacement()?
+    fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
         match self {
-            Material::Diffuse(m) => m.get_bump_map(),
+            Material::Diffuse(m) => m.get_displacement(),
+            Material::Conductor(m) => m.get_displacement(),
         }
     }
 
     fn has_subsurface_scattering(&self) -> bool {
         match self {
             Material::Diffuse(m) => m.has_subsurface_scattering(),
+            Material::Conductor(m) => m.has_subsurface_scattering(),
         }
     }
 }
@@ -216,14 +233,216 @@ impl MaterialI for DiffuseMaterial {
         tex_eval.can_evaluate(&[], &[&self.reflectance])
     }
 
-    fn get_normal_map(&self) -> Option<Image> {
+    fn get_normal_map(&self) -> Option<Arc<Image>> {
         // TODO we should add this later.
         None
     }
 
-    fn get_bump_map(&self) -> Option<FloatTexture> {
+    fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
         // TODO we should add this later.
         None
+    }
+
+    fn has_subsurface_scattering(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug)]
+pub struct ConductorMaterial {
+    displacement: Option<Arc<FloatTexture>>,
+    normal_map: Option<Arc<Image>>,
+    eta: Option<Arc<SpectrumTexture>>,
+    k: Option<Arc<SpectrumTexture>>,
+    reflectance: Option<Arc<SpectrumTexture>>,
+    u_roughness: Arc<FloatTexture>,
+    v_roughness: Arc<FloatTexture>,
+    remap_roughness: bool,
+}
+
+impl ConductorMaterial {
+    pub fn create(
+        parameters: &mut TextureParameterDictionary,
+        normal_map: Option<Arc<Image>>,
+        _loc: &FileLoc,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+    ) -> ConductorMaterial {
+        let mut eta = parameters.get_spectrum_texture_or_none(
+            "eta",
+            SpectrumType::Unbounded,
+            cached_spectra,
+            textures,
+        );
+        let mut k = parameters.get_spectrum_texture(
+            "k",
+            None,
+            SpectrumType::Unbounded,
+            cached_spectra,
+            textures,
+        );
+        let reflectance = parameters.get_spectrum_texture(
+            "reflectance",
+            None,
+            SpectrumType::Albedo,
+            cached_spectra,
+            textures,
+        );
+
+        if reflectance.is_some() && (eta.is_some() || k.is_some()) {
+            panic!("Cannot specify both reflectance and eta/k for conductor material.");
+        }
+
+        if reflectance.is_none() {
+            if eta.is_none() {
+                eta = Some(Arc::new(SpectrumTexture::Constant(
+                    SpectrumConstantTexture::new(Spectrum::get_named_spectrum(
+                        NamedSpectrum::CuEta,
+                    )),
+                )));
+            }
+            if k.is_none() {
+                k = Some(Arc::new(SpectrumTexture::Constant(
+                    SpectrumConstantTexture::new(Spectrum::get_named_spectrum(NamedSpectrum::CuK)),
+                )));
+            }
+        }
+
+        let u_roughness =
+            if let Some(roughness) = parameters.get_float_texture_or_none("uroughness", textures) {
+                roughness
+            } else {
+                parameters.get_float_texture("roughness", 0.0, textures)
+            };
+        let v_roughness =
+            if let Some(roughness) = parameters.get_float_texture_or_none("vroughness", textures) {
+                roughness
+            } else {
+                parameters.get_float_texture("roughness", 0.0, textures)
+            };
+
+        let displacement = parameters.get_float_texture_or_none("displacement", textures);
+        let remap_roughness = parameters.get_one_bool("remaproughness", true);
+
+        ConductorMaterial::new(
+            displacement,
+            normal_map,
+            eta,
+            k,
+            reflectance,
+            u_roughness,
+            v_roughness,
+            remap_roughness,
+        )
+    }
+
+    pub fn new(
+        displacement: Option<Arc<FloatTexture>>,
+        normal_map: Option<Arc<Image>>,
+        // Either eta and k are supplied, or reflectance
+        // TODO Enum?
+        eta: Option<Arc<SpectrumTexture>>,
+        k: Option<Arc<SpectrumTexture>>,
+        reflectance: Option<Arc<SpectrumTexture>>,
+        u_roughness: Arc<FloatTexture>,
+        v_roughness: Arc<FloatTexture>,
+        remap_roughness: bool,
+    ) -> Self {
+        Self {
+            displacement,
+            normal_map,
+            eta,
+            k,
+            reflectance,
+            u_roughness,
+            v_roughness,
+            remap_roughness,
+        }
+    }
+}
+
+impl MaterialI for ConductorMaterial {
+    type ConcreteBxDF = ConductorBxDF;
+
+    fn get_bxdf<T: TextureEvaluatorI>(
+        &self,
+        tex_eval: &T,
+        ctx: &MaterialEvalContext,
+        lambda: &SampledWavelengths,
+    ) -> Self::ConcreteBxDF {
+        let mut u_rough = tex_eval.evaluate_float(&self.u_roughness, &ctx.tex_ctx);
+        let mut v_rough = tex_eval.evaluate_float(&self.v_roughness, &ctx.tex_ctx);
+
+        if self.remap_roughness {
+            u_rough = TrowbridgeReitzDistribution::roughness_to_alpha(u_rough);
+            v_rough = TrowbridgeReitzDistribution::roughness_to_alpha(v_rough);
+        }
+
+        let (etas, ks) = if let Some(eta) = &self.eta {
+            let k = self
+                .k
+                .as_ref()
+                .expect("eta and k should be provided together");
+            let etas = tex_eval.evaluate_spectrum(eta, &ctx.tex_ctx, lambda);
+            let ks = tex_eval.evaluate_spectrum(&k, &ctx.tex_ctx, lambda);
+            (etas, ks)
+        } else {
+            let r = SampledSpectrum::clamp(
+                &tex_eval.evaluate_spectrum(
+                    self.reflectance
+                        .as_ref()
+                        .expect("If eta/k is not present, reflectance should be"),
+                    &ctx.tex_ctx,
+                    lambda,
+                ),
+                0.0,
+                0.0000,
+            );
+            let etas = SampledSpectrum::from_const(1.0);
+            let ks = 2.0 * SampledSpectrum::sqrt(r)
+                / SampledSpectrum::sqrt(SampledSpectrum::clamp_zero(
+                    &(SampledSpectrum::from_const(1.0) - r),
+                ));
+            (etas, ks)
+        };
+        let distrib = TrowbridgeReitzDistribution::new(u_rough, v_rough);
+        ConductorBxDF::new(distrib, etas, ks)
+    }
+
+    fn get_bsdf<T: TextureEvaluatorI>(
+        &self,
+        tex_eval: &T,
+        ctx: &MaterialEvalContext,
+        lambda: &SampledWavelengths,
+    ) -> BSDF {
+        let bxdf = self.get_bxdf(tex_eval, ctx, lambda);
+        BSDF::new(ctx.ns, ctx.dpdus, crate::bxdf::BxDF::Conductor(bxdf))
+    }
+
+    fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool {
+        let s_tex = if let Some(eta) = &self.eta {
+            assert!(self.k.is_some());
+            vec![
+                self.k
+                    .as_ref()
+                    .expect("If eta is provided, k should be as well"),
+                eta,
+            ]
+        } else {
+            vec![self
+                .reflectance
+                .as_ref()
+                .expect("Expected reflectance without eta/k")]
+        };
+        tex_eval.can_evaluate(&[&self.u_roughness, &self.v_roughness], &s_tex)
+    }
+
+    fn get_normal_map(&self) -> Option<Arc<Image>> {
+        self.normal_map.clone()
+    }
+
+    fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
+        self.displacement.clone()
     }
 
     fn has_subsurface_scattering(&self) -> bool {
@@ -261,13 +480,13 @@ impl From<&SurfaceInteraction> for MaterialEvalContext {
 /// can evaluate all textures and is the default for most scenarios), the compiler can
 /// optimize away this abstraction.
 pub trait TextureEvaluatorI {
-    fn can_evaluate(&self, f_tex: &[&FloatTexture], s_tex: &[&SpectrumTexture]) -> bool;
+    fn can_evaluate(&self, f_tex: &[&Arc<FloatTexture>], s_tex: &[&Arc<SpectrumTexture>]) -> bool;
 
-    fn evaluate_float(&self, tex: &FloatTexture, ctx: &TextureEvalContext) -> Float;
+    fn evaluate_float(&self, tex: &Arc<FloatTexture>, ctx: &TextureEvalContext) -> Float;
 
     fn evaluate_spectrum(
         &self,
-        tex: &SpectrumTexture,
+        tex: &Arc<SpectrumTexture>,
         ctx: &TextureEvalContext,
         lambda: &SampledWavelengths,
     ) -> SampledSpectrum;
@@ -277,17 +496,21 @@ pub trait TextureEvaluatorI {
 pub struct UniversalTextureEvaluator {}
 
 impl TextureEvaluatorI for UniversalTextureEvaluator {
-    fn can_evaluate(&self, _f_tex: &[&FloatTexture], _s_tex: &[&SpectrumTexture]) -> bool {
+    fn can_evaluate(
+        &self,
+        _f_tex: &[&Arc<FloatTexture>],
+        _s_tex: &[&Arc<SpectrumTexture>],
+    ) -> bool {
         true
     }
 
-    fn evaluate_float(&self, tex: &FloatTexture, ctx: &TextureEvalContext) -> Float {
+    fn evaluate_float(&self, tex: &Arc<FloatTexture>, ctx: &TextureEvalContext) -> Float {
         tex.evaluate(ctx)
     }
 
     fn evaluate_spectrum(
         &self,
-        tex: &SpectrumTexture,
+        tex: &Arc<SpectrumTexture>,
         ctx: &TextureEvalContext,
         lambda: &SampledWavelengths,
     ) -> SampledSpectrum {

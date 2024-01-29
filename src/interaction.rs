@@ -179,7 +179,7 @@ impl SurfaceInteraction {
 
         let material = self.material.as_ref().unwrap();
 
-        let displacement = material.as_ref().get_bump_map();
+        let displacement = material.as_ref().get_displacement();
         let normal_map = material.as_ref().get_normal_map();
         if displacement.is_some() || normal_map.is_some() {
             // TODO handle shading using normal or bump map
