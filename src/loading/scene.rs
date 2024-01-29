@@ -1048,7 +1048,7 @@ impl TransformSet {
 impl Default for TransformSet {
     fn default() -> Self {
         Self {
-            t: Default::default(),
+            t: [Transform::default(); MAX_TRANSFORMS],
         }
     }
 }

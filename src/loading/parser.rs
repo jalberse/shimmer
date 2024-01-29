@@ -1,11 +1,13 @@
 //! Directives parser.
 // Adapted from pbrt4 crate under apache license.
 
-use std::{collections::HashMap, sync::Arc};
+use core::slice;
+use std::{collections::HashMap, env, fs, path::Path, sync::Arc};
 
 use string_interner::StringInterner;
 
 use crate::{
+    file::set_search_directory,
     loading::error::Error,
     loading::error::Result,
     loading::param::{Param, ParamList},
@@ -18,6 +20,26 @@ use crate::{
 
 use super::parser_target::ParserTarget;
 
+pub fn parse_files<T: ParserTarget>(
+    files: &[&str],
+    target: &mut T,
+    options: &mut Options,
+    string_interner: &mut StringInterner,
+    cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+) {
+    if files.is_empty() {
+        todo!("Read from stdin when no files are provided")
+    }
+
+    for file in files {
+        if *file != "-" {
+            set_search_directory(options, file);
+        }
+        let data = fs::read_to_string(file).unwrap();
+        parse_str(&data, target, options, string_interner, cached_spectra);
+    }
+}
+
 pub fn parse_str<T: ParserTarget>(
     data: &str,
     target: &mut T,
@@ -27,6 +49,10 @@ pub fn parse_str<T: ParserTarget>(
 ) {
     let mut parsers = Vec::new();
     parsers.push(Parser::new(data));
+
+    // Because data from included files might end up in cached parameters,
+    // we should keep the file data around until scene loading is done.
+    let mut includes = Vec::new();
 
     while let Some(parser) = parsers.last_mut() {
         // Fetch next element
@@ -46,7 +72,50 @@ pub fn parse_str<T: ParserTarget>(
         //  We'd like to do that at some point, and then pass it here. It will make error messages better.
         let loc = Default::default();
         match element {
-            Element::Include(_path) => todo!("Support include directive"),
+            Element::Include(path) => {
+                // Include behaves similarly to the #include directive in C++: parsing of the current file is suspended,
+                // the specified file is parsed in its entirety, and only then does parsing of the current file resume.
+                // Its effect is equivalent to direct text substitution of the included file.
+                let path = Path::new(path);
+
+                let full_path;
+                let path = if path.is_absolute() {
+                    path
+                } else {
+                    full_path = match &options.search_directory {
+                        Some(directory) => directory.join(path),
+                        // Use current working directory if not provided
+                        None => env::current_dir().unwrap().join(path),
+                    };
+
+                    full_path.as_path()
+                };
+
+                let data = fs::read_to_string(path).unwrap();
+
+                // In Rust, String is heap allocated type, so it's safe to keep a pointer to
+                // the raw data and move the String object (like push it to the vector).
+                let raw = data.as_bytes();
+                let raw_len = raw.len();
+                let raw_ptr = raw.as_ptr();
+
+                includes.push(data);
+
+                // Included files may be compressed using gzip.
+                // If a scene file name has a ".gz" suffix, then pbrt will automatically decompress it as it is read from disk.
+                if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
+                    if ext.ends_with(".gz") {
+                        todo!("Gzip compression");
+                    }
+                }
+
+                // TODO: is there a better way?
+                let parser = Parser::new(unsafe {
+                    let byte_slice = slice::from_raw_parts(raw_ptr, raw_len);
+                    std::str::from_utf8_unchecked(byte_slice)
+                });
+                parsers.push(parser);
+            }
             Element::Import(_) => todo!("Support import directive"),
             Element::Option(param) => target.option(param.name, param.value, options, loc),
             Element::Film { ty, params } => target.film(ty, params.into(), string_interner, loc),

@@ -169,11 +169,11 @@ fn main() {
 
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
-    let file = fs::read_to_string(cli.scene_file).unwrap();
+    // let file = fs::read_to_string(cli.scene_file).unwrap();
     let scene = Box::new(BasicScene::default());
     let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner);
-    parser::parse_str(
-        &file,
+    parser::parse_files(
+        &[&cli.scene_file],
         &mut scene_builder,
         &mut options,
         &mut string_interner,
