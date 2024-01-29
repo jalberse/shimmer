@@ -125,6 +125,8 @@ impl Spectrum {
             NamedSpectrum::GlassBaf10 => {
                 Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA).clone()
             }
+            NamedSpectrum::CuEta => Lazy::force(&super::named_spectrum::CU_ETA).clone(),
+            NamedSpectrum::CuK => Lazy::force(&super::named_spectrum::CU_K).clone(),
         }
     }
 

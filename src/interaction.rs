@@ -162,7 +162,7 @@ impl SurfaceInteraction {
     pub fn get_bsdf(
         &mut self,
         ray: &RayDifferential,
-        lambda: &SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         camera: &Camera,
         sampler: &mut Sampler,
         options: &Options,

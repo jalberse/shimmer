@@ -392,7 +392,7 @@ impl PixelSampleEvaluatorI for RandomWalkIntegrator {
         } else {
             sampler.get_1d()
         };
-        let lambda = camera.get_film_const().sample_wavelengths(lu);
+        let mut lambda = camera.get_film_const().sample_wavelengths(lu);
 
         // Initialize camera_sample for the current sample
         let filter = camera.get_film_const().get_filter();
@@ -425,7 +425,7 @@ impl PixelSampleEvaluatorI for RandomWalkIntegrator {
                     base,
                     camera,
                     &camera_ray.ray,
-                    &lambda,
+                    &mut lambda,
                     sampler,
                     &visible_surface,
                     scratch_buffer,
@@ -463,7 +463,7 @@ impl RandomWalkIntegrator {
         base: &IntegratorBase,
         camera: &Camera,
         ray: &RayDifferential,
-        lambda: &SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         sampler: &mut Sampler,
         _visible_surface: &Option<VisibleSurface>,
         scratch_buffer: &mut Bump,
@@ -488,7 +488,7 @@ impl RandomWalkIntegrator {
         base: &IntegratorBase,
         camera: &Camera,
         ray: &RayDifferential,
-        lambda: &SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         sampler: &mut Sampler,
         depth: i32,
         scratch_buffer: &mut Bump,
@@ -593,7 +593,7 @@ impl PixelSampleEvaluatorI for SimplePathIntegrator {
         } else {
             sampler.get_1d()
         };
-        let lambda = camera.get_film_const().sample_wavelengths(lu);
+        let mut lambda = camera.get_film_const().sample_wavelengths(lu);
 
         // Initialize camera_sample for the current sample
         let filter = camera.get_film_const().get_filter();
@@ -626,7 +626,7 @@ impl PixelSampleEvaluatorI for SimplePathIntegrator {
                     base,
                     camera,
                     &mut camera_ray.ray,
-                    &lambda,
+                    &mut lambda,
                     sampler,
                     &visible_surface,
                     scratch_buffer,
@@ -665,7 +665,7 @@ impl SimplePathIntegrator {
         base: &IntegratorBase,
         camera: &Camera,
         ray: &mut RayDifferential,
-        lambda: &SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         sampler: &mut Sampler,
         _visible_surface: &Option<VisibleSurface>,
         scratch_buffer: &mut Bump,
