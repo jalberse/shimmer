@@ -3,3 +3,4 @@
 *.ppm
 *.pfm
 *.exr
+.vscode/
