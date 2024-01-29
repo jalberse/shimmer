@@ -1,15 +1,17 @@
 use crate::{
     float::PI_F,
-    math::INV_PI,
+    math::{sqr, INV_PI},
     sampling::{
         cosine_hemisphere_pdf, sample_cosine_hemisphere, sample_uniform_hemisphere,
         uniform_hemisphere_pdf,
     },
-    scattering::{fresnel_complex_spectral, reflect, TrowbridgeReitzDistribution},
+    scattering::{
+        fresnel_complex_spectral, fresnel_dialectric, reflect, refract, TrowbridgeReitzDistribution,
+    },
     spectra::sampled_spectrum::SampledSpectrum,
     vecmath::{
         point::Point2f,
-        spherical::{abs_cos_theta, same_hemisphere},
+        spherical::{abs_cos_theta, cos_theta, same_hemisphere},
         vector::Vector3,
         Length, Normal3f, Normalize, Tuple3, Vector3f,
     },
@@ -109,6 +111,7 @@ pub trait BxDFI {
 pub enum BxDF {
     Diffuse(DiffuseBxDF),
     Conductor(ConductorBxDF),
+    Dialectric(DialectricBxDF),
 }
 
 impl BxDFI for BxDF {
@@ -116,6 +119,7 @@ impl BxDFI for BxDF {
         match self {
             BxDF::Diffuse(v) => v.f(wo, wi, mode),
             BxDF::Conductor(v) => v.f(wo, wi, mode),
+            BxDF::Dialectric(v) => v.f(wo, wi, mode),
         }
     }
 
@@ -130,6 +134,7 @@ impl BxDFI for BxDF {
         match self {
             BxDF::Diffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::Conductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::Dialectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
 
@@ -143,6 +148,7 @@ impl BxDFI for BxDF {
         match self {
             BxDF::Diffuse(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::Conductor(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::Dialectric(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
 
@@ -150,6 +156,7 @@ impl BxDFI for BxDF {
         match self {
             BxDF::Diffuse(v) => v.flags(),
             BxDF::Conductor(v) => v.flags(),
+            BxDF::Dialectric(v) => v.flags(),
         }
     }
 }
@@ -250,7 +257,7 @@ impl ConductorBxDF {
 }
 
 impl BxDFI for ConductorBxDF {
-    fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
+    fn f(&self, wo: Vector3f, wi: Vector3f, _mode: TransportMode) -> SampledSpectrum {
         if !same_hemisphere(wo, wi) {
             return SampledSpectrum::from_const(0.0);
         }
@@ -357,6 +364,278 @@ impl BxDFI for ConductorBxDF {
     }
 }
 
+pub struct DialectricBxDF {
+    eta: Float,
+    mf_distribution: TrowbridgeReitzDistribution,
+}
+
+impl DialectricBxDF {
+    pub fn new(eta: Float, mf_distribution: TrowbridgeReitzDistribution) -> DialectricBxDF {
+        DialectricBxDF {
+            eta,
+            mf_distribution,
+        }
+    }
+
+    pub fn regularize(&mut self) {
+        self.mf_distribution.regularize()
+    }
+}
+
+impl BxDFI for DialectricBxDF {
+    fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
+        if self.eta == 1.0 || self.mf_distribution.effectively_smooth() {
+            return SampledSpectrum::from_const(0.0);
+        }
+
+        // Evaluate rough dialectric BSDF
+        // Compute generalized half vector _wm_
+        let cos_theta_o = cos_theta(wo);
+        let cos_theta_i = cos_theta(wi);
+        let reflect = cos_theta_i * cos_theta_o > 0.0;
+        let etap = if !reflect {
+            if cos_theta_o > 0.0 {
+                self.eta
+            } else {
+                1.0 / self.eta
+            }
+        } else {
+            1.0
+        };
+        let wm = wi * etap + wo;
+        if cos_theta_i == 0.0 || cos_theta_o == 0.0 || wm.length_squared() == 0.0 {
+            return SampledSpectrum::from_const(0.0);
+        }
+
+        let f = fresnel_dialectric(wo.dot(wm), self.eta);
+        if reflect {
+            // Compute reflection at rough dialectric interface
+            SampledSpectrum::from_const(
+                self.mf_distribution.d(wm) * self.mf_distribution.g(wo, wi) * f
+                    / Float::abs(4.0 * cos_theta_i * cos_theta_o),
+            )
+        } else {
+            // Compute transmission at rough dialectric interface
+            let denom = sqr(wi.dot(wm) + wo.dot(wm) / etap) * cos_theta_i * cos_theta_o;
+            let mut ft = self.mf_distribution.d(wm)
+                * (1.0 - f)
+                * self.mf_distribution.g(wo, wi)
+                * Float::abs(wi.dot(wm) * wo.dot(wm) / denom);
+            // Account for non-symmetry with transmission to different medium
+            if mode == TransportMode::Radiance {
+                ft /= sqr(etap)
+            }
+            SampledSpectrum::from_const(ft)
+        }
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        uc: Float,
+        u: Point2f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        if self.eta == 1.0 || self.mf_distribution.effectively_smooth() {
+            // Sample perfect specular dialectric BSDF
+            let r = fresnel_dialectric(cos_theta(wo), self.eta);
+            let t = 1.0 - r;
+            // Compute probabilities pr and pt for sampling reflection and transmission
+            let mut pr = r;
+            let mut pt = t;
+
+            if (sample_flags.bits() & BxDFReflTransFlags::REFLECTION.bits()) == 0 {
+                pr = 0.0;
+            }
+            if (sample_flags.bits() & BxDFReflTransFlags::TRANSMISSION.bits()) == 0 {
+                pt = 0.0;
+            }
+            if pr == 0.0 && pt == 0.0 {
+                return None;
+            }
+
+            if uc < pr / (pr + pt) {
+                // Sample perfect specular reflection BSDF
+                let wi = Vector3f::new(-wo.x, -wo.y, wo.z);
+                let fr = SampledSpectrum::from_const(r / abs_cos_theta(wi));
+                return Some(BSDFSample::new(
+                    fr,
+                    wi,
+                    pr / (pr + pt),
+                    BxDFFLags::SPECULAR_REFLECTION,
+                ));
+            } else {
+                // Sample perfect specular dialectric BTDF
+                // Compute ray direction for specular transmission
+                if let Some((wi, etap)) = refract(wo, Normal3f::Z, self.eta) {
+                    let mut ft = SampledSpectrum::from_const(t / abs_cos_theta(wi));
+                    // Account for non-symmetric with transmission to different medium
+                    if mode == TransportMode::Radiance {
+                        ft /= sqr(etap);
+                    }
+
+                    return Some(BSDFSample::new_with_eta(
+                        ft,
+                        wi,
+                        pt / (pr + pt),
+                        BxDFFLags::SPECULAR_TRANSMISSION,
+                        etap,
+                    ));
+                } else {
+                    return None;
+                }
+            }
+        } else {
+            // Sample rough dialectric BSDF
+            let wm = self.mf_distribution.sample_wm(wo, u);
+            let r = fresnel_dialectric(wo.dot(wm), self.eta);
+            let t = 1.0 - r;
+            // Compute probabilities pr and pt for sampling reflection and transmission
+            let mut pr = r;
+            let mut pt = t;
+            if sample_flags.bits() & BxDFReflTransFlags::REFLECTION.bits() == 0 {
+                pr = 0.0;
+            }
+            if sample_flags.bits() & BxDFReflTransFlags::TRANSMISSION.bits() == 0 {
+                pt = 0.0;
+            }
+            if pr == 0.0 && pt == 0.0 {
+                return None;
+            }
+
+            if uc < pr / (pr + pt) {
+                // Sample reflection at rough dialectric interface
+                let wi = reflect(wo, wm.into());
+                if !same_hemisphere(wo, wi) {
+                    return None;
+                }
+                // Compute PDF of rough dialectric reflection
+                let pdf =
+                    self.mf_distribution.pdf(wo, wm) / (4.0 * wo.abs_dot(wm)) * pr / (pr + pt);
+
+                debug_assert!(!pdf.is_nan());
+                let f = SampledSpectrum::from_const(
+                    self.mf_distribution.d(wm) * self.mf_distribution.g(wo, wi) * r
+                        / (4.0 * cos_theta(wi) * cos_theta(wo)),
+                );
+                Some(BSDFSample::new(f, wi, pdf, BxDFFLags::GLOSSY_REFLECTION))
+            } else {
+                // Sample transmission at rough dialectric interface
+                if let Some((wi, etap)) = refract(wo, wm.into(), self.eta) {
+                    if !same_hemisphere(wo, wi) || wi.z == 0.0 {
+                        return None;
+                    }
+                    // Compute PDF of rough dialectric transmission
+                    let denom = sqr(wi.dot(wm) + wo.dot(wm) / etap);
+                    let dwm_dwi = wi.abs_dot(wm) / denom;
+                    let pdf = self.mf_distribution.pdf(wo, wm) * dwm_dwi * pt / (pr + pt);
+                    debug_assert!(!pdf.is_nan());
+                    // Evaluate BRDF and return BDFSample for rough transmission
+                    let mut ft = SampledSpectrum::from_const(
+                        t * self.mf_distribution.d(wm)
+                            * self.mf_distribution.g(wo, wi)
+                            * Float::abs(
+                                wi.dot(wm) * wo.dot(wm) / (cos_theta(wi) * cos_theta(wo) * denom),
+                            ),
+                    );
+
+                    // Account for non-symmetry with transmission to different medium
+                    if mode == TransportMode::Radiance {
+                        ft /= sqr(etap);
+                    }
+                    Some(BSDFSample::new_with_eta(
+                        ft,
+                        wi,
+                        pdf,
+                        BxDFFLags::GLOSSY_TRANSMISSION,
+                        etap,
+                    ))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn pdf(
+        &self,
+        wo: Vector3f,
+        wi: Vector3f,
+        _mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        if self.eta == 1.0 || self.mf_distribution.effectively_smooth() {
+            return 0.0;
+        }
+        // Evaluate sampling PDF of rough dialectric BSDF
+        // Compute generalized half vector wm
+        let cos_theta_o = cos_theta(wo);
+        let cos_theta_i = cos_theta(wi);
+        let reflect = cos_theta_i * cos_theta_o > 0.0;
+        let etap = if !reflect {
+            if cos_theta_o > 0.0 {
+                self.eta
+            } else {
+                1.0 / self.eta
+            }
+        } else {
+            1.0
+        };
+        let wm = wi * etap + wo;
+        if cos_theta_i == 0.0 || cos_theta_o == 0.0 || wm.length_squared() == 0.0 {
+            return 0.0;
+        }
+        let wm = wm.normalize().face_forward_n(Normal3f::Z);
+
+        // Discard backfacing microfacets
+        if wm.dot(wi) * cos_theta_i < 0.0 || wm.dot(wm) * cos_theta_o < 0.0 {
+            return 0.0;
+        }
+
+        // Determine Fresnel reflectance of dialectric boundary
+        let r = fresnel_dialectric(wo.dot(wm), self.eta);
+        let t = 1.0 - r;
+
+        // Compute probabilities pr and pt for sampling reflectance and transmission
+        let mut pr = r;
+        let mut pt = t;
+        if sample_flags.bits() & BxDFReflTransFlags::REFLECTION.bits() == 0 {
+            pr = 0.0;
+        }
+        if sample_flags.bits() & BxDFReflTransFlags::TRANSMISSION.bits() == 0 {
+            pt = 0.0;
+        }
+        if pr == 0.0 && pt == 0.0 {
+            return 0.0;
+        }
+
+        if reflect {
+            // Compute PDF of rough dialectric reflection
+            self.mf_distribution.pdf(wo, wm) / (4.0 * wo.abs_dot(wm)) * pr / (pr + pt)
+        } else {
+            // Compute PDF of rough dialectric transmission
+            let denom = sqr(wi.dot(wm) + wo.dot(wm) / etap);
+            let dwm_dwi = wi.abs_dot(wm) / denom;
+            self.mf_distribution.pdf(wo, wm) * dwm_dwi * pt / (pr + pt)
+        }
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        let flags = if self.eta == 1.0 {
+            BxDFFLags::TRANSMISSION
+        } else {
+            BxDFFLags::REFLECTION | BxDFFLags::TRANSMISSION
+        };
+        let mf = if self.mf_distribution.effectively_smooth() {
+            BxDFFLags::SPECULAR
+        } else {
+            BxDFFLags::GLOSSY
+        };
+        flags | mf
+    }
+}
+
 pub struct BSDFSample {
     /// Value of the BSDF f()
     pub f: SampledSpectrum,
@@ -384,6 +663,23 @@ impl BSDFSample {
         }
     }
 
+    pub fn new_with_eta(
+        f: SampledSpectrum,
+        wi: Vector3f,
+        pdf: Float,
+        flags: BxDFFLags,
+        eta: Float,
+    ) -> BSDFSample {
+        BSDFSample {
+            f,
+            wi,
+            pdf,
+            flags,
+            eta,
+            pdf_is_proportional: false,
+        }
+    }
+
     pub fn is_reflection(&self) -> bool {
         self.flags.is_reflective()
     }
@@ -405,6 +701,7 @@ impl BSDFSample {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TransportMode {
     Radiance,
     Importance,
