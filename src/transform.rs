@@ -202,7 +202,7 @@ impl Transform {
         let a = axis.normalize();
         let mut m = SquareMatrix::<4>::default();
         // Compute the rotation of each basis vector in turn.
-        m.m[0][0] = a.x * a.x + (1.0 - a.x * a.x) + cos_theta;
+        m.m[0][0] = a.x * a.x + (1.0 - a.x * a.x) * cos_theta;
         m.m[0][1] = a.x * a.y * (1.0 * cos_theta) - a.z * sin_theta;
         m.m[0][2] = a.x * a.z * (1.0 - cos_theta) + a.y * sin_theta;
         m.m[0][3] = 0.0;

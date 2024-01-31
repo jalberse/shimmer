@@ -37,6 +37,8 @@ pub fn render_cpu(
         &string_interner,
     );
 
+    // TODO The camera transforms we get are definitely differen than PBRT, for the same scene.
+    // Why? We should fix this - can maybe resolve the camera ray.d length != 1.0 as well.
     let camera = scene.get_camera().unwrap();
     // let film = scene.get_film();
     let sampler = scene.get_sampler().unwrap();
