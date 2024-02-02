@@ -243,15 +243,15 @@ impl IntegratorI for ImageTileIntegrator {
                 .par_iter()
                 .progress()
                 .map(|tile| -> Vec<FilmSample> {
-                    // TODO Be wary of allocating anything on the scratchbuffer that uses the
-                    // heap to avoid memory leaks; it doesn't call their drop().
-
                     let mut samples = Vec::with_capacity(
                         (tile.bounds.width() * tile.bounds.height() * wave_end - wave_start)
                             as usize,
                     );
 
                     // Initialize or get thread-local objects.
+                    //
+                    // Be wary of allocating anything on the scratchbuffer that uses the
+                    // heap to avoid memory leaks; it doesn't call their drop().
                     let scratch_buffer =
                         scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(256)));
                     let sampler =
