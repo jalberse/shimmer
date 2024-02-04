@@ -5,16 +5,20 @@ Rotate -5 0 0 1
 Camera "perspective"
     "float fov" [ 39 ]
 Film "rgb"
-    "string filename" [ "killeroo-simple-diffuse-fixed-rot.pfm" ]
+    "string filename" [ "killeroo-simple-diffuse-fixed-bvh.pfm" ]
     "integer yresolution" [ 480 ]
     "integer xresolution" [ 480 ]
-#Sampler "halton"
-#    "integer pixelsamples" [ 256 ]
 Sampler "independent"
-  "integer pixelsamples" 100
+  "integer pixelsamples" 10
 Integrator "simplepath"
+Accelerator "bvh"
+  "string splitmethod" "middle"
 
 WorldBegin
+
+# light source
+# uniform blue-ish illumination from all directions
+# LightSource "infinite" "rgb L" [ .6 .6 .7 ]
 
 AttributeBegin
     Material "diffuse"
@@ -46,10 +50,10 @@ AttributeEnd
 AttributeBegin
     Scale 0.5 0.5 0.5
     Rotate -60 0 0 1
-    Material "diffuse"
-        "rgb reflectance" [ 0.4 0.2 0.2 ]
-    Translate 100 200 -140
-    Include "geometry/killeroo.pbrt"
+    # Material "diffuse"
+    #     "rgb reflectance" [ 0.4 0.2 0.2 ]
+    # Translate 100 200 -140
+    # Include "geometry/killeroo.pbrt"
     Material "diffuse"
         "rgb reflectance" [ 0.4 0.5 0.4 ]
     Translate -200 0 0

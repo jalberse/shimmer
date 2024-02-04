@@ -5,13 +5,11 @@ Rotate -5 0 0 1
 Camera "perspective"
     "float fov" [ 39 ]
 Film "rgb"
-    "string filename" [ "killeroo-simple-dielectric-fixed-rot.pfm" ]
+    "string filename" [ "killeroo-simple-dielectric-fixed-bvh.pfm" ]
     "integer yresolution" [ 480 ]
     "integer xresolution" [ 480 ]
-#Sampler "halton"
-#    "integer pixelsamples" [ 256 ]
 Sampler "independent"
-  "integer pixelsamples" 100
+  "integer pixelsamples" 5
 Integrator "simplepath"
 
 WorldBegin

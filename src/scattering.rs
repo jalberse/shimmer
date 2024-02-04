@@ -85,14 +85,14 @@ pub fn fresnel_dielectric(cos_theta_i: Float, mut eta: Float) -> Float {
 pub fn fresnel_complex(cos_theta_i: Float, eta: Complex<Float>) -> Float {
     let cos_theta_i = Float::clamp(cos_theta_i, 0.0, 1.0);
 
-    let sin2_theta_i = 1.0 - cos_theta_i * cos_theta_i;
-    let sin2_theta_t = sin2_theta_i / (eta * eta);
+    let sin2_theta_i = 1.0 - sqr(cos_theta_i);
+    let sin2_theta_t = sin2_theta_i / sqr(eta);
     let cos_theta_t = Complex::sqrt(1.0 - sin2_theta_t);
 
     let r_parl = (eta * cos_theta_i - cos_theta_t) / (eta * cos_theta_i + cos_theta_t);
     let r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
 
-    Complex::norm_sqr(&r_parl) + Complex::norm_sqr(&r_perp) / 2.0
+    (Complex::norm_sqr(&r_parl) + Complex::norm_sqr(&r_perp)) / 2.0
 }
 
 /// Wrapper around fresnel_complex() which takes spectrally varying complex IORs split into

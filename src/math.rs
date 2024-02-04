@@ -1,5 +1,7 @@
 use std::ops::{Add, Mul};
 
+use num::Complex;
+
 use crate::{
     compensated_float::CompensatedFloat,
     float::{Float, PI_F},
@@ -15,7 +17,10 @@ pub const PI_OVER_4: Float = 0.78539816339744830961;
 pub const PI_OVER_2: Float = 1.57079632679489661923;
 
 #[inline]
-pub fn sqr(x: Float) -> Float {
+pub fn sqr<T>(x: T) -> T
+where
+    T: Mul<T, Output = T> + Copy,
+{
     x * x
 }
 
