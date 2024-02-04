@@ -339,9 +339,7 @@ impl BvhAggregate {
             // Compute bound of primitive centroids and choose split dimension to be the largest dimension of the bounds.
             let centroid_bounds = bvh_primitives
                 .iter()
-                .fold(Bounds3f::new(Point3f::ZERO, Point3f::ZERO), |acc, p| {
-                    acc.union_point(p.centroid())
-                });
+                .fold(Bounds3f::default(), |acc, p| acc.union_point(p.centroid()));
             let dim = centroid_bounds.max_dimension();
 
             if centroid_bounds.max[dim] == centroid_bounds.min[dim] {

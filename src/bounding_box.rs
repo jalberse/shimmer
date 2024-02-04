@@ -533,31 +533,39 @@ impl Bounds3<Point3f, Vector3f> {
         dir_is_neg: [usize; 3],
     ) -> bool {
         // Check for ray intersections with the x and y slabs
-        let t_min = (self[dir_is_neg[0]].x - o.x) * inv_dir.x;
-        let t_max = (self[1 - dir_is_neg[0]].x - o.x) * inv_dir.x;
+        let mut t_min = (self[dir_is_neg[0]].x - o.x) * inv_dir.x;
+        let mut t_max = (self[1 - dir_is_neg[0]].x - o.x) * inv_dir.x;
         let ty_min = (self[dir_is_neg[1]].y - o.y) * inv_dir.y;
-        let ty_max = (self[1 - dir_is_neg[1]].y - o.y) * inv_dir.y;
+        let mut ty_max = (self[1 - dir_is_neg[1]].y - o.y) * inv_dir.y;
         // Update the maximum values to ensure robust bounds intersection
-        let t_max = t_max * (1.0 + 2.0 * gamma(3));
-        let ty_max = ty_max * (1.0 + 2.0 * gamma(3));
+        t_max *= 1.0 + 2.0 * gamma(3);
+        ty_max *= 1.0 + 2.0 * gamma(3);
 
         if t_min > ty_max || ty_min > t_max {
             return false;
         }
-        let t_min = if ty_min > t_min { ty_min } else { t_min };
-        let t_max = if ty_max < t_max { ty_max } else { t_max };
+        if ty_min > t_min {
+            t_min = ty_min;
+        }
+        if ty_max < t_max {
+            t_max = ty_max;
+        }
 
         // Check for ray intersection
         let tz_min = (self[dir_is_neg[2]].z - o.z) * inv_dir.z;
-        let tz_max = (self[1 - dir_is_neg[2]].z - o.z) * inv_dir.z;
+        let mut tz_max = (self[1 - dir_is_neg[2]].z - o.z) * inv_dir.z;
         // Update the maximum value to ensure robust bounds intersection
-        let tz_max = tz_max * (1.0 + 2.0 * gamma(3));
+        tz_max *= 1.0 + 2.0 * gamma(3);
 
         if t_min > tz_max || tz_min > t_max {
             return false;
         }
-        let t_min = if tz_min > t_min { tz_min } else { t_min };
-        let t_max = if tz_max < t_max { tz_max } else { t_max };
+        if tz_min > t_min {
+            t_min = tz_min;
+        }
+        if tz_max < t_max {
+            t_max = tz_max;
+        }
 
         t_min < ray_t_max && t_max > 0.0
     }
@@ -573,8 +581,8 @@ impl<P: Point3, V: Vector3> Default for Bounds3<P, V> {
         let min_num = NumericLimit::MIN;
         let max_num = NumericLimit::MAX;
         Self {
-            min: P::new(min_num, min_num, min_num),
-            max: P::new(max_num, max_num, max_num),
+            min: P::new(max_num, max_num, max_num),
+            max: P::new(min_num, min_num, min_num),
             phantom_vector: PhantomData,
         }
     }
