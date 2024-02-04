@@ -34,8 +34,8 @@ pub fn refract(wi: Vector3f, mut n: Normal3f, mut eta: Float) -> Option<(Vector3
         n = -n;
     }
 
-    let sin2_theta_i = Float::max(0.0, 1.0 - cos_theta_i * cos_theta_i);
-    let sin2_theta_t = eta * eta / sin2_theta_i;
+    let sin2_theta_i = Float::max(0.0, 1.0 - sqr(cos_theta_i));
+    let sin2_theta_t = sin2_theta_i / sqr(eta);
 
     // Handle total internal reflection case
     if sin2_theta_t >= 1.0 {
