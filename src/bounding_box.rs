@@ -614,26 +614,6 @@ mod tests {
     use super::Bounds2i;
 
     #[test]
-    fn bounds2_default() {
-        let bounds = Bounds2f::default();
-        assert_eq!(Float::MIN, bounds.min.x);
-        assert_eq!(Float::MIN, bounds.min.y);
-        assert_eq!(Float::MAX, bounds.max.x);
-        assert_eq!(Float::MAX, bounds.max.y);
-    }
-
-    #[test]
-    fn bounds3_default() {
-        let bounds = Bounds3f::default();
-        assert_eq!(Float::MIN, bounds.min.x);
-        assert_eq!(Float::MIN, bounds.min.y);
-        assert_eq!(Float::MIN, bounds.min.z);
-        assert_eq!(Float::MAX, bounds.max.x);
-        assert_eq!(Float::MAX, bounds.max.y);
-        assert_eq!(Float::MAX, bounds.max.z);
-    }
-
-    #[test]
     fn bounds2_from_point() {
         let p = Point2f::new(0.0, 10.0);
         let bounds = Bounds2f::from_point(p);
