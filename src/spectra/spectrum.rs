@@ -508,7 +508,7 @@ pub struct RgbAlbedoSpectrum {
 impl RgbAlbedoSpectrum {
     pub fn new(cs: &RgbColorSpace, rgb: &RGB) -> RgbAlbedoSpectrum {
         debug_assert!(Float::max(Float::max(rgb.r, rgb.g), rgb.b) <= 1.0);
-        debug_assert!(Float::max(Float::min(rgb.r, rgb.g), rgb.b) >= 0.0);
+        debug_assert!(Float::min(Float::min(rgb.r, rgb.g), rgb.b) >= 0.0);
         RgbAlbedoSpectrum {
             rsp: cs.to_rgb_coeffs(rgb),
         }

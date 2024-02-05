@@ -8,7 +8,7 @@ Film "rgb"
     "integer yresolution" [ 480 ]
     "integer xresolution" [ 480 ]
 Sampler "independent"
-  "integer pixelsamples" 256
+  "integer pixelsamples" 1000
 Integrator "simplepath"
 Accelerator "bvh"
   "string splitmethod" "middle"

@@ -204,6 +204,16 @@ impl BxDFI for DiffuseBxDF {
         }
         let pdf = cosine_hemisphere_pdf(abs_cos_theta(wi));
 
+        // TODO self.r seems to be much too small compared to PBRT?
+        //   R is set from the Material in get_bxdf.
+        //   It's not the texture evaluator I think,
+        //   we both use the universal texture eval.
+        // Uhm, I think that the reflectance *should* be the same since we
+        //   just grab it as an array from the file?
+        // Check that.
+        // But then the issue is I guess in evaluating the texture but
+        //   that's literally just grabbing from a constant spectrum right now???
+        //   Ugh idk I guess go step through it.
         Some(BSDFSample::new(
             self.r * INV_PI,
             wi,
