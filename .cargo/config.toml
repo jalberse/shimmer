@@ -1,0 +1,4 @@
+# This is useful during development, but if this code were to ever be compiled and then distributed,
+# then it should be compiled for the proper target architecture.
+[build]
+rustflags = ["-C", "target-cpu=native"]

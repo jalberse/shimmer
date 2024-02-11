@@ -2,7 +2,9 @@ use crate::{
     camera::CameraSample,
     filter::{Filter, FilterI},
     float::{next_float_down, Float, PI_F},
-    math::{lerp, safe_sqrt, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4},
+    math::{
+        lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4,
+    },
     options::Options,
     sampler::SamplerI,
     vecmath::{
@@ -138,7 +140,7 @@ pub fn uniform_hemisphere_pdf() -> Float {
 
 pub fn sample_cosine_hemisphere(u: Point2f) -> Vector3f {
     let d = sample_uniform_disk_concentric(u);
-    let z = safe_sqrt(1.0 - d.x * d.x - d.y * d.y);
+    let z = safe_sqrt(1.0 - sqr(d.x) - sqr(d.y));
     Vector3f {
         x: d.x,
         y: d.y,
@@ -165,6 +167,12 @@ pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
         )
     };
     r * Point2f::new(Float::cos(theta), Float::sin(theta))
+}
+
+pub fn sample_uniform_disk_polar(u: Point2f) -> Point2f {
+    let r = Float::sqrt(u[0]);
+    let theta = 2.0 * PI_F * u[1];
+    Point2f::new(r * Float::cos(theta), r * Float::sin(theta))
 }
 
 pub fn get_camera_sample<T: SamplerI>(

@@ -6,7 +6,7 @@ use crate::{
     interaction::{Interaction, SurfaceInteraction},
     interval::Interval,
     loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
-    math::{radians, safe_acos, safe_sqrt, DifferenceOfProducts, Sqrt},
+    math::{radians, safe_acos, safe_sqrt, sqr, DifferenceOfProducts, Sqrt},
     ray::Ray,
     sampling::sample_uniform_sphere,
     transform::Transform,
@@ -361,13 +361,13 @@ impl ShapeI for Sphere {
         // Sample sphere uniformly inside subtended cone
         // Compute quantities related to the $\theta_\roman{max}$ for cone
         let sin_theta_max: Float = self.radius / ctx.p().distance(p_center);
-        let sin2_theta_max: Float = sin_theta_max * sin_theta_max;
+        let sin2_theta_max: Float = sqr(sin_theta_max);
         let cos_theta_max: Float = safe_sqrt(1.0 - sin2_theta_max);
         let mut one_minus_cos_theta_max: Float = 1.0 - cos_theta_max;
 
         // Compute $\theta$ and $\phi$ values for sample in cone
         let mut cos_theta: Float = (cos_theta_max - 1.0) * u[0] + 1.0;
-        let mut sin2_theta: Float = 1.0 - cos_theta * cos_theta;
+        let mut sin2_theta: Float = 1.0 - sqr(cos_theta);
         if sin2_theta_max < 0.00068523
         /* sin^2(1.5 deg) */
         {
@@ -379,8 +379,8 @@ impl ShapeI for Sphere {
 
         // Compute angle $\alpha$ from center of sphere to sampled point on surface
         let cos_alpha: Float = sin2_theta / sin_theta_max
-            + cos_theta * safe_sqrt(1.0 - sin2_theta / sin_theta_max * sin_theta_max);
-        let sin_alpha: Float = safe_sqrt(1.0 - cos_alpha * cos_alpha);
+            + cos_theta * safe_sqrt(1.0 - sin2_theta / sqr(sin_theta_max));
+        let sin_alpha: Float = safe_sqrt(1.0 - sqr(cos_alpha));
 
         // Compute surface normal and sampled point on sphere
         let phi = u[1] * 2.0 * PI_F;

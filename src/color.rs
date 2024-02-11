@@ -347,6 +347,12 @@ impl RgbSigmoidPolynomial {
     }
 
     pub fn get(&self, lambda: Float) -> Float {
+        // TODO This may be wrong? It looks like the coefficients were right,
+        //  but I am getting a different value for R in the diffuse material
+        //  compared to PBRT (our values were too small).
+        // I know I had bugs with this function before, but I swear I
+        //  have a test for this and it was working well??
+        // Unless I'm getting confused, because I guess I'm seeing different coefficients coming in.
         Self::s(poly(lambda, &[self.c2, self.c1, self.c0]))
     }
 

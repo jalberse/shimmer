@@ -99,9 +99,6 @@ impl PrimitiveI for BvhAggregate {
                 if node.n_primitives > 0 {
                     // Leaf node; intersect ray with primitives in the node
                     for i in 0..node.n_primitives {
-                        // TODO Actually, given this use case, let's not store the offset
-                        // in a variant. The runtime cost of the match while extremely small
-                        // is probably less important than saving the byte or whatever.
                         let prim_si = self.primitives[node.primitive_offset + i as usize]
                             .as_ref()
                             .intersect(ray, t_max);
@@ -303,7 +300,7 @@ impl BvhAggregate {
     ///   ordered_prims with the primitives, but ordered such that each nodes' primitives are
     ///   contiguous, for efficient memory access. Passed in rather than constructed to enable
     ///   recursive behavior and to allow it to be initialized with the correct capacity from the start.
-    /// split_metho: The algorithm by which we split the primitives
+    /// split_method: The algorithm by which we split the primitives
     fn build_recursive(
         bvh_primitives: &mut [BvhPrimitive],
         primitives: &Vec<Arc<Primitive>>,
@@ -342,9 +339,7 @@ impl BvhAggregate {
             // Compute bound of primitive centroids and choose split dimension to be the largest dimension of the bounds.
             let centroid_bounds = bvh_primitives
                 .iter()
-                .fold(Bounds3f::new(Point3f::ZERO, Point3f::ZERO), |acc, p| {
-                    acc.union(&p.bounds)
-                });
+                .fold(Bounds3f::default(), |acc, p| acc.union_point(p.centroid()));
             let dim = centroid_bounds.max_dimension();
 
             if centroid_bounds.max[dim] == centroid_bounds.min[dim] {

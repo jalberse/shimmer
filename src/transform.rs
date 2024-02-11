@@ -200,9 +200,9 @@ impl Transform {
 
     fn rotate_helper(sin_theta: Float, cos_theta: Float, axis: &Vector3f) -> Transform {
         let a = axis.normalize();
-        let mut m = SquareMatrix::<4>::zero();
-        // Coompute the rotation of each basis vector in turn.
-        m.m[0][0] = a.x * a.x + (1.0 - a.x * a.x) + cos_theta;
+        let mut m = SquareMatrix::<4>::default();
+        // Compute the rotation of each basis vector in turn.
+        m.m[0][0] = a.x * a.x + (1.0 - a.x * a.x) * cos_theta;
         m.m[0][1] = a.x * a.y * (1.0 * cos_theta) - a.z * sin_theta;
         m.m[0][2] = a.x * a.z * (1.0 - cos_theta) + a.y * sin_theta;
         m.m[0][3] = 0.0;
@@ -224,7 +224,7 @@ impl Transform {
     }
 
     pub fn rotate(theta: Float, axis: &Vector3f) -> Transform {
-        Transform::rotate_helper(Float::sin(theta), Float::cos(theta), axis)
+        Transform::rotate_helper(Float::sin(radians(theta)), Float::cos(radians(theta)), axis)
     }
 
     /// Gets the rotation matrix that would transform from to to.
@@ -281,7 +281,7 @@ impl Transform {
     }
 
     pub fn look_at(pos: &Point3f, look_at: &Point3f, up: &Vector3f) -> Transform {
-        let mut world_from_camera = SquareMatrix::<4>::zero();
+        let mut world_from_camera = SquareMatrix::<4>::default();
 
         world_from_camera.m[0][3] = pos.x;
         world_from_camera.m[1][3] = pos.y;

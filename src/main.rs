@@ -32,19 +32,19 @@ struct Args {
     outfile: Option<String>,
 
     /// Specify an image crop window w.r.t. [0,1]^2. <x0 x1 y0 y1>
-    #[arg(short, long, num_args = 4)]
+    #[arg(long, num_args = 4)]
     crop_window: Option<Vec<Float>>,
 
     /// Specify image crop window w.r.t. pixel coordinates. <x0 x1 y0 y1>
-    #[arg(short, long, num_args = 4)]
+    #[arg(long, num_args = 4)]
     pixel_bounds: Option<Vec<i32>>,
 
     /// Convert all materials to be diffuse
-    #[arg(short, long, default_value = "false")]
+    #[arg(long, default_value = "false")]
     force_diffuse: bool,
 
     /// Set random number generator seed
-    #[arg(short, long, default_value = "0")]
+    #[arg(long, default_value = "0")]
     seed: i32,
 
     /// Override samples per pixel in scene description file.
@@ -56,39 +56,39 @@ struct Args {
     quick: bool,
 
     /// Always sample the same wavelengths of light.
-    #[arg(short, long)]
+    #[arg(long)]
     disable_wavelength_jitter: bool,
 
     /// Always sample pixels at their centers.
-    #[arg(short, long)]
+    #[arg(long)]
     disable_pixel_jitter: bool,
 
     /// Point-sample all textures.
-    #[arg(short, long)]
+    #[arg(long)]
     disable_texture_filtering: bool,
 
     /// Set the rendering coordinate system.
-    #[arg(short, long, default_value = "camera-world")]
+    #[arg(long, default_value = "camera-world")]
     render_coord_system: RenderingCoordinateSystem,
 
     /// Fullscreen
-    #[arg(short, long, default_value = "false")]
+    #[arg(long, default_value = "false")]
     fullscreen: bool,
 
     /// Scale target triangle edge length by given value.
-    #[arg(short, long, default_value = "1.0")]
+    #[arg(long, default_value = "1.0")]
     displacement_edge_scale: Float,
 
     /// Reference image for MSE calculations.
-    #[arg(short, long)]
+    #[arg(long)]
     mse_reference_image: Option<String>,
 
     /// Output MSE statistics to given filename (implies -mseReferenceImage).
-    #[arg(short, long)]
+    #[arg(long)]
     mse_reference_output: Option<String>,
 
     /// Record pixel statistics
-    #[arg(short, long, default_value = "false")]
+    #[arg(long, default_value = "false")]
     record_pixel_statistics: bool,
 
     /// Use wavefront volumetric path integrator.
@@ -96,7 +96,7 @@ struct Args {
     wavefront: bool,
 
     /// Directory to search for files.
-    #[arg(short, long)]
+    #[arg(long)]
     search_directory: Option<String>,
 }
 
@@ -169,11 +169,11 @@ fn main() {
 
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
-    let file = fs::read_to_string(cli.scene_file).unwrap();
+    // let file = fs::read_to_string(cli.scene_file).unwrap();
     let scene = Box::new(BasicScene::default());
     let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner);
-    parser::parse_str(
-        &file,
+    parser::parse_files(
+        &[&cli.scene_file],
         &mut scene_builder,
         &mut options,
         &mut string_interner,

@@ -34,6 +34,7 @@ pub mod render;
 pub mod rgb_to_spectra;
 pub mod sampler;
 pub mod sampling;
+mod scattering;
 pub mod shape;
 pub mod spectra;
 pub mod sphere;

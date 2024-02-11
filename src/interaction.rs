@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use log::warn;
+
 use crate::{
     bsdf::BSDF,
     bxdf::{self, DiffuseBxDF},
@@ -162,7 +164,7 @@ impl SurfaceInteraction {
     pub fn get_bsdf(
         &mut self,
         ray: &RayDifferential,
-        lambda: &SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         camera: &Camera,
         sampler: &mut Sampler,
         options: &Options,
@@ -179,11 +181,11 @@ impl SurfaceInteraction {
 
         let material = self.material.as_ref().unwrap();
 
-        let displacement = material.as_ref().get_bump_map();
+        let displacement = material.as_ref().get_displacement();
         let normal_map = material.as_ref().get_normal_map();
         if displacement.is_some() || normal_map.is_some() {
-            // TODO handle shading using normal or bump map
-            panic!("Normal and displacement maps not fully implemented yet!");
+            // TODO handle shading using normal or bump map - we just won't do anything right now...
+            warn!("Normal and displacement maps not fully implemented yet!");
         }
 
         let material_eval_context = MaterialEvalContext::from(&*self);

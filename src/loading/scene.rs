@@ -1048,7 +1048,7 @@ impl TransformSet {
 impl Default for TransformSet {
     fn default() -> Self {
         Self {
-            t: Default::default(),
+            t: [Transform::default(); MAX_TRANSFORMS],
         }
     }
 }
@@ -1593,7 +1593,6 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
 
-        // TODO Our graphics_state.ctm is the identity matrix. That's... wrong. It should be the output of look_at()?
         let camera_from_world = &self.graphics_state.ctm;
         let world_from_camera = TransformSet::inverse(&camera_from_world);
         // TODO Animated transform
