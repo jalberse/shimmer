@@ -631,7 +631,7 @@ impl ProjectiveCameraBase {
         ) * Transform::translate(Vector3f::new(
             -screen_window.min.x,
             -screen_window.max.y,
-            1.0,
+            0.0,
         ));
         let raster_from_ndc = Transform::scale(
             camera_base.film.full_resolution().x as Float,
