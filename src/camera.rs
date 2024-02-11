@@ -631,7 +631,7 @@ impl ProjectiveCameraBase {
         ) * Transform::translate(Vector3f::new(
             -screen_window.min.x,
             -screen_window.max.y,
-            1.0,
+            0.0,
         ));
         let raster_from_ndc = Transform::scale(
             camera_base.film.full_resolution().x as Float,
@@ -919,10 +919,10 @@ impl PerspectiveCamera {
         // their origins are unchanges and the ray differentials differ only in their direction
         // for perspective cameras. Compute the change in position on the near perspective plane
         // in camera space wrt shifts in pixel locations.
-        let dx_camera = projective_base.camera_from_raster.apply(&Vector3f::X)
-            - projective_base.camera_from_raster.apply(&Vector3f::ZERO);
-        let dy_camera = projective_base.camera_from_raster.apply(&Vector3f::Y)
-            - projective_base.camera_from_raster.apply(&Vector3f::ZERO);
+        let dx_camera = projective_base.camera_from_raster.apply(&Point3f::X)
+            - projective_base.camera_from_raster.apply(&Point3f::ZERO);
+        let dy_camera = projective_base.camera_from_raster.apply(&Point3f::Y)
+            - projective_base.camera_from_raster.apply(&Point3f::ZERO);
 
         // Compute cos_total_width for perspective camera, the cosine of the maximum angle of the FOV.
         // This is used in a few places, such as for culling points outside the FOV quickly.
