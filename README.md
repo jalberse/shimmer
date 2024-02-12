@@ -2,6 +2,10 @@
 
 Shimmer is a physically based rendering system based on the ray tracing algorithm. It is currently under development.
 
+## Example Scenes
+
+Test and example scenes are available in the [shimmer-scenes](https://github.com/jalberse/shimmer-scenes) repository.
+
 # Notes
 
 Some comments might contain a `PAPERDOC` string. This is for my own reference to find source code snippets that might be useful in a paper I plan to write regarding this project.
