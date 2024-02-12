@@ -319,7 +319,7 @@ impl BvhAggregate {
         // Compute the bounds of all primitives in the primitive range.
         let bounds = bvh_primitives
             .iter()
-            .fold(Bounds3f::new(Point3f::ZERO, Point3f::ZERO), |acc, p| {
+            .fold(Bounds3f::default(), |acc, p| {
                 acc.union(&p.bounds)
             });
 
