@@ -1,0 +1,40 @@
+LookAt 0 -100 50
+  0 0 0
+  0 0 1
+Camera "perspective"
+    "float fov" [ 39 ]
+Film "rgb"
+    "string filename" [ "simple_tri.pfm" ]
+    "integer yresolution" [ 480 ]
+    "integer xresolution" [ 480 ]
+Sampler "independent"
+  "integer pixelsamples" 100
+Integrator "simplepath"
+Accelerator "bvh"
+  "string splitmethod" "middle"
+
+WorldBegin
+
+# Big area light
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0 0 0 ]
+    Translate 0 0 30
+    AreaLightSource "diffuse"
+        "rgb L" [ 100 100 100 ]
+    Shape "sphere"
+        "float radius" [ 10 ]
+AttributeEnd
+
+# floor
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Translate -50 0 -30
+    Shape "trianglemesh"
+    "integer indices" [ 0 1 2 ]
+    "point3 P" [
+      100   0.0   0.0
+      0.0     0.0   0.0
+      0.0     100   0]
+AttributeEnd

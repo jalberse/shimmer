@@ -17,7 +17,7 @@ use super::{Normal3f, Normal3i, Point2f, Point2i, Point3f, Point3i};
 use crate::float::Float;
 use crate::interval::Interval;
 use crate::is_nan::IsNan;
-use crate::math::lerp;
+use crate::math::{lerp, sqr};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
 pub trait Vector2:
@@ -1036,8 +1036,8 @@ impl Vector3f {
 
         let a = -1.0 / (sign + self.z);
         let b = self.x * self.y * a;
-        let v2 = Vector3f::new(1.0 + sign * self.x * self.x * a, sign * b, -sign * self.x);
-        let v3 = Vector3f::new(b, sign + self.y * self.y * a, -self.y);
+        let v2 = Vector3f::new(1.0 + sign * sqr(self.x) * a, sign * b, -sign * self.x);
+        let v3 = Vector3f::new(b, sign + sqr(self.y) * a, -self.y);
         (v2, v3)
     }
 }

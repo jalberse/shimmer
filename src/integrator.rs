@@ -8,7 +8,7 @@ use thread_local::ThreadLocal;
 
 use crate::{
     bounding_box::Bounds2i,
-    bxdf::BxDFReflTransFlags,
+    bxdf::{BxDFReflTransFlags, TransportMode},
     camera::{Camera, CameraI},
     colorspace::RgbColorSpace,
     film::{FilmI, VisibleSurface},
@@ -531,10 +531,9 @@ impl RandomWalkIntegrator {
 
         // Evaluate bsdf at surface for sampled direction
         let f = bsdf.f(wo, wp, crate::bxdf::TransportMode::Radiance);
-        if f.is_none() {
+        if f.is_zero() {
             return le;
         }
-        let f = f.unwrap();
         let fcos = f * wp.abs_dot_normal(isect.shading.n);
 
         // Recursively trace ray to estimate incident radiance at surface
@@ -732,9 +731,10 @@ impl SimplePathIntegrator {
                         if !ls.l.is_zero() && ls.pdf > 0.0 {
                             // Evaluate BSDF for light and possibly scattered radiance
                             let wi = ls.wi;
-                            let f = bsdf.f(wo, wi, crate::bxdf::TransportMode::Radiance);
-                            if f.is_some() && base.unoccluded(&isect.interaction, &ls.p_light) {
-                                l += beta * f.unwrap() * ls.l / (sampled_light.p * ls.pdf);
+                            let f = bsdf.f(wo, wi, TransportMode::Radiance) * wi.abs_dot_normal(isect.shading.n);
+                            if !f.is_zero() && base.unoccluded(&isect.interaction, &ls.p_light)
+                            {
+                                l += beta * f * ls.l / (sampled_light.p * ls.pdf);
                             }
                         }
                     }
@@ -749,7 +749,7 @@ impl SimplePathIntegrator {
                     wo,
                     u,
                     sampler.get_2d(),
-                    crate::bxdf::TransportMode::Radiance,
+                    TransportMode::Radiance,
                     BxDFReflTransFlags::all(),
                 );
                 if bs.is_none() {
@@ -785,7 +785,6 @@ impl SimplePathIntegrator {
                 };
                 beta *= bsdf
                     .f(wo, wi, crate::bxdf::TransportMode::Radiance)
-                    .unwrap()
                     * wi.abs_dot_normal(isect.shading.n)
                     / pdf;
                 specular_bounce = false;

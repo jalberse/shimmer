@@ -1,0 +1,1050 @@
+LookAt 0 -100 0
+  0 0 0
+  0 0 1
+Camera "perspective"
+    "float fov" [ 45 ]
+Film "rgb"
+    "string filename" [ "many_spheres.pfm" ]
+    "integer yresolution" [ 480 ]
+    "integer xresolution" [ 480 ]
+Sampler "independent"
+  "integer pixelsamples" 100
+Integrator "simplepath"
+Accelerator "bvh"
+  "string splitmethod" "middle"
+
+WorldBegin
+
+# light source
+# uniform blue-ish illumination from all directions
+LightSource "infinite" "rgb L" [ .4 .4 .5 ]
+
+Translate -50 0 -50
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+
+
+
+Translate -100 0 10
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd
+
+Translate 10 0 0
+AttributeBegin
+    Material "diffuse"
+        "rgb reflectance" [ 0.1 0.1 0.8 ]
+    Shape "sphere"
+        "float radius" [ 4 ]
+AttributeEnd

@@ -340,7 +340,7 @@ impl ShapeI for Sphere {
         let p_center: Point3f = self.render_from_object.apply(&Point3f::ZERO);
         let p_origin: Point3f = ctx.offset_ray_origin_pt(p_center);
         // Sample uniformly on sphere if $\pt{}$ is inside it
-        if p_origin.distance_squared(p_center) <= self.radius * self.radius {
+        if p_origin.distance_squared(p_center) <= sqr(self.radius) {
             // Sample shape by area and compute incident direction _wi_
             let mut ss = self.sample(u).expect("Sphere sample() failed!");
             ss.intr.time = ctx.time;
@@ -368,8 +368,8 @@ impl ShapeI for Sphere {
         // Compute $\theta$ and $\phi$ values for sample in cone
         let mut cos_theta: Float = (cos_theta_max - 1.0) * u[0] + 1.0;
         let mut sin2_theta: Float = 1.0 - sqr(cos_theta);
-        if sin2_theta_max < 0.00068523
         /* sin^2(1.5 deg) */
+        if sin2_theta_max < 0.00068523
         {
             // Compute cone sample via Taylor series expansion for small angles
             sin2_theta = sin2_theta_max * u[0];
