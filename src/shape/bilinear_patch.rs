@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::bounding_box::Bounds3f;
 use crate::math::lerp;
 use crate::vecmath::point::Point3;
 use crate::vecmath::{Length, Point3f, Vector3f};
@@ -8,6 +9,7 @@ use crate::vecmath::vector::Vector3;
 use crate::vecmath::normalize::Normalize;
 
 use super::mesh::BilinearPatchMesh;
+use super::ShapeI;
 
 
 pub struct BilinearPatch{
@@ -101,5 +103,45 @@ impl BilinearPatch{
             }
         }
         true
+    }
+}
+
+impl ShapeI for BilinearPatch
+{
+    fn bounds(&self) -> crate::bounding_box::Bounds3f {
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(&self.mesh, self.blp_index);
+        Bounds3f::new(p00, p01).union(&Bounds3f::new(p10, p11))
+    }
+
+    fn normal_bounds(&self) -> crate::direction_cone::DirectionCone {
+        todo!()
+    }
+
+    fn intersect(&self, ray: &crate::ray::Ray, t_max: Float) -> Option<super::ShapeIntersection> {
+        todo!()
+    }
+
+    fn intersect_predicate(&self, ray: &crate::ray::Ray, t_max: Float) -> bool {
+        todo!()
+    }
+
+    fn area(&self) -> Float {
+        self.area
+    }
+
+    fn sample(&self, u: crate::vecmath::Point2f) -> Option<super::ShapeSample> {
+        todo!()
+    }
+
+    fn pdf(&self, interaction: &crate::interaction::Interaction) -> Float {
+        todo!()
+    }
+
+    fn sample_with_context(&self, ctx: &super::ShapeSampleContext, u: crate::vecmath::Point2f) -> Option<super::ShapeSample> {
+        todo!()
+    }
+
+    fn pdf_with_context(&self, ctx: &super::ShapeSampleContext, wi: Vector3f) -> Float {
+        todo!()
     }
 }
