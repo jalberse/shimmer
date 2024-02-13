@@ -1,3 +1,4 @@
+use clap::parser::Indices;
 use itertools::Itertools;
 
 use crate::{
@@ -89,6 +90,86 @@ impl TriangleMesh {
             face_indices,
             reverse_orientation,
             transform_swaps_handedness: render_from_object.swaps_handedness(),
+        }
+    }
+}
+
+
+pub struct BilinearPatchMesh
+{
+    pub reverse_orientation: bool,
+    pub transform_swaps_handedness: bool,
+    pub n_patches: usize,
+    pub n_vertices: usize,
+    pub vertex_indices: Vec<usize>,
+    pub p: Vec<Point3f>,
+    pub n: Vec<Normal3f>,
+    pub uv: Vec<Point2f>,
+}
+
+impl BilinearPatchMesh{
+    pub fn new(
+        render_from_object: &Transform,
+        reverse_orientation: bool,
+        vertex_indices: Vec<usize>,
+        p: Vec<Point3f>,
+        mut n: Vec<Normal3f>,
+        uv: Vec<Point2f>,
+        face_indices: Vec<usize>,
+        // TODO imageDist
+    ) -> BilinearPatchMesh
+    {
+        assert_eq!(vertex_indices.len() % 4, 0);
+
+        let n_vertices = p.len();
+        let n_patches = vertex_indices.len() / 4;
+        let transform_swaps_handedness = render_from_object.swaps_handedness();
+        
+        // TODO We'd like to use a buffercache for the vertex indices to avoid repeats.
+
+        // Transform mesh vertices to rendering space
+        let p = p
+            .iter()
+            .map(|pt| render_from_object.apply(pt))
+            .collect_vec();
+        
+        // Copy UV and n vertex data, if present
+        if !uv.is_empty()
+        {
+            assert_eq!(n_vertices, uv.len());
+            // TODO Use cache
+        }
+
+        if !n.is_empty()
+        {
+            assert_eq!(n_vertices, n.len());
+            for nn in n.iter_mut()
+            {
+                *nn = render_from_object.apply(nn);
+                if reverse_orientation
+                {
+                    *nn = -(*nn);
+                }
+            }
+            // TODO Use cache
+        }
+
+        if !face_indices.is_empty()
+        {
+            assert_eq!(n_patches, face_indices.len());
+            // TODO Use cache
+        }
+
+        BilinearPatchMesh
+        {
+            reverse_orientation,
+            transform_swaps_handedness,
+            n_patches,
+            n_vertices,
+            vertex_indices,
+            p,
+            n,
+            uv,
         }
     }
 }
