@@ -18,14 +18,7 @@ pub struct BilinearPatch{
 
 impl BilinearPatch{
     pub fn new(mesh: Arc<BilinearPatchMesh>, blp_index: usize) -> BilinearPatch{
-        let v = mesh.vertex_indices[blp_index * 4];
-        let p00 = mesh.p[v];
-        let v = mesh.vertex_indices[blp_index * 4 + 1];
-        let p10 = mesh.p[v];
-        let v = mesh.vertex_indices[blp_index * 4 + 2];
-        let p01 = mesh.p[v];
-        let v = mesh.vertex_indices[blp_index * 4 + 3];
-        let p11 = mesh.p[v];
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(&mesh, blp_index);
 
         let area = if BilinearPatch::is_rectangle(&mesh, blp_index)
         {
@@ -61,7 +54,7 @@ impl BilinearPatch{
         }
     }
 
-    fn is_rectangle(mesh: &Arc<BilinearPatchMesh>, blp_index: usize) -> bool 
+    fn get_points(mesh: &Arc<BilinearPatchMesh>, blp_index: usize) -> (Point3f, Point3f, Point3f, Point3f)
     {
         let v = mesh.vertex_indices[blp_index * 4];
         let p00 = mesh.p[v];
@@ -71,6 +64,12 @@ impl BilinearPatch{
         let p01 = mesh.p[v];
         let v = mesh.vertex_indices[blp_index * 4 + 3];
         let p11 = mesh.p[v];
+        (p00, p10, p01, p11)
+    }
+
+    fn is_rectangle(mesh: &Arc<BilinearPatchMesh>, blp_index: usize) -> bool 
+    {
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(mesh, blp_index);
 
         if p00 == p01 || p01 == p11 || p11 == p10 || p10 == p00
         {
