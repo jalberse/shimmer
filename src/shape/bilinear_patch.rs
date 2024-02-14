@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use num::traits::int;
+
 use crate::bounding_box::Bounds3f;
 use crate::direction_cone::DirectionCone;
 use crate::float::gamma;
@@ -12,7 +14,7 @@ use crate::square_matrix::{Determinant, SquareMatrix};
 use crate::transform::Transform;
 use crate::vecmath::normal::Normal3;
 use crate::vecmath::point::{Point3, Point3fi};
-use crate::vecmath::{Length, Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f};
+use crate::vecmath::{invert_bilinear, Length, Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f};
 use crate::Float;
 use crate::vecmath::vector::Vector3;
 use crate::vecmath::normalize::Normalize;
@@ -587,7 +589,40 @@ impl ShapeI for BilinearPatch
     }
 
     fn pdf(&self, interaction: &crate::interaction::Interaction) -> Float {
-        todo!()
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(&self.mesh, self.blp_index);
+        let (v0, v1, v2, v3) = BilinearPatch::get_vertex_indices(&self.mesh, self.blp_index);
+
+        let mut uv = interaction.uv;
+        if !self.mesh.uv.is_empty()
+        {
+            let uv00 = self.mesh.uv[v0];
+            let uv10 = self.mesh.uv[v1];
+            let uv01 = self.mesh.uv[v2];
+            let uv11 = self.mesh.uv[v3];
+            uv = invert_bilinear(uv, &[uv00, uv10, uv01, uv11])
+        }
+    
+
+        // TODO Handle if we have an image distribution
+        let pdf = if !BilinearPatch::is_rectangle(&self.mesh, self.blp_index)
+        {
+            let w = [
+                (p10 - p00).cross(p01 - p00).length(),
+                (p10 - p00).cross(p11 - p10).length(),
+                (p01 - p00).cross(p11 - p01).length(),
+                (p11 - p10).cross(p11 - p01).length(),
+            ];
+            bilinear_pdf(uv, &w)
+        } else {
+            1.0
+        };
+
+        let pu0: Point3f = lerp::<Vector3f>(uv[1], p00.into(), p10.into()).into();
+        let pu1: Point3f = lerp::<Vector3f>(uv[1], p10.into(), p11.into()).into();
+        let dpdu: Vector3f = pu1 - pu0;
+        let dpdv = lerp::<Vector3f>(uv[0], p01.into(), p11.into()) - lerp::<Vector3f>(uv[0], p00.into(), p10.into());
+
+        pdf / dpdu.cross(dpdv).length()
     }
 
     fn sample_with_context(&self, ctx: &super::ShapeSampleContext, u: crate::vecmath::Point2f) -> Option<super::ShapeSample> {

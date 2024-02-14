@@ -61,6 +61,57 @@ pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use tuple::{Tuple2, Tuple3};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
+use crate::Float;
+use crate::math::{quadratic, DifferenceOfProducts};
+
+pub fn invert_bilinear(p: Point2f, vert: &[Point2f]) -> Point2f
+{
+    // The below assumes a quad (vs uv parametric layout) in v....
+    let a = vert[0];
+    let b = vert[1];
+    let c = vert[3];
+    let d = vert[2];
+    let e = b - a;
+    let f = d - a;
+    let g = (a - b) + (c - d);
+    let h = p - a;
+
+    let cross2d = |a: Vector2f, b: Vector2f| {
+        Float::difference_of_products(a.x, b.y, a.y, b.x)
+    };
+
+    let k2 = cross2d(g, f);
+    let k1 = cross2d(e, f) + cross2d(h, g);
+    let k0 = cross2d(h, e);
+
+    // if edges are parallel, this is a linear equation
+    if Float::abs(k2) < 0.001 {
+        if Float::abs(e.x * k1 - g.x * k0) < 1e-5
+        {
+            return Point2f::new((h.y * k1 + f.y * k0) / (e.y * k1 - g.y * k0), -k0 / k1);
+
+        }
+        else
+        {
+            return Point2f::new((h.x * k1 + f.x * k0) / (e.x * k1 - g.x * k0), -k0 / k1);
+        }
+    }
+
+    let quadratic_result = quadratic(k2, k1, k0);
+    if quadratic_result.is_none()
+    {
+        return Point2f::ZERO;
+    }
+    let (v0, v1) = quadratic_result.unwrap();
+
+    let u = (h.x - f.x * v0) / (e.x + g.x * v0);
+    if u < 0.0 || u > 1.0 || v0 < 0.0 || v0 > 1.0
+    {
+        return Point2f::new((h.x - f.x * v1) / (e.x + g.x * v1), v1);
+    }
+    Point2f::new(u, v0)
+}
+
 // TODO Consider specialization after Rust RFC 1210 is implemented, if ever.
 //
 // Consider: I think that the better way to represent e.g. Point2f vs Point2i,
