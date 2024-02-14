@@ -374,6 +374,41 @@ pub fn linear_least_squares_helper<const N: usize, const ROWS: usize>(
     (a_t_a, a_t_b)
 }
 
+pub fn quadratic(a: Float, b: Float, c: Float) -> Option<(Float, Float)>
+{
+    // Handle the case of a == 0 for quadratic solution
+    if a == 0.0
+    {
+        if b == 0.0
+        {
+            return None;
+        }
+        return Some((-c / b, -c / b));
+    }
+
+    // Find quadratic discriminant
+    let discrim = Float::difference_of_products(b, b, 4.0 * a, c);
+    if discrim < 0.0
+    {
+        return None;
+    }
+
+    let root_discrim = Float::sqrt(discrim);
+
+    // Compute quadratic _t_ values
+    let q = -0.5 * (b + Float::copysign(root_discrim, b));
+    let t0 = q / a;
+    let t1 = c / q;
+    if t0 > t1
+    {
+        Some((t1, t0))
+    }
+    else
+    {
+        Some((t0, t1))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::DifferenceOfProducts;

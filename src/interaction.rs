@@ -144,6 +144,26 @@ impl SurfaceInteraction {
         }
     }
 
+    pub fn new_with_face_index(
+        pi: Point3fi,
+        uv: Point2f,
+        wo: Vector3f,
+        dpdu: Vector3f,
+        dpdv: Vector3f,
+        dndu: Normal3f,
+        dndv: Normal3f,
+        time: Float,
+        flip_normal: bool,
+        face_index: i32,
+    ) -> SurfaceInteraction
+    {
+        let mut isect = SurfaceInteraction::new(
+            pi, uv, wo, dpdu, dpdv, dndu, dndv, time, flip_normal
+        );
+        isect.face_index = face_index;
+        isect
+    }
+
     pub fn p(&self) -> Point3f {
         self.interaction.p()
     }

@@ -105,6 +105,7 @@ pub struct BilinearPatchMesh
     pub p: Vec<Point3f>,
     pub n: Vec<Normal3f>,
     pub uv: Vec<Point2f>,
+    pub face_indices: Vec<usize>,
 }
 
 impl BilinearPatchMesh{
@@ -170,6 +171,7 @@ impl BilinearPatchMesh{
             p,
             n,
             uv,
+            face_indices
         }
     }
 }
