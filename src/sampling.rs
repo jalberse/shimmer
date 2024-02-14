@@ -1,15 +1,9 @@
 use crate::{
-    camera::CameraSample,
-    filter::{Filter, FilterI},
-    float::{next_float_down, Float, PI_F},
-    math::{
+    camera::CameraSample, filter::{Filter, FilterI}, float::{next_float_down, Float, PI_F}, frame::Frame, math::{
         lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4,
-    },
-    options::Options,
-    sampler::SamplerI,
-    vecmath::{
-        vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Vector2f, Vector3f,
-    },
+    }, options::Options, sampler::SamplerI, vecmath::{
+        vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f, Vector3f
+    }
 };
 
 // See PBRT v4 2.14
@@ -327,6 +321,86 @@ pub fn sample_spherical_triangle(v: &[Point3f; 3], p: Point3f, u: Point2f) -> ([
         (b1, b2)
     };
     ([1.0 - b1 - b2, b1, b2], pdf)
+}
+
+pub fn sample_spherical_rectangle(p_ref: Point3f, s: Point3f, ex: Vector3f, ey: Vector3f,
+    u: Point2f, pdf: Option<&mut Float>) -> Point3f {
+    // Compute local reference frame and transform rectangle coordinates
+    let exl = ex.length();
+    let eyl = ey.length();
+    let mut r: Frame = Frame::from_xy(ex / exl, ey / eyl);
+    let d_local: Vector3f = r.to_local_v(&(s - p_ref));
+    let mut z0 = d_local.z;
+
+    // flip 'z' to make it point against 'Q'
+    if z0 > 0.0 {
+        r.z = -r.z;
+        z0 *= -1.0;
+    }
+    let x0 = d_local.x;
+    let y0 = d_local.y;
+    let x1 = x0 + exl;
+    let y1 = y0 + eyl;
+
+    // Find plane normals to rectangle edges and compute internal angles
+    let v00 = Vector3f::new(x0, y0, z0);
+    let v01 = Vector3f::new(x0, y1, z0);
+    let v10 = Vector3f::new(x1, y0, z0);
+    let v11 = Vector3f::new(x1, y1, z0);
+    let n0: Vector3f = v00.cross(v10).normalize();
+    let n1: Vector3f = v10.cross(v11).normalize();
+    let n2: Vector3f = v11.cross(v01).normalize();
+    let n3: Vector3f = v01.cross(v00).normalize();
+
+    let g0 = -n0.angle_between(n1);
+    let g1 = -n1.angle_between(n2);
+    let g2 = -n2.angle_between(n3);
+    let g3 = -n3.angle_between(n0);
+
+    // Compute spherical rectangle solid angle and PDF
+    let solid_angle = g0 + g1 + g2 + g3 - 2.0 * PI_F;
+    if solid_angle <= 0.0 {
+        if let Some(pdf) = pdf {
+            *pdf = 0.0;
+        }
+        return Point3f::from(s + u[0] * ex + u[1] * ey);
+    }
+    if let Some(pdf) = pdf
+    {
+        *pdf = Float::max(0.0, 1.0 / solid_angle);
+    }
+    if solid_angle < 1e-3
+    {
+        return Point3f::from(s + u[0] * ex + u[1] * ey);
+    }
+
+    // Sample _cu_ for spherical rectangle sample
+    let b0 = n0.z;
+    let b1 = n2.z;
+    let au = u[0] * (g0 + g1 - 2.0 * PI_F) + (u[0] - 1.0) * (g2 + g3);
+    let fu = (Float::cos(au) * b0 - b1) / Float::sin(au);
+    let cu = Float::copysign(1.0 / Float::sqrt(sqr(fu) + sqr(b0)), fu);
+    let cu = Float::clamp(cu, -(1.0 - Float::EPSILON), 1.0 - Float::EPSILON);  // avoid NaNs
+
+    // Find _xu_ along $x$ edge for spherical rectangle sample
+    let xu = -(cu * z0) / safe_sqrt(1.0 - sqr(cu));
+    let xu = Float::clamp(xu, x0, x1);
+
+    // Find _xv_ along $y$ edge for spherical rectangle sample
+    let dd = Float::sqrt(sqr(xu) + sqr(z0));
+    let h0 = y0 / Float::sqrt(sqr(dd) + sqr(y0));
+    let h1 = y1 / Float::sqrt(sqr(dd) + sqr(y1));
+    let hv = h0 + u[1] * (h1 - h0);
+    let hvsq = sqr(hv);
+    let yv = if hvsq < 1.0 - 1e-6
+    {
+        (hv * dd) / Float::sqrt(1.0 - hvsq)
+    }  else {
+        y1
+    };
+
+    // Return spherical triangle sample in original coordinate system
+    return p_ref + r.from_local_v(&Vector3f::new(xu, yv, z0));
 }
 
 pub fn invert_spherical_triangle_sample(v: &[Point3f; 3], p: Point3f, w: Vector3f) -> Point2f {

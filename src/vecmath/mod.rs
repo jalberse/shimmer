@@ -61,8 +61,11 @@ pub use point::{Point2f, Point2i, Point3f, Point3i};
 pub use tuple::{Tuple2, Tuple3};
 pub use vector::{Vector2f, Vector2i, Vector3f, Vector3i};
 
+use crate::float::PI_F;
 use crate::Float;
 use crate::math::{quadratic, DifferenceOfProducts};
+
+use self::vector::Vector3;
 
 pub fn invert_bilinear(p: Point2f, vert: &[Point2f]) -> Point2f
 {
@@ -110,6 +113,30 @@ pub fn invert_bilinear(p: Point2f, vert: &[Point2f]) -> Point2f
         return Point2f::new((h.x - f.x * v1) / (e.x + g.x * v1), v1);
     }
     Point2f::new(u, v0)
+}
+
+pub fn spherical_quad_area(a: Vector3f, b: Vector3f, c: Vector3f, d: Vector3f) -> Float
+{
+    let axb = a.cross(b);
+    let bxc = b.cross(c);
+    let cxd = c.cross(d);
+    let dxa = d.cross(a);
+    if axb.length_squared() == 0.0 || bxc.length_squared() == 0.0 || cxd.length_squared() == 0.0 || dxa.length_squared() == 0.0
+    {
+        return 0.0;
+    }
+
+    let axb = axb.normalize();
+    let bxc = bxc.normalize();
+    let cxd = cxd.normalize();
+    let dxa = dxa.normalize();
+
+    let alpha = dxa.angle_between(-axb);
+    let beta = axb.angle_between(-bxc);
+    let gamma = bxc.angle_between(-cxd);
+    let delta = cxd.angle_between(-dxa);
+
+    Float::abs(alpha + beta + gamma + delta - 2.0 * PI_F)
 }
 
 // TODO Consider specialization after Rust RFC 1210 is implemented, if ever.

@@ -8,20 +8,20 @@ use crate::float::gamma;
 use crate::interaction::{Interaction, SurfaceInteraction};
 use crate::math::{lerp, quadratic};
 use crate::ray::Ray;
-use crate::sampling::{bilinear_pdf, sample_bilinear};
+use crate::sampling::{bilinear_pdf, sample_bilinear, sample_spherical_rectangle};
 use crate::shape::ShapeSample;
 use crate::square_matrix::{Determinant, SquareMatrix};
 use crate::transform::Transform;
 use crate::vecmath::normal::Normal3;
 use crate::vecmath::point::{Point3, Point3fi};
-use crate::vecmath::{invert_bilinear, Length, Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f};
+use crate::vecmath::{invert_bilinear, spherical_quad_area, Length, Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f};
 use crate::Float;
 use crate::vecmath::vector::Vector3;
 use crate::vecmath::normalize::Normalize;
 use crate::math::DifferenceOfProducts;
 
 use super::mesh::BilinearPatchMesh;
-use super::{Shape, ShapeI, ShapeIntersection};
+use super::{Shape, ShapeI, ShapeIntersection, ShapeSampleContext};
 
 
 pub struct BilinearPatch{
@@ -36,6 +36,8 @@ pub struct BilinearIntersection{
 }
 
 impl BilinearPatch{
+    const MIN_SPHERICAL_SAMPLE_AREA: Float = 1e-4;
+
     pub fn new(mesh: Arc<BilinearPatchMesh>, blp_index: usize) -> BilinearPatch{
         let (p00, p10, p01, p11) = BilinearPatch::get_points(&mesh, blp_index);
 
@@ -602,7 +604,6 @@ impl ShapeI for BilinearPatch
             uv = invert_bilinear(uv, &[uv00, uv10, uv01, uv11])
         }
     
-
         // TODO Handle if we have an image distribution
         let pdf = if !BilinearPatch::is_rectangle(&self.mesh, self.blp_index)
         {
@@ -625,8 +626,105 @@ impl ShapeI for BilinearPatch
         pdf / dpdu.cross(dpdv).length()
     }
 
-    fn sample_with_context(&self, ctx: &super::ShapeSampleContext, u: crate::vecmath::Point2f) -> Option<super::ShapeSample> {
-        todo!()
+    fn sample_with_context(&self, ctx: &ShapeSampleContext, mut u: Point2f) -> Option<ShapeSample> {
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(&self.mesh, self.blp_index);
+        let (v0, v1, v2, v3) = BilinearPatch::get_vertex_indices(&self.mesh, self.blp_index);
+
+        // Sample bilinear patch w.r.t. solid angle from reference point
+        let v00 = (p00 - ctx.p()).normalize();
+        let v10 = (p10 - ctx.p()).normalize();
+        let v01 = (p01 - ctx.p()).normalize();
+        let v11 = (p11 - ctx.p()).normalize();
+
+        // TODO Also handle image distribution, when added
+        if !Self::is_rectangle(&self.mesh, self.blp_index) || spherical_quad_area(v00, v10, v11, v01) <= Self::MIN_SPHERICAL_SAMPLE_AREA
+        {
+            let mut ss = self.sample(u).unwrap();
+            ss.intr.time = ctx.time;
+            let wi = ss.intr.p() - ctx.p();
+            if wi.length_squared() == 0.0
+            {
+                return None;
+            }
+            let wi = wi.normalize();
+
+            // Convert area sampling PDF in ss to solid angle measure
+            ss.pdf /= ss.intr.n.abs_dot_vector(-wi) / (ctx.p() - ss.intr.p()).length_squared();
+            if ss.pdf.is_infinite()
+            {
+                return None;
+            }
+            return Some(ss)
+        }
+
+        // Sample spherical direction to rectangular bilinear patch
+
+        // Warp uniform sample u to account for incidenrt cos theta factor
+        let mut pdf = 1.0;
+        if ctx.ns != Normal3f::ZERO
+        {
+            let w = [
+                Float::max(0.01, v00.dot_normal(ctx.ns)),
+                Float::max(0.01, v10.dot_normal(ctx.ns)),
+                Float::max(0.01, v01.dot_normal(ctx.ns)),
+                Float::max(0.01, v11.dot_normal(ctx.ns)),
+            ];
+
+            u = sample_bilinear(u, &w);
+            pdf = bilinear_pdf(u, &w);
+        }
+
+        // Sample spherical rectangle at reference point
+        let eu = p10 - p00;
+        let ev = p01 - p00;
+        let mut quad_pdf = 0.0;
+        let p = sample_spherical_rectangle(ctx.p(), p00, eu, ev, u, Some(&mut quad_pdf));
+        pdf *= quad_pdf;
+
+        // Compute uv and surface normal for sampled point on rectangle
+        let uv = Point2f::new(
+            (p - p00).dot(eu) / p10.distance_squared(p00),
+            (p - p00).dot(ev) / p01.distance_squared(p00),
+        );
+
+        let mut n: Normal3f = eu.cross(ev).normalize().into();
+
+        // Flip normal at sampled uv if necessary
+        if !self.mesh.n.is_empty()
+        {
+            let n00 = self.mesh.n[v0];
+            let n10 = self.mesh.n[v1];
+            let n01 = self.mesh.n[v2];
+            let n11 = self.mesh.n[v3];
+            let ns = lerp(uv[0], lerp(uv[1], n00, n01), lerp(uv[1], n10, n11));
+            n = n.face_forward(ns);
+        } else if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
+            n = -n;
+        }
+
+        // Compute st texture coordinates for sampled uv
+        let mut st = uv;
+        if !self.mesh.uv.is_empty()
+        {
+            let uv00 = self.mesh.uv[v0];
+            let uv10 = self.mesh.uv[v1];
+            let uv01 = self.mesh.uv[v2];
+            let uv11 = self.mesh.uv[v3];
+            st = lerp::<Vector2f>(uv[0], lerp(uv[1], uv00.into(), uv01.into()), lerp(uv[1], uv10.into(), uv11.into())).into();
+        }
+
+        Some(
+            ShapeSample{
+                intr: Interaction::new(
+                    Point3fi::from(p),
+                    n,
+                    st,
+                    Default::default(),
+                    ctx.time,
+                ),
+                pdf,
+            }
+        )
     }
 
     fn pdf_with_context(&self, ctx: &super::ShapeSampleContext, wi: Vector3f) -> Float {
