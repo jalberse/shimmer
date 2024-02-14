@@ -8,7 +8,7 @@ use crate::float::gamma;
 use crate::interaction::{Interaction, SurfaceInteraction};
 use crate::math::{lerp, quadratic};
 use crate::ray::Ray;
-use crate::sampling::{bilinear_pdf, sample_bilinear, sample_spherical_rectangle};
+use crate::sampling::{bilinear_pdf, invert_spherical_rectangle_sample, sample_bilinear, sample_spherical_rectangle};
 use crate::shape::ShapeSample;
 use crate::square_matrix::{Determinant, SquareMatrix};
 use crate::transform::Transform;
@@ -728,6 +728,49 @@ impl ShapeI for BilinearPatch
     }
 
     fn pdf_with_context(&self, ctx: &super::ShapeSampleContext, wi: Vector3f) -> Float {
-        todo!()
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(&self.mesh, self.blp_index);
+
+        // Compute solid angle PDF for sampling bilinear patch from ctx
+        // Intersect sample ray with shape geometry.
+        let ray = ctx.spawn_ray(wi);
+        let isect = self.intersect(&ray, Float::INFINITY);
+        if isect.is_none()
+        {
+            return 0.0;
+        }
+        let isect = isect.unwrap();
+
+        let v00 = (p00 - ctx.p()).normalize();
+        let v10 = (p10 - ctx.p()).normalize();
+        let v01 = (p01 - ctx.p()).normalize();
+        let v11 = (p11 - ctx.p()).normalize();
+
+        // TODO handle image distributions
+        if !Self::is_rectangle(&self.mesh, self.blp_index) || spherical_quad_area(v00, v10, v11, v01) <= Self::MIN_SPHERICAL_SAMPLE_AREA
+        {
+            let pdf = self.pdf(&isect.intr.interaction) * (ctx.p().distance_squared(isect.intr.p())) / isect.intr.interaction.n.abs_dot_vector(-wi);
+            if pdf.is_infinite()
+            {
+                0.0
+            } else {
+                pdf
+            }
+        } else {
+            // Return PDF for sample in spherical rectangle
+            let pdf = 1.0 / spherical_quad_area(v00, v10, v11, v01);
+            if ctx.ns != Normal3f::ZERO
+            {
+                let w = [
+                    Float::max(0.01, v00.dot_normal(ctx.ns)),
+                    Float::max(0.01, v10.dot_normal(ctx.ns)),
+                    Float::max(0.01, v01.dot_normal(ctx.ns)),
+                    Float::max(0.01, v11.dot_normal(ctx.ns)),
+                ];
+                let u = invert_spherical_rectangle_sample(ctx.p(), p00, p10 - p00, p01 - p00, isect.intr.p());
+                bilinear_pdf(u, &w) * pdf
+            } else {
+                pdf
+            }
+        }
     }
 }
