@@ -95,6 +95,7 @@ impl TriangleMesh {
 }
 
 
+#[derive(Debug)]
 pub struct BilinearPatchMesh
 {
     pub reverse_orientation: bool,

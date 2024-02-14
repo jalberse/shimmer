@@ -21,9 +21,10 @@ use crate::vecmath::normalize::Normalize;
 use crate::math::DifferenceOfProducts;
 
 use super::mesh::BilinearPatchMesh;
-use super::{Shape, ShapeI, ShapeIntersection, ShapeSampleContext};
+use super::{ShapeI, ShapeIntersection, ShapeSampleContext};
 
 
+#[derive(Debug, Clone)]
 pub struct BilinearPatch{
     mesh: Arc<BilinearPatchMesh>,
     blp_index: usize,

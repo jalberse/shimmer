@@ -12,7 +12,7 @@ use crate::{
     Float,
 };
 
-use super::{sphere::Sphere, Triangle};
+use super::{sphere::Sphere, BilinearPatch, Triangle};
 
 /// The Shape interface provides basic geometric properties of the primitive,
 /// such as its surface area and its ray intersection routine. The non-geometric
@@ -65,6 +65,7 @@ pub trait ShapeI {
 pub enum Shape {
     Sphere(Sphere),
     Triangle(Triangle),
+    BilinearPatch(BilinearPatch),
 }
 
 impl Shape {
@@ -111,6 +112,8 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.bounds(),
             Shape::Triangle(t) => t.bounds(),
+            Shape::BilinearPatch(s) => s.bounds(),
+            
         }
     }
 
@@ -118,6 +121,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.normal_bounds(),
             Shape::Triangle(t) => t.normal_bounds(),
+            Shape::BilinearPatch(s) => s.normal_bounds(),
         }
     }
 
@@ -125,6 +129,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.intersect(ray, t_max),
             Shape::Triangle(t) => t.intersect(ray, t_max),
+            Shape::BilinearPatch(s) => s.intersect(ray, t_max),
         }
     }
 
@@ -132,6 +137,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.intersect_predicate(ray, t_max),
             Shape::Triangle(t) => t.intersect_predicate(ray, t_max),
+            Shape::BilinearPatch(s) => s.intersect_predicate(ray, t_max),
         }
     }
 
@@ -139,6 +145,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.area(),
             Shape::Triangle(t) => t.area(),
+            Shape::BilinearPatch(s) => s.area(),
         }
     }
 
@@ -146,6 +153,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.sample(u),
             Shape::Triangle(t) => t.sample(u),
+            Shape::BilinearPatch(s) => s.sample(u),
         }
     }
 
@@ -153,6 +161,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.pdf(interaction),
             Shape::Triangle(t) => t.pdf(interaction),
+            Shape::BilinearPatch(s) => s.pdf(interaction),
         }
     }
 
@@ -160,6 +169,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.sample_with_context(ctx, u),
             Shape::Triangle(t) => t.sample_with_context(ctx, u),
+            Shape::BilinearPatch(s) => s.sample_with_context(ctx, u),
         }
     }
 
@@ -167,6 +177,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.pdf_with_context(ctx, wi),
             Shape::Triangle(t) => t.pdf_with_context(ctx, wi),
+            Shape::BilinearPatch(s) => s.pdf_with_context(ctx, wi),
         }
     }
 }
