@@ -3,11 +3,14 @@ use std::sync::Arc;
 use crate::bounding_box::Bounds3f;
 use crate::direction_cone::DirectionCone;
 use crate::float::gamma;
-use crate::interaction::SurfaceInteraction;
+use crate::interaction::{Interaction, SurfaceInteraction};
 use crate::math::{lerp, quadratic};
 use crate::ray::Ray;
+use crate::sampling::{bilinear_pdf, sample_bilinear};
+use crate::shape::ShapeSample;
 use crate::square_matrix::{Determinant, SquareMatrix};
 use crate::transform::Transform;
+use crate::vecmath::normal::Normal3;
 use crate::vecmath::point::{Point3, Point3fi};
 use crate::vecmath::{Length, Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f};
 use crate::Float;
@@ -503,7 +506,84 @@ impl ShapeI for BilinearPatch
     }
 
     fn sample(&self, u: crate::vecmath::Point2f) -> Option<super::ShapeSample> {
-        todo!()
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(&self.mesh, self.blp_index);
+        let (v0, v1, v2, v3) = BilinearPatch::get_vertex_indices(&self.mesh, self.blp_index);
+
+        // TODO Handle if we use an image distribution for emission
+        // Sample bilinear patch parametric (u, v) coordinates
+        let (uv, pdf) = if BilinearPatch::is_rectangle(&self.mesh, self.blp_index)
+        {
+            (u, 1.0)
+        } else {
+            let w = [
+                (p10 - p00).cross(p01 - p00).length(),
+                (p10 - p00).cross(p11 - p10).length(),
+                (p01 - p00).cross(p11 - p01).length(),
+                (p11 - p10).cross(p11 - p01).length(),
+            ];
+
+            let uv = sample_bilinear(u, &w);
+            let pdf = bilinear_pdf(uv, &w);
+            (uv, pdf)
+        };
+
+        // Compute bilinear patch geometric quantities at the sampled uv
+        let pu0: Point3f = lerp::<Vector3f>(uv[0], p00.into(), p10.into()).into();
+        let pu1: Point3f = lerp::<Vector3f>(uv[1], p10.into(), p11.into()).into();
+        let p: Point3f = lerp::<Vector3f>(uv[0], pu0.into(), pu1.into()).into();
+        let dpdu  = pu1 - pu0;
+        let dpdv = lerp::<Vector3f>(uv[0], p01.into(), p11.into()) - lerp::<Vector3f>(uv[0], p00.into(), p10.into());
+
+        if dpdu.length_squared() == 0.0 || dpdv.length_squared() == 0.0
+        {
+            return None;
+        }
+
+        let mut st = uv;
+        if !self.mesh.uv.is_empty()
+        {
+            // Compute texture coordinates for bilinear patch intersection point
+            let uv00 = self.mesh.uv[v0];
+            let uv10 = self.mesh.uv[v1];
+            let uv01 = self.mesh.uv[v2];
+            let uv11 = self.mesh.uv[v3];
+            st = lerp::<Vector2f>(
+                uv[0],
+                lerp::<Vector2f>(uv[1], uv00.into(), uv01.into()),
+                lerp::<Vector2f>(uv[1], uv10.into(), uv11.into())
+            ).into();
+        }
+
+        // Compute surface normal for sampled bilinear patch uv
+        let mut n: Normal3f = dpdu.cross(dpdv).normalize().into();
+
+        // Flip normal if necessary
+        if !self.mesh.n.is_empty()
+        {
+            let n00 = self.mesh.n[v0];
+            let n10 = self.mesh.n[v1];
+            let n01 = self.mesh.n[v2];
+            let n11 = self.mesh.n[v3];
+            let ns = lerp(uv[0], lerp(uv[1], n00, n01), lerp(uv[1], n10, n11));
+            n = n.face_forward(ns);
+        } else if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
+            n = -n;
+        }
+
+        // Compute p_error for sampled bilinear patch uv
+        let p_abs_sum = p00.abs() + p01.abs().into() + p10.abs().into() + p11.abs().into();
+        let p_error = gamma(6) * Vector3f::from(p_abs_sum);
+
+        Some(ShapeSample{
+            intr: Interaction::new(
+                Point3fi::from_value_and_error(p, p_error),
+                n,
+                st,
+                Default::default(),
+                Default::default(),
+            ),
+            pdf: pdf / dpdu.cross(dpdv).length(),
+        })
     }
 
     fn pdf(&self, interaction: &crate::interaction::Interaction) -> Float {
