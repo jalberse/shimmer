@@ -16,7 +16,7 @@ use crate::vecmath::normalize::Normalize;
 use crate::math::DifferenceOfProducts;
 
 use super::mesh::BilinearPatchMesh;
-use super::ShapeI;
+use super::{Shape, ShapeI, ShapeIntersection};
 
 
 pub struct BilinearPatch{
@@ -478,11 +478,24 @@ impl ShapeI for BilinearPatch
     }
 
     fn intersect(&self, ray: &crate::ray::Ray, t_max: Float) -> Option<super::ShapeIntersection> {
-        todo!()
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(&self.mesh, self.blp_index);
+        let intersection = BilinearPatch::intersect_blp(ray, t_max, p00, p10, p01, p11);
+        if intersection.is_none()
+        {
+            return None;
+        }
+        let intersection = intersection.unwrap();
+        let interaction = BilinearPatch::interaction_from_intersection(&self.mesh, self.blp_index, intersection.uv, ray.time, -ray.d);
+        Some(ShapeIntersection{
+            intr: interaction,
+            t_hit: intersection.t,
+        })
     }
 
     fn intersect_predicate(&self, ray: &crate::ray::Ray, t_max: Float) -> bool {
-        todo!()
+        let (p00, p10, p01, p11) = BilinearPatch::get_points(&self.mesh, self.blp_index);
+        let intersection = BilinearPatch::intersect_blp(ray, t_max, p00, p10, p01, p11);
+        intersection.is_some()
     }
 
     fn area(&self) -> Float {
