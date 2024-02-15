@@ -35,6 +35,7 @@ pub fn render_cpu(
         &named_materials,
         &materials,
         &string_interner,
+        options,
     );
 
     // TODO The camera transforms we get are definitely differen than PBRT, for the same scene.

@@ -1,18 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
+use itertools::Itertools;
+use ply_rs::ply;
+
 use crate::{
-    bounding_box::Bounds3f,
-    direction_cone::DirectionCone,
-    interaction::{Interaction, SurfaceInteraction},
-    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
-    ray::Ray,
-    texture::FloatTexture,
-    transform::Transform,
-    vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},
-    Float,
+    bounding_box::Bounds3f, direction_cone::DirectionCone, file::resolve_filename, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::ParameterDictionary, parser_target::FileLoc}, options::Options, ray::Ray, shape::{mesh::{BilinearPatchMesh, TriQuadMesh}, TriangleMesh}, texture::FloatTexture, transform::Transform, vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f}, Float
 };
 
-use super::{sphere::Sphere, Triangle};
+use super::{sphere::Sphere, BilinearPatch, Triangle};
 
 /// The Shape interface provides basic geometric properties of the primitive,
 /// such as its surface area and its ray intersection routine. The non-geometric
@@ -65,6 +60,7 @@ pub trait ShapeI {
 pub enum Shape {
     Sphere(Sphere),
     Triangle(Triangle),
+    BilinearPatch(BilinearPatch),
 }
 
 impl Shape {
@@ -76,6 +72,7 @@ impl Shape {
         parameters: &mut ParameterDictionary,
         _float_textures: &HashMap<String, Arc<FloatTexture>>, // TODO will be used in future
         loc: &FileLoc,
+        options: &Options,
     ) -> Vec<Arc<Shape>> {
         let shapes = match name {
             "sphere" => {
@@ -97,6 +94,46 @@ impl Shape {
                 ));
                 Triangle::create_triangles(trianglemesh)
             }
+            "plymesh" => {
+                let filename = parameters.get_one_string("filename", "".to_string());
+                let filename = resolve_filename(options, &filename);
+                let ply_mesh = TriQuadMesh::read_ply(&filename);
+
+                // TODO Handle displacement texture.
+
+                let mut tri_quad_shapes = Vec::new();
+                if !ply_mesh.tri_indices.is_empty()
+                {
+                    // TODO We could try to share these lists instead of cloning them.
+                    let mesh = Arc::new(TriangleMesh::new(
+                        render_from_object,
+                        reverse_orientation,
+                        ply_mesh.tri_indices.into_iter().map(|x| x as usize).collect_vec(),
+                        ply_mesh.p.clone(),
+                        Vec::new(),
+                        ply_mesh.n.clone(),
+                        ply_mesh.uv.clone(),
+                        ply_mesh.face_indices.clone().into_iter().map(|x| x as usize).collect_vec(),
+                    ));
+                    tri_quad_shapes = Triangle::create_triangles(mesh);
+                }
+
+                if !ply_mesh.quad_indices.is_empty()
+                {
+                    let quad_mesh = Arc::new(BilinearPatchMesh::new(
+                        render_from_object,
+                        reverse_orientation,
+                        ply_mesh.quad_indices.into_iter().map(|x| x as usize).collect_vec(),
+                        ply_mesh.p,
+                        ply_mesh.n,
+                        ply_mesh.uv,
+                        ply_mesh.face_indices.into_iter().map(|x| x as usize).collect_vec(),
+                    ));
+                    let patches = BilinearPatch::create_patches(quad_mesh);
+                    tri_quad_shapes.extend(patches);
+                }
+                tri_quad_shapes
+            }
             _ => {
                 panic!("Unknown Shape {}", name);
             }
@@ -111,6 +148,8 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.bounds(),
             Shape::Triangle(t) => t.bounds(),
+            Shape::BilinearPatch(s) => s.bounds(),
+            
         }
     }
 
@@ -118,6 +157,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.normal_bounds(),
             Shape::Triangle(t) => t.normal_bounds(),
+            Shape::BilinearPatch(s) => s.normal_bounds(),
         }
     }
 
@@ -125,6 +165,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.intersect(ray, t_max),
             Shape::Triangle(t) => t.intersect(ray, t_max),
+            Shape::BilinearPatch(s) => s.intersect(ray, t_max),
         }
     }
 
@@ -132,6 +173,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.intersect_predicate(ray, t_max),
             Shape::Triangle(t) => t.intersect_predicate(ray, t_max),
+            Shape::BilinearPatch(s) => s.intersect_predicate(ray, t_max),
         }
     }
 
@@ -139,6 +181,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.area(),
             Shape::Triangle(t) => t.area(),
+            Shape::BilinearPatch(s) => s.area(),
         }
     }
 
@@ -146,6 +189,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.sample(u),
             Shape::Triangle(t) => t.sample(u),
+            Shape::BilinearPatch(s) => s.sample(u),
         }
     }
 
@@ -153,6 +197,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.pdf(interaction),
             Shape::Triangle(t) => t.pdf(interaction),
+            Shape::BilinearPatch(s) => s.pdf(interaction),
         }
     }
 
@@ -160,6 +205,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.sample_with_context(ctx, u),
             Shape::Triangle(t) => t.sample_with_context(ctx, u),
+            Shape::BilinearPatch(s) => s.sample_with_context(ctx, u),
         }
     }
 
@@ -167,6 +213,7 @@ impl ShapeI for Shape {
         match self {
             Shape::Sphere(s) => s.pdf_with_context(ctx, wi),
             Shape::Triangle(t) => t.pdf_with_context(ctx, wi),
+            Shape::BilinearPatch(s) => s.pdf_with_context(ctx, wi),
         }
     }
 }

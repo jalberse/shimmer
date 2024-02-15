@@ -1,15 +1,9 @@
 use crate::{
-    camera::CameraSample,
-    filter::{Filter, FilterI},
-    float::{next_float_down, Float, PI_F},
-    math::{
+    camera::CameraSample, filter::{Filter, FilterI}, float::{next_float_down, Float, PI_F}, frame::Frame, math::{
         lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4,
-    },
-    options::Options,
-    sampler::SamplerI,
-    vecmath::{
-        vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Vector2f, Vector3f,
-    },
+    }, options::Options, sampler::SamplerI, vecmath::{
+        vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f, Vector3f
+    }
 };
 
 // See PBRT v4 2.14
@@ -329,6 +323,86 @@ pub fn sample_spherical_triangle(v: &[Point3f; 3], p: Point3f, u: Point2f) -> ([
     ([1.0 - b1 - b2, b1, b2], pdf)
 }
 
+pub fn sample_spherical_rectangle(p_ref: Point3f, s: Point3f, ex: Vector3f, ey: Vector3f,
+    u: Point2f, pdf: Option<&mut Float>) -> Point3f {
+    // Compute local reference frame and transform rectangle coordinates
+    let exl = ex.length();
+    let eyl = ey.length();
+    let mut r: Frame = Frame::from_xy(ex / exl, ey / eyl);
+    let d_local: Vector3f = r.to_local_v(&(s - p_ref));
+    let mut z0 = d_local.z;
+
+    // flip 'z' to make it point against 'Q'
+    if z0 > 0.0 {
+        r.z = -r.z;
+        z0 *= -1.0;
+    }
+    let x0 = d_local.x;
+    let y0 = d_local.y;
+    let x1 = x0 + exl;
+    let y1 = y0 + eyl;
+
+    // Find plane normals to rectangle edges and compute internal angles
+    let v00 = Vector3f::new(x0, y0, z0);
+    let v01 = Vector3f::new(x0, y1, z0);
+    let v10 = Vector3f::new(x1, y0, z0);
+    let v11 = Vector3f::new(x1, y1, z0);
+    let n0: Vector3f = v00.cross(v10).normalize();
+    let n1: Vector3f = v10.cross(v11).normalize();
+    let n2: Vector3f = v11.cross(v01).normalize();
+    let n3: Vector3f = v01.cross(v00).normalize();
+
+    let g0 = (-n0).angle_between(n1);
+    let g1 = (-n1).angle_between(n2);
+    let g2 = (-n2).angle_between(n3);
+    let g3 = (-n3).angle_between(n0);
+
+    // Compute spherical rectangle solid angle and PDF
+    let solid_angle = g0 + g1 + g2 + g3 - 2.0 * PI_F;
+    if solid_angle <= 0.0 {
+        if let Some(pdf) = pdf {
+            *pdf = 0.0;
+        }
+        return Point3f::from(s + u[0] * ex + u[1] * ey);
+    }
+    if let Some(pdf) = pdf
+    {
+        *pdf = Float::max(0.0, 1.0 / solid_angle);
+    }
+    if solid_angle < 1e-3
+    {
+        return Point3f::from(s + u[0] * ex + u[1] * ey);
+    }
+
+    // Sample _cu_ for spherical rectangle sample
+    let b0 = n0.z;
+    let b1 = n2.z;
+    let au = u[0] * (g0 + g1 - 2.0 * PI_F) + (u[0] - 1.0) * (g2 + g3);
+    let fu = (Float::cos(au) * b0 - b1) / Float::sin(au);
+    let cu = Float::copysign(1.0 / Float::sqrt(sqr(fu) + sqr(b0)), fu);
+    let cu = Float::clamp(cu, -(1.0 - Float::EPSILON), 1.0 - Float::EPSILON);  // avoid NaNs
+
+    // Find _xu_ along $x$ edge for spherical rectangle sample
+    let xu = -(cu * z0) / safe_sqrt(1.0 - sqr(cu));
+    let xu = Float::clamp(xu, x0, x1);
+
+    // Find _xv_ along $y$ edge for spherical rectangle sample
+    let dd = Float::sqrt(sqr(xu) + sqr(z0));
+    let h0 = y0 / Float::sqrt(sqr(dd) + sqr(y0));
+    let h1 = y1 / Float::sqrt(sqr(dd) + sqr(y1));
+    let hv = h0 + u[1] * (h1 - h0);
+    let hvsq = sqr(hv);
+    let yv = if hvsq < 1.0 - 1e-6
+    {
+        (hv * dd) / Float::sqrt(1.0 - hvsq)
+    }  else {
+        y1
+    };
+
+    // Return spherical triangle sample in original coordinate system
+    return p_ref + r.from_local_v(&Vector3f::new(xu, yv, z0));
+}
+
 pub fn invert_spherical_triangle_sample(v: &[Point3f; 3], p: Point3f, w: Vector3f) -> Point2f {
     // Compute vectors a, b, and c to spherical triangle vertices
     let a = v[0] - p;
@@ -389,6 +463,152 @@ pub fn invert_spherical_triangle_sample(v: &[Point3f; 3], p: Point3f, w: Vector3
     // Invert arc sampling to find u1 and return result.
     let u1 = (1.0 - w.dot(b)) / (1.0 - cp.dot(b));
     Point2f::new(u0.clamp(0.0, 1.0), u1.clamp(0.0, 1.0))
+}
+
+pub fn invert_spherical_rectangle_sample(p_ref: Point3f , s: Point3f, ex: Vector3f, ey: Vector3f, p_rect: Point3f
+) -> Point2f
+{
+    // TODO: Delete anything unused in the below...
+
+    // SphQuadInit()
+    // local reference system 'R'
+    let exl = ex.length();
+    let eyl = ey.length();
+    let mut r = Frame::from_xy(ex / exl, ey / eyl);
+
+    // compute rectangle coords in local reference system
+    let d = s - p_ref;
+    let d_local = r.to_local_v(&d);
+    let mut z0 = d_local.z;
+
+    // flip 'z' to make it point against 'Q'
+    if z0 > 0.0 {
+        r.z = -r.z;
+        z0 *= -1.0;
+    }
+    let z0sq = sqr(z0);
+    let x0 = d_local.x;
+    let y0 = d_local.y;
+    let x1 = x0 + exl;
+    let y1 = y0 + eyl;
+    let y0sq = sqr(y0);
+    let y1sq = sqr(y1);
+
+    // create vectors to four vertices
+    let v00 = Vector3f::new(x0, y0, z0);
+    let v01 = Vector3f::new(x0, y1, z0);
+    let v10 = Vector3f::new(x1, y0, z0);
+    let v11 = Vector3f::new(x1, y1, z0);
+
+    // compute normals to edges
+    let n0 = v00.cross(v10).normalize();
+    let n1 = v10.cross(v11).normalize();
+    let n2 = v11.cross(v01).normalize();
+    let n3 = v01.cross(v00).normalize();
+
+    // compute internal angles (gamma_i)
+    let g0 = (-n0).angle_between(n1);
+    let g1 = (-n1).angle_between(n2);
+    let g2 = (-n2).angle_between(n3);
+    let g3 = (-n3).angle_between(n0);
+
+    // compute predefined constants
+    let b0 = n0.z;
+    let b1 = n2.z;
+    let b0sq = sqr(b0);
+    let b1sq = sqr(b1);
+
+    // compute solid angle from internal angles
+    let solid_angle = g0 + g1 + g2 + g3 - 2.0 * PI_F;
+
+    // TODO: this (rarely) goes differently than sample. figure out why...
+    if solid_angle < 1e-3 {
+        let pq = p_rect - s;
+        return Point2f::new(pq.dot(ex) / ex.length_squared(), pq.dot(ey) / ey.length_squared());
+    }
+
+    let v = r.to_local_v(&(p_rect - p_ref));
+    let mut xu = v.x;
+    let yv = v.y;
+
+    xu = Float::clamp(xu, x0, x1);  // avoid Infs
+    if xu == 0.0
+    {
+        xu = 1e-10;
+    }
+
+    // These comments are from the authors of PBRTv4, from which this algorithm is lifted.
+    // They apparently went insane while writing this, so I am not venturing into it.
+
+    // Doing all this in double actually makes things slightly worse???!?
+    // Float fusq = (1 - b0sq * Sqr(cu)) / Sqr(cu);
+    // Float fusq = 1 / Sqr(cu) - b0sq;  // more stable
+    let invcusq = 1.0 + z0sq / sqr(xu);
+    let fusq = invcusq - b0sq;  // the winner so far
+    let fu = Float::copysign(Float::sqrt(fusq), xu);
+    // Note, though have 1 + z^2/x^2 - b0^2, which isn't great if b0 \approx 1
+    // double fusq = 1. - Sqr(double(b0)) + Sqr(double(z0) / double(xu));  //
+    // this is worse?? double fu = pstd::copysign(std::sqrt(fusq), cu);
+
+    // State of the floating point world: in the bad cases, about half the
+    // error seems to come from inaccuracy in fu and half comes from
+    // inaccuracy in sqrt/au.
+    //
+    // For fu, the main issue comes adding a small value to 1+ in invcusq
+    // and then having b0sq be close to one, so having catastrophic
+    // cancellation affect fusq. Approximating it as z0sq / Sqr(xu) when
+    // b0sq is close to one doesn't help, however..
+    //
+    // For au, DifferenceOfProducts doesn't seem to help with the two
+    // factors. Furthermore, while it would be nice to think about this
+    // like atan(y/x) and then rewrite/simplify y/x, we need to do so in a
+    // way that doesn't flip the sign of x and y, which would be fine if we
+    // were computing y/x, but messes up atan2's quadrant-determinations...
+
+    let sqrt = safe_sqrt(Float::difference_of_products(b0, b0, b1, b1) + fusq);
+    // No benefit to difference of products here...
+    let mut au = Float::atan2(-(b1 * fu) - Float::copysign(b0 * sqrt, fu * b0),
+                          b0 * b1 - sqrt * Float::abs(fu));
+    if au > 0.0
+    {
+        au -= 2.0 * PI_F;
+    }
+
+    if fu == 0.0
+    {
+        au = PI_F;
+    }
+
+    let u0 = (au + g2 + g3) / solid_angle;
+
+    let ddsq = sqr(xu) + z0sq;
+    let dd = Float::sqrt(ddsq);
+    let h0 = y0 / Float::sqrt(ddsq + y0sq);
+    let h1 = y1 / Float::sqrt(ddsq + y1sq);
+    let yvsq = sqr(yv);
+
+    let u1  = [(Float::difference_of_products(h0, h0, h0, h1) -
+                    Float::abs(h0 - h1) * Float::sqrt(yvsq * (ddsq + yvsq)) / (ddsq + yvsq)) /
+                       sqr(h0 - h1),
+                   (Float::difference_of_products(h0, h0, h0, h1) +
+                    Float::abs(h0 - h1) * Float::sqrt(yvsq * (ddsq + yvsq)) / (ddsq + yvsq)) /
+                       sqr(h0 - h1)];
+
+    // TODO: yuck is there a better way to figure out which is the right
+    // solution?
+    let hv = [lerp(u1[0], h0, h1), lerp(u1[1], h0, h1)];
+    let hvsq = [sqr(hv[0]), sqr(hv[1])];
+    let yz = [(hv[0] * dd) / Float::sqrt(1.0 - hvsq[0]),
+                   (hv[1] * dd) / Float::sqrt(1.0 - hvsq[1])];
+
+    let u = if Float::abs(yz[0] - yv) < Float::abs(yz[1] - yv)
+    {
+        Point2f::new(Float::clamp(u0, 0.0, 1.0), u1[0])
+    } else {
+        Point2f::new(Float::clamp(u0, 0.0, 1.0), u1[1])
+    };
+
+    u
 }
 
 #[cfg(test)]
