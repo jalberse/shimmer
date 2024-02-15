@@ -1,15 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
+use itertools::Itertools;
+use ply_rs::ply;
+
 use crate::{
-    bounding_box::Bounds3f,
-    direction_cone::DirectionCone,
-    interaction::{Interaction, SurfaceInteraction},
-    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
-    ray::Ray,
-    texture::FloatTexture,
-    transform::Transform,
-    vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f},
-    Float,
+    bounding_box::Bounds3f, direction_cone::DirectionCone, file::resolve_filename, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::ParameterDictionary, parser_target::FileLoc}, options::Options, ray::Ray, shape::{mesh::{BilinearPatchMesh, TriQuadMesh}, TriangleMesh}, texture::FloatTexture, transform::Transform, vecmath::{point::Point3fi, Normal3f, Point2f, Point3f, Vector3f}, Float
 };
 
 use super::{sphere::Sphere, BilinearPatch, Triangle};
@@ -77,6 +72,7 @@ impl Shape {
         parameters: &mut ParameterDictionary,
         _float_textures: &HashMap<String, Arc<FloatTexture>>, // TODO will be used in future
         loc: &FileLoc,
+        options: &Options,
     ) -> Vec<Arc<Shape>> {
         let shapes = match name {
             "sphere" => {
@@ -98,20 +94,46 @@ impl Shape {
                 ));
                 Triangle::create_triangles(trianglemesh)
             }
-            // TODO We'll add PLY mesh here; that will read into a QuadTriMesh,
-            //   and then we'll create a TriangleMesh and a BilinearPatchMesh,
-            //   and add the shapes from each of those.
-            // TODO now... reading in a PLY looks awful.
-            //    ply-rs is what we should use: https://crates.io/crates/ply-rs
-            // https://fluci.github.io/travis_docs/ply-rs/ply_rs/ply/struct.Ply.html
-            //    This shows how to access points and stuff...
-            //  for i in 0..ply.payload["point"].len()
-            //     let p = ply.payload["point"][i];
-            //   ^^ we can probably do something like that...
-            // We can look at what PBRT pulls out, but use this library to do it 
-            // instead of those C++ callbacks and stuff. But that should tell us the names of the types
-            //  in the payload.
-            // We can load into a TriQuadMesh from the PLY using this crate.
+            "plymesh" => {
+                let filename = parameters.get_one_string("filename", "".to_string());
+                let filename = resolve_filename(options, &filename);
+                let ply_mesh = TriQuadMesh::read_ply(&filename);
+
+                // TODO Handle displacement texture.
+
+                let mut tri_quad_shapes = Vec::new();
+                if !ply_mesh.tri_indices.is_empty()
+                {
+                    // TODO We could try to share these lists instead of cloning them.
+                    let mesh = Arc::new(TriangleMesh::new(
+                        render_from_object,
+                        reverse_orientation,
+                        ply_mesh.tri_indices.into_iter().map(|x| x as usize).collect_vec(),
+                        ply_mesh.p.clone(),
+                        Vec::new(),
+                        ply_mesh.n.clone(),
+                        ply_mesh.uv.clone(),
+                        ply_mesh.face_indices.clone().into_iter().map(|x| x as usize).collect_vec(),
+                    ));
+                    tri_quad_shapes = Triangle::create_triangles(mesh);
+                }
+
+                if !ply_mesh.quad_indices.is_empty()
+                {
+                    let quad_mesh = Arc::new(BilinearPatchMesh::new(
+                        render_from_object,
+                        reverse_orientation,
+                        ply_mesh.quad_indices.into_iter().map(|x| x as usize).collect_vec(),
+                        ply_mesh.p,
+                        ply_mesh.n,
+                        ply_mesh.uv,
+                        ply_mesh.face_indices.into_iter().map(|x| x as usize).collect_vec(),
+                    ));
+                    let patches = BilinearPatch::create_patches(quad_mesh);
+                    tri_quad_shapes.extend(patches);
+                }
+                tri_quad_shapes
+            }
             _ => {
                 panic!("Unknown Shape {}", name);
             }

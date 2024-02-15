@@ -571,6 +571,7 @@ impl BasicScene {
                 &mut shape.base.parameters,
                 &textures.float_textures,
                 &shape.base.loc,
+                options,
             );
 
             // TODO Support an alpha texture if parameters.get_texture("alpha") is specified.
@@ -701,6 +702,7 @@ impl BasicScene {
         named_materials: &HashMap<String, Arc<Material>>,
         materials: &[Arc<Material>],
         string_interner: &StringInterner,
+        options: &Options,
     ) -> Arc<Primitive> {
         // TODO We'll need lambdas for find_medium and get_alpha_texture.
 
@@ -718,6 +720,7 @@ impl BasicScene {
                         &mut sh.base.parameters,
                         &textures.float_textures,
                         &sh.base.loc,
+                        options,
                     );
                 }
 

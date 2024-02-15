@@ -179,7 +179,7 @@ impl BilinearPatchMesh{
 /// TriQuadMesh is not used for rendering, but as an intermediate mesh format
 /// when reading e.g. PLY files. It is converted to a TriangleMesh and BilinearPatchMesh
 /// for rendering purposes.
-struct TriQuadMesh
+pub struct TriQuadMesh
 {
     pub p: Vec<Point3f>,
     pub n: Vec<Normal3f>,
@@ -193,7 +193,11 @@ impl TriQuadMesh
 {
     pub fn read_ply(filename: &str) -> TriQuadMesh
     {
-        let f = std::fs::File::open(filename).unwrap();
+        // TODO Handle if this is a .ply.gz file?
+        // https://stackoverflow.com/questions/47048037/how-to-iterate-stream-a-gzip-file-containing-a-single-csv
+        // Would just need to make a gzdecoder and pass it to BufReader instead of f, if we end in .gz.
+
+        let f = std::fs::File::open(filename).expect("Unable to read PLY file");
         let mut f = std::io::BufReader::new(f);
 
         let vertex_parser = Parser::<PlyVertex>::new();
@@ -224,6 +228,7 @@ impl TriQuadMesh
             (p, n, uv)
         }).multiunzip();
 
+        // TODO could reserve these with the proper length.
         let mut tri_indices = Vec::new();
         let mut quad_indices = Vec::new();
         let mut face_indices = Vec::new();

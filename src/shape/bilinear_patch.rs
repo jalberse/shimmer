@@ -21,7 +21,7 @@ use crate::vecmath::normalize::Normalize;
 use crate::math::DifferenceOfProducts;
 
 use super::mesh::BilinearPatchMesh;
-use super::{ShapeI, ShapeIntersection, ShapeSampleContext};
+use super::{Shape, ShapeI, ShapeIntersection, ShapeSampleContext};
 
 
 #[derive(Debug, Clone)]
@@ -74,6 +74,16 @@ impl BilinearPatch{
             blp_index,
             area,
         }
+    }
+
+    pub fn create_patches(mesh: Arc<BilinearPatchMesh>) -> Vec<Arc<Shape>>
+    {
+        let mut patches = Vec::new();
+        for i in 0..mesh.n_patches
+        {
+            patches.push(Arc::new(Shape::BilinearPatch(BilinearPatch::new(Arc::clone(&mesh), i))));
+        }
+        patches
     }
 
     fn get_points(mesh: &Arc<BilinearPatchMesh>, blp_index: usize) -> (Point3f, Point3f, Point3f, Point3f)
