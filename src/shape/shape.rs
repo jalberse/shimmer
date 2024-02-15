@@ -98,6 +98,20 @@ impl Shape {
                 ));
                 Triangle::create_triangles(trianglemesh)
             }
+            // TODO We'll add PLY mesh here; that will read into a QuadTriMesh,
+            //   and then we'll create a TriangleMesh and a BilinearPatchMesh,
+            //   and add the shapes from each of those.
+            // TODO now... reading in a PLY looks awful.
+            //    ply-rs is what we should use: https://crates.io/crates/ply-rs
+            // https://fluci.github.io/travis_docs/ply-rs/ply_rs/ply/struct.Ply.html
+            //    This shows how to access points and stuff...
+            //  for i in 0..ply.payload["point"].len()
+            //     let p = ply.payload["point"][i];
+            //   ^^ we can probably do something like that...
+            // We can look at what PBRT pulls out, but use this library to do it 
+            // instead of those C++ callbacks and stuff. But that should tell us the names of the types
+            //  in the payload.
+            // We can load into a TriQuadMesh from the PLY using this crate.
             _ => {
                 panic!("Unknown Shape {}", name);
             }
