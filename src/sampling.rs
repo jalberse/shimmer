@@ -129,7 +129,7 @@ pub fn sample_uniform_hemisphere(u: Point2f) -> Vector3f {
 }
 
 pub fn uniform_hemisphere_pdf() -> Float {
-    INV_2PI
+    INV_4PI
 }
 
 pub fn sample_cosine_hemisphere(u: Point2f) -> Vector3f {
