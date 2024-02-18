@@ -8,7 +8,7 @@ use crate::{
         sampled_wavelengths::SampledWavelengths,
         spectrum::{self, SpectrumI},
         Spectrum,
-    }, transform::Transform, vecmath::{spherical::spherical_theta, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f}, Float
+    }, transform::Transform, vecmath::{normal::Normal3, spherical::spherical_theta, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f}, Float
 };
 
 pub trait FloatTextureI {
@@ -20,6 +20,7 @@ pub enum FloatTexture {
     Constant(FloatConstantTexture),
     Scaled(FloatScaledTexture),
     Mix(FloatMixTexture),
+    DirectionMix(FloatDirectionMixTexture),
 }
 
 impl FloatTexture {
@@ -44,6 +45,11 @@ impl FloatTexture {
                 let t = FloatMixTexture::create(render_from_texture, parameters, loc, textures);
                 FloatTexture::Mix(t)
             }
+            "directionmix" => 
+            {
+                let t = FloatDirectionMixTexture::create(render_from_texture, parameters, loc, textures);
+                FloatTexture::DirectionMix(t)
+            }
             _ => {
                 panic!("Texture {} unknown", name);
             }
@@ -62,6 +68,7 @@ impl FloatTextureI for FloatTexture {
             FloatTexture::Constant(t) => t.evaluate(ctx),
             FloatTexture::Scaled(t) => t.evaluate(ctx),
             FloatTexture::Mix(t) => t.evaluate(ctx),
+            FloatTexture::DirectionMix(t) => t.evaluate(ctx),
         }
     }
 }
@@ -174,6 +181,52 @@ impl FloatTextureI for FloatMixTexture
     }
 }
 
+#[derive(Debug)]
+pub struct FloatDirectionMixTexture 
+{
+    tex1: Arc<FloatTexture>,
+    tex2: Arc<FloatTexture>,
+    dir: Vector3f,
+}
+
+impl FloatDirectionMixTexture
+{
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        _loc: &FileLoc,
+        textures: &NamedTextures,
+    ) -> FloatDirectionMixTexture {
+        let tex1 = parameters.get_float_texture("tex1", 0.0, textures);
+        let tex2 = parameters.get_float_texture("tex2", 1.0, textures);
+        let dir = parameters.get_one_vector3f("dir", Vector3f::new(0.0, 1.0, 0.0));
+        
+        FloatDirectionMixTexture {
+            tex1,
+            tex2,
+            dir,
+        }
+    }
+}
+
+impl FloatTextureI for FloatDirectionMixTexture
+{
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
+        let amt = ctx.n.dot_vector(self.dir);
+        let mut t1 = 0.0;
+        let mut t2 = 0.0;
+        if amt != 0.0 
+        {
+            t1 = self.tex1.evaluate(ctx);
+        }
+        if amt != 1.0
+        {
+            t2 = self.tex2.evaluate(ctx);
+        }
+        amt * t1 + (1.0 - amt) * t2
+    }
+}
+
 pub trait SpectrumTextureI {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
@@ -267,7 +320,7 @@ impl SpectrumConstantTexture {
     }
 
     pub fn create(
-        render_from_texture: Transform,
+        _render_from_texture: Transform,
         parameters: &mut TextureParameterDictionary,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
