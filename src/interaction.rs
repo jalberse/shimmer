@@ -260,7 +260,7 @@ impl SurfaceInteraction {
         }) {
             let aux = ray.auxiliary.as_ref().unwrap();
             // Estimate screen-space change in pt using ray differentials
-            // Compute auxiliary intersecrtion points with plane, px and py
+            // Compute auxiliary intersection points with plane, px and py
             let d = -self.interaction.n.dot_vector(self.p().into());
             let tx = (-self.interaction.n.dot_vector(aux.rx_origin.into()) - d)
                 / self.interaction.n.dot_vector(aux.rx_direction);
