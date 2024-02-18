@@ -128,6 +128,7 @@ pub trait SpectrumTextureI {
 #[derive(Debug)]
 pub enum SpectrumTexture {
     Constant(SpectrumConstantTexture),
+    Scaled(SpectrumScaledTexture),
 }
 
 impl SpectrumTexture {
@@ -137,6 +138,7 @@ impl SpectrumTexture {
         parameters: &mut TextureParameterDictionary,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
         loc: &FileLoc,
     ) -> SpectrumTexture {
         let tex = match name {
@@ -149,6 +151,17 @@ impl SpectrumTexture {
                     loc,
                 );
                 SpectrumTexture::Constant(t)
+            }
+            "scale" => {
+                let t = SpectrumScaledTexture::create(
+                    render_from_texture,
+                    parameters,
+                    spectrum_type,
+                    cached_spectra,
+                    textures,
+                    loc,
+                );
+                SpectrumTexture::Scaled(t)
             }
             _ => {
                 panic!("Texture {} unknown", name);
@@ -166,6 +179,7 @@ impl SpectrumTextureI for SpectrumTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         match self {
             SpectrumTexture::Constant(t) => t.evaluate(ctx, lambda),
+            SpectrumTexture::Scaled(t) => t.evaluate(ctx, lambda),
         }
     }
 }
@@ -198,6 +212,54 @@ impl SpectrumConstantTexture {
             .get_one_spectrum("value", Some(Arc::new(one)), spectrum_type, cached_spectra)
             .unwrap();
         SpectrumConstantTexture::new(c)
+    }
+}
+
+#[derive(Debug)]
+pub struct SpectrumScaledTexture
+{
+    tex: Arc<SpectrumTexture>,
+    scale: Arc<FloatTexture>,
+}
+
+impl SpectrumScaledTexture
+{
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+        _loc: &FileLoc,
+    ) -> SpectrumScaledTexture {
+        let one = ConstantSpectrum::new(1.0);
+        let tex = parameters.get_spectrum_texture(
+            "tex", 
+            Some(Arc::new(Spectrum::Constant(one))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let scale = parameters.get_float_texture(
+            "scale", 
+            1.0, 
+            textures);
+        
+        // TODO Handle if either is const? I think that can make it more efficient. See PBRT.
+        
+        SpectrumScaledTexture {
+            tex,
+            scale,
+        }
+    }
+}
+
+impl SpectrumTextureI for SpectrumScaledTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let sc = self.scale.evaluate(ctx);
+        if sc == 0.0 {
+            return SampledSpectrum::from_const(0.0);
+        }
+        self.tex.evaluate(ctx, lambda) * sc
     }
 }
 

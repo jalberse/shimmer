@@ -298,6 +298,7 @@ impl BasicScene {
             &mut text_dict,
             crate::loading::paramdict::SpectrumType::Albedo,
             cached_spectra,
+            &self.textures,
             &texture.base.loc,
         );
         self.textures
@@ -404,6 +405,7 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Unbounded,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
             );
 
@@ -415,6 +417,7 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Illuminant,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
             );
 
@@ -463,6 +466,7 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Albedo,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
             );
 
@@ -474,6 +478,7 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Unbounded,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
             );
 
@@ -485,6 +490,7 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Illuminant,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
             );
 
