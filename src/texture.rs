@@ -3,18 +3,12 @@ use std::{collections::HashMap, sync::Arc};
 use spectrum::ConstantSpectrum;
 
 use crate::{
-    interaction::{Interaction, SurfaceInteraction},
-    loading::paramdict::{SpectrumType, TextureParameterDictionary},
-    loading::parser_target::FileLoc,
-    spectra::{
+    float::PI_F, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{self, SpectrumI},
         Spectrum,
-    },
-    transform::Transform,
-    vecmath::{Normal3f, Point2f, Point3f, Tuple2, Vector3f},
-    Float,
+    }, transform::Transform, vecmath::{spherical::spherical_theta, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f}, Float
 };
 
 pub trait FloatTextureI {
@@ -218,6 +212,45 @@ impl TextureMapping2DI for UVMapping {
         let dtdy = self.sv * ctx.dvdy;
 
         let st = Point2f::new(self.su * ctx.uv[0] + self.du, self.sv * ctx.uv[1] + self.dv);
+        TexCoord2D {
+            st,
+            dsdx,
+            dsdy,
+            dtdx,
+            dtdy,
+        }
+    }
+}
+
+pub struct SphericalMapping
+{
+    texture_from_render: Transform,
+}
+
+impl TextureMapping2DI for SphericalMapping {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
+        let pt = self.texture_from_render.apply(&ctx.p);
+        let x2y2 = sqr(pt.x) + sqr(pt.y);
+        let sqrtx2y2 = x2y2.sqrt();
+        let dsdp = Vector3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI_F * x2y2);
+        let dtdp = 
+            1.0 / (PI_F * (x2y2 + sqr(pt.z))) *
+            Vector3f::new(pt.x * pt.z / sqrtx2y2, pt.y * pt.z / sqrtx2y2, -sqrtx2y2);
+        
+        let dpdx = self.texture_from_render.apply(&ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(&ctx.dpdy);
+
+        let dsdx = dsdp.dot(dpdx);
+        let dsdy = dsdp.dot(dpdy);
+        let dtdx = dtdp.dot(dpdx);
+        let dtdy = dtdp.dot(dpdy);
+
+        let vec = (pt - Point3f::ZERO).normalize();
+        let st = Point2f::new(
+            spherical_theta(vec) * INV_PI,
+            spherical_theta(vec) * INV_2PI,
+        );
+        
         TexCoord2D {
             st,
             dsdx,
