@@ -19,6 +19,7 @@ pub trait FloatTextureI {
 pub enum FloatTexture {
     Constant(FloatConstantTexture),
     Scaled(FloatScaledTexture),
+    Mix(FloatMixTexture),
 }
 
 impl FloatTexture {
@@ -38,6 +39,11 @@ impl FloatTexture {
                 let t = FloatScaledTexture::create(render_from_texture, parameters, loc, textures);
                 FloatTexture::Scaled(t)
             }
+            "mix" => 
+            {
+                let t = FloatMixTexture::create(render_from_texture, parameters, loc, textures);
+                FloatTexture::Mix(t)
+            }
             _ => {
                 panic!("Texture {} unknown", name);
             }
@@ -55,6 +61,7 @@ impl FloatTextureI for FloatTexture {
         match self {
             FloatTexture::Constant(t) => t.evaluate(ctx),
             FloatTexture::Scaled(t) => t.evaluate(ctx),
+            FloatTexture::Mix(t) => t.evaluate(ctx),
         }
     }
 }
@@ -118,6 +125,52 @@ impl FloatTextureI for FloatScaledTexture {
             return 0.0;
         }
         self.tex.evaluate(ctx) * sc
+    }
+}
+
+#[derive(Debug)]
+pub struct FloatMixTexture 
+{
+    tex1: Arc<FloatTexture>,
+    tex2: Arc<FloatTexture>,
+    amount: Arc<FloatTexture>,
+}
+
+impl FloatMixTexture
+{
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        _loc: &FileLoc,
+        textures: &NamedTextures,
+    ) -> FloatMixTexture {
+        let tex1 = parameters.get_float_texture("tex1", 0.0, textures);
+        let tex2 = parameters.get_float_texture("tex2", 1.0, textures);
+        let amount = parameters.get_float_texture("amount", 0.5, textures);
+        
+        FloatMixTexture {
+            tex1,
+            tex2,
+            amount,
+        }
+    }
+}
+
+impl FloatTextureI for FloatMixTexture
+{
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
+        let amt = self.amount.evaluate(ctx);
+        let mut t1 = 0.0;
+        let mut t2 = 0.0;
+        if amt != 1.0 
+        {
+            t1 = self.tex1.evaluate(ctx);
+        }
+        if amt != 0.0
+        {
+            t2 = self.tex2.evaluate(ctx);
+        }
+        t1 * (1.0 - amt) + t2 * amt
     }
 }
 
