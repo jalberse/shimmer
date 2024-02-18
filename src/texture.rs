@@ -170,6 +170,7 @@ pub enum TextureMapping2D {
     UV(UVMapping),
     Spherical(SphericalMapping),
     Cylindrical(CylindricalMapping),
+    Planar(PlanarMapping),
 }
 
 impl TextureMapping2DI for TextureMapping2D {
@@ -178,7 +179,7 @@ impl TextureMapping2DI for TextureMapping2D {
             TextureMapping2D::UV(m) => m.map(ctx),
             TextureMapping2D::Spherical(m) => m.map(ctx),
             TextureMapping2D::Cylindrical(m) => m.map(ctx),
-            
+            TextureMapping2D::Planar(m) => m.map(ctx),
         }
     }
 }
