@@ -168,6 +168,7 @@ pub trait TextureMapping2DI {
 /// Provides 2D texture coordinate generation.
 pub enum TextureMapping2D {
     UV(UVMapping),
+    Spherical(SphericalMapping),
     // TODO spherical, cylindrical, and Planar mapping.
 }
 
@@ -175,6 +176,8 @@ impl TextureMapping2DI for TextureMapping2D {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
         match self {
             TextureMapping2D::UV(m) => m.map(ctx),
+            TextureMapping2D::Spherical(m) => m.map(ctx),
+            
         }
     }
 }
