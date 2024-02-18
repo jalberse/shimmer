@@ -236,6 +236,7 @@ pub enum SpectrumTexture {
     Constant(SpectrumConstantTexture),
     Scaled(SpectrumScaledTexture),
     Mix(SpectrumMixTexture),
+    DirectionMix(SpectrumDirectionMixTexture),
 }
 
 impl SpectrumTexture {
@@ -281,6 +282,17 @@ impl SpectrumTexture {
                 );
                 SpectrumTexture::Mix(t)
             }
+            "directionmix" => {
+                let t = SpectrumDirectionMixTexture::create(
+                    render_from_texture,
+                    parameters,
+                    spectrum_type,
+                    cached_spectra,
+                    textures,
+                    loc,
+                );
+                SpectrumTexture::DirectionMix(t)
+            }
             _ => {
                 panic!("Texture {} unknown", name);
             }
@@ -299,6 +311,7 @@ impl SpectrumTextureI for SpectrumTexture {
             SpectrumTexture::Constant(t) => t.evaluate(ctx, lambda),
             SpectrumTexture::Scaled(t) => t.evaluate(ctx, lambda),
             SpectrumTexture::Mix(t) => t.evaluate(ctx, lambda),
+            SpectrumTexture::DirectionMix(t) => t.evaluate(ctx, lambda),
         }
     }
 }
@@ -442,6 +455,66 @@ impl SpectrumTextureI for SpectrumMixTexture
             t2 = self.tex2.evaluate(ctx, lambda);
         }
         t1 * (1.0 - amt) + t2 * amt
+    }
+}
+
+#[derive(Debug)]
+pub struct SpectrumDirectionMixTexture
+{
+    tex1: Arc<SpectrumTexture>,
+    tex2: Arc<SpectrumTexture>,
+    dir: Vector3f,
+}
+
+impl SpectrumDirectionMixTexture
+{
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+        _loc: &FileLoc,
+    ) -> SpectrumDirectionMixTexture {
+        let zero = ConstantSpectrum::new(0.0);
+        let one = ConstantSpectrum::new(1.0);
+        let tex1 = parameters.get_spectrum_texture(
+            "tex1", 
+            Some(Arc::new(Spectrum::Constant(zero))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let tex2 = parameters.get_spectrum_texture(
+            "tex2", 
+            Some(Arc::new(Spectrum::Constant(one))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let dir = parameters.get_one_vector3f("dir", Vector3f::new(0.0, 1.0, 0.0));
+        
+        SpectrumDirectionMixTexture {
+            tex1,
+            tex2,
+            dir,
+        }
+    }
+}
+
+impl SpectrumTextureI for SpectrumDirectionMixTexture
+{
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let amt = ctx.n.dot_vector(self.dir);
+        let mut t1 = SampledSpectrum::from_const(0.0);
+        let mut t2 = SampledSpectrum::from_const(0.0);
+        if amt != 0.0 
+        {
+            t1 = self.tex1.evaluate(ctx, lambda);
+        }
+        if amt != 1.0
+        {
+            t2 = self.tex2.evaluate(ctx, lambda);
+        }
+        amt * t1 + (1.0 - amt) * t2
     }
 }
 
