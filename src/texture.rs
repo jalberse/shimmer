@@ -182,6 +182,7 @@ pub trait SpectrumTextureI {
 pub enum SpectrumTexture {
     Constant(SpectrumConstantTexture),
     Scaled(SpectrumScaledTexture),
+    Mix(SpectrumMixTexture),
 }
 
 impl SpectrumTexture {
@@ -216,6 +217,17 @@ impl SpectrumTexture {
                 );
                 SpectrumTexture::Scaled(t)
             }
+            "mix" => {
+                let t = SpectrumMixTexture::create(
+                    render_from_texture,
+                    parameters,
+                    spectrum_type,
+                    cached_spectra,
+                    textures,
+                    loc,
+                );
+                SpectrumTexture::Mix(t)
+            }
             _ => {
                 panic!("Texture {} unknown", name);
             }
@@ -233,6 +245,7 @@ impl SpectrumTextureI for SpectrumTexture {
         match self {
             SpectrumTexture::Constant(t) => t.evaluate(ctx, lambda),
             SpectrumTexture::Scaled(t) => t.evaluate(ctx, lambda),
+            SpectrumTexture::Mix(t) => t.evaluate(ctx, lambda),
         }
     }
 }
@@ -313,6 +326,69 @@ impl SpectrumTextureI for SpectrumScaledTexture {
             return SampledSpectrum::from_const(0.0);
         }
         self.tex.evaluate(ctx, lambda) * sc
+    }
+}
+
+#[derive(Debug)]
+pub struct SpectrumMixTexture 
+{
+    tex1: Arc<SpectrumTexture>,
+    tex2: Arc<SpectrumTexture>,
+    amount: Arc<FloatTexture>,
+}
+
+impl SpectrumMixTexture
+{
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+        _loc: &FileLoc,
+    ) -> SpectrumMixTexture {
+        let zero = ConstantSpectrum::new(0.0);
+        let one = ConstantSpectrum::new(1.0);
+        let tex1 = parameters.get_spectrum_texture(
+            "tex1", 
+            Some(Arc::new(Spectrum::Constant(zero))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let tex2 = parameters.get_spectrum_texture(
+            "tex2", 
+            Some(Arc::new(Spectrum::Constant(one))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let amount = parameters.get_float_texture(
+            "amount", 
+            0.5, 
+            textures);
+        
+        SpectrumMixTexture {
+            tex1,
+            tex2,
+            amount,
+        }
+    }
+}
+
+impl SpectrumTextureI for SpectrumMixTexture
+{
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let amt = self.amount.evaluate(ctx);
+        let mut t1 = SampledSpectrum::from_const(0.0);
+        let mut t2 = SampledSpectrum::from_const(0.0);
+        if amt != 1.0 
+        {
+            t1 = self.tex1.evaluate(ctx, lambda);
+        }
+        if amt != 0.0
+        {
+            t2 = self.tex2.evaluate(ctx, lambda);
+        }
+        t1 * (1.0 - amt) + t2 * amt
     }
 }
 
