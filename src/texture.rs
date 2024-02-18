@@ -298,6 +298,39 @@ impl TextureMapping2DI for CylindricalMapping {
     }
 }
 
+pub struct PlanarMapping
+{
+    texture_from_render: Transform,
+    vs: Vector3f,
+    vt: Vector3f,
+    ds: Float,
+    dt: Float,
+}
+
+impl TextureMapping2DI for PlanarMapping {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
+        let vec: Vector3f = self.texture_from_render.apply(&ctx.p).into();
+        let dpdx = self.texture_from_render.apply(&ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(&ctx.dpdy);
+        let dsdx = self.vs.dot(dpdx);
+        let dsdy = self.vs.dot(dpdy);
+        let dtdx = self.vt.dot(dpdx);
+        let dtdy = self.vt.dot(dpdy);
+
+        let st = Point2f::new(
+            self.ds + vec.dot(self.vs),
+            self.dt + vec.dot(self.vt),
+        );
+        TexCoord2D {
+            st,
+            dsdx,
+            dsdy,
+            dtdx,
+            dtdy,
+        }
+    }
+}
+
 /// Stores the (s, t) texture cordinates and estimates for the change in (s, t) w.r.t. pixel
 /// x and y coordinates so that textures that using the mapping can determine the (s, t) sampling rate
 /// and filter accordingly.
