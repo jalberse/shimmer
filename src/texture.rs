@@ -169,7 +169,7 @@ pub trait TextureMapping2DI {
 pub enum TextureMapping2D {
     UV(UVMapping),
     Spherical(SphericalMapping),
-    // TODO spherical, cylindrical, and Planar mapping.
+    Cylindrical(CylindricalMapping),
 }
 
 impl TextureMapping2DI for TextureMapping2D {
@@ -177,6 +177,7 @@ impl TextureMapping2DI for TextureMapping2D {
         match self {
             TextureMapping2D::UV(m) => m.map(ctx),
             TextureMapping2D::Spherical(m) => m.map(ctx),
+            TextureMapping2D::Cylindrical(m) => m.map(ctx),
             
         }
     }
@@ -254,6 +255,39 @@ impl TextureMapping2DI for SphericalMapping {
             spherical_theta(vec) * INV_2PI,
         );
         
+        TexCoord2D {
+            st,
+            dsdx,
+            dsdy,
+            dtdx,
+            dtdy,
+        }
+    }
+}
+
+pub struct CylindricalMapping
+{
+    texture_from_render: Transform,
+}
+
+impl TextureMapping2DI for CylindricalMapping {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
+        let pt = self.texture_from_render.apply(&ctx.p);
+        let x2y2 = sqr(pt.x) + sqr(pt.y);
+        let dsdp = Vector3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI_F * x2y2);
+        let dtdp = Vector3f::Z;
+        let dpdx = self.texture_from_render.apply(&ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(&ctx.dpdy);
+        let dsdx = dsdp.dot(dpdx);
+        let dsdy = dsdp.dot(dpdy);
+        let dtdx = dtdp.dot(dpdx);
+        let dtdy = dtdp.dot(dpdy);
+
+        let st = Point2f::new(
+            PI_F + Float::atan2(pt.y, pt.x) * INV_2PI,
+            pt.z,
+        );
+
         TexCoord2D {
             st,
             dsdx,
