@@ -394,7 +394,6 @@ impl SurfaceInteraction {
     pub fn spawn_ray_with_differentials(
         &self,
         ray_i: &RayDifferential,
-        bsdf: &BSDF,
         wi: Vector3f,
         flags: BxDFFLags,
         eta: Float,
