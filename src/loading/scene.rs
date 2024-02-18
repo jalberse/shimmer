@@ -232,14 +232,15 @@ impl BasicScene {
         // TODO Can make this async.
         let render_from_texture = texture.render_from_object;
 
-        let tex_dict = TextureParameterDictionary::new(texture.base.parameters.clone());
+        let mut tex_dict = TextureParameterDictionary::new(texture.base.parameters.clone());
         let float_texture = FloatTexture::create(
             string_interner
                 .resolve(texture.base.name)
                 .expect("Unknown symbol"),
             render_from_texture,
-            tex_dict,
+            &mut tex_dict,
             &texture.base.loc,
+            &self.textures,
         );
 
         self.textures
@@ -428,7 +429,7 @@ impl BasicScene {
         for tex in &self.serial_float_textures {
             let render_from_texture = tex.1.render_from_object;
 
-            let tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone());
+            let mut tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone());
 
             // TODO Will need to pass self.textures to create() functions, so they can resolve textures.
             // Not encessary right now as we only have the FloatConstant texture.
@@ -437,8 +438,9 @@ impl BasicScene {
                     .resolve(tex.1.base.name)
                     .expect("Unexpected symbol"),
                 render_from_texture,
-                tex_dict,
+                &mut tex_dict,
                 &tex.1.base.loc,
+                &self.textures
             );
 
             self.textures

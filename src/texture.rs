@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use spectrum::ConstantSpectrum;
 
 use crate::{
-    float::PI_F, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, spectra::{
+    float::PI_F, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{self, SpectrumI},
@@ -18,19 +18,25 @@ pub trait FloatTextureI {
 #[derive(Debug)]
 pub enum FloatTexture {
     Constant(FloatConstantTexture),
+    Scaled(FloatScaledTexture),
 }
 
 impl FloatTexture {
     pub fn create(
         name: &str,
         render_from_texture: Transform,
-        parameters: TextureParameterDictionary,
+        parameters: &mut TextureParameterDictionary,
         loc: &FileLoc,
+        textures: &NamedTextures,
     ) -> FloatTexture {
         let tex = match name {
             "constant" => {
-                let t = FloatConstantTexture::create(render_from_texture, parameters, loc);
+                let t = FloatConstantTexture::create(render_from_texture, parameters, loc, textures);
                 FloatTexture::Constant(t)
+            }
+            "scale" => {
+                let t = FloatScaledTexture::create(render_from_texture, parameters, loc, textures);
+                FloatTexture::Scaled(t)
             }
             _ => {
                 panic!("Texture {} unknown", name);
@@ -48,6 +54,7 @@ impl FloatTextureI for FloatTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         match self {
             FloatTexture::Constant(t) => t.evaluate(ctx),
+            FloatTexture::Scaled(t) => t.evaluate(ctx),
         }
     }
 }
@@ -64,8 +71,9 @@ impl FloatConstantTexture {
 
     pub fn create(
         _render_from_texture: Transform,
-        mut parameters: TextureParameterDictionary,
+        parameters: &mut TextureParameterDictionary,
         _loc: &FileLoc,
+        _textures: &NamedTextures,
     ) -> FloatConstantTexture {
         let v = parameters.get_one_float("value", 1.0);
         FloatConstantTexture::new(v)
@@ -75,6 +83,41 @@ impl FloatConstantTexture {
 impl FloatTextureI for FloatConstantTexture {
     fn evaluate(&self, _ctx: &TextureEvalContext) -> Float {
         self.value
+    }
+}
+
+#[derive(Debug)]
+pub struct FloatScaledTexture {
+    tex: Arc<FloatTexture>,
+    scale: Arc<FloatTexture>,
+}
+
+impl FloatScaledTexture {
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        _loc: &FileLoc,
+        textures: &NamedTextures,
+    ) -> FloatScaledTexture {
+        let tex = parameters.get_float_texture("tex", 1.0, textures);
+        let scale = parameters.get_float_texture("scale", 1.0, textures);
+        
+        // TODO Handle if either is const? I think that can make it more efficient. See PBRT.
+        
+        FloatScaledTexture {
+            tex,
+            scale,
+        }
+    }
+}
+
+impl FloatTextureI for FloatScaledTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
+        let sc = self.scale.evaluate(ctx);
+        if sc == 0.0 {
+            return 0.0;
+        }
+        self.tex.evaluate(ctx) * sc
     }
 }
 
