@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
     bounding_box::Bounds2i,
-    color::{ColorEncoding, ColorEncodingI, SRgbColorEncoding},
+    color::{ColorEncoding, ColorEncodingCache, ColorEncodingI, ColorEncodingPtr, SRgbColorEncoding},
     colorspace::RgbColorSpace,
     float::Float,
     square_matrix::SquareMatrix,
@@ -71,7 +71,7 @@ pub struct ResampleWeight {
     weight: [Float; 4],
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum WrapMode {
     Black,
     Clamp,
@@ -323,7 +323,7 @@ pub struct Image {
     channel_names: Vec<String>,
     /// For images with fixed-precision (non-floating-point) pixel values, a ColorEncoding is specified.
     /// This is for e.g. PNG images; floating point formats like EXR will not use this.
-    color_encoding: Option<ColorEncoding>,
+    color_encoding: Option<ColorEncodingPtr>,
     // Which one of p8, p16, or p32 is used depends on the PixelFormat.
     p8: Vec<u8>,
     p16: Vec<f16>,
@@ -335,7 +335,7 @@ impl Image {
         format: PixelFormat,
         resolution: Point2i,
         channels: &[String],
-        encoding: Option<ColorEncoding>,
+        encoding: Option<ColorEncodingPtr>,
     ) -> Image {
         // TODO We could improve this API by splitting into fixed-point and floating-point versions,
         // with only the former taking an encoding. That would remove the need for checks...
@@ -378,7 +378,7 @@ impl Image {
         p8: Vec<u8>,
         resolution: Point2i,
         channels: &[String],
-        encoding: ColorEncoding,
+        encoding: ColorEncodingPtr,
     ) -> Image {
         debug_assert!(p8.len() as i32 == channels.len() as i32 * resolution[0] * resolution[1]);
         Image {
@@ -434,7 +434,7 @@ impl Image {
         self.channel_names.clone()
     }
 
-    pub fn encoding(&self) -> &Option<ColorEncoding> {
+    pub fn encoding(&self) -> &Option<ColorEncodingPtr> {
         &self.color_encoding
     }
 
@@ -473,7 +473,7 @@ impl Image {
                 let mut r = [0.0];
                 self.color_encoding
                     .as_ref()
-                    .expect("Non-floating point images need encoding")
+                    .expect("Non-floating point images need encoding").0
                     .to_linear(&[self.p8[self.pixel_offset(p) + c]], &mut r);
                 return r[0];
             }
@@ -499,7 +499,7 @@ impl Image {
             PixelFormat::U256 => self
                 .color_encoding
                 .as_ref()
-                .expect("Fixed point images should have an encoding")
+                .expect("Fixed point images should have an encoding").0
                 .to_linear(
                     &self.p8[pixel_offset..pixel_offset + self.n_channels()],
                     &mut cv.values,
@@ -545,7 +545,7 @@ impl Image {
                     let index = pixel_offset + desc.offset[i] as usize;
                     self.color_encoding
                         .as_ref()
-                        .expect("Expected color encoding")
+                        .expect("Expected color encoding").0
                         .to_linear(&self.p8[index..index + 1], &mut cv.values[i..i + 1]);
                 }
             }
@@ -653,7 +653,7 @@ impl Image {
             PixelFormat::U256 => self
                 .color_encoding
                 .as_ref()
-                .expect("Non-floating-point images need encoding")
+                .expect("Non-floating-point images need encoding").0
                 .from_linear(&[value], &mut self.p8[index..index + 1]),
             PixelFormat::Half => self.p16[index] = f16::from_f32(value),
             PixelFormat::Float => self.p32[index] = value,
@@ -674,7 +674,7 @@ impl Image {
         }
     }
 
-    pub fn read(path: &Path, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
+    pub fn read(path: &Path, encoding: Option<ColorEncodingPtr>) -> ImageAndMetadata {
         // TODO Should return an IO Result instead likely.
 
         // TODO Other file extension types.
@@ -686,11 +686,11 @@ impl Image {
     }
 
     // TODO Test.
-    fn read_png(path: &Path, encoding: Option<ColorEncoding>) -> ImageAndMetadata {
+    fn read_png(path: &Path, encoding: Option<ColorEncodingPtr>) -> ImageAndMetadata {
         let encoding = if let Some(encoding) = encoding {
             encoding
         } else {
-            ColorEncoding::SRGB(SRgbColorEncoding {})
+            ColorEncoding::get("srgb", None).clone()
         };
 
         let mut decoder = png::Decoder::new(File::open(path).unwrap());
@@ -726,7 +726,7 @@ impl Image {
                                     .unwrap(),
                             );
                             let v: Float = v.into();
-                            let v = encoding.to_float_linear(v);
+                            let v = encoding.0.to_float_linear(v);
                             image.set_channel(Point2i::new(x as i32, y as i32), 0, v);
                         }
                     }
@@ -786,7 +786,7 @@ impl Image {
                                     );
                                     let rgba = [r, g, b, a];
                                     for c in 0..4 {
-                                        let cv = encoding.to_float_linear(rgba[c].into());
+                                        let cv = encoding.0.to_float_linear(rgba[c].into());
                                         image.set_channel(
                                             Point2i::new(x as i32, y as i32),
                                             c,
@@ -819,7 +819,7 @@ impl Image {
                                     );
                                     let rgb = [r, g, b];
                                     for c in 0..3 {
-                                        let cv = encoding.to_float_linear(rgb[c].into());
+                                        let cv = encoding.0.to_float_linear(rgb[c].into());
                                         image.set_channel(
                                             Point2i::new(x as i32, y as i32),
                                             c,
@@ -937,8 +937,10 @@ impl Default for Image {
 // TODO Image tests; can copy PBRT's tests.
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::{
-        color::{ColorEncoding, LinearColorEncoding},
+        color::{ColorEncoding, ColorEncodingPtr, LinearColorEncoding},
         vecmath::{Point2i, Tuple2},
     };
 
@@ -946,7 +948,7 @@ mod tests {
 
     #[test]
     fn image_basics() {
-        let encoding = ColorEncoding::Linear(LinearColorEncoding {});
+        let encoding = ColorEncodingPtr(Arc::new(ColorEncoding::Linear(LinearColorEncoding {})));
         let y8 = Image::new(
             super::PixelFormat::U256,
             Point2i::new(4, 8),

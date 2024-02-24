@@ -8,7 +8,7 @@ use std::{
 use crate::{
     aggregate::{create_accelerator, BvhAggregate},
     camera::{Camera, CameraI, CameraTransform},
-    color::LinearColorEncoding,
+    color::{ColorEncoding, LinearColorEncoding},
     colorspace::RgbColorSpace,
     file::resolve_filename,
     film::{Film, FilmI},
@@ -16,8 +16,7 @@ use crate::{
     image::Image,
     integrator::{create_integrator, IntegratorI},
     light::Light,
-    loading::paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
-    loading::parser_target::{FileLoc, ParsedParameterVector, ParserTarget},
+    loading::{paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary}, parser_target::{FileLoc, ParsedParameterVector, ParserTarget}},
     material::Material,
     medium::Medium,
     options::Options,
@@ -368,7 +367,7 @@ impl BasicScene {
 
         let image_and_metadata = Image::read(
             filename,
-            Some(crate::color::ColorEncoding::Linear(LinearColorEncoding {})),
+            Some(ColorEncoding::get("linear", None)),
         );
 
         let image = image_and_metadata.image;

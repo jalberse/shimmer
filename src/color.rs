@@ -1,8 +1,10 @@
-use std::{ops::{Index, IndexMut}, rc::Rc};
+use std::{collections::HashMap, ops::{Index, IndexMut}, sync::Arc};
 use std::hash::Hash;
 
 use auto_ops::impl_op_ex;
 use fast_polynomial::poly;
+use once_cell::sync::Lazy;
+use ordered_float::OrderedFloat;
 
 use crate::{
     math::safe_sqrt,
@@ -436,13 +438,14 @@ pub trait ColorEncodingI {
 /// on a pointer to authoritative color encodings.
 /// This provides a wrapper that implements the necessary traits for that pointer.
 #[derive(Debug, Clone)]
-pub struct ColorEncodingPtr(pub Rc<ColorEncoding>);
+pub struct ColorEncodingPtr(pub Arc<ColorEncoding>);
 
 impl PartialEq for ColorEncodingPtr
 {
     fn eq(&self, other: &Self) -> bool
     {
-        Rc::ptr_eq(&self.0, &other.0)
+        // TODO Maybe so long as it's SRGB or Linear, we can just compare the enum?
+        Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -451,15 +454,68 @@ impl Eq for ColorEncodingPtr {}
 impl Hash for ColorEncodingPtr
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        state.write_usize(Rc::as_ptr(&self.0) as usize);
+        state.write_usize(Arc::as_ptr(&self.0) as usize);
     }
 }
+
+pub struct ColorEncodingCache(HashMap<OrderedFloat<Float>, ColorEncodingPtr>);
 
 #[derive(Debug, Clone)]
 pub enum ColorEncoding {
     Linear(LinearColorEncoding),
     SRGB(SRgbColorEncoding),
     Gamma(GammaColorEncoding),
+}
+
+static LINEAR_PTR: Lazy<ColorEncodingPtr> = Lazy::new(|| {ColorEncodingPtr(Arc::new(ColorEncoding::Linear(LinearColorEncoding {})))});
+static SRGB_PTR: Lazy<ColorEncodingPtr> = Lazy::new(|| {ColorEncodingPtr(Arc::new(ColorEncoding::SRGB(SRgbColorEncoding {}))) });
+
+impl ColorEncoding
+{
+
+    // TODO We might need to lock the cache. Arc<Mutex<HashMap<...>>>.
+    /// Gets the specified color encoding. If linear or SRGB, no cache needs to be provided.
+    /// A cache should be provided if requesting a gamma encoding; it will panic if not provided.
+    pub fn get(name: &str, gamma_encoding_cache: Option<&mut ColorEncodingCache>) -> ColorEncodingPtr
+    {
+        if name == "linear" {
+            Lazy::force(&LINEAR_PTR).clone()
+        } else if name == "srgb" {
+            Lazy::force(&SRGB_PTR).clone()
+        } else {
+            let params = name.split_whitespace().collect::<Vec<&str>>();
+
+            if params.len() != 2 || params[0] != "gamma"
+            {
+                panic!("Expected gamma <value> for color encoding.");
+            }
+
+            let gamma = params[1].parse::<Float>().expect("Unable to parse gamma float value");
+            if gamma == 0.0 
+            {
+                panic!("Gamma value cannot be 0.0");
+            }
+
+            let gamma = OrderedFloat(gamma);
+
+            if let Some(gamma_encoding_cache) = gamma_encoding_cache
+            {
+                if let Some(encoding) = gamma_encoding_cache.0.get(&gamma)
+                {
+                    encoding.clone()
+                }
+                else
+                {
+                    let encoding = ColorEncodingPtr(Arc::new(ColorEncoding::Gamma(GammaColorEncoding::new(gamma.0))));
+                    gamma_encoding_cache.0.insert(gamma, encoding.clone());
+                    encoding
+                }
+            } else
+            {
+                panic!("No gamma encoding cache provided");
+            }
+        }
+    }
 }
 
 impl ColorEncodingI for ColorEncoding {
