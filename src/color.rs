@@ -1,4 +1,5 @@
-use std::ops::{Index, IndexMut};
+use std::{ops::{Index, IndexMut}, rc::Rc};
+use std::hash::Hash;
 
 use auto_ops::impl_op_ex;
 use fast_polynomial::poly;
@@ -428,6 +429,30 @@ pub trait ColorEncodingI {
     /// Such cases are handled by to_float_linear(), which takes a single encoded
     /// value stored as a Float and decodes it.
     fn to_float_linear(&self, v: Float) -> Float;
+}
+
+/// The color encoding is used in the key for the texture cache.
+/// We don't want to hash the full GammaColorEncoding, so we hash
+/// on a pointer to authoritative color encodings.
+/// This provides a wrapper that implements the necessary traits for that pointer.
+#[derive(Debug, Clone)]
+pub struct ColorEncodingPtr(pub Rc<ColorEncoding>);
+
+impl PartialEq for ColorEncodingPtr
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for ColorEncodingPtr {}
+
+impl Hash for ColorEncodingPtr
+{
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_usize(Rc::as_ptr(&self.0) as usize);
+    }
 }
 
 #[derive(Debug, Clone)]
