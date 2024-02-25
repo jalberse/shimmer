@@ -409,6 +409,30 @@ pub fn quadratic(a: Float, b: Float, c: Float) -> Option<(Float, Float)>
     }
 }
 
+// http://www.plunk.org/~hatch/rightway.html
+pub fn sin_over_x(x: Float) -> Float
+{
+    if 1.0 - x * x == 1.0
+    {
+        return 1.0;
+    }
+    x.sin() / x
+}
+
+pub fn sinc(x: Float) -> Float 
+{
+    sin_over_x(PI_F * x)
+}
+
+pub fn windowed_sinc(x: Float, radius: Float, tau: Float) -> Float 
+{
+    if x.abs() > radius
+    {
+        return 0.0;
+    }
+    sinc(x) * sinc(x / tau)
+}
+
 #[cfg(test)]
 mod tests {
     use super::DifferenceOfProducts;

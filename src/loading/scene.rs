@@ -371,7 +371,14 @@ impl BasicScene {
         );
 
         let image = image_and_metadata.image;
-        let rgb_desc = image.get_channel_desc(&["R".to_owned(), "G".to_owned(), "B".to_owned()]);
+        let rgb_desc = image.get_channel_desc(&["R", "G", "B"]);
+        if rgb_desc.is_none() {
+            panic!(
+                "Normal map \"{}\" should have RGB channels.",
+                filename.display()
+            );
+        }
+        let rgb_desc = rgb_desc.unwrap();
         if rgb_desc.size() != 3 {
             panic!(
                 "Normal map \"{}\" should have RGB channels.",

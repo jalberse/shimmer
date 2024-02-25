@@ -1,8 +1,10 @@
 use arrayvec::ArrayVec;
+use env_logger::filter;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use core::fmt;
 use half::f16;
 use std::{
-    collections::HashMap,
+    collections::{btree_set::Intersection, HashMap},
     fs::File,
     io::{BufWriter, Write},
     ops::{Index, IndexMut},
@@ -11,12 +13,7 @@ use std::{
 };
 
 use crate::{
-    bounding_box::Bounds2i,
-    color::{ColorEncoding, ColorEncodingCache, ColorEncodingI, ColorEncodingPtr, SRgbColorEncoding},
-    colorspace::RgbColorSpace,
-    float::Float,
-    square_matrix::SquareMatrix,
-    vecmath::{Point2f, Point2i, Tuple2},
+    bounding_box::Bounds2i, color::{ColorEncoding, ColorEncodingI, ColorEncodingPtr}, colorspace::RgbColorSpace, float::Float, interaction, math::windowed_sinc, square_matrix::SquareMatrix, vecmath::{Point2f, Point2i, Tuple2}
 };
 
 #[cfg(target_endian = "little")]
@@ -66,9 +63,17 @@ impl PixelFormat {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ResampleWeight {
     first_pixel: i32,
     weight: [Float; 4],
+}
+
+impl Default for ResampleWeight
+{
+    fn default() -> Self {
+        Self { first_pixel: Default::default(), weight: Default::default() }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -316,7 +321,7 @@ impl From<ImageChannelValues> for [Float; 3] {
 
 /// Stores a 2D array of pixel values where each pixel stores
 /// a fixed unmber of scalar-valued channels (e.g. RGB is three channels).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Image {
     format: PixelFormat,
     resolution: Point2i,
@@ -566,7 +571,7 @@ impl Image {
         cv
     }
 
-    pub fn get_channel_desc(&self, requested_channels: &[String]) -> ImageChannelDesc {
+    pub fn get_channel_desc(&self, requested_channels: &[&str]) -> Option<ImageChannelDesc> {
         let mut offset = ArrayVec::<i32, 4>::new();
         for i in 0..requested_channels.len() {
             let mut j = 0;
@@ -578,10 +583,10 @@ impl Image {
                 j += 1;
             }
             if j == self.channel_names.len() {
-                return ImageChannelDesc::default();
+                return None;
             }
         }
-        ImageChannelDesc { offset }
+        Some(ImageChannelDesc { offset })
     }
 
     pub fn all_channels_desc(&self) -> ImageChannelDesc {
@@ -672,6 +677,323 @@ impl Image {
         for i in 0..values.len() {
             self.set_channel(p, i, values[i]);
         }
+    }
+
+    pub fn select_channels(&self, desc: &ImageChannelDesc) -> Image 
+    {
+        let desc_channel_names = desc.offset.iter().map(|i| self.channel_names[*i as usize].clone()).collect::<Vec<String>>();
+
+        let mut image = Image::new(self.format, self.resolution, &desc_channel_names, self.color_encoding.clone());
+        // TODO Test
+        for y in 0..self.resolution.y
+        {
+            for x in 0..self.resolution.x
+            {
+                let p = Point2i::new(x, y);
+                let values = self.get_channels_from_desc(p, desc);
+                image.set_channels(p, &values);
+            }
+        }
+        image
+    }
+
+
+    // TODO I probably want to test these. Can go ahead and write test cases and just load/output images to disk in the test case
+    //   so I can look at them and make sure they're reasonable. I can delete them after (or tag so it's not normally run).
+
+    pub fn generate_pyramid(image: Image, wrap_mode: WrapMode2D) -> Vec<Image>
+    {
+        let orig_format = image.format;
+        let n_channels = image.n_channels();
+        let orig_encoding = image.color_encoding.clone();
+
+        // Prepare image for building pyramid
+        let mut image = if !(image.resolution[0] as u32).is_power_of_two() || !(image.resolution[1] as u32).is_power_of_two()
+        {
+            image.float_resize_up(Point2i::new(
+                (image.resolution[0] as u32).next_power_of_two() as i32,
+                (image.resolution[1] as u32).next_power_of_two() as i32,
+            ), wrap_mode)
+        } else if !image.format.is_32bit() {
+            image.convert_to_format(PixelFormat::Float)
+        } else {
+            image
+        };
+        assert!(image.format.is_32bit());
+
+        // TODO Can take log2 more efficiently.
+        let n_levels = 1 + ((i32::max(image.resolution[0], image.resolution[1]) as Float).log2() as i32);
+
+        let mut pyramid = Vec::with_capacity(n_levels as usize);
+        for i in 0..(n_levels - 1)
+        {
+            // Initialize i + 1 level from ith level, and copy the ith into the pyramid
+            pyramid.push(Image::new(orig_format, image.resolution, &image.channel_names, orig_encoding.clone()));
+
+            let next_resolution = Point2i::new(
+                i32::max(1, (image.resolution[0] + 1) / 2),
+                i32::max(1, (image.resolution[1] + 1) / 2),
+            );
+            let mut next_image = Image::new(orig_format, next_resolution, &image.channel_names, orig_encoding.clone());
+
+            // Compute offsets from pixels to the 4 pixels used for downsampling
+            let mut src_deltas = [
+                0,
+                n_channels,
+                n_channels * image.resolution[0] as usize,
+                n_channels * (image.resolution[0] as usize + 1),
+            ];
+
+            if image.resolution[0] == 1
+            {
+                src_deltas[1] = 0;
+                src_deltas[3] -= n_channels;
+            }
+            if image.resolution[1] == 1
+            {
+                src_deltas[2] = 0;
+                src_deltas[3] -= n_channels * image.resolution[0] as usize;
+            }
+
+            // TODO We'd like to parallelize this with into_par_iter(), but we would need to reconfigure as p32/pyramid can't be borrowed mutably in
+            //   a parallel iterator. Likely we'd want to build a new p32 in parallel then copy it to new_image?, or wrap next_image (and pyramid?) in Arc<Mutex<..>>.
+            //   Maybe try the latter.
+
+            // Downsample image to create next level and update pyramid
+            (0..next_resolution[1]).into_iter().for_each(|y| {
+                // Loop over pixels in scanline y and downsample for the next pyramid level
+                let mut src_offset = image.pixel_offset(Point2i::new(0, 2 * y));
+                let mut next_offset = next_image.pixel_offset(Point2i::new(0, y));
+                for _x in 0..next_resolution[0]
+                {
+                    for _c in 0..n_channels
+                    {
+                        next_image.p32[next_offset] = 0.25 * (
+                            image.p32[src_offset] +
+                            image.p32[src_offset + src_deltas[1]] +
+                            image.p32[src_offset + src_deltas[2]] +
+                            image.p32[src_offset + src_deltas[3]]
+                        );
+
+                        src_offset += 1;
+                        next_offset += 1;
+                    }
+                    src_offset += n_channels
+                }
+
+                // Copy two scanlines from image output to its pyramid level
+                let y_start = 2 * y;
+                let y_end = i32::min(2 * y + 2, image.resolution[1]);
+                let offset = image.pixel_offset(Point2i::new(0, y_start));
+                let count = (y_end - y_start) * n_channels as i32 * image.resolution[0];
+                pyramid[i as usize].copy_rect_in(
+                    &Bounds2i::new(Point2i::new(0, y_start), Point2i::new(image.resolution[0], y_end)),
+                    &image.p32[offset..offset + count as usize],
+                );
+                todo!()
+            });
+
+            image = next_image;
+        }
+
+        // Initialize top level of pyramid and return it
+        assert!(image.resolution[0] == 1 && image.resolution[1] == 1);
+        pyramid.push(Image::new(orig_format, Point2i::new(1, 1), &image.channel_names, orig_encoding));
+        pyramid[n_levels as usize - 1].copy_rect_in(
+            &Bounds2i::new(Point2i::new(0, 0), Point2i::new(1, 1)),
+            &image.p32[0..n_channels],
+        );
+        pyramid
+    }
+
+    // Apply op to the extent in the image
+    fn for_extent<F>(&mut self, extent: &Bounds2i, wrap_mode: WrapMode2D, mut op: F)
+    where
+        F: FnMut(&mut Self, usize)
+    {
+        assert!(extent.min.x < extent.max.x);
+        assert!(extent.min.y < extent.max.y);
+
+        let nx = extent.max[0] - extent.min[0];
+        let nc = self.n_channels();
+        let intersection = extent.intersect(&Bounds2i::new(Point2i::ZERO, self.resolution));
+        if intersection.is_some_and(|i| i == *extent)
+        {
+            // All in bounds
+            for y in extent.min[1]..extent.max[1]
+            {
+                let mut offset = self.pixel_offset(Point2i::new(extent.min[0], y));
+                for _x in 0..nx
+                {
+                    for _c in 0..nc
+                    {
+                        op(self, offset);
+                        offset += 1;
+                    }
+                }
+            }
+        } else {
+            for y in extent.min[1]..extent.max[1]
+            {
+                for x in 0..nx
+                {
+                    let mut p = Point2i::new(extent.min[0] + x, y);
+                    // TODO This will fail on Black wrap mode
+                    assert!(remap_pixel_coords(&mut p, self.resolution(), wrap_mode));
+                    let mut offset = self.pixel_offset(p);
+                    for _c in 0..nc 
+                    {
+                        op(self, offset);
+                        offset += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn copy_rect_in(&mut self, extent: &Bounds2i, buf: &[f32]) 
+    {
+        let mut buf_offset = 0;
+        assert!(buf.len() > extent.area() as usize * self.n_channels() as usize);
+        match self.format
+        {
+            PixelFormat::U256 => 
+            {
+                if extent.intersect(&Bounds2i::new(Point2i::ZERO, self.resolution)).is_some_and(|i| i == *extent) 
+                {
+                    // All in bounds
+                    let count = self.n_channels() * (extent.max.x - extent.min.x) as usize;
+                    for y in extent.min.y..extent.max.y
+                    {
+                        // Convert scanlines all at once (unless we're using double precision)
+                        let offset = self.pixel_offset(Point2i::new(extent.min.x, y));
+                        #[cfg(use_f64)]
+                        {
+                            for i in 0..count
+                            {
+                                self.color_encoding.as_ref().expect("Expected color encoding").0.from_linear(
+                                    &buf[buff_offset..buf_offset + 1],
+                                    &mut self.p8[offset + i..offset + i + 1],
+                                );
+                                buf_offset += 1;
+                            }
+                        }
+                        #[cfg(not(use_f64))]
+                        {
+                            self.color_encoding.as_ref().expect("Expected color encoding").0.from_linear(
+                                &buf[buf_offset..buf_offset + count],
+                                &mut self.p8[offset..offset + count],
+                            );
+                            buf_offset += count;
+                        }
+                    } 
+                } else {
+                    self.for_extent(extent, WrapMode2D{ wrap: [WrapMode::Clamp, WrapMode::Clamp] }, 
+                        |image, offset: usize| {
+                                image.color_encoding.as_ref().expect("Expected color encoding").0.from_linear(
+                                &buf[buf_offset..buf_offset + 1], 
+                                &mut image.p8[offset..offset + 1]);
+                                buf_offset += 1;
+                            })
+                }
+            },
+            PixelFormat::Half => 
+            {
+                // PAPERDOC: Useful for obviating interprocedural conflicts - pass a reference to self to the closure.
+                self.for_extent(
+                    extent,
+                    WrapMode2D{ wrap: [WrapMode::Clamp, WrapMode::Clamp] },
+                    |image, offset: usize| {
+                        image.p16[offset] = f16::from_f32(buf[buf_offset]);
+                        buf_offset += 1;
+                    })
+            },
+            PixelFormat::Float => {
+                self.for_extent(
+                    extent,
+                    WrapMode2D{ wrap: [WrapMode::Clamp, WrapMode::Clamp] },
+                    |image, offset: usize| {
+                        image.p32[offset] = buf[buf_offset];
+                        buf_offset += 1;
+                    })
+            
+            },
+        }
+    }
+
+    pub fn convert_to_format(&self, format: PixelFormat) -> Image 
+    {
+        if self.format == format
+        {
+            return self.clone();
+        }
+
+        let mut new_image = Image::new(
+            format,
+            self.resolution,
+            &self.channel_names,
+            self.color_encoding.clone(),
+        );
+        for y in 0..self.resolution.y
+        {
+            for x in 0..self.resolution.x
+            {
+                for c in 0..self.n_channels()
+                {
+                    let v = self.get_channel(Point2i::new(x, y), c);
+                    new_image.set_channel(Point2i::new(x, y), c, v);
+                }
+            }
+        }
+        new_image
+    }
+
+    pub fn float_resize_up(&self, new_res: Point2i, wrap_mode: WrapMode2D) -> Image
+    {
+        assert!(new_res.x > self.resolution.x);
+        assert!(new_res.y > self.resolution.y);
+
+        // TODO Ugh okay do this stuff...
+        let resampled_image = Image::new(PixelFormat::Float, new_res, &self.channel_names, None);
+
+        // Compute x and y resampling weights for image resizing
+        let x_weights = self.resample_weights(self.resolution[0] as usize, new_res[0] as usize);
+        let y_weights = self.resample_weights(self.resolution[1] as usize, new_res[1] as usize);
+        
+        // TODO Can we resample in parallel? Maybe repurpose tile-based approach?
+        //   Yeah I mean we can move Tile into its own module and re-use it here.
+        //   Simply split the bounds into tiles, process like we do in integrator - probably map it into some Vec<ResizedTile> and then condense them sequentially afterwards.
+
+        // Resample image.
+
+        todo!()
+    }
+
+    fn resample_weights(&self, old_res: usize, new_res: usize) -> Vec<ResampleWeight>
+    {
+        assert!(old_res < new_res);
+        let mut wt = vec![ResampleWeight::default(); new_res as usize];
+        let filter_radius = 2.0;
+        let tau = 2.0;
+        for i in 0..new_res
+        {
+            // Compute image resampling weights for ith pixel
+            let center = (i as Float + 0.5) * old_res as Float / new_res as Float;
+            wt[i].first_pixel = ((center - filter_radius + 0.5).floor() as i32).max(0);
+            for j in 0..4{
+                let pos: Float = wt[i].first_pixel as Float + 0.5;
+                wt[i].weight[j] = windowed_sinc(pos - center, filter_radius, tau);
+            }
+
+            // Normalize filter weights for pixel resampling
+            let inv_sum_wts =
+                1.0 / (wt[i].weight[0] + wt[i].weight[1] + wt[i].weight[2] + wt[i].weight[3]);
+            for j in 0..4
+            {
+                wt[i].weight[j] *= inv_sum_wts;
+            }
+        }
+        wt
     }
 
     pub fn read(path: &Path, encoding: Option<ColorEncodingPtr>) -> ImageAndMetadata {
@@ -847,7 +1169,7 @@ impl Image {
                 );
                 metadata
             }
-            png::ColorType::Indexed => panic!("Unspported indexed PNGs!"),
+            png::ColorType::Indexed => panic!("Unsupported indexed PNGs!"),
         };
 
         ImageAndMetadata { image, metadata }
@@ -934,7 +1256,6 @@ impl Default for Image {
     }
 }
 
-// TODO Image tests; can copy PBRT's tests.
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
