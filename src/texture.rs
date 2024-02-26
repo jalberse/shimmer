@@ -47,7 +47,15 @@ impl ImageTextureBase
             encoding: encoding.clone(),
         };
 
-        let mipmap = match texture_cache.lock().unwrap().get(&tex_info) {
+        // PAPERDOC - Okay, here's a fun one - I forgot that texture_cache was already locked and tried to
+        // lock it again to insert() within the match statement, leading to a deadlock.
+        // Rust can't eliminate e.g. deadlocks, but these are easier to find.
+        // We fix this just by moving the lock() call outside of the match statement to texture_cache_guard.
+        // When that's dropped, we unlock the mutex.
+
+        let mut texture_cache_guard = texture_cache.lock().unwrap();
+
+        let mipmap = match texture_cache_guard.get(&tex_info) {
             Some(m) => m.clone(),
             None => {
                 let m = Arc::new(MIPMap::create_from_file(
@@ -57,7 +65,7 @@ impl ImageTextureBase
                     encoding,
                     options,
                 ));
-                texture_cache.lock().unwrap().insert(tex_info, m.clone());
+                texture_cache_guard.insert(tex_info, m.clone());
                 m
             }
         };

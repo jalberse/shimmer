@@ -441,7 +441,7 @@ impl Image {
         self.p8.len() + 2 * self.p16.len() + 4 * self.p32.len()
     }
 
-    /// Returns the offset intot he pixel value array for given integer
+    /// Returns the offset into the pixel value array for given integer
     /// pixel coordinates.
     pub fn pixel_offset(&self, p: Point2i) -> usize {
         debug_assert!(Bounds2i::new(Point2i { x: 0, y: 0 }, self.resolution).inside_exclusive(&p));
