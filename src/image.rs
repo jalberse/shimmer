@@ -77,7 +77,7 @@ pub enum WrapMode {
 }
 
 impl WrapMode {
-    pub fn parse_wrap_mode(str: &str) -> Option<Self> {
+    pub fn parse(str: &str) -> Option<Self> {
         if str.eq(WRAP_MODE_CLAMP_STR) {
             Some(WrapMode::Clamp)
         } else if str.eq(WRAP_MODE_REPEAT_STR) {

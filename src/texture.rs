@@ -1,9 +1,9 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, path::Path, sync::{Arc, Mutex}};
 
 use spectrum::ConstantSpectrum;
 
 use crate::{
-    color::{ColorEncodingPtr, RGB}, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, mipmap::{MIPMap, MIPMapFilterOptions}, options::Options, spectra::{
+    color::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, RGB}, file::resolve_filename, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{self, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, SpectrumI},
@@ -35,7 +35,7 @@ impl ImageTextureBase
         scale: Float,
         invert: bool,
         encoding: ColorEncodingPtr,
-        texture_cache: Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
         options: &Options,
     ) -> ImageTextureBase
     {
@@ -98,6 +98,9 @@ impl FloatTexture {
         parameters: &mut TextureParameterDictionary,
         loc: &FileLoc,
         textures: &NamedTextures,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) -> FloatTexture {
         let tex = match name {
             "constant" => {
@@ -117,6 +120,10 @@ impl FloatTexture {
             {
                 let t = FloatDirectionMixTexture::create(render_from_texture, parameters, loc, textures);
                 FloatTexture::DirectionMix(t)
+            }
+            "imagemap" => {
+                let t = FloatImageTexture::create(&render_from_texture, parameters, loc, options, texture_cache, gamma_encoding_cache);
+                FloatTexture::Image(t)
             }
             _ => {
                 panic!("Texture {} unknown", name);
@@ -312,7 +319,7 @@ impl FloatImageTexture
         scale: Float,
         invert: bool,
         encoding: ColorEncodingPtr,
-        texture_cache: Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
         options: &Options,
     ) -> FloatImageTexture
     {
@@ -331,6 +338,53 @@ impl FloatImageTexture
         FloatImageTexture {
             base,
         }
+    }
+
+    pub fn create(
+        render_from_texture: &Transform,
+        parameters: &mut TextureParameterDictionary,
+        loc: &FileLoc,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
+    ) -> FloatImageTexture
+    {
+        let map = TextureMapping2D::create(&mut parameters.dict, render_from_texture, loc);
+
+        let max_aniso = parameters.get_one_float("maxanisotropy", 8.0);
+        let filter = parameters.get_one_string("filter", "bilinear".to_owned());
+        
+        let ff = FilterFunction::parse(&filter).expect("Unknown filter function");
+        let filter_options = MIPMapFilterOptions::new(ff, max_aniso);
+
+        let wrap = parameters.get_one_string("wrap", "repeat".to_owned());
+        let wrap = WrapMode::parse(&wrap).expect("Unknown wrap mode");
+
+        let scale = parameters.get_one_float("scale", 1.0);
+        let invert = parameters.get_one_bool("invert", false);
+        let filename = resolve_filename(options, &parameters.get_one_string("filename", "".to_owned()));
+
+        let default_encoding = if Path::new(&filename).extension().expect("Expected extension") == "png"
+        {
+            "sRGB"
+        } else {
+            "linear"
+        };
+        let encoding_string = parameters.get_one_string("encoding", default_encoding.to_owned());
+
+        let encoding = ColorEncoding::get(&encoding_string, Some(gamma_encoding_cache));
+
+        FloatImageTexture::new(
+            map,
+            filename,
+            filter_options,
+            wrap,
+            scale,
+            invert,
+            encoding,
+            texture_cache,
+            options,
+        )
     }
 }
 
@@ -369,6 +423,9 @@ impl SpectrumTexture {
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
         loc: &FileLoc,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) -> SpectrumTexture {
         let tex = match name {
             "constant" => {
@@ -413,6 +470,10 @@ impl SpectrumTexture {
                     loc,
                 );
                 SpectrumTexture::DirectionMix(t)
+            }
+            "imagemap" => {
+                let t = SpectrumImageTexture::create(&render_from_texture, parameters, spectrum_type, options, texture_cache, gamma_encoding_cache, loc);
+                SpectrumTexture::Image(t)
             }
             _ => {
                 panic!("Texture {} unknown", name);
@@ -640,7 +701,7 @@ impl SpectrumImageTexture
         scale: Float,
         invert: bool,
         encoding: ColorEncodingPtr,
-        texture_cache: Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
         options: &Options,
     ) -> SpectrumImageTexture
     {
@@ -660,7 +721,54 @@ impl SpectrumImageTexture
             base,
             spectrum_type,
         }
-    
+    }
+
+    pub fn create(
+        render_from_texture: &Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
+        loc: &FileLoc
+    ) -> SpectrumImageTexture
+    {
+        let map = TextureMapping2D::create(&mut parameters.dict, render_from_texture, loc);
+
+        let max_aniso = parameters.get_one_float("maxanisotropy", 8.0);
+        let filter = parameters.get_one_string("filter", "bilinear".to_owned());
+
+        let ff = FilterFunction::parse(&filter).expect("Unknown filter function");
+        let filter_options = MIPMapFilterOptions::new(ff, max_aniso);
+
+        let wrap = parameters.get_one_string("wrap", "repeat".to_owned());
+        let wrap = WrapMode::parse(&wrap).expect("Unknown wrap mode");
+
+        let scale = parameters.get_one_float("scale", 1.0);
+        let invert = parameters.get_one_bool("invert", false);
+        let filename = resolve_filename(options, &parameters.get_one_string("filename", "".to_owned()));
+        
+        let default_encoding = if Path::new(&filename).extension().expect("Expected extension") == "png"
+        {
+            "sRGB"
+        } else {
+            "linear"
+        };
+        let encoding_string = parameters.get_one_string("encoding", default_encoding.to_owned());
+        let encoding = ColorEncoding::get(&encoding_string, Some(gamma_encoding_cache));
+
+        SpectrumImageTexture::new(
+            spectrum_type,
+            map,
+            filename,
+            filter_options,
+            wrap,
+            scale,
+            invert,
+            encoding,
+            texture_cache,
+            options,
+        )
     }
 }
 
@@ -730,6 +838,43 @@ pub enum TextureMapping2D {
     Spherical(SphericalMapping),
     Cylindrical(CylindricalMapping),
     Planar(PlanarMapping),
+}
+
+impl TextureMapping2D
+{
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        render_from_texture: &Transform,
+        loc: &FileLoc,
+    ) -> TextureMapping2D
+    {
+        // TODO change the default to take &str...
+        let ty = parameters.get_one_string("mapping", "uv".to_owned());
+        match ty.as_str()
+        {
+            "uv" => {
+                let su = parameters.get_one_float("uscale", 1.0);
+                let sv = parameters.get_one_float("vscale", 1.0);
+                let du = parameters.get_one_float("udelta", 0.0);
+                let dv = parameters.get_one_float("vdelta", 0.0);
+                TextureMapping2D::UV(UVMapping { su, sv, du, dv })
+            },
+            "spherical" => TextureMapping2D::Spherical(SphericalMapping {
+                texture_from_render: render_from_texture.inverse(),
+            }),
+            "cylindrical" => TextureMapping2D::Cylindrical(CylindricalMapping{
+                texture_from_render: render_from_texture.inverse(),
+            }),
+            "planaer" => TextureMapping2D::Planar(PlanarMapping {
+                texture_from_render: render_from_texture.inverse(),
+                vs: parameters.get_one_vector3f("v1", Vector3f::X),
+                vt: parameters.get_one_vector3f("v2", Vector3f::Y),
+                ds: parameters.get_one_float("udelta", 0.0),
+                dt: parameters.get_one_float("vdelta", 0.0)
+            }),
+            _ => panic!("Unknown texture mapping type {}", ty),
+        }
+    }
 }
 
 impl TextureMapping2DI for TextureMapping2D {

@@ -1,21 +1,23 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 use log::info;
 use string_interner::StringInterner;
 
-use crate::{loading::scene::BasicScene, options::Options, spectra::Spectrum};
+use crate::{color::ColorEncodingCache, loading::scene::BasicScene, mipmap::MIPMap, options::Options, spectra::Spectrum, texture::TexInfo};
 
 pub fn render_cpu(
     mut scene: Box<BasicScene>,
     options: &Options,
     string_interner: &mut StringInterner,
     cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    texture_cache: &&Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+    gamma_encoding_cache: &mut ColorEncodingCache,
 ) {
     // TODO Create media from scene; use an empty map for now.
     let media = HashMap::new();
 
     info!("Creating textures...");
-    let textures = scene.create_textures(cached_spectra, string_interner);
+    let textures = scene.create_textures(cached_spectra, string_interner, options, texture_cache, gamma_encoding_cache);
     info!("Done creating textures.");
 
     info!("Creating lights...");

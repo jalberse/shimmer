@@ -2,34 +2,11 @@ use std::{
     collections::{HashMap, HashSet},
     ops::{Index, IndexMut},
     path::Path,
-    sync::{atomic, Arc},
+    sync::{atomic, Arc, Mutex},
 };
 
 use crate::{
-    aggregate::{create_accelerator, BvhAggregate},
-    camera::{Camera, CameraI, CameraTransform},
-    color::{ColorEncoding, LinearColorEncoding},
-    colorspace::RgbColorSpace,
-    file::resolve_filename,
-    film::{Film, FilmI},
-    filter::Filter,
-    image::Image,
-    integrator::{create_integrator, IntegratorI},
-    light::Light,
-    loading::{paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary}, parser_target::{FileLoc, ParsedParameterVector, ParserTarget}},
-    material::Material,
-    medium::Medium,
-    options::Options,
-    primitive::{GeometricPrimitive, Primitive, SimplePrimitive, TransformedPrimitive},
-    sampler::Sampler,
-    shape::Shape,
-    spectra::spectrum,
-    square_matrix::SquareMatrix,
-    texture::{FloatConstantTexture, FloatTexture, SpectrumTexture},
-    transform::Transform,
-    util::normalize_arg,
-    vecmath::{Point3f, Tuple3, Vector3f},
-    Float,
+    aggregate::{create_accelerator, BvhAggregate}, camera::{Camera, CameraI, CameraTransform}, color::{ColorEncoding, ColorEncodingCache, LinearColorEncoding}, colorspace::RgbColorSpace, file::resolve_filename, film::{Film, FilmI}, filter::Filter, image::Image, integrator::{create_integrator, IntegratorI}, light::Light, loading::{paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary}, parser_target::{FileLoc, ParsedParameterVector, ParserTarget}}, material::Material, medium::Medium, mipmap::MIPMap, options::Options, primitive::{GeometricPrimitive, Primitive, SimplePrimitive, TransformedPrimitive}, sampler::Sampler, shape::Shape, spectra::spectrum, square_matrix::SquareMatrix, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, transform::Transform, util::normalize_arg, vecmath::{Point3f, Tuple3, Vector3f}, Float
 };
 
 use log::{trace, warn};
@@ -190,6 +167,8 @@ impl BasicScene {
         mut texture: TextureSceneEntity,
         string_interner: &StringInterner,
         options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) {
         // TODO Check if animated once we add animated transforms.
 
@@ -240,6 +219,9 @@ impl BasicScene {
             &mut tex_dict,
             &texture.base.loc,
             &self.textures,
+            options,
+            texture_cache,
+            gamma_encoding_cache,
         );
 
         self.textures
@@ -254,6 +236,8 @@ impl BasicScene {
         string_interner: &StringInterner,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) {
         if string_interner.resolve(texture.base.name).unwrap() != "ptex"
             && string_interner.resolve(texture.base.name).unwrap() != "imagemap"
@@ -299,6 +283,9 @@ impl BasicScene {
             cached_spectra,
             &self.textures,
             &texture.base.loc,
+            options,
+            texture_cache,
+            gamma_encoding_cache,
         );
         self.textures
             .albedo_spectrum_textures
@@ -393,6 +380,9 @@ impl BasicScene {
         &mut self,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         string_interner: &StringInterner,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) -> NamedTextures {
         // TODO Note that albedo spectrum and float textures were created
         //  earlier; if we switch to asynch, we will want to resolve them here.
@@ -413,6 +403,9 @@ impl BasicScene {
                 cached_spectra,
                 &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             let illum_tex = SpectrumTexture::create(
@@ -425,6 +418,9 @@ impl BasicScene {
                 cached_spectra,
                 &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             self.textures
@@ -449,7 +445,10 @@ impl BasicScene {
                 render_from_texture,
                 &mut tex_dict,
                 &tex.1.base.loc,
-                &self.textures
+                &self.textures,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             self.textures
@@ -474,6 +473,9 @@ impl BasicScene {
                 cached_spectra,
                 &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             let unbounded_tex = SpectrumTexture::create(
@@ -486,6 +488,9 @@ impl BasicScene {
                 cached_spectra,
                 &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             let illum_tex = SpectrumTexture::create(
@@ -498,6 +503,9 @@ impl BasicScene {
                 cached_spectra,
                 &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             self.textures
@@ -1727,6 +1735,8 @@ impl ParserTarget for BasicSceneBuilder {
         loc: FileLoc,
         options: &Options,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) {
         // TODO Normalize name to UTF8
         // TODO Verify world
@@ -1761,6 +1771,8 @@ impl ParserTarget for BasicSceneBuilder {
                         ),
                         &string_interner,
                         options,
+                        texture_cache,
+                        gamma_encoding_cache,
                     );
                 }
                 "spectrum" => {
@@ -1776,6 +1788,8 @@ impl ParserTarget for BasicSceneBuilder {
                         &string_interner,
                         cached_spectra,
                         options,
+                        texture_cache,
+                        gamma_encoding_cache,
                     );
                 }
                 _ => panic!("{} Unknown texture type {}", loc, texture_type),

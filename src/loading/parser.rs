@@ -2,20 +2,12 @@
 // Adapted from pbrt4 crate under apache license.
 
 use core::slice;
-use std::{collections::HashMap, env, fs, path::Path, sync::Arc};
+use std::{collections::HashMap, env, fs, path::Path, sync::{Arc, Mutex}};
 
 use string_interner::StringInterner;
 
 use crate::{
-    file::set_search_directory,
-    loading::error::Error,
-    loading::error::Result,
-    loading::param::{Param, ParamList},
-    loading::token::{Directive, Token},
-    loading::tokenizer::Tokenizer,
-    options::Options,
-    spectra::Spectrum,
-    Float,
+    color::ColorEncodingCache, file::set_search_directory, loading::{error::{Error, Result}, param::{Param, ParamList}, token::{Directive, Token}, tokenizer::Tokenizer}, mipmap::MIPMap, options::Options, spectra::Spectrum, texture::TexInfo, Float
 };
 
 use super::parser_target::ParserTarget;
@@ -26,6 +18,8 @@ pub fn parse_files<T: ParserTarget>(
     options: &mut Options,
     string_interner: &mut StringInterner,
     cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+    gamma_encoding_cache: &mut ColorEncodingCache,
 ) {
     if files.is_empty() {
         todo!("Read from stdin when no files are provided")
@@ -36,7 +30,7 @@ pub fn parse_files<T: ParserTarget>(
             set_search_directory(options, file);
         }
         let data = fs::read_to_string(file).unwrap();
-        parse_str(&data, target, options, string_interner, cached_spectra);
+        parse_str(&data, target, options, string_interner, cached_spectra, texture_cache, gamma_encoding_cache);
     }
 }
 
@@ -46,6 +40,8 @@ pub fn parse_str<T: ParserTarget>(
     options: &mut Options,
     string_interner: &mut StringInterner,
     cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+    gamma_encoding_cache: &mut ColorEncodingCache,
 ) {
     let mut parsers = Vec::new();
     parsers.push(Parser::new(data));
@@ -194,6 +190,8 @@ pub fn parse_str<T: ParserTarget>(
                 loc,
                 options,
                 cached_spectra,
+                texture_cache,
+                gamma_encoding_cache,
             ),
             Element::Shape { name, params } => {
                 target.shape(name, params.into(), string_interner, loc)

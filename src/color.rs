@@ -460,6 +460,14 @@ impl Hash for ColorEncodingPtr
 
 pub struct ColorEncodingCache(HashMap<OrderedFloat<Float>, ColorEncodingPtr>);
 
+impl ColorEncodingCache
+{
+    pub fn new() -> ColorEncodingCache
+    {
+        ColorEncodingCache(HashMap::new())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ColorEncoding {
     Linear(LinearColorEncoding),

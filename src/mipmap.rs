@@ -340,12 +340,38 @@ pub enum FilterFunction
     EWA,
 }
 
+impl FilterFunction
+{
+    pub fn parse(f: &str) -> Option<FilterFunction>
+    {
+        match f
+        {
+            "ewa" | "EWA" => Some(FilterFunction::EWA),
+            "trilinear" | "Trilinear" => Some(FilterFunction::Trilinear),
+            "bilinear" | "Bilinear" => Some(FilterFunction::Bilinear),
+            "point" | "Point" => Some(FilterFunction::Point),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct MIPMapFilterOptions
 {
     filter: FilterFunction,
     // Use an OrderedFloat because this is used as a key in a hashmap cache
     max_anisotropy: OrderedFloat<Float>,
+}
+
+impl MIPMapFilterOptions
+{
+    pub fn new(filter: FilterFunction, max_anisotropy: Float) -> MIPMapFilterOptions
+    {
+        MIPMapFilterOptions {
+            filter,
+            max_anisotropy: OrderedFloat(max_anisotropy),
+        }
+    }
 }
 
 impl Default for MIPMapFilterOptions

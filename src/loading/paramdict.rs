@@ -808,7 +808,7 @@ impl Default for NamedTextures {
 }
 
 pub struct TextureParameterDictionary {
-    dict: ParameterDictionary,
+    pub dict: ParameterDictionary,
 }
 
 impl TextureParameterDictionary {
