@@ -5,10 +5,11 @@ use ordered_float::OrderedFloat;
 
 use crate::{color::{ColorEncodingPtr, RGB}, colorspace::RgbColorSpace, image::{Image, WrapMode}, math::{lerp, safe_sqrt, sqr}, options::Options, vecmath::{Length, Point2f, Point2i, Tuple2, Vector2f}, Float};
 
+#[derive(Debug)]
 pub struct MIPMap
 {
     pyramid: Vec<Image>,
-    color_space: Arc<RgbColorSpace>,
+    color_space: Option<Arc<RgbColorSpace>>,
     wrap_mode: WrapMode,
     options: MIPMapFilterOptions,
 }
@@ -17,7 +18,7 @@ impl MIPMap
 {
     pub fn new(
         image: Image,
-        color_space: Arc<RgbColorSpace>,
+        color_space: Option<Arc<RgbColorSpace>>,
         wrap_mode: WrapMode,
         filter_options: MIPMapFilterOptions,
         options: &Options,
@@ -93,7 +94,7 @@ impl MIPMap
             }
         }
 
-        let color_space = image_and_metadata.metadata.color_space.expect("Expected color space");
+        let color_space = image_and_metadata.metadata.color_space;
 
         MIPMap::new(
             image,
@@ -104,7 +105,7 @@ impl MIPMap
         )
     }
 
-    pub fn get_color_space(&self) -> Arc<RgbColorSpace>
+    pub fn get_color_space(&self) -> Option<Arc<RgbColorSpace>>
     {
         self.color_space.clone()
     }

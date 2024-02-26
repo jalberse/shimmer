@@ -6,7 +6,7 @@ use crate::{
     color::{ColorEncodingPtr, RGB}, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, mipmap::{MIPMap, MIPMapFilterOptions}, options::Options, spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
-        spectrum::{self, SpectrumI},
+        spectrum::{self, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, SpectrumI},
         Spectrum,
     }, transform::Transform, vecmath::{normal::Normal3, spherical::spherical_theta, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f}, Float
 };
@@ -15,6 +15,7 @@ pub trait FloatTextureI {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float;
 }
 
+#[derive(Debug)]
 pub struct ImageTextureBase
 {
     mapping: TextureMapping2D,
@@ -87,6 +88,7 @@ pub enum FloatTexture {
     Scaled(FloatScaledTexture),
     Mix(FloatMixTexture),
     DirectionMix(FloatDirectionMixTexture),
+    Image(FloatImageTexture),
 }
 
 impl FloatTexture {
@@ -135,6 +137,7 @@ impl FloatTextureI for FloatTexture {
             FloatTexture::Scaled(t) => t.evaluate(ctx),
             FloatTexture::Mix(t) => t.evaluate(ctx),
             FloatTexture::DirectionMix(t) => t.evaluate(ctx),
+            FloatTexture::Image(t) => t.evaluate(ctx),
         }
     }
 }
@@ -293,6 +296,57 @@ impl FloatTextureI for FloatDirectionMixTexture
     }
 }
 
+#[derive(Debug)]
+pub struct FloatImageTexture
+{
+    base: ImageTextureBase,
+}
+
+impl FloatImageTexture
+{
+    pub fn new(
+        mapping: TextureMapping2D,
+        filename: String,
+        filter_options: MIPMapFilterOptions,
+        wrap_mode: WrapMode,
+        scale: Float,
+        invert: bool,
+        encoding: ColorEncodingPtr,
+        texture_cache: Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        options: &Options,
+    ) -> FloatImageTexture
+    {
+        let base = ImageTextureBase::new(
+            mapping,
+            filename,
+            filter_options,
+            wrap_mode,
+            scale,
+            invert,
+            encoding,
+            texture_cache,
+            options,
+        );
+
+        FloatImageTexture {
+            base,
+        }
+    }
+}
+
+impl FloatTextureI for FloatImageTexture
+{
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
+        let mut c = self.base.mapping.map(ctx);
+        // Texture coordinates are (0,0) in the lower left corner, but
+        // image coordinates are (0,0) in the upper left.
+        c.st[1] = 1.0 - c.st[1];
+
+        let v = self.base.mipmap.filter::<Float>(c.st, Vector2f::new(c.dsdx, c.dtdx), Vector2f::new(c.dsdy, c.dtdy)) * self.base.scale;
+        if self.base.invert { Float::max(0.0, 1.0 - v) } else { v }
+    }
+}
+
 pub trait SpectrumTextureI {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
@@ -303,6 +357,7 @@ pub enum SpectrumTexture {
     Scaled(SpectrumScaledTexture),
     Mix(SpectrumMixTexture),
     DirectionMix(SpectrumDirectionMixTexture),
+    Image(SpectrumImageTexture),
 }
 
 impl SpectrumTexture {
@@ -378,6 +433,7 @@ impl SpectrumTextureI for SpectrumTexture {
             SpectrumTexture::Scaled(t) => t.evaluate(ctx, lambda),
             SpectrumTexture::Mix(t) => t.evaluate(ctx, lambda),
             SpectrumTexture::DirectionMix(t) => t.evaluate(ctx, lambda),
+            SpectrumTexture::Image(t) => t.evaluate(ctx, lambda),
         }
     }
 }
@@ -566,6 +622,7 @@ impl SpectrumDirectionMixTexture
     }
 }
 
+#[derive(Debug)]
 pub struct SpectrumImageTexture
 {
     base: ImageTextureBase,
@@ -615,11 +672,28 @@ impl SpectrumTextureI for SpectrumImageTexture
         c.st[1] = 1.0 - c.st[1];
 
         let rgb = self.base.mipmap.filter::<RGB>(c.st, Vector2f::new(c.dsdx, c.dtdx), Vector2f::new(c.dsdy, c.dtdy)) * self.base.scale;
-         
-        // TODO Finish this.
-        todo!()
+        let rgb = if self.base.invert { RGB::new(1.0, 1.0, 1.0) - rgb } else { rgb };
+        let rgb = rgb.clamp_zero();
 
-        // TODO Once we're done here, implement FloatImageTexture.
+        if let Some(cs) = self.base.mipmap.get_color_space()
+        {
+            match self.spectrum_type
+            {
+                SpectrumType::Illuminant => {
+                    RgbIlluminantSpectrum::new(&cs, &rgb).sample(lambda)
+                },
+                SpectrumType::Albedo => {
+                    RgbAlbedoSpectrum::new(&cs, &rgb).sample(lambda)
+                },
+                SpectrumType::Unbounded => {
+                    RgbUnboundedSpectrum::new(&cs, &rgb).sample(lambda)
+                },
+            }
+        } else {
+            // If no colorspace, then it should be a one-channel texture
+            debug_assert!(rgb[0] == rgb[1] && rgb[1] == rgb[2]);
+            SampledSpectrum::from_const(rgb[0])
+        }
     }
 }
 
@@ -650,6 +724,7 @@ pub trait TextureMapping2DI {
 // TODO let's also provide a 3D mapping equivalent. pg 654.
 
 /// Provides 2D texture coordinate generation.
+#[derive(Debug)]
 pub enum TextureMapping2D {
     UV(UVMapping),
     Spherical(SphericalMapping),
@@ -670,6 +745,7 @@ impl TextureMapping2DI for TextureMapping2D {
 
 /// Uses the (u, v) coordinates in the TextureEvalContext to compute the texture
 /// coordinates, optionally scaling and offsetting their values in each dimension.
+#[derive(Debug)]
 pub struct UVMapping {
     /// Scale s from u
     su: Float,
@@ -711,6 +787,7 @@ impl TextureMapping2DI for UVMapping {
     }
 }
 
+#[derive(Debug)]
 pub struct SphericalMapping
 {
     texture_from_render: Transform,
@@ -750,6 +827,7 @@ impl TextureMapping2DI for SphericalMapping {
     }
 }
 
+#[derive(Debug)]
 pub struct CylindricalMapping
 {
     texture_from_render: Transform,
@@ -783,6 +861,7 @@ impl TextureMapping2DI for CylindricalMapping {
     }
 }
 
+#[derive(Debug)]
 pub struct PlanarMapping
 {
     texture_from_render: Transform,
