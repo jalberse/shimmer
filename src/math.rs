@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, Div, Mul, Sub};
 
 use num::Complex;
 
@@ -431,6 +431,24 @@ pub fn windowed_sinc(x: Float, radius: Float, tau: Float) -> Float
         return 0.0;
     }
     sinc(x) * sinc(x / tau)
+}
+
+/// Provides modulo operator, making the result positive.
+/// This is useful for e.g. repeating textures, where Rust's default modulo operator
+/// would keep the sign the same as the divident, but where we want a positive value.
+pub fn modulo<T>(a: T, b: T) -> T
+where
+    T: Div<T, Output = T> + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T> + Copy + std::cmp::PartialOrd<i32>,
+{
+    let result = a - (a / b) * b;
+    if result < 0
+    {
+        result + b
+    }
+    else
+    {
+        result
+    }
 }
 
 #[cfg(test)]

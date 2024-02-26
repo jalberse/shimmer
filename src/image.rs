@@ -5,7 +5,7 @@ use std::{collections::HashMap, fs::File, io::{BufWriter, Write}, ops::{Index, I
 };
 
 use crate::{
-    bounding_box::Bounds2i, color::{ColorEncoding, ColorEncodingI, ColorEncodingPtr}, colorspace::RgbColorSpace, float::Float, math::windowed_sinc, square_matrix::SquareMatrix, tile::Tile, vecmath::{Point2f, Point2i, Tuple2}
+    bounding_box::Bounds2i, color::{ColorEncoding, ColorEncodingI, ColorEncodingPtr}, colorspace::RgbColorSpace, float::Float, math::{modulo, windowed_sinc}, square_matrix::SquareMatrix, tile::Tile, vecmath::{Point2f, Point2i, Tuple2}
 };
 
 #[cfg(target_endian = "little")]
@@ -169,7 +169,7 @@ pub fn remap_pixel_coords(p: &mut Point2i, resolution: Point2i, wrap_mode: WrapM
         match wrap_mode.wrap[c] {
             WrapMode::Black => return false,
             WrapMode::Clamp => p[c] = p[c].clamp(0, resolution[c] - 1),
-            WrapMode::Repeat => p[c] = p[c] % resolution[c],
+            WrapMode::Repeat => p[c] = modulo(p[c], resolution[c]),
             WrapMode::OctahedralSphere => panic!("Octahedral Sphere should be handled prior!"),
         }
     }
