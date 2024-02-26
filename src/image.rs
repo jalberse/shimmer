@@ -605,6 +605,16 @@ impl Image {
         self.get_channel_wrapped(pi, c, wrap_mode)
     }
 
+    pub fn bilerp(&self, p: Point2f, wrap_mode: WrapMode2D) -> ImageChannelValues
+    {
+        let mut cv = ImageChannelValues::new(self.n_channels());
+        for c in 0..self.n_channels()
+        {
+            cv[c] = self.bilerp_channel_wrapped(p, c, wrap_mode);
+        }
+        cv
+    }
+
     pub fn bilerp_channel(&self, p: Point2f, c: usize) -> Float {
         self.bilerp_channel_wrapped(p, c, WrapMode::Clamp.into())
     }

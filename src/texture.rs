@@ -3,12 +3,12 @@ use std::{collections::HashMap, sync::{Arc, Mutex}};
 use spectrum::ConstantSpectrum;
 
 use crate::{
-    color::ColorEncodingPtr, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, mipmap::{MIPMap, MIPMapFilterOptions}, options::Options, spectra::{
+    color::{ColorEncodingPtr, RGB}, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, mipmap::{MIPMap, MIPMapFilterOptions}, options::Options, spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{self, SpectrumI},
         Spectrum,
-    }, transform::Transform, vecmath::{normal::Normal3, spherical::spherical_theta, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f}, Float
+    }, transform::Transform, vecmath::{normal::Normal3, spherical::spherical_theta, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f}, Float
 };
 
 pub trait FloatTextureI {
@@ -563,6 +563,63 @@ impl SpectrumDirectionMixTexture
             tex2,
             dir,
         }
+    }
+}
+
+pub struct SpectrumImageTexture
+{
+    base: ImageTextureBase,
+    spectrum_type: SpectrumType,
+}
+
+impl SpectrumImageTexture
+{
+    pub fn new(
+        spectrum_type: SpectrumType,
+        mapping: TextureMapping2D,
+        filename: String,
+        filter_options: MIPMapFilterOptions,
+        wrap_mode: WrapMode,
+        scale: Float,
+        invert: bool,
+        encoding: ColorEncodingPtr,
+        texture_cache: Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        options: &Options,
+    ) -> SpectrumImageTexture
+    {
+        let base = ImageTextureBase::new(
+            mapping,
+            filename,
+            filter_options,
+            wrap_mode,
+            scale,
+            invert,
+            encoding,
+            texture_cache,
+            options,
+        );
+
+        SpectrumImageTexture {
+            base,
+            spectrum_type,
+        }
+    
+    }
+}
+
+impl SpectrumTextureI for SpectrumImageTexture
+{
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        // Apply texture mapping and flip t coordinate for image texture lookup (following typical conventions).
+        let mut c = self.base.mapping.map(ctx);
+        c.st[1] = 1.0 - c.st[1];
+
+        let rgb = self.base.mipmap.filter::<RGB>(c.st, Vector2f::new(c.dsdx, c.dtdx), Vector2f::new(c.dsdy, c.dtdy)) * self.base.scale;
+         
+        // TODO Finish this.
+        todo!()
+
+        // TODO Once we're done here, implement FloatImageTexture.
     }
 }
 
