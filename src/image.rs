@@ -562,7 +562,7 @@ impl Image {
     }
 
     pub fn get_channel_desc(&self, requested_channels: &[&str]) -> Option<ImageChannelDesc> {
-        let mut offset = ArrayVec::<i32, 4>::new();
+        let mut offset: ArrayVec<i32, 4> = [0; 4].into();
         for i in 0..requested_channels.len() {
             let mut j = 0;
             while j < self.channel_names.len() {
