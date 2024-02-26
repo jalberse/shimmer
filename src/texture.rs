@@ -1,10 +1,9 @@
 use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use clap::builder::styling::Color;
 use spectrum::ConstantSpectrum;
 
 use crate::{
-    color::{ColorEncoding, ColorEncodingPtr}, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, mipmap::{MIPMap, MIPMapFilterOptions}, spectra::{
+    color::ColorEncodingPtr, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, mipmap::{MIPMap, MIPMapFilterOptions}, options::Options, spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{self, SpectrumI},
@@ -27,19 +26,16 @@ pub struct ImageTextureBase
 
 impl ImageTextureBase
 {
-    // TODO We'll want to ensure that we have one copy of each colorencoding, and just point to it -
-    //   like PBRT's ColorEncoding::Get().
-    //   We need to ensure that if it's the same color encoding, it's the same ColorEncodingPtr,
-    //   so that our key works in our texture cache.
     pub fn new(
         mapping: TextureMapping2D,
         filename: String,
-        filter_options: &MIPMapFilterOptions,
+        filter_options: MIPMapFilterOptions,
         wrap_mode: WrapMode,
         scale: Float,
         invert: bool,
         encoding: ColorEncodingPtr,
-        texture_cache: Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>
+        texture_cache: Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        options: &Options,
     ) -> ImageTextureBase
     {
         // Get MIPMap from texture cache if present
@@ -49,10 +45,7 @@ impl ImageTextureBase
             wrap_mode: wrap_mode,
             encoding: encoding.clone(),
         };
-        // TODO Need to implement things for TexInfo etc, and MIPMap::create_from_file().
-        //   Then this should be good. The Linear and sRGB can just be lazy static,
-        //   and then I guess a lazy static cache for the gamma encodings too.
-        //    Gamma cache would need a Mutex around it.
+
         let mipmap = match texture_cache.lock().unwrap().get(&tex_info) {
             Some(m) => m.clone(),
             None => {
@@ -61,14 +54,21 @@ impl ImageTextureBase
                     filter_options,
                     wrap_mode,
                     encoding,
+                    options,
                 ));
                 texture_cache.lock().unwrap().insert(tex_info, m.clone());
                 m
             }
         };
 
-        // TODO Once we clear up the mipmap, we're good, just make the thing and return it
-        todo!()
+        ImageTextureBase
+        {
+            mapping,
+            filename,
+            scale,
+            invert,
+            mipmap,
+        }
     }
 }
 

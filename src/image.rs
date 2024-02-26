@@ -877,7 +877,7 @@ impl Image {
                         }
                     } 
                 } else {
-                    self.for_extent(extent, WrapMode2D{ wrap: [WrapMode::Clamp, WrapMode::Clamp] }, 
+                    self.for_extent(extent, WrapMode::Clamp.into(), 
                         |image, offset: usize| {
                                 image.color_encoding.as_ref().expect("Expected color encoding").0.from_linear(
                                 &buf[buf_offset..buf_offset + 1], 
@@ -891,7 +891,7 @@ impl Image {
                 // PAPERDOC: Useful for obviating interprocedural conflicts - pass a reference to self to the closure.
                 self.for_extent(
                     extent,
-                    WrapMode2D{ wrap: [WrapMode::Clamp, WrapMode::Clamp] },
+                    WrapMode::Clamp.into(),
                     |image, offset: usize| {
                         image.p16[offset] = f16::from_f32(buf[buf_offset]);
                         buf_offset += 1;
@@ -900,7 +900,7 @@ impl Image {
             PixelFormat::Float => {
                 self.for_extent(
                     extent,
-                    WrapMode2D{ wrap: [WrapMode::Clamp, WrapMode::Clamp] },
+                    WrapMode::Clamp.into(),
                     |image, offset: usize| {
                         image.p32[offset] = buf[buf_offset];
                         buf_offset += 1;
@@ -1410,7 +1410,7 @@ mod tests {
     //     let image = Image::read(
     //         path::Path::new("./pyramid_test.png"),
     //         Some(ColorEncoding::get("linear", None))).image;
-    //     let pyramid = Image::generate_pyramid(image, super::WrapMode2D{ wrap: [super::WrapMode::Clamp, super::WrapMode::Clamp] });
+    //     let pyramid = Image::generate_pyramid(image, WrapMode::Clamp.into());
     //     // Write out the pyramid images as PFMs so we can look at them
     //     for (i, level) in pyramid.iter().enumerate()
     //     {

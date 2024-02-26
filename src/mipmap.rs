@@ -8,27 +8,44 @@ use crate::{color::ColorEncodingPtr, colorspace::RgbColorSpace, image::{Image, W
 
 pub struct MIPMap
 {
-    // TODO
+    pyramid: Vec<Image>,
+    color_space: Arc<RgbColorSpace>,
+    wrap_mode: WrapMode,
+    options: MIPMapFilterOptions,
 }
 
 impl MIPMap
 {
     pub fn new(
         image: Image,
-        color_space: Option<Arc<RgbColorSpace>>,
+        color_space: Arc<RgbColorSpace>,
         wrap_mode: WrapMode,
-        filter_options: &MIPMapFilterOptions,
+        filter_options: MIPMapFilterOptions,
+        options: &Options,
     ) -> MIPMap
     {
-
-        todo!()
+        let mut pyramid = Image::generate_pyramid(image, wrap_mode.into());
+        if options.disable_image_textures
+        {
+            let top = pyramid.pop().unwrap();
+            pyramid.clear();
+            pyramid.push(top);
+        }
+        MIPMap
+        {
+            pyramid,
+            color_space,
+            wrap_mode,
+            options: filter_options,   
+        }
     }
 
     pub fn create_from_file(
         filename: &str,
-        filter_options: &MIPMapFilterOptions,
+        filter_options: MIPMapFilterOptions,
         wrap_mode: WrapMode,
         encoding: ColorEncodingPtr,
+        options: &Options,
     ) -> MIPMap
     {
         let image_and_metadata = Image::read(Path::new(filename), Some(encoding));
@@ -77,13 +94,14 @@ impl MIPMap
             }
         }
 
-        let color_space = image_and_metadata.metadata.color_space;
+        let color_space = image_and_metadata.metadata.color_space.expect("Expected color space");
 
         MIPMap::new(
             image,
             color_space,
             wrap_mode,
             filter_options,
+            options,
         )
     }
 }
