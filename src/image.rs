@@ -264,9 +264,9 @@ impl Default for ImageChannelValues {
 }
 
 impl ImageChannelValues {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: usize, v: Float) -> Self {
         Self {
-            values: ArrayVec::new(),
+            values: vec![v; size].into_iter().collect(),
         }
     }
 
@@ -527,7 +527,7 @@ impl Image {
         desc: &ImageChannelDesc,
         wrap_mode: WrapMode2D,
     ) -> ImageChannelValues {
-        let mut cv = ImageChannelValues::new(desc.offset.len());
+        let mut cv = ImageChannelValues::new(desc.offset.len(), 0.0);
         let mut p = p;
         if !remap_pixel_coords(&mut p, self.resolution, wrap_mode) {
             return cv;
@@ -607,7 +607,7 @@ impl Image {
 
     pub fn bilerp(&self, p: Point2f, wrap_mode: WrapMode2D) -> ImageChannelValues
     {
-        let mut cv = ImageChannelValues::new(self.n_channels());
+        let mut cv = ImageChannelValues::new(self.n_channels(), 0.0);
         for c in 0..self.n_channels()
         {
             cv[c] = self.bilerp_channel_wrapped(p, c, wrap_mode);
