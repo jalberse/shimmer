@@ -488,7 +488,7 @@ impl ColorEncoding
     {
         if name == "linear" {
             Lazy::force(&LINEAR_PTR).clone()
-        } else if name == "srgb" {
+        } else if name == "srgb" || name == "sRGB" {
             Lazy::force(&SRGB_PTR).clone()
         } else {
             let params = name.split_whitespace().collect::<Vec<&str>>();
