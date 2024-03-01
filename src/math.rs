@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, Div, Mul, Sub};
 
 use num::Complex;
 
@@ -212,7 +212,7 @@ impl DifferenceOfProducts for i32 {
 
 pub fn difference_of_products_float_vec(a: Float, b: Vector3f, c: Float, d: Vector3f) -> Vector3f {
     let cd = c * d;
-    let difference = a * b + cd;
+    let difference = a * b - cd;
     let error = -c * d + cd;
     difference + error
 }
@@ -406,6 +406,48 @@ pub fn quadratic(a: Float, b: Float, c: Float) -> Option<(Float, Float)>
     else
     {
         Some((t0, t1))
+    }
+}
+
+// http://www.plunk.org/~hatch/rightway.html
+pub fn sin_over_x(x: Float) -> Float
+{
+    if 1.0 - x * x == 1.0
+    {
+        return 1.0;
+    }
+    x.sin() / x
+}
+
+pub fn sinc(x: Float) -> Float 
+{
+    sin_over_x(PI_F * x)
+}
+
+pub fn windowed_sinc(x: Float, radius: Float, tau: Float) -> Float 
+{
+    if x.abs() > radius
+    {
+        return 0.0;
+    }
+    sinc(x) * sinc(x / tau)
+}
+
+/// Provides modulo operator, making the result positive.
+/// This is useful for e.g. repeating textures, where Rust's default modulo operator
+/// would keep the sign the same as the divident, but where we want a positive value.
+pub fn modulo<T>(a: T, b: T) -> T
+where
+    T: Div<T, Output = T> + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T> + Copy + std::cmp::PartialOrd<i32>,
+{
+    let result = a - (a / b) * b;
+    if result < 0
+    {
+        result + b
+    }
+    else
+    {
+        result
     }
 }
 

@@ -1,6 +1,6 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::{Arc, Mutex}};
 
-use crate::{loading::paramdict::ParsedParameter, options::Options, spectra::Spectrum, Float};
+use crate::{color::ColorEncodingCache, loading::paramdict::ParsedParameter, mipmap::MIPMap, options::Options, spectra::Spectrum, texture::TexInfo, Float};
 
 use arrayvec::ArrayVec;
 use string_interner::StringInterner;
@@ -146,6 +146,8 @@ pub trait ParserTarget {
         loc: FileLoc,
         options: &Options,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     );
     fn material(
         &mut self,

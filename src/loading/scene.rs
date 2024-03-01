@@ -2,35 +2,11 @@ use std::{
     collections::{HashMap, HashSet},
     ops::{Index, IndexMut},
     path::Path,
-    sync::{atomic, Arc},
+    sync::{atomic, Arc, Mutex},
 };
 
 use crate::{
-    aggregate::{create_accelerator, BvhAggregate},
-    camera::{Camera, CameraI, CameraTransform},
-    color::LinearColorEncoding,
-    colorspace::RgbColorSpace,
-    file::resolve_filename,
-    film::{Film, FilmI},
-    filter::Filter,
-    image::Image,
-    integrator::{create_integrator, IntegratorI},
-    light::Light,
-    loading::paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary},
-    loading::parser_target::{FileLoc, ParsedParameterVector, ParserTarget},
-    material::Material,
-    medium::Medium,
-    options::Options,
-    primitive::{GeometricPrimitive, Primitive, SimplePrimitive, TransformedPrimitive},
-    sampler::Sampler,
-    shape::Shape,
-    spectra::spectrum,
-    square_matrix::SquareMatrix,
-    texture::{FloatConstantTexture, FloatTexture, SpectrumTexture},
-    transform::Transform,
-    util::normalize_arg,
-    vecmath::{Point3f, Tuple3, Vector3f},
-    Float,
+    aggregate::{create_accelerator, BvhAggregate}, camera::{Camera, CameraI, CameraTransform}, color::{ColorEncoding, ColorEncodingCache, LinearColorEncoding}, colorspace::RgbColorSpace, file::resolve_filename, film::{Film, FilmI}, filter::Filter, image::Image, integrator::{create_integrator, IntegratorI}, light::Light, loading::{paramdict::{NamedTextures, ParameterDictionary, TextureParameterDictionary}, parser_target::{FileLoc, ParsedParameterVector, ParserTarget}}, material::Material, medium::Medium, mipmap::MIPMap, options::Options, primitive::{GeometricPrimitive, Primitive, SimplePrimitive, TransformedPrimitive}, sampler::Sampler, shape::Shape, spectra::spectrum, square_matrix::SquareMatrix, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, transform::Transform, util::normalize_arg, vecmath::{Point3f, Tuple3, Vector3f}, Float
 };
 
 use log::{trace, warn};
@@ -191,6 +167,8 @@ impl BasicScene {
         mut texture: TextureSceneEntity,
         string_interner: &StringInterner,
         options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) {
         // TODO Check if animated once we add animated transforms.
 
@@ -232,14 +210,18 @@ impl BasicScene {
         // TODO Can make this async.
         let render_from_texture = texture.render_from_object;
 
-        let tex_dict = TextureParameterDictionary::new(texture.base.parameters.clone());
+        let mut tex_dict = TextureParameterDictionary::new(texture.base.parameters.clone());
         let float_texture = FloatTexture::create(
             string_interner
                 .resolve(texture.base.name)
                 .expect("Unknown symbol"),
             render_from_texture,
-            tex_dict,
+            &mut tex_dict,
             &texture.base.loc,
+            &self.textures,
+            options,
+            texture_cache,
+            gamma_encoding_cache,
         );
 
         self.textures
@@ -254,6 +236,8 @@ impl BasicScene {
         string_interner: &StringInterner,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) {
         if string_interner.resolve(texture.base.name).unwrap() != "ptex"
             && string_interner.resolve(texture.base.name).unwrap() != "imagemap"
@@ -297,7 +281,11 @@ impl BasicScene {
             &mut text_dict,
             crate::loading::paramdict::SpectrumType::Albedo,
             cached_spectra,
+            &self.textures,
             &texture.base.loc,
+            options,
+            texture_cache,
+            gamma_encoding_cache,
         );
         self.textures
             .albedo_spectrum_textures
@@ -366,11 +354,18 @@ impl BasicScene {
 
         let image_and_metadata = Image::read(
             filename,
-            Some(crate::color::ColorEncoding::Linear(LinearColorEncoding {})),
+            Some(ColorEncoding::get("linear", None)),
         );
 
         let image = image_and_metadata.image;
-        let rgb_desc = image.get_channel_desc(&["R".to_owned(), "G".to_owned(), "B".to_owned()]);
+        let rgb_desc = image.get_channel_desc(&["R", "G", "B"]);
+        if rgb_desc.is_none() {
+            panic!(
+                "Normal map \"{}\" should have RGB channels.",
+                filename.display()
+            );
+        }
+        let rgb_desc = rgb_desc.unwrap();
         if rgb_desc.size() != 3 {
             panic!(
                 "Normal map \"{}\" should have RGB channels.",
@@ -385,6 +380,9 @@ impl BasicScene {
         &mut self,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         string_interner: &StringInterner,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) -> NamedTextures {
         // TODO Note that albedo spectrum and float textures were created
         //  earlier; if we switch to asynch, we will want to resolve them here.
@@ -403,7 +401,11 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Unbounded,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             let illum_tex = SpectrumTexture::create(
@@ -414,7 +416,11 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Illuminant,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             self.textures
@@ -428,7 +434,7 @@ impl BasicScene {
         for tex in &self.serial_float_textures {
             let render_from_texture = tex.1.render_from_object;
 
-            let tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone());
+            let mut tex_dict = TextureParameterDictionary::new(tex.1.base.parameters.clone());
 
             // TODO Will need to pass self.textures to create() functions, so they can resolve textures.
             // Not encessary right now as we only have the FloatConstant texture.
@@ -437,8 +443,12 @@ impl BasicScene {
                     .resolve(tex.1.base.name)
                     .expect("Unexpected symbol"),
                 render_from_texture,
-                tex_dict,
+                &mut tex_dict,
                 &tex.1.base.loc,
+                &self.textures,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             self.textures
@@ -461,7 +471,11 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Albedo,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             let unbounded_tex = SpectrumTexture::create(
@@ -472,7 +486,11 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Unbounded,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             let illum_tex = SpectrumTexture::create(
@@ -483,7 +501,11 @@ impl BasicScene {
                 &mut tex_dict,
                 SpectrumType::Illuminant,
                 cached_spectra,
+                &self.textures,
                 &tex.1.base.loc,
+                options,
+                texture_cache,
+                gamma_encoding_cache,
             );
 
             self.textures
@@ -1713,6 +1735,8 @@ impl ParserTarget for BasicSceneBuilder {
         loc: FileLoc,
         options: &Options,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
     ) {
         // TODO Normalize name to UTF8
         // TODO Verify world
@@ -1747,6 +1771,8 @@ impl ParserTarget for BasicSceneBuilder {
                         ),
                         &string_interner,
                         options,
+                        texture_cache,
+                        gamma_encoding_cache,
                     );
                 }
                 "spectrum" => {
@@ -1762,6 +1788,8 @@ impl ParserTarget for BasicSceneBuilder {
                         &string_interner,
                         cached_spectra,
                         options,
+                        texture_cache,
+                        gamma_encoding_cache,
                     );
                 }
                 _ => panic!("{} Unknown texture type {}", loc, texture_type),

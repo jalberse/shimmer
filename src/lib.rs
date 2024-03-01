@@ -44,6 +44,8 @@ pub mod transform;
 mod util;
 pub mod vec2d;
 pub mod vecmath;
+mod mipmap;
+mod tile;
 
 // For convenience, re-export.
 pub use float::Float;

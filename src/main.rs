@@ -8,17 +8,12 @@ use std::{
     time::Instant,
 };
 
-use clap::Parser;
+use clap::{builder::styling::Color, Parser};
 use shimmer::{
-    bounding_box::{Bounds2f, Bounds2i},
-    loading::{
+    bounding_box::{Bounds2f, Bounds2i}, color::ColorEncodingCache, loading::{
         parser,
         scene::{BasicScene, BasicSceneBuilder},
-    },
-    options::{Options, RenderingCoordinateSystem},
-    render::{self},
-    vecmath::{Point2f, Point2i, Tuple2},
-    Float,
+    }, options::{Options, RenderingCoordinateSystem}, render, vecmath::{Point2f, Point2i, Tuple2}, Float
 };
 use string_interner::StringInterner;
 
@@ -169,6 +164,9 @@ fn main() {
 
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = std::collections::HashMap::new();
+    let mut texture_cache = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
+    let mut gamme_encoding_cache = ColorEncodingCache::new();
+
     // let file = fs::read_to_string(cli.scene_file).unwrap();
     let scene = Box::new(BasicScene::default());
     let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner);
@@ -178,11 +176,13 @@ fn main() {
         &mut options,
         &mut string_interner,
         &mut cached_spectra,
+        &mut texture_cache,
+        &mut gamme_encoding_cache,
     );
     let scene = scene_builder.done();
 
     let start_time = Instant::now();
-    render::render_cpu(scene, &options, &mut string_interner, &mut cached_spectra);
+    render::render_cpu(scene, &options, &mut string_interner, &mut cached_spectra, &mut &texture_cache, &mut gamme_encoding_cache);
     let elapsed = start_time.elapsed();
     println!(
         "Render time: {}.{:03} seconds",

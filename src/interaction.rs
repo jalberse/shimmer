@@ -4,11 +4,11 @@ use log::warn;
 
 use crate::{
     bsdf::BSDF,
-    bxdf::{self, DiffuseBxDF},
+    bxdf::{self, BxDFFLags, DiffuseBxDF},
     camera::{Camera, CameraI},
     light::{Light, LightI},
     material::{Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
-    math::DifferenceOfProducts,
+    math::{sqr, DifferenceOfProducts},
     options::Options,
     ray::{AuxiliaryRays, Ray, RayDifferential},
     sampler::{Sampler, SamplerI},
@@ -260,7 +260,7 @@ impl SurfaceInteraction {
         }) {
             let aux = ray.auxiliary.as_ref().unwrap();
             // Estimate screen-space change in pt using ray differentials
-            // Compute auxiliary intersecrtion points with plane, px and py
+            // Compute auxiliary intersection points with plane, px and py
             let d = -self.interaction.n.dot_vector(self.p().into());
             let tx = (-self.interaction.n.dot_vector(aux.rx_origin.into()) - d)
                 / self.interaction.n.dot_vector(aux.rx_direction);
@@ -384,6 +384,93 @@ impl SurfaceInteraction {
             None
         };
         *ray = new_ray
+    }
+
+    // This is useful for ray differentials for specular reflection and transmission,
+    // which lets us have ray differentials after the first bounce.
+    // Introduced by Igehy "Tracing ray differentials" (1999).
+    // This is not used by the SimplePathIntegrator, but can be used
+    // by more complex integrators.
+    pub fn spawn_ray_with_differentials(
+        &self,
+        ray_i: &RayDifferential,
+        wi: Vector3f,
+        flags: BxDFFLags,
+        eta: Float,
+    ) -> RayDifferential
+    {
+        let mut rd = self.interaction.spawn_ray(wi);
+        if let Some(aux) = &ray_i.auxiliary
+        {
+            // Compute ray differentials for specular reflection or transmission
+            // Compute common factors for specular ray differentials.
+            let mut n = self.shading.n;
+            let mut dndx = self.shading.dndu * self.dudx + self.shading.dndv * self.dvdx;
+            let mut dndy = self.shading.dndu * self.dudy + self.shading.dndv * self.dvdy;
+            let dwodx = -aux.rx_direction - self.interaction.wo;
+            let dwody = -aux.ry_direction - self.interaction.wo;
+
+            rd.auxiliary = if flags == BxDFFLags::SPECULAR_REFLECTION {
+                // Initialize origins of specular differential rays
+                let rx_origin = self.interaction.p() + self.dpdx;
+                let ry_origin = self.interaction.p() + self.dpdy;
+
+                // Compute differential reflected directions
+                let dwo_dotn_dx = dwodx.dot_normal(n) + self.interaction.wo.dot_normal(dndx);
+                let dwo_dotn_dy = dwody.dot_normal(n) + self.interaction.wo.dot_normal(dndy);
+                let rx_direction = wi - dwodx + 2.0 * (self.interaction.wo.dot_normal(n) * dndx + dwo_dotn_dx * n);
+                let ry_direction = wi - dwody + 2.0 * (self.interaction.wo.dot_normal(n) * dndy + dwo_dotn_dy * n);
+                Some(AuxiliaryRays
+                {
+                    rx_origin,
+                    rx_direction,
+                    ry_origin,
+                    ry_direction,
+                })
+            } else if flags == BxDFFLags::SPECULAR_TRANSMISSION {
+                // Initialize origins of specular differential rays
+                let rx_origin = self.interaction.p() + self.dpdx;
+                let ry_origin = self.interaction.p() + self.dpdy;
+
+                // Compute differential transmitted directions
+                // Find oriented surface normal for transmission
+                if self.interaction.wo.dot_normal(n) < 0.0
+                {
+                    n = -n;
+                    dndx = -dndx;
+                    dndy = -dndy;
+                }
+
+                // Compute partial derivatives of mu
+                let dwo_dotn_dx = dwodx.dot_normal(n) + self.interaction.wo.dot_normal(dndx);
+                let dwo_dotn_dy = dwody.dot_normal(n) + self.interaction.wo.dot_normal(dndy);
+                let mu = self.interaction.wo.dot_normal(n) / eta - wi.abs_dot_normal(n);
+                let dmudx = dwo_dotn_dx * (1.0 / eta + 1.0 / sqr(eta) * self.interaction.wo.dot_normal(n) / wi.dot_normal(n));
+                let dmudy = dwo_dotn_dy * (1.0 / eta + 1.0 / sqr(eta) * self.interaction.wo.dot_normal(n) / wi.dot_normal(n));
+
+                let rx_direction = wi - eta * dwodx + Vector3f::from(mu * dndx + dmudx * n);
+                let ry_direction = wi - eta * dwody + Vector3f::from(mu * dndy + dmudy * n);
+
+                Some(AuxiliaryRays{
+                    rx_origin,
+                    rx_direction,
+                    ry_origin,
+                    ry_direction,
+                })
+            } else {
+                None
+            };
+        }
+
+        // Squash any potentially troublesome differentials
+        if rd.auxiliary.as_ref().is_some_and(|aux| {
+            aux.rx_direction.length_squared() > 1e16 || aux.ry_direction.length_squared() > 1e16
+            || Vector3f::from(aux.rx_origin).length_squared() > 1e16 || Vector3f::from(aux.ry_origin).length_squared() > 1e16
+        }) {
+            rd.auxiliary = None;
+        }
+
+        rd
     }
 }
 
