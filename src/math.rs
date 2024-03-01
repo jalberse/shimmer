@@ -212,7 +212,7 @@ impl DifferenceOfProducts for i32 {
 
 pub fn difference_of_products_float_vec(a: Float, b: Vector3f, c: Float, d: Vector3f) -> Vector3f {
     let cd = c * d;
-    let difference = a * b + cd;
+    let difference = a * b - cd;
     let error = -c * d + cd;
     difference + error
 }
