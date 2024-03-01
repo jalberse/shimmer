@@ -585,7 +585,7 @@ impl PixelSampleEvaluatorI for SimplePathIntegrator {
             debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
             debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
 
-            // TODO Scale camera ray differentials absed on image sampling rate.
+            // TODO Scale camera ray differentials based on image sampling rate.
             let ray_diff_scale = Float::max(
                 0.125,
                 1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
