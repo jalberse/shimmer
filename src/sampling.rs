@@ -611,6 +611,11 @@ pub fn invert_spherical_rectangle_sample(p_ref: Point3f , s: Point3f, ex: Vector
     u
 }
 
+pub fn sample_exponential(x: Float, a: Float) -> Float
+{
+    a * Float::exp(-a * x)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::sampling::visible_wavelengths_pdf;

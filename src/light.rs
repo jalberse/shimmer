@@ -16,7 +16,7 @@ use crate::{
     interaction::{Interaction, SurfaceInteraction},
     loading::paramdict::ParameterDictionary,
     loading::parser_target::FileLoc,
-    medium::Medium,
+    media::Medium,
     options::Options,
     ray::Ray,
     sampling::{sample_uniform_sphere, uniform_hemisphere_pdf, uniform_sphere_pdf},

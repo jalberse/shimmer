@@ -14,7 +14,7 @@ use crate::{
     loading::paramdict::ParameterDictionary,
     loading::parser_target::FileLoc,
     math::{lerp, radians},
-    medium::Medium,
+    media::Medium,
     options::{Options, RenderingCoordinateSystem},
     ray::{AuxiliaryRays, Ray, RayDifferential, RayI},
     sampling::sample_uniform_disk_concentric,

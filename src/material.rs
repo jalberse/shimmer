@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     bsdf::BSDF,
-    bxdf::{BxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF},
+    bxdf::{BxDF, CoatedDiffuseBxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF},
     image::Image,
     interaction::SurfaceInteraction,
     loading::{
@@ -59,6 +59,8 @@ pub enum Material {
     Diffuse(DiffuseMaterial),
     Conductor(ConductorMaterial),
     Dielectric(DielectricMaterial),
+    // TODO Add ThinDielectric as well; we have its BxDF but not its material.
+    CoatedDiffuse(CoatedDiffuseMaterial),
 }
 
 impl Material {
@@ -93,6 +95,13 @@ impl Material {
                 cached_spectra,
                 textures,
             )),
+            "coateddiffuse" => Material::CoatedDiffuse(CoatedDiffuseMaterial::create(
+                parameters,
+                normal_map,
+                loc,
+                cached_spectra,
+                textures,
+            )),
             _ => panic!("Material {} unknown.", name),
         };
         material
@@ -114,6 +123,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
             Material::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
             Material::Dielectric(m) => BxDF::Dielectric(m.get_bxdf(tex_eval, ctx, lambda)),
+            Material::CoatedDiffuse(m) => BxDF::CoatedDiffuse(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -134,6 +144,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
             Material::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
             Material::Dielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            Material::CoatedDiffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -142,6 +153,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.can_evaluate_textures(tex_eval),
             Material::Conductor(m) => m.can_evaluate_textures(tex_eval),
             Material::Dielectric(m) => m.can_evaluate_textures(tex_eval),
+            Material::CoatedDiffuse(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
@@ -150,6 +162,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.get_normal_map(),
             Material::Conductor(m) => m.get_normal_map(),
             Material::Dielectric(m) => m.get_normal_map(),
+            Material::CoatedDiffuse(m) => m.get_normal_map(),
         }
     }
 
@@ -158,6 +171,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.get_displacement(),
             Material::Conductor(m) => m.get_displacement(),
             Material::Dielectric(m) => m.get_displacement(),
+            Material::CoatedDiffuse(m) => m.get_displacement(),
         }
     }
 
@@ -166,6 +180,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.has_subsurface_scattering(),
             Material::Conductor(m) => m.has_subsurface_scattering(),
             Material::Dielectric(m) => m.has_subsurface_scattering(),
+            Material::CoatedDiffuse(m) => m.has_subsurface_scattering(),
         }
     }
 }
@@ -598,6 +613,232 @@ impl MaterialI for DielectricMaterial {
         false
     }
 }
+
+#[derive(Debug)]
+pub struct CoatedDiffuseMaterial
+{
+    displacement: Option<Arc<FloatTexture>>,
+    normal_map: Option<Arc<Image>>,
+    reflectance: Arc<SpectrumTexture>,
+    albedo: Arc<SpectrumTexture>,
+    u_roughness: Arc<FloatTexture>,
+    v_roughness: Arc<FloatTexture>,
+    thickness: Arc<FloatTexture>,
+    g: Arc<FloatTexture>,
+    eta: Arc<Spectrum>,
+    remap_roughness: bool,
+    max_depth: i32,
+    n_samples: i32,
+}
+
+impl CoatedDiffuseMaterial
+{
+    pub fn new(
+        displacement: Option<Arc<FloatTexture>>,
+        normal_map: Option<Arc<Image>>,
+        reflectance: Arc<SpectrumTexture>,
+        albedo: Arc<SpectrumTexture>,
+        u_roughness: Arc<FloatTexture>,
+        v_roughness: Arc<FloatTexture>,
+        thickness: Arc<FloatTexture>,
+        g: Arc<FloatTexture>,
+        eta: Arc<Spectrum>,
+        remap_roughness: bool,
+        max_depth: i32,
+        n_samples: i32,
+    ) -> Self {
+        Self {
+            displacement,
+            normal_map,
+            reflectance,
+            albedo,
+            u_roughness,
+            v_roughness,
+            thickness,
+            g,
+            eta,
+            remap_roughness,
+            max_depth,
+            n_samples,
+        }
+    }
+
+    pub fn create(
+        parameters: &mut TextureParameterDictionary,
+        normal_map: Option<Arc<Image>>,
+        _loc: &FileLoc,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+    ) -> CoatedDiffuseMaterial
+    {
+        let reflectance = parameters.get_spectrum_texture("reflectance", None, SpectrumType::Albedo, cached_spectra, textures);
+        let reflectance = if reflectance.is_none()
+        {
+            Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture::new(Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5))))))
+        }
+        else
+        {
+            reflectance.unwrap()
+        };
+
+        let u_roughness = parameters.get_float_texture_or_none("uroughness", textures);
+        let v_roughness = parameters.get_float_texture_or_none("vroughness", textures);
+
+        let u_roughness = if u_roughness.is_none()
+        {
+            parameters.get_float_texture("roughness", 0.0, textures)
+        }
+        else
+        {
+            u_roughness.unwrap()
+        };
+
+        let v_roughness = if v_roughness.is_none()
+        {
+            parameters.get_float_texture("roughness", 0.0, textures)
+        }
+        else
+        {
+            v_roughness.unwrap()
+        };
+
+        let thickness = parameters.get_float_texture("thickness", 0.01, textures);
+
+        let eta = if !parameters.get_float_array("eta").is_empty()
+        {
+            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(parameters.get_float_array("eta")[0]))))
+        }
+        else
+        {
+            parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)
+        };
+        let eta = if eta.is_none()
+        {
+            Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.5)))
+        }
+        else
+        {
+            eta.unwrap()
+        };
+
+        let max_depth = parameters.get_one_int("maxdepth", 10);
+        let n_samples = parameters.get_one_int("nsamples", 1);
+
+        let g = parameters.get_float_texture("g", 0.0, textures);
+        let albedo = parameters.get_spectrum_texture("albedo", None, SpectrumType::Albedo, cached_spectra, textures);
+
+        let albedo = if albedo.is_none()
+        {
+            Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture::new(Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.0))))))
+        }
+        else
+        {
+            albedo.unwrap()
+        };
+
+        let displacement = parameters.get_float_texture_or_none("displacement", textures);
+        let remap_roughness = parameters.get_one_bool("remaproughness", true);
+
+        CoatedDiffuseMaterial::new(
+            displacement,
+            normal_map,
+            reflectance,
+            albedo,
+            u_roughness,
+            v_roughness,
+            thickness,
+            g,
+            eta,
+            remap_roughness,
+            max_depth,
+            n_samples
+        )
+    }
+}
+
+impl MaterialI for CoatedDiffuseMaterial
+{
+    type ConcreteBxDF = CoatedDiffuseBxDF;
+
+    fn get_bxdf<T: TextureEvaluatorI>(
+        &self,
+        tex_eval: &T,
+        ctx: &MaterialEvalContext,
+        lambda: &mut SampledWavelengths,
+    ) -> Self::ConcreteBxDF {
+        // Initialize diffuse component of plastic material
+        let r = SampledSpectrum::clamp(&tex_eval.evaluate_spectrum(&self.reflectance, &ctx.tex_ctx, lambda), 0.0, 1.0);
+
+        // Create microfacet distribution distrib for coated diffuse material
+        let mut u_rough = tex_eval.evaluate_float(&self.u_roughness, &ctx.tex_ctx);
+        let mut v_rough = tex_eval.evaluate_float(&self.v_roughness, &ctx.tex_ctx);
+        if self.remap_roughness
+        {
+            u_rough = TrowbridgeReitzDistribution::roughness_to_alpha(u_rough);
+            v_rough = TrowbridgeReitzDistribution::roughness_to_alpha(v_rough);
+        }
+        let distrib = TrowbridgeReitzDistribution::new(u_rough, v_rough);
+
+        let thick = tex_eval.evaluate_float(&self.thickness, &ctx.tex_ctx);
+
+        let mut sampled_eta = self.eta.get(lambda[0]);
+        match self.eta.as_ref() {
+            Spectrum::Constant(_) => lambda.terminate_secondary(),
+            _ => {}
+        }
+        if sampled_eta == 0.0
+        {
+            sampled_eta = 1.0;
+        }
+
+        let a = SampledSpectrum::clamp(&tex_eval.evaluate_spectrum(&self.albedo, &ctx.tex_ctx, lambda), 0.0, 1.0);
+        let gg = Float::clamp(tex_eval.evaluate_float(&self.g, &ctx.tex_ctx), -1.0, 1.0);
+
+        CoatedDiffuseBxDF::new(
+            DielectricBxDF::new(
+                sampled_eta,
+                distrib,
+            ),
+            DiffuseBxDF::new(r),
+            thick,
+            &a,
+            gg,
+            self.max_depth,
+            self.n_samples
+        )
+    }
+
+    fn get_bsdf<T: TextureEvaluatorI>(
+        &self,
+        tex_eval: &T,
+        ctx: &MaterialEvalContext,
+        lambda: &mut SampledWavelengths,
+    ) -> BSDF {
+        let bxdf = self.get_bxdf(tex_eval, ctx, lambda);
+        BSDF::new(ctx.ns, ctx.dpdus, crate::bxdf::BxDF::CoatedDiffuse(bxdf))
+    }
+
+    fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool {
+        // TODO Here and in other fns, we might make some of these maps optional, in which case, transform.
+        // We do something like that for other materials
+        tex_eval.can_evaluate(
+            &[&self.u_roughness, &self.v_roughness, &self.thickness, &self.g],
+            &[&self.reflectance, &self.albedo])
+    }
+
+    fn get_normal_map(&self) -> Option<Arc<Image>> {
+        self.normal_map.clone()
+    }
+
+    fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
+        self.displacement.clone()
+    }
+
+    fn has_subsurface_scattering(&self) -> bool {
+        false
+    }
+}
+
 
 pub struct MaterialEvalContext {
     tex_ctx: TextureEvalContext,

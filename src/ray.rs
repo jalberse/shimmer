@@ -1,6 +1,6 @@
 use crate::{
     float::{next_float_down, next_float_up},
-    medium::Medium,
+    media::Medium,
     vecmath::{
         normal::Normal3, point::Point3fi, vector::Vector3, HasNan, Normal3f, Point3f, Tuple3,
         Vector3f,

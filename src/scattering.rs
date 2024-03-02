@@ -1,15 +1,10 @@
 use crate::{
-    float::PI_F,
-    math::{lerp, safe_sqrt, sqr},
-    sampling::{sample_uniform_disk_concentric, sample_uniform_disk_polar},
-    spectra::{sampled_spectrum::SampledSpectrum, NUM_SPECTRUM_SAMPLES},
-    vecmath::{
+    float::PI_F, frame::Frame, math::{lerp, safe_sqrt, sqr, INV_4PI}, sampling::sample_uniform_disk_polar, spectra::{sampled_spectrum::SampledSpectrum, NUM_SPECTRUM_SAMPLES}, vecmath::{
         normal::Normal3,
-        spherical::{abs_cos_theta, cos2_theta, cos_phi, sin_phi, tan2_theta},
+        spherical::{abs_cos_theta, cos2_theta, cos_phi, sin_phi, spherical_direction, tan2_theta},
         vector::Vector3,
         Length, Normal3f, Normalize, Point2f, Tuple3, Vector2f, Vector3f,
-    },
-    Float,
+    }, Float
 };
 use num::complex::Complex;
 
@@ -233,4 +228,35 @@ impl Default for TrowbridgeReitzDistribution {
             alpha_y: Default::default(),
         }
     }
+}
+
+pub fn henyey_greenstein(cos_theta: Float, g: Float) -> Float
+{
+    let g = Float::clamp(g, -0.99, 0.99);
+    let denom = 1.0 + sqr(g) + 2.0 * g * cos_theta;
+    INV_4PI * (1.0 - sqr(g)) / (denom * safe_sqrt(denom))
+}
+ 
+/// Returns (pdf, wi)
+pub fn sample_henyey_greenstein(wo: Vector3f, g: Float, u: Point2f) -> (Float, Vector3f)
+{
+    let g= Float::clamp(g, -0.99, 0.99);
+
+    let cos_theta = if g.abs() < 1e-3
+    {
+        1.0 - 2.0 * u[0]
+    }
+    else
+    {
+        -1.0 / (2.0 * g) * (1.0 + sqr(g) - sqr((1.0 - sqr(g)) / (1.0 + g - 2.0 * g * u[0])))
+    };
+
+    // Compute direction wi for sample
+    let sin_theta = safe_sqrt(1.0 - sqr(cos_theta));
+    let phi = 2.0 * PI_F * u[1];
+    let w_frame = Frame::from_z(wo);
+    let wi = w_frame.from_local_v(&spherical_direction(sin_theta, cos_theta, phi));
+
+    let pdf = henyey_greenstein(cos_theta, g);
+    (pdf, wi)
 }
