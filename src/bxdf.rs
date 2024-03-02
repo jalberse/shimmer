@@ -495,6 +495,13 @@ impl BxDFI for DielectricBxDF {
             return SampledSpectrum::from_const(0.0);
         }
 
+        let wm = wm.normalize().face_forward_n(Normal3f::Z);
+        // Discard backwards facing microfacets
+        if wm.dot(wi) * cos_theta_i < 0.0 || wm.dot(wo) * cos_theta_o < 0.0
+        {
+            return SampledSpectrum::from_const(0.0);
+        }
+
         let f = fresnel_dielectric(wo.dot(wm), self.eta);
         if reflect {
             // Compute reflection at rough dielectric interface
@@ -1012,7 +1019,7 @@ where
                 }
 
                 // Account for media between layers and possibly scatter
-                if !self.albedo.is_zero()
+                if self.albedo.is_zero()
                 {
                     // Advance to next layer boundary and update beta for transmittance
                     z = if z == self.thickness

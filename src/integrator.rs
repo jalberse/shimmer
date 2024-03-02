@@ -7,7 +7,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thread_local::ThreadLocal;
 
 use crate::{
-    bounding_box::Bounds2i, bxdf::{BxDFReflTransFlags, TransportMode}, camera::{Camera, CameraI}, colorspace::RgbColorSpace, film::{FilmI, VisibleSurface}, float::PI_F, image::ImageMetadata, interaction::Interaction, light::{Light, LightI, LightSampleContext, LightType}, light_sampler::{LightSamplerI, UniformLightSampler}, loading::paramdict::ParameterDictionary, options::Options, primitive::{Primitive, PrimitiveI}, ray::{Ray, RayDifferential}, sampler::{Sampler, SamplerI}, sampling::{
+    bxdf::{BxDFReflTransFlags, TransportMode}, camera::{Camera, CameraI}, colorspace::RgbColorSpace, film::{FilmI, VisibleSurface}, float::PI_F, image::ImageMetadata, interaction::Interaction, light::{Light, LightI, LightSampleContext, LightType}, light_sampler::{LightSamplerI, UniformLightSampler}, loading::paramdict::ParameterDictionary, options::Options, primitive::{Primitive, PrimitiveI}, ray::{Ray, RayDifferential}, sampler::{Sampler, SamplerI}, sampling::{
         get_camera_sample, sample_uniform_hemisphere, sample_uniform_sphere,
         uniform_hemisphere_pdf, uniform_sphere_pdf,
     }, shape::ShapeIntersection, spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths}, tile::Tile, vecmath::{vector::Vector3, HasNan, Length, Point2i, Tuple2, Vector3f}, Float

@@ -1,6 +1,7 @@
 use std::ops::{Deref, Index, IndexMut, Not};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
+use num::Zero;
 
 use crate::{
     color::{RGB, XYZ},
@@ -32,7 +33,7 @@ impl SampledSpectrum {
     }
 
     pub fn is_zero(&self) -> bool {
-        self.values.iter().all(|x: &Float| x == &0.0)
+        self.values.iter().all(|x: &Float| x.is_zero())
     }
 
     pub fn safe_div(&self, other: &SampledSpectrum) -> SampledSpectrum {
