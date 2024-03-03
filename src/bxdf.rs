@@ -1771,7 +1771,11 @@ impl BxDFFLags {
 
 #[cfg(test)]
 mod tests {
-    use super::BxDFFLags;
+    use float_cmp::approx_eq;
+
+    use crate::{scattering::TrowbridgeReitzDistribution, vecmath::{Point2f, Tuple2, Tuple3, Vector3f}, Float};
+
+    use super::{BxDFFLags, BxDFI, DielectricBxDF};
 
     #[test]
     fn basic_bxdf_flags() {
@@ -1785,5 +1789,39 @@ mod tests {
         assert!(gt.is_glossy());
         assert!(gt.is_transmissive());
         assert!(!gt.is_diffuse());
+    }
+
+    #[test]
+    fn dielectric_sample_f()
+    {
+        let bxdf = DielectricBxDF::new(
+            1.5,
+            TrowbridgeReitzDistribution::new(0.0, 0.0)
+        );
+
+        let sample = bxdf.sample_f(
+            Vector3f::new(-0.419299453, -0.656406343, 0.627151370),
+            0.237656280,
+            Point2f::new(
+                0.0488742627,
+                0.941848040
+            ),
+            super::TransportMode::Radiance,
+            super::BxDFReflTransFlags::ALL
+        );
+
+        assert!(sample.is_some());
+        let sample = sample.unwrap();
+        assert_eq!(sample.flags, BxDFFLags::SPECULAR_TRANSMISSION);
+        approx_eq!(Float, sample.pdf, 0.940032840);
+        approx_eq!(Float, sample.eta, 1.5);
+        assert!(!sample.pdf_is_proportional);
+        approx_eq!(Float, sample.f[0], 0.488867134);
+        approx_eq!(Float, sample.f[1], 0.488867134);
+        approx_eq!(Float, sample.f[2], 0.488867134);
+        approx_eq!(Float, sample.f[3], 0.488867134);
+        approx_eq!(Float, sample.wi.x, 0.279532969);
+        approx_eq!(Float, sample.wi.y, 0.437604219);
+        approx_eq!(Float, sample.wi.z, -0.854613364);
     }
 }
