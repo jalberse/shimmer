@@ -220,14 +220,14 @@ impl IntegratorI for ImageTileIntegrator {
         let sampler_tl = ThreadLocal::new();
         // Render in waves until the samples per pixel limit is reached.
         while wave_start < spp {
-            let film_samples: Vec<Vec<FilmSample>> = tiles
+            let film_samples: Box<Vec<Box<Vec<FilmSample>>>> = Box::new(tiles
                 .par_iter()
                 .progress()
-                .map(|tile| -> Vec<FilmSample> {
-                    let mut samples = Vec::with_capacity(
-                        (tile.bounds.width() * tile.bounds.height() * wave_end - wave_start)
+                .map(|tile| -> Box<Vec<FilmSample>> {
+                    let mut samples = Box::new(Vec::with_capacity(
+                        (tile.bounds.width() * tile.bounds.height() * (wave_end - wave_start))
                             as usize,
-                    );
+                    ));
 
                     // Initialize or get thread-local objects.
                     //
@@ -265,16 +265,18 @@ impl IntegratorI for ImageTileIntegrator {
                     }
                     samples
                 })
-                .collect();
-            let samples: Vec<FilmSample> = film_samples.into_iter().flatten().collect();
-            samples.into_iter().for_each(|s| {
-                self.camera.get_film().add_sample(
-                    &s.p_film,
-                    &s.l,
-                    &s.lambda,
-                    &s.visible_surface,
-                    s.weight,
-                )
+                .collect());
+            film_samples.into_iter().for_each(|vec| {
+                vec.into_iter().for_each(|s|
+                {
+                    self.camera.get_film().add_sample(
+                        &s.p_film,
+                        &s.l,
+                        &s.lambda,
+                        &s.visible_surface,
+                        s.weight,
+                    )
+                })
             });
 
             wave_start = wave_end;
