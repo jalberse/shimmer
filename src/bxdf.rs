@@ -957,7 +957,7 @@ where
             Float::min(v, next_float_down(1.0))
         };
 
-        for s in 0..self.n_samples
+        for _s in 0..self.n_samples
         {
             // Sample random walk through layers to estimate BSDF value
             // Sample transmission direction through entrance interface
@@ -1100,12 +1100,12 @@ where
                     let bs = exit_interface.sample_f(-w, uc, Point2f::new(r(), r()), mode, BxDFReflTransFlags::REFLECTION);
                     if bs.is_none()
                     {
-                        continue;
+                        break;
                     }
                     let bs = bs.unwrap();
                     if bs.f.is_zero() || bs.pdf == 0.0 || bs.wi.z == 0.0
                     {
-                        continue;
+                        break;
                     }
                     beta = beta * (bs.f * abs_cos_theta(bs.wi) / bs.pdf);
                     w = bs.wi;
@@ -1129,12 +1129,12 @@ where
                         -w, uc, u, mode, BxDFReflTransFlags::REFLECTION);
                     if bs.is_none()
                     {
-                        continue;
+                        break;
                     }
                     let bs = bs.unwrap();
                     if bs.f.is_zero() || bs.pdf == 0.0 || bs.wi.z == 0.0
                     {
-                        continue;
+                        break;
                     }
                     beta = beta * (bs.f * abs_cos_theta(bs.wi) / bs.pdf);
                     w = bs.wi;

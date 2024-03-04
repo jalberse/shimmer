@@ -783,8 +783,8 @@ impl MaterialI for CoatedDiffuseMaterial
 
         let mut sampled_eta = self.eta.get(lambda[0]);
         match self.eta.as_ref() {
-            Spectrum::Constant(_) => lambda.terminate_secondary(),
-            _ => {}
+            Spectrum::Constant(_) => {},
+            _ => lambda.terminate_secondary()
         }
         if sampled_eta == 0.0
         {
