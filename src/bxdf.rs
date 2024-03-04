@@ -684,7 +684,7 @@ impl BxDFI for DielectricBxDF {
         let wm = wm.normalize().face_forward_n(Normal3f::Z);
 
         // Discard backfacing microfacets
-        if wm.dot(wi) * cos_theta_i < 0.0 || wm.dot(wm) * cos_theta_o < 0.0 {
+        if wm.dot(wi) * cos_theta_i < 0.0 || wm.dot(wo) * cos_theta_o < 0.0 {
             return 0.0;
         }
 
@@ -1075,7 +1075,7 @@ where
 
                         // Possibly account for scattering through exit_interface
                         if ((z < exit_z && w.z > 0.0) || (z > exit_z && w.z < 0.0)) &&
-                        !exit_interface.flags().is_specular()
+                            !exit_interface.flags().is_specular()
                         {
                             // Account for scattering through exit_interface 
                             let f_exit = exit_interface.f(-w, wi, mode);
