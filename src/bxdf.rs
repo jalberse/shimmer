@@ -1778,6 +1778,24 @@ mod tests {
     use super::{BxDFFLags, BxDFI, DielectricBxDF};
 
     #[test]
+    fn mf_distrib()
+    {
+        let distrib = TrowbridgeReitzDistribution::new(0.0299999993, 0.0299999993);
+        let wm = Vector3f::new(
+            -0.430063188,
+            -0.881908476,
+            0.193088099,
+        );
+        let wi = Vector3f::new(
+            0.568110108, 0.816620350, 0.101893365
+        );
+        let d = distrib.d(wm);
+        let g = distrib.g(wm, wi);
+        approx_eq!(Float, g, 0.954060972);
+        approx_eq!(Float, d, 0.000309075956);
+    }
+
+    #[test]
     fn basic_bxdf_flags() {
         let unset = BxDFFLags::UNSET;
         assert!(!unset.is_diffuse());
