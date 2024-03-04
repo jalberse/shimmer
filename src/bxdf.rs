@@ -1,23 +1,17 @@
+use std::{process::exit, rc::Rc, sync::Arc};
+
 use crate::{
-    float::PI_F,
-    math::{sqr, INV_PI},
-    sampling::{
-        cosine_hemisphere_pdf, sample_cosine_hemisphere, sample_uniform_hemisphere,
-        uniform_hemisphere_pdf,
-    },
-    scattering::{
+    float::{next_float_down, PI_F}, math::{lerp, sqr, INV_PI}, media::HGPhaseFunction, sampling::{
+        cosine_hemisphere_pdf, power_heuristic, sample_cosine_hemisphere, sample_exponential, sample_uniform_hemisphere, uniform_hemisphere_pdf
+    }, scattering::{
         fresnel_complex_spectral, fresnel_dielectric, reflect, refract, TrowbridgeReitzDistribution,
-    },
-    spectra::sampled_spectrum::SampledSpectrum,
-    vecmath::{
-        point::Point2f,
-        spherical::{abs_cos_theta, cos_theta, same_hemisphere},
-        vector::Vector3,
-        Length, Normal3f, Normalize, Tuple3, Vector3f,
-    },
-    Float,
+    }, spectra::sampled_spectrum::SampledSpectrum, vecmath::{
+        point::Point2f, spherical::{abs_cos_theta, cos_theta, same_hemisphere}, vector::Vector3, Length, Normal3f, Normalize, Tuple2, Tuple3, Vector3f
+    }, Float
 };
 use bitflags::bitflags;
+use itertools::Diff;
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 /// The BxDF Interface.
 pub trait BxDFI {
@@ -106,10 +100,13 @@ pub trait BxDFI {
         }
         r / (PI_F * uc.len() as Float)
     }
+
+    fn regularize(&mut self);
 }
 
 pub enum BxDF {
     Diffuse(DiffuseBxDF),
+    CoatedDiffuse(CoatedDiffuseBxDF),
     Conductor(ConductorBxDF),
     Dielectric(DielectricBxDF),
     ThinDielectric(ThinDielectricBxDF),
@@ -122,6 +119,7 @@ impl BxDFI for BxDF {
             BxDF::Conductor(v) => v.f(wo, wi, mode),
             BxDF::Dielectric(v) => v.f(wo, wi, mode),
             BxDF::ThinDielectric(v) => v.f(wo, wi, mode),
+            BxDF::CoatedDiffuse(v) => v.f(wo, wi, mode),
         }
     }
 
@@ -138,6 +136,7 @@ impl BxDFI for BxDF {
             BxDF::Conductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::Dielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::ThinDielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::CoatedDiffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
 
@@ -153,6 +152,7 @@ impl BxDFI for BxDF {
             BxDF::Conductor(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::Dielectric(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::ThinDielectric(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::CoatedDiffuse(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
 
@@ -162,8 +162,21 @@ impl BxDFI for BxDF {
             BxDF::Conductor(v) => v.flags(),
             BxDF::Dielectric(v) => v.flags(),
             BxDF::ThinDielectric(v) => v.flags(),
+            BxDF::CoatedDiffuse(v) => v.flags(),
         }
     }
+    
+    fn regularize(&mut self) {
+        match self {
+            BxDF::Diffuse(f) => f.regularize(),
+            BxDF::Conductor(f) => f.regularize(),
+            BxDF::Dielectric(f) => f.regularize(),
+            BxDF::ThinDielectric(f) => f.regularize(),
+            BxDF::CoatedDiffuse(f) => f.regularize(),
+        }
+    }
+
+    
 }
 
 pub struct DiffuseBxDF {
@@ -245,6 +258,70 @@ impl BxDFI for DiffuseBxDF {
             BxDFFLags::DIFFUSE_REFLECTION
         }
     }
+    
+    fn regularize(&mut self) {
+        // Do nothing   
+    }
+}
+
+pub struct CoatedDiffuseBxDF
+{
+    bxdf: LayeredBxDF<DielectricBxDF, DiffuseBxDF, true>
+}
+
+impl CoatedDiffuseBxDF
+{
+    pub fn new(
+        top: DielectricBxDF,
+        bottom: DiffuseBxDF,
+        thickness: Float,
+        albedo: &SampledSpectrum,
+        g: Float,
+        max_depth: i32,
+        n_samples: i32,
+    ) -> CoatedDiffuseBxDF
+    {
+        CoatedDiffuseBxDF {
+            bxdf: LayeredBxDF::new(top, bottom, thickness, albedo, g, max_depth, n_samples)
+        }
+    
+    }
+}
+
+impl BxDFI for CoatedDiffuseBxDF
+{
+    fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
+        self.bxdf.f(wo, wi, mode)
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        uc: Float,
+        u: Point2f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        self.bxdf.sample_f(wo, uc, u, mode, sample_flags)
+    }
+
+    fn pdf(
+        &self,
+        wo: Vector3f,
+        wi: Vector3f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        self.bxdf.pdf(wo, wi, mode, sample_flags)
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        self.bxdf.flags()
+    }
+
+    fn regularize(&mut self) {
+        self.bxdf.regularize()
+    }
 }
 
 pub struct ConductorBxDF {
@@ -264,10 +341,6 @@ impl ConductorBxDF {
             eta,
             k,
         }
-    }
-
-    pub fn regularize(&mut self) {
-        self.mf_distribution.regularize()
     }
 }
 
@@ -377,6 +450,10 @@ impl BxDFI for ConductorBxDF {
             BxDFFLags::GLOSSY_REFLECTION
         }
     }
+
+    fn regularize(&mut self) {
+        self.mf_distribution.regularize()
+    }
 }
 
 pub struct DielectricBxDF {
@@ -390,10 +467,6 @@ impl DielectricBxDF {
             eta,
             mf_distribution,
         }
-    }
-
-    pub fn regularize(&mut self) {
-        self.mf_distribution.regularize()
     }
 }
 
@@ -419,6 +492,13 @@ impl BxDFI for DielectricBxDF {
         };
         let wm = wi * etap + wo;
         if cos_theta_i == 0.0 || cos_theta_o == 0.0 || wm.length_squared() == 0.0 {
+            return SampledSpectrum::from_const(0.0);
+        }
+
+        let wm = wm.normalize().face_forward_n(Normal3f::Z);
+        // Discard backwards facing microfacets
+        if wm.dot(wi) * cos_theta_i < 0.0 || wm.dot(wo) * cos_theta_o < 0.0
+        {
             return SampledSpectrum::from_const(0.0);
         }
 
@@ -538,7 +618,7 @@ impl BxDFI for DielectricBxDF {
             } else {
                 // Sample transmission at rough dielectric interface
                 if let Some((wi, etap)) = refract(wo, wm.into(), self.eta) {
-                    if !same_hemisphere(wo, wi) || wi.z == 0.0 {
+                    if same_hemisphere(wo, wi) || wi.z == 0.0 {
                         return None;
                     }
                     // Compute PDF of rough dielectric transmission
@@ -604,7 +684,7 @@ impl BxDFI for DielectricBxDF {
         let wm = wm.normalize().face_forward_n(Normal3f::Z);
 
         // Discard backfacing microfacets
-        if wm.dot(wi) * cos_theta_i < 0.0 || wm.dot(wm) * cos_theta_o < 0.0 {
+        if wm.dot(wi) * cos_theta_i < 0.0 || wm.dot(wo) * cos_theta_o < 0.0 {
             return 0.0;
         }
 
@@ -648,6 +728,10 @@ impl BxDFI for DielectricBxDF {
             BxDFFLags::GLOSSY
         };
         flags | mf
+    }
+
+    fn regularize(&mut self) {
+        self.mf_distribution.regularize()
     }
 }
 
@@ -730,6 +814,829 @@ impl BxDFI for ThinDielectricBxDF {
 
     fn flags(&self) -> BxDFFLags {
         BxDFFLags::REFLECTION | BxDFFLags::TRANSMISSION | BxDFFLags::SPECULAR
+    }
+
+    fn regularize(&mut self) {
+        // TODO Should we regularize thin dieletric?
+    }
+}
+
+struct LayeredBxDF<TopBxDF, BottomBxDF, const TWO_SIDED: bool>
+where
+    TopBxDF: BxDFI,
+    BottomBxDF: BxDFI,
+{
+    top: TopBxDF,
+    bottom: BottomBxDF,
+    thickness: Float,
+    g: Float,
+    albedo: SampledSpectrum,
+    max_depth: i32,
+    n_samples: i32,
+}
+
+impl<TopBxDF, BottomBxDF, const TWO_SIDED: bool> LayeredBxDF<TopBxDF, BottomBxDF, TWO_SIDED>
+where
+    TopBxDF: BxDFI,
+    BottomBxDF: BxDFI,
+{
+    pub fn new(
+        top: TopBxDF,
+        bottom: BottomBxDF,
+        thickness: Float,
+        albedo: &SampledSpectrum,
+        g: Float,
+        max_depth: i32,
+        n_samples: i32,
+    ) -> LayeredBxDF<TopBxDF, BottomBxDF, TWO_SIDED>
+    {
+        LayeredBxDF {
+            top,
+            bottom,
+            thickness,
+            g,
+            albedo: *albedo,
+            max_depth,
+            n_samples,
+        }
+    }
+
+    fn tr(&self, dz: Float, w: Vector3f) -> Float
+    {
+        if Float::abs(dz) <= Float::MIN{
+            1.0
+        } else {
+            // TODO fast_exp()?
+            Float::exp(-Float::abs(dz / w.z))
+        }
+    }
+}
+
+impl<TopBxDF, BottomBxDF, const TWO_SIDED: bool> BxDFI for LayeredBxDF<TopBxDF, BottomBxDF, TWO_SIDED>
+where
+    TopBxDF: BxDFI,
+    BottomBxDF: BxDFI,
+{
+    fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
+        let mut f = SampledSpectrum::from_const(0.0);
+
+        // Estimate layered bxdf value f using random sampling
+        // Set wo and wi for layered bsdf evaluation
+
+        let mut wo = wo;
+        let mut wi = wi;
+
+        if TWO_SIDED && wo.z < 0.0
+        {
+            wo = -wo;
+            wi = -wi;
+        }
+
+        // Determine entrance interface for layered bsdf
+        let entered_top = TWO_SIDED || wo.z > 0.0;
+        let enter_interface = if entered_top
+        {
+            TopOrBottomBxDF{
+                top: Some(&self.top),
+                bottom: None,
+            }
+        } else {
+            TopOrBottomBxDF
+            {
+                top: None,
+                bottom: Some(&self.bottom),
+            }
+        };
+
+        // Determine exit interface and exit z
+        let (exit_interface, non_exit_interface) = if same_hemisphere(wo, wi) ^ entered_top
+        {
+            let exit_interface = TopOrBottomBxDF
+            {
+                top: None,
+                bottom: Some(&self.bottom),
+            };
+            let non_exit_interface = TopOrBottomBxDF
+            {
+                top: Some(&self.top),
+                bottom: None,
+            };
+            (exit_interface, non_exit_interface)
+        } else {
+            let exit_interface = TopOrBottomBxDF
+            {
+                top: Some(&self.top),
+                bottom: None,
+            };
+            let non_exit_interface = TopOrBottomBxDF
+            {
+                top: None,
+                bottom: Some(&self.bottom),
+            };
+            (exit_interface, non_exit_interface)
+        };
+
+        let exit_z = if same_hemisphere(wo, wi) ^ entered_top
+        {
+            0.0
+        } else {
+            self.thickness
+        };
+
+        // Account for reflection at entrance interface
+        if same_hemisphere(wo, wi) {
+            f = enter_interface.f(wo, wi, mode) * self.n_samples as Float;
+        }
+
+        // TODO Use a seed for this
+        let rng = &mut SmallRng::from_entropy();
+        let mut r = ||
+        {
+            let v: Float = rng.gen();
+            // TODO - Can we have a ONE_MINUS_EPSILON constant instead?
+            Float::min(v, next_float_down(1.0))
+        };
+
+        for _s in 0..self.n_samples
+        {
+            // Sample random walk through layers to estimate BSDF value
+            // Sample transmission direction through entrance interface
+            let uc: Float = r();
+            let wos = enter_interface.sample_f(
+                wo, uc, Point2f::new(r(), r()), mode, BxDFReflTransFlags::TRANSMISSION);
+            
+            if wos.is_none() {
+                continue;
+            }
+            let wos = wos.unwrap();
+
+            if wos.f.is_zero() || wos.pdf == 0.0 || wos.wi.z == 0.0
+            {
+                continue;
+            }
+
+            // Sample BSDF for virtual light from wi
+            let uc = r();
+            let wis_mode = match mode
+            {
+                TransportMode::Radiance => TransportMode::Importance,
+                TransportMode::Importance => TransportMode::Radiance,
+            };
+            let wis = exit_interface.sample_f(wi, uc, Point2f::new(r(), r()), wis_mode, BxDFReflTransFlags::TRANSMISSION);
+            if wis.is_none()
+            {
+                continue;
+            }
+            let wis = wis.unwrap();
+            if wis.f.is_zero() || wis.pdf == 0.0 || wis.wi.z == 0.0
+            {
+                continue;
+            }
+
+            // Declare state for random walk through BSDF layers
+            let mut beta = wos.f * abs_cos_theta(wos.wi) / wos.pdf;
+            let mut z = if entered_top
+            {
+                self.thickness
+            } else {
+                0.0
+            };
+            let mut w = wos.wi;
+            let phase = HGPhaseFunction::new(self.g);
+
+            for depth in 0..self.max_depth
+            {
+                // Sample next event for layered BSDF random walk
+                // Possibly terminate layered BSDF random walk with Russian roulette
+                if depth > 3 && beta.max_component_value() < 0.25
+                {
+                    let q = Float::max(0.0, 1.0 - beta.max_component_value());
+                    if r() < q
+                    {
+                        break;
+                    }
+                    beta /= 1.0 - q;
+                }
+
+                // Account for media between layers and possibly scatter
+                if self.albedo.is_zero()
+                {
+                    // Advance to next layer boundary and update beta for transmittance
+                    z = if z == self.thickness
+                    {
+                        0.0
+                    } else {
+                        self.thickness
+                    };
+                    beta = beta * self.tr(self.thickness, w);
+                } else {
+                    // Sample medium scattering
+                    let sigma_t = 1.0;
+                    let dz = sample_exponential(r(), sigma_t / Float::abs(w.z));
+                    let zp = if w.z > 0.0 
+                    {
+                        z + dz
+                    } else {
+                        z - dz
+                    };
+
+                    if z == zp
+                    {
+                        continue;
+                    }
+
+                    if 0.0 < zp && zp < self.thickness
+                    {
+                        // Handle scattering event
+                        // Account for scattering through exit_interface suing wis
+                        let wt = if !exit_interface.flags().is_specular()
+                        {
+                            power_heuristic(1, wis.pdf, 1, phase.pdf(-w, -wis.wi))
+                        } else {
+                            1.0
+                        };
+                        f += beta * self.albedo * phase.p(-w, -wis.wi) * wt * self.tr(zp - exit_z, wis.wi) * wis.f / wis.pdf;
+
+                        // Sample phase function and update layered path state
+                        let u = Point2f::new(r(), r());
+                        let ps = phase.sample_p(-w, u);
+                        if ps.is_none()
+                        {
+                            continue;
+                        }
+                        let ps = ps.unwrap();
+                        if ps.pdf == 0.0 || ps.wi.z == 0.0
+                        {
+                            continue;
+                        }
+                        beta = beta * (self.albedo * ps.p / ps.pdf);
+                        w = ps.wi;
+                        z = zp;
+
+                        // Possibly account for scattering through exit_interface
+                        if ((z < exit_z && w.z > 0.0) || (z > exit_z && w.z < 0.0)) &&
+                            !exit_interface.flags().is_specular()
+                        {
+                            // Account for scattering through exit_interface 
+                            let f_exit = exit_interface.f(-w, wi, mode);
+                            if !f_exit.is_zero()
+                            {
+                                let exit_pdf = exit_interface.pdf(-w, wi, mode, BxDFReflTransFlags::TRANSMISSION);
+                                let wt = power_heuristic(1, ps.pdf, 1, exit_pdf);
+                                f += beta * self.tr(zp - exit_z, ps.wi) * f_exit * wt;
+                            }
+                        }
+
+                        continue;
+                    }
+                    z = Float::clamp(zp, 0.0, self.thickness);
+                }
+
+                // Account for scattering at appropriate interface
+                if z == exit_z
+                {
+                    // Account for reflection at exit_interface
+                    let uc = r();
+                    let bs = exit_interface.sample_f(-w, uc, Point2f::new(r(), r()), mode, BxDFReflTransFlags::REFLECTION);
+                    if bs.is_none()
+                    {
+                        break;
+                    }
+                    let bs = bs.unwrap();
+                    if bs.f.is_zero() || bs.pdf == 0.0 || bs.wi.z == 0.0
+                    {
+                        break;
+                    }
+                    beta = beta * (bs.f * abs_cos_theta(bs.wi) / bs.pdf);
+                    w = bs.wi;
+                } else {
+                    // Account for scattering at non_exit_interface
+                    if !non_exit_interface.flags().is_specular()
+                    {
+                        // Add NEE contribution along presampled wis direction
+                        let wt = if !exit_interface.flags().is_specular()
+                        {
+                            power_heuristic(1, wis.pdf, 1, non_exit_interface.pdf(-w, -wis.wi, mode, BxDFReflTransFlags::ALL))
+                        } else {
+                            1.0
+                        };
+                        f += beta * non_exit_interface.f(-w, -wis.wi, mode) * abs_cos_theta(wis.wi) * wt * self.tr(self.thickness, wis.wi) * wis.f / wis.pdf;
+                    }
+                    // Sample new direction using BSDF at non_exit_interface
+                    let uc = r();
+                    let u = Point2f::new(r(), r());
+                    let bs = non_exit_interface.sample_f(
+                        -w, uc, u, mode, BxDFReflTransFlags::REFLECTION);
+                    if bs.is_none()
+                    {
+                        break;
+                    }
+                    let bs = bs.unwrap();
+                    if bs.f.is_zero() || bs.pdf == 0.0 || bs.wi.z == 0.0
+                    {
+                        break;
+                    }
+                    beta = beta * (bs.f * abs_cos_theta(bs.wi) / bs.pdf);
+                    w = bs.wi;
+
+                    if !exit_interface.flags().is_specular()
+                    {
+                        // Add NEE contribution along direction for BSDF sample
+                        let f_exit = exit_interface.f(-w, wi, mode);
+                        if !f_exit.is_zero()
+                        {
+                            let wt = if !non_exit_interface.flags().is_specular()
+                            {
+                                let exit_pdf = exit_interface.pdf(-w, wi, mode, BxDFReflTransFlags::TRANSMISSION);
+                                power_heuristic(1, bs.pdf, 1, exit_pdf)
+                            } else {
+                                1.0
+                            };
+                            f += beta * self.tr(self.thickness, bs.wi) * f_exit * wt;
+                        }
+                    }
+                }
+            }
+        }
+
+        f / self.n_samples as Float
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        uc: Float,
+        u: Point2f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        assert!(sample_flags == BxDFReflTransFlags::ALL);
+        let mut wo = wo;
+        // Set wo for layered sampling
+        let flip_wi = if TWO_SIDED && wo.z < 0.0
+        {
+            wo = -wo;
+            true
+        } else {
+            false
+        };
+
+        // Sample BSDF at entrance interface to get initial direction w
+        let entered_top = TWO_SIDED || wo.z > 0.0;
+        let mut bs = if entered_top
+        {
+            self.top.sample_f(wo, uc, u, mode, BxDFReflTransFlags::ALL)?
+        } else {
+            self.bottom.sample_f(wo, uc, u, mode, BxDFReflTransFlags::ALL)?
+        };
+        if bs.f.is_zero() || bs.pdf == 0.0 || bs.wi.z == 0.0
+        {
+            return None;
+        }
+
+        if bs.is_reflection()
+        {
+            if flip_wi
+            {
+                bs.wi = -bs.wi;
+            }
+            bs.pdf_is_proportional = true;
+            return Some(bs);
+        }
+
+        let mut w = bs.wi;
+        let mut specular_path = bs.is_specular();
+
+        // TODO Use a seed for this
+        let rng = &mut SmallRng::from_entropy();
+        let mut r = ||
+        {
+            let v: Float = rng.gen();
+            // TODO - Can we have a ONE_MINUS_EPSILON constant instead?
+            Float::min(v, next_float_down(1.0))
+        };
+
+        let mut f = bs.f * abs_cos_theta(bs.wi);
+        let mut pdf =  bs.pdf;
+        let mut z = if entered_top { self.thickness } else { 0.0 };
+        let phase = HGPhaseFunction::new(self.g);
+
+        for depth in 0..self.max_depth
+        {
+            // Follow random walk through layers to sample layered BSDF
+            // Possibly terminate through russian roulette
+            let rr_beta = f.max_component_value() / pdf;
+            if depth > 3 && rr_beta < 0.25
+            {
+                let q = Float::max(0.0, 1.0 - rr_beta);
+                if r() < q
+                {
+                    return None;
+                }
+                pdf *= 1.0 - q;
+            }
+            if w.z == 0.0
+            {
+                return None;
+
+            }
+
+            if !self.albedo.is_zero()
+            {
+                // Sample potential scattering event in layered medium
+                let sigma_t = 1.0;
+                let dz = sample_exponential(r(), sigma_t / abs_cos_theta(w));
+                let zp = if w.z > 0.0 {
+                    z + dz
+                } else {
+                    z - dz
+                };
+                if zp == z
+                {
+                    return None;
+                }
+                if 0.0 < zp && zp < self.thickness
+                {
+                    // Update path state for valid scattering event between interfaces
+                    let ps = phase.sample_p(-w, Point2f::new(r(), r()))?;
+                    if ps.pdf == 0.0 || ps.wi.z == 0.0
+                    {
+                        return None;
+                    }
+                    f *= self.albedo * ps.p;
+                    pdf *= ps.pdf;
+                    specular_path = false;
+                    w = ps.wi;
+                    z = zp;
+                    
+                    continue;
+                }
+                z = Float::clamp(zp, 0.0, self.thickness);
+                if z == 0.0
+                {
+                    debug_assert!(w.z < 0.0);
+                } else {
+                    debug_assert!(w.z > 0.0);
+                }
+            } else {
+                z = if z == self.thickness { 0.0 } else { self.thickness };
+                f = f * self.tr(self.thickness, w);
+            }
+
+            // Initialize interface for current interface surface
+            let interface = if z == 0.0 
+            {
+                TopOrBottomBxDF{
+                    top: None,
+                    bottom: Some(&self.bottom),
+                }
+            } else {
+                TopOrBottomBxDF{
+                    top: Some(&self.top),
+                    bottom: None,
+                }
+            };
+
+            // Sample interface BSDF to determine new path direction
+            let uc = r();
+            let u = Point2f::new(r(), r());
+            let bs = interface.sample_f(-w, uc, u, mode, BxDFReflTransFlags::ALL)?;
+            if bs.f.is_zero() || bs.pdf == 0.0 || bs.wi.z == 0.0
+            {
+                return None;
+            }
+            f *= bs.f;
+            pdf *= bs.pdf;
+            specular_path &= bs.is_specular();
+            w = bs.wi;
+            
+            // Return BSDFSample if the path has left the layers
+            if bs.is_transmission()
+            {
+                let mut flags = if same_hemisphere(wo, w)
+                {
+                    BxDFFLags::REFLECTION
+                } else {
+                    BxDFFLags::TRANSMISSION
+                };
+                flags |= if specular_path { BxDFFLags::SPECULAR } else { BxDFFLags::GLOSSY };
+                if flip_wi
+                {
+                    w = -w;
+                }
+                return Some(BSDFSample{
+                    f,
+                    wi: w,
+                    pdf,
+                    flags,
+                    eta: 1.0,
+                    pdf_is_proportional: true,
+                });
+            }
+
+            // Scale f by cosine term after scattering at the interface
+            f = f * abs_cos_theta(bs.wi);
+
+        }
+
+        None
+    }
+
+    fn pdf(
+        &self,
+        wo: Vector3f,
+        wi: Vector3f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        assert!(sample_flags == BxDFReflTransFlags::ALL);
+
+        let mut wo = wo;
+        let mut wi = wi;
+        if TWO_SIDED && wo.z < 0.0
+        {
+            wo = -wo;
+            wi = -wi;
+        }
+
+        // Declare RNG for layered PDF evaluation
+        // TODO Use a seed for this
+        let rng = &mut SmallRng::from_entropy();
+        let mut r = ||
+        {
+            let v: Float = rng.gen();
+            // TODO - Can we have a ONE_MINUS_EPSILON constant instead?
+            Float::min(v, next_float_down(1.0))
+        };
+
+        // Update pdf_sum for reflection at the entrance layer
+        let entered_top = TWO_SIDED || wo.z > 0.0;
+        let mut pdf_sum = 0.0;
+        if same_hemisphere(wo, wi)
+        {
+            let refl_flag = BxDFReflTransFlags::REFLECTION;
+            pdf_sum += if entered_top
+            {
+                self.n_samples as Float * self.top.pdf(wo, wi, mode, refl_flag)
+            } else {
+                self.n_samples as Float * self.bottom.pdf(wo, wi, mode, refl_flag)
+            };
+        }
+
+        for s in 0..self.n_samples
+        {
+            if same_hemisphere(wo, wi)
+            {
+                let (r_interface, t_interface) = if entered_top
+                {
+                    let r_interface = TopOrBottomBxDF{
+                        top: None,
+                        bottom: Some(&self.bottom),
+                    };
+                    let t_interface = TopOrBottomBxDF{
+                        top: Some(&self.top),
+                        bottom: None,
+                    };
+                    (r_interface, t_interface)
+                } else {
+                    let r_interface = TopOrBottomBxDF{
+                        top: Some(&self.top),
+                        bottom: None,
+                    };
+                    let t_interface = TopOrBottomBxDF{
+                        top: None,
+                        bottom: Some(&self.bottom),
+                    };
+                    (r_interface, t_interface)
+                };
+
+                // Sample t_interface to get direction into the layers
+                let trans = BxDFReflTransFlags::TRANSMISSION;
+                let wos = t_interface.sample_f(wo, r(), Point2f::new(r(), r()), mode, trans);
+                let wis_mode = match mode
+                {
+                    TransportMode::Radiance => TransportMode::Importance,
+                    TransportMode::Importance => TransportMode::Radiance,
+                };
+                let wis = t_interface.sample_f(wi, r(), Point2f::new(r(), r()), wis_mode, trans);
+
+                // Update pdf_sum accounting for TRT scattering events
+                if let (Some(wos), Some(wis)) = (wos, wis)
+                {
+                    if !wos.f.is_zero() && wos.pdf > 0.0 && !wis.f.is_zero() && wis.pdf > 0.0
+                    {
+                        if !t_interface.flags().is_non_specular()
+                        {
+                            pdf_sum += r_interface.pdf(-wos.wi, -wis.wi, mode, BxDFReflTransFlags::ALL);
+                        } else {
+                            // Use multiple importance sampling to estimate PDF product
+                            let rs = r_interface.sample_f(-wos.wi, r(), Point2f::new(r(), r()), mode, BxDFReflTransFlags::ALL);
+                            if let Some(rs) = rs
+                            {
+                                if !r_interface.flags().is_non_specular()
+                                {
+                                    pdf_sum += t_interface.pdf(-rs.wi, wi, mode, BxDFReflTransFlags::ALL);
+                                } else {
+                                    let r_pdf = r_interface.pdf(-wos.wi, -wis.wi, mode, BxDFReflTransFlags::ALL);
+                                    let wt = power_heuristic(1, wis.pdf, 1, r_pdf);
+                                    pdf_sum += wt * r_pdf;
+
+                                    let t_pdf = t_interface.pdf(-rs.wi, wi, mode, BxDFReflTransFlags::ALL);
+                                    let wt = power_heuristic(1, rs.pdf, 1, t_pdf);
+                                    pdf_sum += wt * t_pdf;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Note the same hemisphere
+                // Evaluate TT term for PDF estimate
+
+                let (to_interface, ti_interface) = if entered_top
+                {
+                    let to_interface = TopOrBottomBxDF{
+                        top: Some(&self.top),
+                        bottom: None,
+                    };
+                    let ti_interface = TopOrBottomBxDF{
+                        top: None,
+                        bottom: Some(&self.bottom),
+                    };
+                    (to_interface, ti_interface)
+                } else {
+                    let to_interface = TopOrBottomBxDF{
+                        top: None,
+                        bottom: Some(&self.bottom),
+                    };
+                    let ti_interface = TopOrBottomBxDF
+                    {
+                        top: Some(&self.top),
+                        bottom: None,
+                    };
+                    (to_interface, ti_interface)
+                };
+
+                let uc = r();
+                let u = Point2f::new(r(), r());
+                let wos = to_interface.sample_f(wo, uc, u, mode, BxDFReflTransFlags::ALL);
+                if wos.is_none()
+                {
+                    continue;
+                }
+                let wos = wos.unwrap();
+                if wos.f.is_zero() || wos.pdf == 0.0 || wos.wi.z == 0.0 || wos.is_reflection()
+                {
+                    continue;
+                }
+
+                let uc = r();
+                let u = Point2f::new(r(), r());
+                let wis_mode = match mode
+                {
+                    TransportMode::Radiance => TransportMode::Importance,
+                    TransportMode::Importance => TransportMode::Radiance,
+                };
+                let wis = ti_interface.sample_f(wi, uc, u, wis_mode, BxDFReflTransFlags::ALL);
+                if wis.is_none()
+                {
+                    continue;
+                }
+                let wis = wis.unwrap();
+                if wis.f.is_zero() || wis.pdf == 0.0 || wis.wi.z == 0.0 || wis.is_reflection()
+                {
+                    continue;
+                }
+
+                if to_interface.flags().is_specular()
+                {
+                    pdf_sum += ti_interface.pdf(-wos.wi, wi, mode, BxDFReflTransFlags::ALL);
+                } else if ti_interface.flags().is_specular()
+                {
+                    pdf_sum += to_interface.pdf(wo, -wis.wi, mode, BxDFReflTransFlags::ALL);
+                } else {
+                    pdf_sum += (to_interface.pdf(wo, -wis.wi, mode, BxDFReflTransFlags::ALL)
+                        + ti_interface.pdf(-wos.wi, wi, mode, BxDFReflTransFlags::ALL)) / 2.0;
+                }
+            }
+        }
+
+        // Return mixture of PDF estimate and constant PDF
+        lerp(0.9, 1.0 / (4.0 * PI_F), pdf_sum / self.n_samples as Float)
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        let top_flags = self.top.flags();
+        let bottom_flags = self.bottom.flags();
+
+        // Otherwise, what are we doing here?
+        debug_assert!(top_flags.is_transmissive() || bottom_flags.is_transmissive());
+
+        let mut flags = BxDFFLags::REFLECTION;
+        if top_flags.is_specular()
+        {
+            flags = flags | BxDFFLags::SPECULAR;
+        }
+
+        if top_flags.is_diffuse() || bottom_flags.is_diffuse() || !self.albedo.is_zero()
+        {
+            flags = flags | BxDFFLags::DIFFUSE;
+        } else if top_flags.is_glossy() || bottom_flags.is_glossy()
+        {
+            flags = flags | BxDFFLags::GLOSSY;
+        }
+
+        if top_flags.is_transmissive() && bottom_flags.is_transmissive()
+        {
+            flags = flags | BxDFFLags::TRANSMISSION;
+        }
+
+        flags
+    }
+    
+    fn regularize(&mut self) {
+        self.top.regularize();
+        self.bottom.regularize();
+    }
+}
+
+struct TopOrBottomBxDF<'a, TopBxDF, BottomBxDF>
+where
+    TopBxDF: BxDFI,
+    BottomBxDF: BxDFI,
+{
+    top: Option<&'a TopBxDF>,
+    bottom: Option<&'a BottomBxDF>,
+}
+
+impl<'a, TopBxDF, BottomBxDF> TopOrBottomBxDF<'a, TopBxDF, BottomBxDF>
+where 
+    TopBxDF: BxDFI,
+    BottomBxDF: BxDFI,
+{
+    fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
+        if let Some(top) = &self.top
+        {
+            top.f(wo, wi, mode)
+        } else if let Some(bottom) = &self.bottom
+        {
+            bottom.f(wo, wi, mode)
+        } else
+        {
+            panic!("TopOrBottomBxDF: No BxDFs to evaluate");
+        }
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        uc: Float,
+        u: Point2f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        if let Some(top) = &self.top
+        {
+            top.sample_f(wo, uc, u, mode, sample_flags)
+        } else if let Some(bottom) = &self.bottom
+        {
+            bottom.sample_f(wo, uc, u, mode, sample_flags)
+        } else
+        {
+            panic!("TopOrBottomBxDF: No BxDFs to sample");
+        }
+    }
+
+    fn pdf(
+        &self,
+        wo: Vector3f,
+        wi: Vector3f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        if let Some(top) = &self.top
+        {
+            top.pdf(wo, wi, mode, sample_flags)
+        } else if let Some(bottom) = &self.bottom
+        {
+            bottom.pdf(wo, wi, mode, sample_flags)
+        } else
+        {
+            panic!("TopOrBottomBxDF: No BxDFs to evaluate");
+        }
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        if let Some(top) = &self.top
+        {
+            top.flags()
+        }
+        else if let Some(bottom) = &self.bottom
+        {
+            bottom.flags()
+        } else {
+            panic!("TopOrBottomBxDF: No BxDFs to evaluate");
+        }
     }
 }
 
@@ -864,7 +1771,29 @@ impl BxDFFLags {
 
 #[cfg(test)]
 mod tests {
-    use super::BxDFFLags;
+    use float_cmp::approx_eq;
+
+    use crate::{scattering::TrowbridgeReitzDistribution, vecmath::{Point2f, Tuple2, Tuple3, Vector3f}, Float};
+
+    use super::{BxDFFLags, BxDFI, DielectricBxDF};
+
+    #[test]
+    fn mf_distrib()
+    {
+        let distrib = TrowbridgeReitzDistribution::new(0.0299999993, 0.0299999993);
+        let wm = Vector3f::new(
+            -0.430063188,
+            -0.881908476,
+            0.193088099,
+        );
+        let wi = Vector3f::new(
+            0.568110108, 0.816620350, 0.101893365
+        );
+        let d = distrib.d(wm);
+        let g = distrib.g(wm, wi);
+        approx_eq!(Float, g, 0.954060972);
+        approx_eq!(Float, d, 0.000309075956);
+    }
 
     #[test]
     fn basic_bxdf_flags() {
@@ -878,5 +1807,39 @@ mod tests {
         assert!(gt.is_glossy());
         assert!(gt.is_transmissive());
         assert!(!gt.is_diffuse());
+    }
+
+    #[test]
+    fn dielectric_sample_f()
+    {
+        let bxdf = DielectricBxDF::new(
+            1.5,
+            TrowbridgeReitzDistribution::new(0.0, 0.0)
+        );
+
+        let sample = bxdf.sample_f(
+            Vector3f::new(-0.419299453, -0.656406343, 0.627151370),
+            0.237656280,
+            Point2f::new(
+                0.0488742627,
+                0.941848040
+            ),
+            super::TransportMode::Radiance,
+            super::BxDFReflTransFlags::ALL
+        );
+
+        assert!(sample.is_some());
+        let sample = sample.unwrap();
+        assert_eq!(sample.flags, BxDFFLags::SPECULAR_TRANSMISSION);
+        approx_eq!(Float, sample.pdf, 0.940032840);
+        approx_eq!(Float, sample.eta, 1.5);
+        assert!(!sample.pdf_is_proportional);
+        approx_eq!(Float, sample.f[0], 0.488867134);
+        approx_eq!(Float, sample.f[1], 0.488867134);
+        approx_eq!(Float, sample.f[2], 0.488867134);
+        approx_eq!(Float, sample.f[3], 0.488867134);
+        approx_eq!(Float, sample.wi.x, 0.279532969);
+        approx_eq!(Float, sample.wi.y, 0.437604219);
+        approx_eq!(Float, sample.wi.z, -0.854613364);
     }
 }

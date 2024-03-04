@@ -26,7 +26,7 @@ pub mod light_sampler;
 pub mod loading;
 pub mod material;
 pub mod math;
-pub mod medium;
+pub mod media;
 pub mod options;
 pub mod primitive;
 pub mod ray;

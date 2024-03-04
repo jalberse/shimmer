@@ -15,6 +15,9 @@ pub fn balance_heuristic(nf: u8, f_pdf: Float, ng: u8, g_pdf: Float) -> Float {
 pub fn power_heuristic(nf: u8, f_pdf: Float, ng: u8, g_pdf: Float) -> Float {
     let f = nf as Float * f_pdf;
     let g = ng as Float * g_pdf;
+    if sqr(f).is_infinite() {
+        return 1.0;
+    }
     (f * f) / (f * f + g * g)
 }
 
@@ -609,6 +612,11 @@ pub fn invert_spherical_rectangle_sample(p_ref: Point3f , s: Point3f, ex: Vector
     };
 
     u
+}
+
+pub fn sample_exponential(x: Float, a: Float) -> Float
+{
+    a * Float::exp(-a * x)
 }
 
 #[cfg(test)]
