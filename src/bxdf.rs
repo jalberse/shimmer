@@ -1,5 +1,3 @@
-use std::{process::exit, rc::Rc, sync::Arc};
-
 use crate::{
     float::{next_float_down, PI_F}, math::{lerp, sqr, INV_PI}, media::HGPhaseFunction, sampling::{
         cosine_hemisphere_pdf, power_heuristic, sample_cosine_hemisphere, sample_exponential, sample_uniform_hemisphere, uniform_hemisphere_pdf
@@ -10,7 +8,6 @@ use crate::{
     }, Float
 };
 use bitflags::bitflags;
-use itertools::Diff;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 /// The BxDF Interface.
@@ -106,10 +103,11 @@ pub trait BxDFI {
 
 pub enum BxDF {
     Diffuse(DiffuseBxDF),
-    CoatedDiffuse(CoatedDiffuseBxDF),
     Conductor(ConductorBxDF),
     Dielectric(DielectricBxDF),
     ThinDielectric(ThinDielectricBxDF),
+    CoatedDiffuse(CoatedDiffuseBxDF),
+    CoatedConductor(CoatedConductorBxDF),
 }
 
 impl BxDFI for BxDF {
@@ -120,6 +118,8 @@ impl BxDFI for BxDF {
             BxDF::Dielectric(v) => v.f(wo, wi, mode),
             BxDF::ThinDielectric(v) => v.f(wo, wi, mode),
             BxDF::CoatedDiffuse(v) => v.f(wo, wi, mode),
+            BxDF::CoatedConductor(v) => v.f(wo, wi, mode),
+            
         }
     }
 
@@ -137,6 +137,7 @@ impl BxDFI for BxDF {
             BxDF::Dielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::ThinDielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::CoatedDiffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::CoatedConductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
 
@@ -153,6 +154,7 @@ impl BxDFI for BxDF {
             BxDF::Dielectric(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::ThinDielectric(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::CoatedDiffuse(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::CoatedConductor(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
 
@@ -163,6 +165,7 @@ impl BxDFI for BxDF {
             BxDF::Dielectric(v) => v.flags(),
             BxDF::ThinDielectric(v) => v.flags(),
             BxDF::CoatedDiffuse(v) => v.flags(),
+            BxDF::CoatedConductor(v) => v.flags(),
         }
     }
     
@@ -173,10 +176,9 @@ impl BxDFI for BxDF {
             BxDF::Dielectric(f) => f.regularize(),
             BxDF::ThinDielectric(f) => f.regularize(),
             BxDF::CoatedDiffuse(f) => f.regularize(),
+            BxDF::CoatedConductor(f) => f.regularize(),
         }
     }
-
-    
 }
 
 pub struct DiffuseBxDF {
@@ -284,7 +286,6 @@ impl CoatedDiffuseBxDF
         CoatedDiffuseBxDF {
             bxdf: LayeredBxDF::new(top, bottom, thickness, albedo, g, max_depth, n_samples)
         }
-    
     }
 }
 
@@ -453,6 +454,64 @@ impl BxDFI for ConductorBxDF {
 
     fn regularize(&mut self) {
         self.mf_distribution.regularize()
+    }
+}
+
+pub struct CoatedConductorBxDF {
+    bxdf: LayeredBxDF<DielectricBxDF, ConductorBxDF, true>,
+}
+
+impl CoatedConductorBxDF
+{
+    pub fn new(
+        top: DielectricBxDF,
+        bottom: ConductorBxDF,
+        thickness: Float,
+        albedo: &SampledSpectrum,
+        g: Float,
+        max_depth: i32,
+        n_samples: i32,
+    ) -> CoatedConductorBxDF
+    {
+        CoatedConductorBxDF {
+            bxdf: LayeredBxDF::new(top, bottom, thickness, albedo, g, max_depth, n_samples)
+        }
+    }
+}
+
+impl BxDFI for CoatedConductorBxDF
+{
+    fn f(&self, wo: Vector3f, wi: Vector3f, mode: TransportMode) -> SampledSpectrum {
+        self.bxdf.f(wo, wi, mode)
+    }
+
+    fn sample_f(
+        &self,
+        wo: Vector3f,
+        uc: Float,
+        u: Point2f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Option<BSDFSample> {
+        self.bxdf.sample_f(wo, uc, u, mode, sample_flags)
+    }
+
+    fn pdf(
+        &self,
+        wo: Vector3f,
+        wi: Vector3f,
+        mode: TransportMode,
+        sample_flags: BxDFReflTransFlags,
+    ) -> Float {
+        self.bxdf.pdf(wo, wi, mode, sample_flags)
+    }
+
+    fn flags(&self) -> BxDFFLags {
+        self.bxdf.flags()
+    }
+
+    fn regularize(&mut self) {
+        self.bxdf.regularize()
     }
 }
 
