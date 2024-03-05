@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     bsdf::BSDF,
-    bxdf::{BxDF, CoatedDiffuseBxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF},
+    bxdf::{BxDF, CoatedDiffuseBxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF, ThinDielectricBxDF},
     image::Image,
     interaction::SurfaceInteraction,
     loading::{
@@ -59,7 +59,7 @@ pub enum Material {
     Diffuse(DiffuseMaterial),
     Conductor(ConductorMaterial),
     Dielectric(DielectricMaterial),
-    // TODO Add ThinDielectric as well; we have its BxDF but not its material.
+    ThinDielectric(ThinDielectricMaterial),
     CoatedDiffuse(CoatedDiffuseMaterial),
 }
 
@@ -95,6 +95,13 @@ impl Material {
                 cached_spectra,
                 textures,
             )),
+            "thindielectric" => Material::ThinDielectric(ThinDielectricMaterial::create(
+                parameters,
+                normal_map,
+                loc,
+                cached_spectra,
+                textures,
+            )),
             "coateddiffuse" => Material::CoatedDiffuse(CoatedDiffuseMaterial::create(
                 parameters,
                 normal_map,
@@ -123,6 +130,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
             Material::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
             Material::Dielectric(m) => BxDF::Dielectric(m.get_bxdf(tex_eval, ctx, lambda)),
+            Material::ThinDielectric(m) => BxDF::ThinDielectric(m.get_bxdf(tex_eval, ctx, lambda)),
             Material::CoatedDiffuse(m) => BxDF::CoatedDiffuse(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
@@ -144,6 +152,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
             Material::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
             Material::Dielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            Material::ThinDielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
             Material::CoatedDiffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
@@ -153,6 +162,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.can_evaluate_textures(tex_eval),
             Material::Conductor(m) => m.can_evaluate_textures(tex_eval),
             Material::Dielectric(m) => m.can_evaluate_textures(tex_eval),
+            Material::ThinDielectric(m) => m.can_evaluate_textures(tex_eval),
             Material::CoatedDiffuse(m) => m.can_evaluate_textures(tex_eval),
         }
     }
@@ -162,6 +172,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.get_normal_map(),
             Material::Conductor(m) => m.get_normal_map(),
             Material::Dielectric(m) => m.get_normal_map(),
+            Material::ThinDielectric(m) => m.get_normal_map(),
             Material::CoatedDiffuse(m) => m.get_normal_map(),
         }
     }
@@ -171,6 +182,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.get_displacement(),
             Material::Conductor(m) => m.get_displacement(),
             Material::Dielectric(m) => m.get_displacement(),
+            Material::ThinDielectric(m) => m.get_displacement(),
             Material::CoatedDiffuse(m) => m.get_displacement(),
         }
     }
@@ -180,6 +192,7 @@ impl MaterialI for Material {
             Material::Diffuse(m) => m.has_subsurface_scattering(),
             Material::Conductor(m) => m.has_subsurface_scattering(),
             Material::Dielectric(m) => m.has_subsurface_scattering(),
+            Material::ThinDielectric(m) => m.has_subsurface_scattering(),
             Material::CoatedDiffuse(m) => m.has_subsurface_scattering(),
         }
     }
@@ -599,6 +612,113 @@ impl MaterialI for DielectricMaterial {
 
     fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool {
         tex_eval.can_evaluate(&[&self.u_roughness, &self.v_roughness], &[])
+    }
+
+    fn get_normal_map(&self) -> Option<Arc<Image>> {
+        self.normal_map.clone()
+    }
+
+    fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
+        self.displacement.clone()
+    }
+
+    fn has_subsurface_scattering(&self) -> bool {
+        false
+    }
+}
+
+/// Material for thin dielectric materials such as panes of glass,
+/// which requires special handling due to the proximity of the interfaces.
+#[derive(Debug)]
+pub struct ThinDielectricMaterial
+{
+    displacement: Option<Arc<FloatTexture>>,
+    normal_map: Option<Arc<Image>>,
+    eta: Arc<Spectrum>,
+}
+
+impl ThinDielectricMaterial
+{
+    pub fn new(
+        displacement: Option<Arc<FloatTexture>>,
+        normal_map: Option<Arc<Image>>,
+        eta: Arc<Spectrum>,
+    ) -> Self {
+        Self {
+            displacement,
+            normal_map,
+            eta,
+        }
+    }
+
+    pub fn create(
+        parameters: &mut TextureParameterDictionary,
+        normal_map: Option<Arc<Image>>,
+        _loc: &FileLoc,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+    ) -> ThinDielectricMaterial
+    {
+        let eta = if !parameters.get_float_array("eta").is_empty()
+        {
+            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(parameters.get_float_array("eta")[0]))))
+        }
+        else
+        {
+            parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)
+        };
+        let eta = if eta.is_none()
+        {
+            Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.5)))
+        }
+        else
+        {
+            eta.unwrap()
+        };
+
+        let displacement = parameters.get_float_texture_or_none("displacement", textures);
+
+        ThinDielectricMaterial::new(displacement, normal_map, eta)
+    }
+}
+
+impl MaterialI for ThinDielectricMaterial
+{
+    type ConcreteBxDF = ThinDielectricBxDF;
+
+    fn get_bxdf<T: TextureEvaluatorI>(
+        &self,
+        tex_eval: &T,
+        ctx: &MaterialEvalContext,
+        lambda: &mut SampledWavelengths,
+    ) -> Self::ConcreteBxDF {
+        let mut sampled_eta = self.eta.get(lambda[0]);
+        match self.eta.as_ref() {
+            Spectrum::Constant(_) => {},
+            _ => lambda.terminate_secondary(),
+        };
+
+        // Handle edge case where lambda[0] is beyond the wavelengths stored by the spectrum.
+        if sampled_eta == 0.0
+        {
+            sampled_eta = 1.0;
+        }
+
+        ThinDielectricBxDF::new(sampled_eta)
+    }
+
+    fn get_bsdf<T: TextureEvaluatorI>(
+        &self,
+        tex_eval: &T,
+        ctx: &MaterialEvalContext,
+        lambda: &mut SampledWavelengths,
+    ) -> BSDF {
+        let bxdf = self.get_bxdf(tex_eval, ctx, lambda);
+        BSDF::new(ctx.ns, ctx.dpdus, crate::bxdf::BxDF::ThinDielectric(bxdf))
+    }
+
+    fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool {
+        true
     }
 
     fn get_normal_map(&self) -> Option<Arc<Image>> {
