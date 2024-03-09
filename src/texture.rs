@@ -873,7 +873,7 @@ impl TextureMapping2D
             "cylindrical" => TextureMapping2D::Cylindrical(CylindricalMapping{
                 texture_from_render: render_from_texture.inverse(),
             }),
-            "planer" => TextureMapping2D::Planar(PlanarMapping {
+            "planar" => TextureMapping2D::Planar(PlanarMapping {
                 texture_from_render: render_from_texture.inverse(),
                 vs: parameters.get_one_vector3f("v1", Vector3f::X),
                 vt: parameters.get_one_vector3f("v2", Vector3f::Y),
