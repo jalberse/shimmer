@@ -11,17 +11,16 @@ use crate::{
     filter::FilterI,
     frame::Frame,
     image::ImageMetadata,
-    loading::paramdict::ParameterDictionary,
-    loading::parser_target::FileLoc,
+    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
     math::{lerp, radians},
     media::Medium,
     options::{Options, RenderingCoordinateSystem},
     ray::{AuxiliaryRays, Ray, RayDifferential, RayI},
     sampling::sample_uniform_disk_concentric,
     spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
-    transform::Transform,
+    transform::{InverseTransformI, InverseTransformRayI, Transform, TransformI, TransformRayI},
     vecmath::{
-        normal::Normal3, Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f,
+        normal::Normal3, Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f
     },
     Float,
 };
@@ -331,9 +330,9 @@ impl CameraBase {
         // Compute tangent plane equation for ray differential intersections
         let down_z_from_camera =
             Transform::rotate_from_to(&Vector3f::from(p_camera).normalize(), &Vector3f::Z);
-        let p_down_z = down_z_from_camera.apply(&p_camera);
+        let p_down_z = down_z_from_camera.apply(p_camera);
         // TODO Finding cases where n_down_z.z is 0, which propagates down to dpdx and dpdy being NaN.
-        let n_down_z = down_z_from_camera.apply(&self.camera_from_render_n(n, time));
+        let n_down_z = down_z_from_camera.apply(self.camera_from_render_n(n, time));
         let d = n_down_z.z * p_down_z.z;
 
         // Find intersection points for approximated camera differential rays
@@ -360,9 +359,9 @@ impl CameraBase {
         };
 
         let dpdx =
-            spp_scale * self.render_from_camera_v(&down_z_from_camera.apply_inv(&(px - p_down_z)));
+            spp_scale * self.render_from_camera_v(&down_z_from_camera.apply_inverse(px - p_down_z));
         let dpdy =
-            spp_scale * self.render_from_camera_v(&down_z_from_camera.apply_inv(&(py - p_down_z)));
+            spp_scale * self.render_from_camera_v(&down_z_from_camera.apply_inverse(py - p_down_z));
         (dpdx, dpdy)
     }
 
@@ -522,7 +521,7 @@ impl CameraTransform {
         let world_from_render = match options.rendering_coord_system {
             RenderingCoordinateSystem::Camera => *world_from_camera,
             RenderingCoordinateSystem::CameraWorld => {
-                let p_camera = world_from_camera.apply(&Point3f::ZERO);
+                let p_camera = world_from_camera.apply(Point3f::ZERO);
                 Transform::translate(p_camera.into())
             }
             RenderingCoordinateSystem::World => Transform::default(),
@@ -540,39 +539,39 @@ impl CameraTransform {
     }
 
     pub fn render_from_camera_p(&self, p: &Point3f) -> Point3f {
-        self.render_from_camera.apply(p)
+        self.render_from_camera.apply(*p)
     }
     pub fn render_from_camera_v(&self, v: &Vector3f) -> Vector3f {
-        self.render_from_camera.apply(v)
+        self.render_from_camera.apply(*v)
     }
     pub fn render_from_camera_n(&self, n: &Normal3f) -> Normal3f {
-        self.render_from_camera.apply(n)
+        self.render_from_camera.apply(*n)
     }
     pub fn render_from_camera_r(&self, r: &Ray) -> Ray {
-        self.render_from_camera.apply_ray(r, None)
+        self.render_from_camera.apply_ray(*r, None)
     }
     pub fn render_from_camera_rd(&self, r: &RayDifferential) -> RayDifferential {
-        self.render_from_camera.apply_ray(r, None)
+        self.render_from_camera.apply_ray(*r, None)
     }
 
     pub fn camera_from_render_p(&self, p: &Point3f, _time: Float) -> Point3f {
-        self.render_from_camera.apply_inv(p)
+        self.render_from_camera.apply_inverse(*p)
     }
     pub fn camera_from_render_v(&self, v: &Vector3f, _time: Float) -> Vector3f {
-        self.render_from_camera.apply_inv(v)
+        self.render_from_camera.apply_inverse(*v)
     }
     pub fn camera_from_render_n(&self, n: &Normal3f, _time: Float) -> Normal3f {
-        self.render_from_camera.apply_inv(n)
+        self.render_from_camera.apply_inverse(*n)
     }
     pub fn camera_from_render_r(&self, r: &Ray, _time: Float) -> Ray {
-        self.render_from_camera.apply_ray_inverse(r, None)
+        self.render_from_camera.apply_ray_inverse(*r, None)
     }
     pub fn camera_from_render_rd(&self, r: &RayDifferential, _time: Float) -> RayDifferential {
-        self.render_from_camera.apply_ray_inverse(r, None)
+        self.render_from_camera.apply_ray_inverse(*r, None)
     }
 
     pub fn render_from_world_p(&self, p: &Point3f) -> Point3f {
-        self.world_from_render.apply_inv(p)
+        self.world_from_render.apply_inverse(*p)
     }
 
     pub fn render_from_world(&self) -> Transform {
@@ -735,8 +734,8 @@ impl OrthographicCamera {
             screen_from_camera,
             screen_window,
         );
-        let dx_camera = projective_base.camera_from_raster.apply(&Vector3f::X);
-        let dy_camera = projective_base.camera_from_raster.apply(&Vector3f::Y);
+        let dx_camera = projective_base.camera_from_raster.apply(Vector3f::X);
+        let dy_camera = projective_base.camera_from_raster.apply(Vector3f::Y);
 
         // TODO I don't love having to make projective_base mutable and initializing these values
         // here; can we re-work the initialization to keep things const?
@@ -760,7 +759,7 @@ impl CameraI for OrthographicCamera {
         lambda: &SampledWavelengths,
     ) -> Option<CameraRay> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective_base.camera_from_raster.apply(&p_film);
+        let p_camera = self.projective_base.camera_from_raster.apply(p_film);
 
         let ray = Ray::new_with_time(
             p_camera,
@@ -782,7 +781,7 @@ impl CameraI for OrthographicCamera {
         lambda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective_base.camera_from_raster.apply(&p_film);
+        let p_camera = self.projective_base.camera_from_raster.apply(p_film);
 
         let ray = Ray::new_with_time(
             p_camera,
@@ -919,24 +918,24 @@ impl PerspectiveCamera {
         // their origins are unchanges and the ray differentials differ only in their direction
         // for perspective cameras. Compute the change in position on the near perspective plane
         // in camera space wrt shifts in pixel locations.
-        let dx_camera = projective_base.camera_from_raster.apply(&Point3f::X)
-            - projective_base.camera_from_raster.apply(&Point3f::ZERO);
-        let dy_camera = projective_base.camera_from_raster.apply(&Point3f::Y)
-            - projective_base.camera_from_raster.apply(&Point3f::ZERO);
+        let dx_camera = projective_base.camera_from_raster.apply(Point3f::X)
+            - projective_base.camera_from_raster.apply(Point3f::ZERO);
+        let dy_camera = projective_base.camera_from_raster.apply(Point3f::Y)
+            - projective_base.camera_from_raster.apply(Point3f::ZERO);
 
         // Compute cos_total_width for perspective camera, the cosine of the maximum angle of the FOV.
         // This is used in a few places, such as for culling points outside the FOV quickly.
         let radius = Point2f::from(projective_base.camera_base.film.get_filter().radius());
         let p_corner = Point3f::new(-radius.x, -radius.y, 0.0);
         let w_corner_camera =
-            Vector3f::from(projective_base.camera_from_raster.apply(&p_corner)).normalize();
+            Vector3f::from(projective_base.camera_from_raster.apply(p_corner)).normalize();
         let cos_total_width = w_corner_camera.z;
         debug_assert!(0.9999 * cos_total_width <= Float::cos(radians(fov / 2.0)));
 
         // Compute image plane area at z == 1.0 for perspective
         let res = projective_base.camera_base.film.full_resolution();
-        let mut p_min = projective_base.camera_from_raster.apply(&Point3f::ZERO);
-        let mut p_max = projective_base.camera_from_raster.apply(&Point3f::new(
+        let mut p_min = projective_base.camera_from_raster.apply(Point3f::ZERO);
+        let mut p_max = projective_base.camera_from_raster.apply(Point3f::new(
             res.x as Float,
             res.y as Float,
             0.0,
@@ -979,7 +978,7 @@ impl CameraI for PerspectiveCamera {
         _lambda: &SampledWavelengths,
     ) -> Option<CameraRay> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective_base.camera_from_raster.apply(&p_film);
+        let p_camera = self.projective_base.camera_from_raster.apply(p_film);
 
         let mut ray = Ray::new_with_time(
             Point3f::ZERO,
@@ -1015,7 +1014,7 @@ impl CameraI for PerspectiveCamera {
         _lambda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective_base.camera_from_raster.apply(&p_film);
+        let p_camera = self.projective_base.camera_from_raster.apply(p_film);
 
         let dir = Vector3f::from(p_camera).normalize();
         let mut base_ray = Ray::new_with_time(

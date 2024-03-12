@@ -2,7 +2,7 @@ use crate::{
     bounding_box::Bounds3f,
     float::PI_F,
     math::{degrees, safe_acos, safe_sqrt},
-    transform::Transform,
+    transform::{Transform, TransformI},
     vecmath::{point::Point3, vector::Vector3, Length, Normalize, Point3f, Vector3f},
     Float,
 };
@@ -102,7 +102,7 @@ impl DirectionCone {
         if wr.length_squared() == 0.0 {
             return DirectionCone::entire_sphere();
         }
-        let w = Transform::rotate(degrees(theta_r), &wr).apply(&self.w);
+        let w = Transform::rotate(degrees(theta_r), &wr).apply(self.w);
         DirectionCone::new(w, Float::cos(theta_o))
     }
 }

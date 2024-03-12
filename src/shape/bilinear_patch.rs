@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use num::traits::int;
-
 use crate::bounding_box::Bounds3f;
 use crate::direction_cone::DirectionCone;
 use crate::float::gamma;
@@ -11,7 +9,7 @@ use crate::ray::Ray;
 use crate::sampling::{bilinear_pdf, invert_spherical_rectangle_sample, sample_bilinear, sample_spherical_rectangle};
 use crate::shape::ShapeSample;
 use crate::square_matrix::{Determinant, SquareMatrix};
-use crate::transform::Transform;
+use crate::transform::{Transform, TransformI};
 use crate::vecmath::normal::Normal3;
 use crate::vecmath::point::{Point3, Point3fi};
 use crate::vecmath::{invert_bilinear, spherical_quad_area, Length, Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f};
@@ -419,7 +417,7 @@ impl BilinearPatch{
                 dndv = dndt;
 
                 let r = Transform::rotate_from_to(&isect.interaction.n.into(), &ns.into());
-                isect.set_shading_geometry(ns, r.apply(&dpdu), r.apply(&dpdv), dndu, dndv, true);
+                isect.set_shading_geometry(ns, r.apply(dpdu), r.apply(dpdv), dndu, dndv, true);
             }
         }
 

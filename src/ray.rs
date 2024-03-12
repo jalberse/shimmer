@@ -12,6 +12,7 @@ pub trait RayI {
     fn get(&self, t: Float) -> Point3f;
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct Ray {
     /// Origin of the ray
     pub o: Point3f,
@@ -121,6 +122,8 @@ impl HasNan for Ray {
     }
 }
 
+
+#[derive(Debug, Copy, Clone)]
 pub struct RayDifferential {
     pub ray: Ray,
     pub auxiliary: Option<AuxiliaryRays>,
@@ -174,6 +177,7 @@ impl HasNan for RayDifferential {
 
 /// We wrap the differential information in a single struct so that
 /// we can guarantee all or none are present in RayDifferential via a single Option member.
+#[derive(Debug, Copy, Clone)]
 pub struct AuxiliaryRays {
     pub rx_origin: Point3f,
     pub rx_direction: Vector3f,

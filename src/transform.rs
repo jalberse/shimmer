@@ -17,26 +17,29 @@ use crate::{
     Float,
 };
 
-pub trait Transformable {
-    fn apply(&self, transform: &Transform) -> Self;
+// TODO Actually, this trait can be implemented just for Transform, if we use a generic type T for the trait.
+// THen Transform can implement it for various <T>.
+// That's probably cleaner...
+pub trait TransformI<T> {
+    fn apply(&self, val: T) -> T;
 }
 
-pub trait TransformableRay {
+pub trait TransformRayI<T> {
     /// Applies the transformation, returning the transformed ray
     /// and the new t_max, if provided. The t_max is adjusted to account for
     /// error correction necessary for ray transformations.
-    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self;
+    fn apply_ray(&self, val: T, t_max: Option<&mut Float>) -> T;
 }
 
-pub trait InverseTransformable {
-    fn apply_inverse(&self, transform: &Transform) -> Self;
+pub trait InverseTransformI<T> {
+    fn apply_inverse(&self, val: T) -> T;
 }
 
-pub trait InverseTransformableRay {
+pub trait InverseTransformRayI<T> {
     /// Applies the inverse transformation, returning the transformed ray
     /// and the new t_max, if provided. The t_max is adjusted to account for
     /// error correction necessary for ray transformations.
-    fn apply_ray_inverse(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self;
+    fn apply_ray_inverse(&self, val: T, t_max: Option<&mut Float>) -> T;
 }
 
 // TODO Note that since transforms are relatively memory hungry, it can be good to
@@ -137,9 +140,9 @@ impl Transform {
     }
 
     pub fn has_scale_tolerance(&self, tolerance: Float) -> bool {
-        let la2 = self.apply(&Vector3f::new(1.0, 0.0, 0.0)).length_squared();
-        let lb2 = self.apply(&Vector3f::new(0.0, 1.0, 0.0)).length_squared();
-        let lc2 = self.apply(&Vector3f::new(0.0, 0.0, 1.0)).length_squared();
+        let la2 = self.apply(Vector3f::new(1.0, 0.0, 0.0)).length_squared();
+        let lb2 = self.apply(Vector3f::new(0.0, 1.0, 0.0)).length_squared();
+        let lc2 = self.apply(Vector3f::new(0.0, 0.0, 1.0)).length_squared();
 
         la2.abs() - 1.0 > tolerance || lb2.abs() > tolerance || lc2.abs() > tolerance
     }
@@ -348,26 +351,6 @@ impl Transform {
         ]);
         s.determinant() < 0.0
     }
-
-    pub fn apply<T: Transformable>(&self, val: &T) -> T {
-        val.apply(&self)
-    }
-
-    pub fn apply_inv<T: InverseTransformable>(&self, val: &T) -> T {
-        val.apply_inverse(&self)
-    }
-
-    pub fn apply_ray<T: TransformableRay>(&self, val: &T, t_max: Option<&mut Float>) -> T {
-        val.apply_ray(&self, t_max)
-    }
-
-    pub fn apply_ray_inverse<T: InverseTransformableRay>(
-        &self,
-        val: &T,
-        t_max: Option<&mut Float>,
-    ) -> T {
-        val.apply_ray_inverse(&self, t_max)
-    }
 }
 
 impl Default for Transform {
@@ -393,90 +376,92 @@ impl_op_ex!(*|t1: &Transform, t2: &Transform| -> Transform {
     }
 });
 
-impl Transformable for Point3f {
-    fn apply(&self, transform: &Transform) -> Self {
-        apply_point_helper(&transform.m, self)
+impl TransformI<Point3f> for Transform
+{
+    fn apply(&self, val: Point3f) -> Point3f {
+        apply_point_helper(&self.m, &val)
     }
 }
 
-impl Transformable for Vector3f {
-    fn apply(&self, transform: &Transform) -> Self {
-        apply_vector_helper(&transform.m, self)
+impl TransformI<Vector3f> for Transform
+{
+    fn apply(&self, val: Vector3f) -> Vector3f {
+        apply_vector_helper(&self.m, &val)
     }
 }
 
-impl Transformable for Normal3f {
-    fn apply(&self, transform: &Transform) -> Self {
+impl TransformI<Normal3f> for Transform {
+    fn apply(&self, val: Normal3f) -> Normal3f {
         // Note that we pass m_inv. This is intentional; normals are
         // transformed by the inverse.
-        apply_normal_helper(&transform.m_inv, self)
+        apply_normal_helper(&self.m_inv, &val)
     }
 }
 
-impl Transformable for Point3fi {
-    fn apply(&self, transform: &Transform) -> Self {
-        let x: Float = self.x().into();
-        let y: Float = self.y().into();
-        let z: Float = self.z().into();
+impl TransformI<Point3fi> for Transform {
+    fn apply(&self, val: Point3fi) -> Point3fi {
+        let x: Float = val.x().into();
+        let y: Float = val.y().into();
+        let z: Float = val.z().into();
         // Compute transformed coordinates
-        let xp: Float = (transform.m[0][0] * x + transform.m[0][1] * y)
-            + (transform.m[0][2] * z + transform.m[0][3]);
-        let yp: Float = (transform.m[1][0] * x + transform.m[1][1] * y)
-            + (transform.m[1][2] * z + transform.m[1][3]);
-        let zp: Float = (transform.m[2][0] * x + transform.m[2][1] * y)
-            + (transform.m[2][2] * z + transform.m[2][3]);
-        let wp: Float = (transform.m[3][0] * x + transform.m[3][1] * y)
-            + (transform.m[3][2] * z + transform.m[3][3]);
+        let xp: Float = (self.m[0][0] * x + self.m[0][1] * y)
+            + (self.m[0][2] * z + self.m[0][3]);
+        let yp: Float = (self.m[1][0] * x + self.m[1][1] * y)
+            + (self.m[1][2] * z + self.m[1][3]);
+        let zp: Float = (self.m[2][0] * x + self.m[2][1] * y)
+            + (self.m[2][2] * z + self.m[2][3]);
+        let wp: Float = (self.m[3][0] * x + self.m[3][1] * y)
+            + (self.m[3][2] * z + self.m[3][3]);
 
         // Compute absolute error for transformed point
-        let p_error: Vector3f = if self.is_exact() {
+        let p_error: Vector3f = if val.is_exact() {
             // Compute error for transformed exact _p_
             let err_x = gamma(3)
-                * (Float::abs(transform.m[0][0] * x)
-                    + Float::abs(transform.m[0][1] * y)
-                    + Float::abs(transform.m[0][2] * z)
-                    + Float::abs(transform.m[0][3]));
+                * (Float::abs(self.m[0][0] * x)
+                    + Float::abs(self.m[0][1] * y)
+                    + Float::abs(self.m[0][2] * z)
+                    + Float::abs(self.m[0][3]));
             let err_y = gamma(3)
-                * (Float::abs(transform.m[1][0] * x)
-                    + Float::abs(transform.m[1][1] * y)
-                    + Float::abs(transform.m[1][2] * z)
-                    + Float::abs(transform.m[1][3]));
+                * (Float::abs(self.m[1][0] * x)
+                    + Float::abs(self.m[1][1] * y)
+                    + Float::abs(self.m[1][2] * z)
+                    + Float::abs(self.m[1][3]));
             let err_z = gamma(3)
-                * (Float::abs(transform.m[2][0] * x)
-                    + Float::abs(transform.m[2][1] * y)
-                    + Float::abs(transform.m[2][2] * z)
-                    + Float::abs(transform.m[2][3]));
+                * (Float::abs(self.m[2][0] * x)
+                    + Float::abs(self.m[2][1] * y)
+                    + Float::abs(self.m[2][2] * z)
+                    + Float::abs(self.m[2][3]));
             Vector3f::new(err_x, err_y, err_z)
         } else {
             // Compute error for transformed approximate _p_
-            let p_in_error = self.error();
+            let p_in_error = val.error();
             let err_x = (gamma(3) + 1.0)
-                * (Float::abs(transform.m[0][0]) * p_in_error.x
-                    + Float::abs(transform.m[0][1]) * p_in_error.y
-                    + Float::abs(transform.m[0][2]) * p_in_error.z)
+                * (Float::abs(self.m[0][0]) * p_in_error.x
+                    + Float::abs(self.m[0][1]) * p_in_error.y
+                    + Float::abs(self.m[0][2]) * p_in_error.z)
                 + gamma(3)
-                    * (Float::abs(transform.m[0][0] * x)
-                        + Float::abs(transform.m[0][1] * y)
-                        + Float::abs(transform.m[0][2] * z)
-                        + Float::abs(transform.m[0][3]));
+                    * (Float::abs(self.m[0][0] * x)
+                        + Float::abs(self.m[0][1] * y)
+                        + Float::abs(self.m[0][2] * z)
+                        + Float::abs(self.m[0][3]));
             let err_y = (gamma(3) + 1.0)
-                * (Float::abs(transform.m[1][0]) * p_in_error.x
-                    + Float::abs(transform.m[1][1]) * p_in_error.y
-                    + Float::abs(transform.m[1][2]) * p_in_error.z)
+                * (Float::abs(self.m[1][0]) * p_in_error.x
+                    + Float::abs(self.m[1][1]) * p_in_error.y
+                    + Float::abs(self.m[1][2]) * p_in_error.z)
                 + gamma(3)
-                    * (Float::abs(transform.m[1][0] * x)
-                        + Float::abs(transform.m[1][1] * y)
-                        + Float::abs(transform.m[1][2] * z)
-                        + Float::abs(transform.m[1][3]));
+                    * (Float::abs(self.m[1][0] * x)
+                        + Float::abs(self.m[1][1] * y)
+                        + Float::abs(self.m[1][2] * z)
+                        + Float::abs(self.m[1][3]));
             let err_z = (gamma(3) + 1.0)
-                * (Float::abs(transform.m[2][0]) * p_in_error.x
-                    + Float::abs(transform.m[2][1]) * p_in_error.y
-                    + Float::abs(transform.m[2][2]) * p_in_error.z)
+                * (Float::abs(self.m[2][0]) * p_in_error.x
+                    + Float::abs(self.m[2][1]) * p_in_error.y
+                    + Float::abs(self.m[2][2]) * p_in_error.z)
                 + gamma(3)
-                    * (Float::abs(transform.m[2][0] * x)
-                        + Float::abs(transform.m[2][1] * y)
-                        + Float::abs(transform.m[2][2] * z)
-                        + Float::abs(transform.m[2][3]));
+                    * (Float::abs(self.m[2][0] * x)
+                        + Float::abs(self.m[2][1] * y)
+                        + Float::abs(self.m[2][2] * z)
+                        + Float::abs(self.m[2][3]));
             Vector3f::new(err_x, err_y, err_z)
         };
         if wp == 1.0 {
@@ -487,66 +472,66 @@ impl Transformable for Point3fi {
     }
 }
 
-impl Transformable for Vector3fi {
-    fn apply(&self, transform: &Transform) -> Self {
-        let x: Float = self.x().into();
-        let y: Float = self.y().into();
-        let z: Float = self.z().into();
-        let v_out_err = if self.is_exact() {
+impl TransformI<Vector3fi> for Transform {
+    fn apply(&self, val: Vector3fi) -> Vector3fi {
+        let x: Float = val.x().into();
+        let y: Float = val.y().into();
+        let z: Float = val.z().into();
+        let v_out_err = if val.is_exact() {
             let x_err = gamma(3)
-                * (Float::abs(transform.m[0][0] * x)
-                    + Float::abs(transform.m[0][1] * y)
-                    + Float::abs(transform.m[0][2] * z));
+                * (Float::abs(self.m[0][0] * x)
+                    + Float::abs(self.m[0][1] * y)
+                    + Float::abs(self.m[0][2] * z));
             let y_err = gamma(3)
-                * (Float::abs(transform.m[1][0] * x)
-                    + Float::abs(transform.m[1][1] * y)
-                    + Float::abs(transform.m[1][2] * z));
+                * (Float::abs(self.m[1][0] * x)
+                    + Float::abs(self.m[1][1] * y)
+                    + Float::abs(self.m[1][2] * z));
             let z_err = gamma(3)
-                * (Float::abs(transform.m[2][0] * x)
-                    + Float::abs(transform.m[2][1] * y)
-                    + Float::abs(transform.m[2][2] * z));
+                * (Float::abs(self.m[2][0] * x)
+                    + Float::abs(self.m[2][1] * y)
+                    + Float::abs(self.m[2][2] * z));
             Vector3f::new(x_err, y_err, z_err)
         } else {
-            let v_in_error = self.error();
+            let v_in_error = val.error();
             let x_err = (gamma(3) + 1.0)
-                * (Float::abs(transform.m[0][0]) * v_in_error.x
-                    + Float::abs(transform.m[0][1]) * v_in_error.y
-                    + Float::abs(transform.m[0][2]) * v_in_error.z)
+                * (Float::abs(self.m[0][0]) * v_in_error.x
+                    + Float::abs(self.m[0][1]) * v_in_error.y
+                    + Float::abs(self.m[0][2]) * v_in_error.z)
                 + gamma(3)
-                    * (Float::abs(transform.m[0][0] * x)
-                        + Float::abs(transform.m[0][1] * y)
-                        + Float::abs(transform.m[0][2] * z));
+                    * (Float::abs(self.m[0][0] * x)
+                        + Float::abs(self.m[0][1] * y)
+                        + Float::abs(self.m[0][2] * z));
             let y_err = (gamma(3) + 1.0)
-                * (Float::abs(transform.m[1][0]) * v_in_error.x
-                    + Float::abs(transform.m[1][1]) * v_in_error.y
-                    + Float::abs(transform.m[1][2]) * v_in_error.z)
+                * (Float::abs(self.m[1][0]) * v_in_error.x
+                    + Float::abs(self.m[1][1]) * v_in_error.y
+                    + Float::abs(self.m[1][2]) * v_in_error.z)
                 + gamma(3)
-                    * (Float::abs(transform.m[1][0] * x)
-                        + Float::abs(transform.m[1][1] * y)
-                        + Float::abs(transform.m[1][2] * z));
+                    * (Float::abs(self.m[1][0] * x)
+                        + Float::abs(self.m[1][1] * y)
+                        + Float::abs(self.m[1][2] * z));
             let z_err = (gamma(3) + 1.0)
-                * (Float::abs(transform.m[2][0]) * v_in_error.x
-                    + Float::abs(transform.m[2][1]) * v_in_error.y
-                    + Float::abs(transform.m[2][2]) * v_in_error.z)
+                * (Float::abs(self.m[2][0]) * v_in_error.x
+                    + Float::abs(self.m[2][1]) * v_in_error.y
+                    + Float::abs(self.m[2][2]) * v_in_error.z)
                 + gamma(3)
-                    * (Float::abs(transform.m[2][0] * x)
-                        + Float::abs(transform.m[2][1] * y)
-                        + Float::abs(transform.m[2][2] * z));
+                    * (Float::abs(self.m[2][0] * x)
+                        + Float::abs(self.m[2][1] * y)
+                        + Float::abs(self.m[2][2] * z));
             Vector3f::new(x_err, y_err, z_err)
         };
 
-        let xp: Float = transform.m[0][0] * x + transform.m[0][1] * y + transform.m[0][2] * z;
-        let yp: Float = transform.m[1][0] * x + transform.m[1][1] * y + transform.m[1][2] * z;
-        let zp: Float = transform.m[2][0] * x + transform.m[2][1] * y + transform.m[2][2] * z;
+        let xp: Float = self.m[0][0] * x + self.m[0][1] * y + self.m[0][2] * z;
+        let yp: Float = self.m[1][0] * x + self.m[1][1] * y + self.m[1][2] * z;
+        let zp: Float = self.m[2][0] * x + self.m[2][1] * y + self.m[2][2] * z;
 
         Vector3fi::from_value_and_error(Vector3f::new(xp, yp, zp), v_out_err)
     }
 }
 
-impl TransformableRay for Ray {
-    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self {
-        let o: Point3fi = transform.apply(&self.o).into();
-        let d: Vector3f = transform.apply(&self.d);
+impl TransformRayI<Ray> for Transform {
+    fn apply_ray(&self, val: Ray, t_max: Option<&mut Float>) -> Ray {
+        let o: Point3fi = self.apply(val.o).into();
+        let d: Vector3f = self.apply(val.d);
         // Offset ray origin to edge of error bounds and compute t_max
         let length_squared = d.length_squared();
         let o: Point3fi = if length_squared > 0.0 {
@@ -558,20 +543,20 @@ impl TransformableRay for Ray {
         } else {
             o
         };
-        Ray::new_with_time(o.into(), d.into(), self.time, self.medium)
+        Ray::new_with_time(o.into(), d.into(), val.time, val.medium)
     }
 }
 
-impl TransformableRay for RayDifferential {
-    fn apply_ray(&self, transform: &Transform, t_max: Option<&mut Float>) -> Self {
+impl TransformRayI<RayDifferential> for Transform {
+    fn apply_ray(&self, val: RayDifferential, t_max: Option<&mut Float>) -> RayDifferential {
         // Get the transformed base ray
-        let tr = transform.apply_ray(&self.ray, t_max);
+        let tr = self.apply_ray(val.ray, t_max);
         // Get the transformed aux rays, if any
-        let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &self.auxiliary {
-            let rx_origin = transform.apply(&aux.rx_origin);
-            let rx_direction = transform.apply(&aux.rx_direction);
-            let ry_origin = transform.apply(&aux.ry_origin);
-            let ry_direction = transform.apply(&aux.ry_direction);
+        let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &val.auxiliary {
+            let rx_origin = self.apply(aux.rx_origin);
+            let rx_direction = self.apply(aux.rx_direction);
+            let ry_origin = self.apply(aux.ry_origin);
+            let ry_direction = self.apply(aux.ry_direction);
             Some(AuxiliaryRays::new(
                 rx_origin,
                 rx_direction,
@@ -585,139 +570,139 @@ impl TransformableRay for RayDifferential {
     }
 }
 
-impl Transformable for Bounds3f {
-    fn apply(&self, transform: &Transform) -> Self {
+impl TransformI<Bounds3f> for Transform {
+    fn apply(&self, val: Bounds3f) -> Bounds3f {
         // TODO this could be made more efficient.
         let mut out = Bounds3f::new(
-            transform.apply(&self.corner(0)),
-            transform.apply(&self.corner(1)),
+            self.apply(val.corner(0)),
+            self.apply(val.corner(1)),
         );
 
         for i in 2..8 {
-            out = out.union_point(transform.apply(&self.corner(i)));
+            out = out.union_point(self.apply(val.corner(i)));
         }
 
         out
     }
 }
 
-impl Transformable for SurfaceInteraction {
-    fn apply(&self, transform: &Transform) -> Self {
-        let t = transform.inverse();
+impl TransformI<SurfaceInteraction> for Transform {
+    fn apply(&self, val: SurfaceInteraction) -> SurfaceInteraction {
+        let t = self.inverse();
 
-        let n = t.apply(&self.interaction.n).normalize();
+        let n = t.apply(val.interaction.n).normalize();
 
         SurfaceInteraction {
             interaction: Interaction {
-                pi: transform.apply(&self.interaction.pi),
-                time: self.interaction.time,
-                wo: t.apply(&self.interaction.wo).normalize(),
+                pi: self.apply(val.interaction.pi),
+                time: val.interaction.time,
+                wo: t.apply(val.interaction.wo).normalize(),
                 n,
-                uv: self.interaction.uv,
+                uv: val.interaction.uv,
             },
-            dpdu: t.apply(&self.dpdu),
-            dpdv: t.apply(&self.dpdv),
-            dndu: t.apply(&self.dndu),
-            dndv: t.apply(&self.dndv),
+            dpdu: t.apply(val.dpdu),
+            dpdv: t.apply(val.dpdv),
+            dndu: t.apply(val.dndu),
+            dndv: t.apply(val.dndv),
             shading: SurfaceInteractionShading {
-                n: t.apply(&self.shading.n).normalize().face_forward(n),
-                dpdu: t.apply(&self.shading.dpdu),
-                dpdv: t.apply(&self.shading.dpdv),
-                dndu: t.apply(&self.shading.dndu),
-                dndv: t.apply(&self.shading.dndv),
+                n: t.apply(val.shading.n).normalize().face_forward(n),
+                dpdu: t.apply(val.shading.dpdu),
+                dpdv: t.apply(val.shading.dpdv),
+                dndu: t.apply(val.shading.dndu),
+                dndv: t.apply(val.shading.dndv),
             },
-            face_index: self.face_index,
-            material: self.material.clone(),
-            area_light: self.area_light.clone(),
-            dpdx: t.apply(&self.dpdx),
-            dpdy: t.apply(&self.dpdy),
-            dudx: self.dudx,
-            dvdx: self.dvdx,
-            dudy: self.dudy,
-            dvdy: self.dvdy,
+            face_index: val.face_index,
+            material: val.material.clone(),
+            area_light: val.area_light.clone(),
+            dpdx: t.apply(val.dpdx),
+            dpdy: t.apply(val.dpdy),
+            dudx: val.dudx,
+            dvdx: val.dvdx,
+            dudy: val.dudy,
+            dvdy: val.dvdy,
         }
     }
 }
 
-impl InverseTransformable for Point3f {
-    fn apply_inverse(&self, transform: &Transform) -> Self {
-        apply_point_helper(&transform.m_inv, self)
+impl InverseTransformI<Point3f> for Transform {
+    fn apply_inverse(&self, val: Point3f) -> Point3f {
+        apply_point_helper(&self.m_inv, &val)
     }
 }
 
-impl InverseTransformable for Vector3f {
-    fn apply_inverse(&self, transform: &Transform) -> Self {
-        apply_vector_helper(&transform.m_inv, self)
+impl InverseTransformI<Vector3f> for Transform {
+    fn apply_inverse(&self, val: Vector3f) -> Vector3f {
+        apply_vector_helper(&self.m_inv, &val)
     }
 }
 
-impl InverseTransformable for Normal3f {
-    fn apply_inverse(&self, transform: &Transform) -> Self {
+impl InverseTransformI<Normal3f> for Transform {
+    fn apply_inverse(&self, val: Normal3f) -> Normal3f {
         // See PBRTv4 page 131 - we haven't passed the wrong matrix!
         // Normals must be transformed by the inverse transform of the transformation matrix.
-        apply_normal_helper(&transform.m, self)
+        apply_normal_helper(&self.m, &val)
     }
 }
 
-impl InverseTransformable for Point3fi {
-    fn apply_inverse(&self, transform: &Transform) -> Self {
-        let x: Float = self.x().into();
-        let y: Float = self.y().into();
-        let z: Float = self.z().into();
+impl InverseTransformI<Point3fi> for Transform {
+    fn apply_inverse(&self, val: Point3fi) -> Point3fi {
+        let x: Float = val.x().into();
+        let y: Float = val.y().into();
+        let z: Float = val.z().into();
         // Compute transformed coordinates from point _pt_
-        let xp: Float = (transform.m_inv[0][0] * x + transform.m_inv[0][1] * y)
-            + (transform.m_inv[0][2] * z + transform.m_inv[0][3]);
-        let yp: Float = (transform.m_inv[1][0] * x + transform.m_inv[1][1] * y)
-            + (transform.m_inv[1][2] * z + transform.m_inv[1][3]);
-        let zp: Float = (transform.m_inv[2][0] * x + transform.m_inv[2][1] * y)
-            + (transform.m_inv[2][2] * z + transform.m_inv[2][3]);
-        let wp: Float = (transform.m_inv[3][0] * x + transform.m_inv[3][1] * y)
-            + (transform.m_inv[3][2] * z + transform.m_inv[3][3]);
+        let xp: Float = (self.m_inv[0][0] * x + self.m_inv[0][1] * y)
+            + (self.m_inv[0][2] * z + self.m_inv[0][3]);
+        let yp: Float = (self.m_inv[1][0] * x + self.m_inv[1][1] * y)
+            + (self.m_inv[1][2] * z + self.m_inv[1][3]);
+        let zp: Float = (self.m_inv[2][0] * x + self.m_inv[2][1] * y)
+            + (self.m_inv[2][2] * z + self.m_inv[2][3]);
+        let wp: Float = (self.m_inv[3][0] * x + self.m_inv[3][1] * y)
+            + (self.m_inv[3][2] * z + self.m_inv[3][3]);
 
         // Compute absolute error for transformed point
-        let p_out_error = if self.is_exact() {
+        let p_out_error = if val.is_exact() {
             let x_err = gamma(3)
-                * (Float::abs(transform.m_inv[0][0] * x)
-                    + Float::abs(transform.m_inv[0][1] * y)
-                    + Float::abs(transform.m_inv[0][2] * z));
+                * (Float::abs(self.m_inv[0][0] * x)
+                    + Float::abs(self.m_inv[0][1] * y)
+                    + Float::abs(self.m_inv[0][2] * z));
             let y_err = gamma(3)
-                * (Float::abs(transform.m_inv[1][0] * x)
-                    + Float::abs(transform.m_inv[1][1] * y)
-                    + Float::abs(transform.m_inv[1][2] * z));
+                * (Float::abs(self.m_inv[1][0] * x)
+                    + Float::abs(self.m_inv[1][1] * y)
+                    + Float::abs(self.m_inv[1][2] * z));
             let z_err = gamma(3)
-                * (Float::abs(transform.m_inv[2][0] * x)
-                    + Float::abs(transform.m_inv[2][1] * y)
-                    + Float::abs(transform.m_inv[2][2] * z));
+                * (Float::abs(self.m_inv[2][0] * x)
+                    + Float::abs(self.m_inv[2][1] * y)
+                    + Float::abs(self.m_inv[2][2] * z));
             Vector3f::new(x_err, y_err, z_err)
         } else {
-            let p_in_err = self.error();
+            let p_in_err = val.error();
             let x_err = (gamma(3) + 1.0)
-                * (Float::abs(transform.m_inv[0][0]) * p_in_err.x
-                    + Float::abs(transform.m_inv[0][1]) * p_in_err.y
-                    + Float::abs(transform.m_inv[0][2]) * p_in_err.z)
+                * (Float::abs(self.m_inv[0][0]) * p_in_err.x
+                    + Float::abs(self.m_inv[0][1]) * p_in_err.y
+                    + Float::abs(self.m_inv[0][2]) * p_in_err.z)
                 + gamma(3)
-                    * (Float::abs(transform.m_inv[0][0] * x)
-                        + Float::abs(transform.m_inv[0][1] * y)
-                        + Float::abs(transform.m_inv[0][2] * z)
-                        + Float::abs(transform.m_inv[0][3]));
+                    * (Float::abs(self.m_inv[0][0] * x)
+                        + Float::abs(self.m_inv[0][1] * y)
+                        + Float::abs(self.m_inv[0][2] * z)
+                        + Float::abs(self.m_inv[0][3]));
             let y_err = (gamma(3) + 1.0)
-                * (Float::abs(transform.m_inv[1][0]) * p_in_err.x
-                    + Float::abs(transform.m_inv[1][1]) * p_in_err.y
-                    + Float::abs(transform.m_inv[1][2]) * p_in_err.z)
+                * (Float::abs(self.m_inv[1][0]) * p_in_err.x
+                    + Float::abs(self.m_inv[1][1]) * p_in_err.y
+                    + Float::abs(self.m_inv[1][2]) * p_in_err.z)
                 + gamma(3)
-                    * (Float::abs(transform.m_inv[1][0] * x)
-                        + Float::abs(transform.m_inv[1][1] * y)
-                        + Float::abs(transform.m_inv[1][2] * z)
-                        + Float::abs(transform.m_inv[1][3]));
+                    * (Float::abs(self.m_inv[1][0] * x)
+                        + Float::abs(self.m_inv[1][1] * y)
+                        + Float::abs(self.m_inv[1][2] * z)
+                        + Float::abs(self.m_inv[1][3]));
             let z_err = (gamma(3) + 1.0)
-                * (Float::abs(transform.m_inv[2][0]) * p_in_err.x
-                    + Float::abs(transform.m_inv[2][1]) * p_in_err.y
-                    + Float::abs(transform.m_inv[2][2]) * p_in_err.z)
+                * (Float::abs(self.m_inv[2][0]) * p_in_err.x
+                    + Float::abs(self.m_inv[2][1]) * p_in_err.y
+                    + Float::abs(self.m_inv[2][2]) * p_in_err.z)
                 + gamma(3)
-                    * (Float::abs(transform.m_inv[2][0] * x)
-                        + Float::abs(transform.m_inv[2][1] * y)
-                        + Float::abs(transform.m_inv[2][2] * z)
-                        + Float::abs(transform.m_inv[2][3]));
+                    * (Float::abs(self.m_inv[2][0] * x)
+                        + Float::abs(self.m_inv[2][1] * y)
+                        + Float::abs(self.m_inv[2][2] * z)
+                        + Float::abs(self.m_inv[2][3]));
             Vector3f::new(x_err, y_err, z_err)
         };
 
@@ -729,10 +714,10 @@ impl InverseTransformable for Point3fi {
     }
 }
 
-impl InverseTransformableRay for Ray {
-    fn apply_ray_inverse(&self, transform: &Transform, t_max: Option<&mut Float>) -> Ray {
-        let o: Point3fi = Point3fi::from(self.o).apply_inverse(transform);
-        let d: Vector3f = self.d.apply_inverse(transform);
+impl InverseTransformRayI<Ray> for Transform {
+    fn apply_ray_inverse(&self, val: Ray, t_max: Option<&mut Float>) -> Ray {
+        let o: Point3fi = self.apply_inverse(Point3fi::from(val.o));
+        let d: Vector3f = self.apply_inverse(val.d);
         // Offset ray origin to edge of error bounds
         let length_squared = d.length_squared();
         let o = if length_squared > 0.0 {
@@ -749,24 +734,24 @@ impl InverseTransformableRay for Ray {
         } else {
             o
         };
-        Ray::new_with_time(Point3f::from(o), d, self.time, self.medium)
+        Ray::new_with_time(Point3f::from(o), d, val.time, val.medium)
     }
 }
 
-impl InverseTransformableRay for RayDifferential {
+impl InverseTransformRayI<RayDifferential> for Transform {
     fn apply_ray_inverse(
         &self,
-        transform: &Transform,
+        val: RayDifferential,
         t_max: Option<&mut Float>,
     ) -> RayDifferential {
         // Get the transformed base ray
-        let tr = transform.apply_ray_inverse(&self.ray, t_max);
+        let tr = self.apply_ray_inverse(val.ray, t_max);
         // Get the transformed aux rays, if any
-        let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &self.auxiliary {
-            let rx_origin = transform.apply_inv(&aux.rx_origin);
-            let rx_direction = transform.apply_inv(&aux.rx_direction);
-            let ry_origin = transform.apply_inv(&aux.ry_origin);
-            let ry_direction = transform.apply_inv(&aux.ry_direction);
+        let auxiliary: Option<AuxiliaryRays> = if let Some(aux) = &val.auxiliary {
+            let rx_origin = self.apply_inverse(aux.rx_origin);
+            let rx_direction = self.apply_inverse(aux.rx_direction);
+            let ry_origin = self.apply_inverse(aux.ry_origin);
+            let ry_direction = self.apply_inverse(aux.ry_direction);
             Some(AuxiliaryRays::new(
                 rx_origin,
                 rx_direction,
@@ -827,12 +812,13 @@ mod tests {
     };
 
     use super::Transform;
+    use super::{TransformI, InverseTransformI, TransformRayI, InverseTransformRayI};
 
     #[test]
     fn translate_point() {
         let p = Point3f::new(1.0, 2.0, 3.0);
         let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
-        let new = translate.apply(&p);
+        let new = translate.apply(p);
         assert_eq!(Point3f::new(11.0, 22.0, 43.0), new);
     }
 
@@ -840,7 +826,7 @@ mod tests {
     fn translate_inverse_point() {
         let p = Point3f::new(1.0, 2.0, 3.0);
         let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
-        let new = translate.apply_inv(&p);
+        let new = translate.apply_inverse(p);
         assert_eq!(Point3f::new(-9.0, -18.0, -37.0), new);
     }
 
@@ -848,7 +834,7 @@ mod tests {
     fn translate_vector() {
         let v = Vector3f::new(1.0, 2.0, 3.0);
         let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
-        let new = translate.apply(&v);
+        let new = translate.apply(v);
         // Translation does not effect vectors or normals!
         assert_eq!(Vector3f::new(1.0, 2.0, 3.0), new);
     }
@@ -857,7 +843,7 @@ mod tests {
     fn translate_vector_inv() {
         let v = Vector3f::new(1.0, 2.0, 3.0);
         let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
-        let new = translate.apply_inv(&v);
+        let new = translate.apply_inverse(v);
         // Translation does not effect vectors or normals!
         assert_eq!(Vector3f::new(1.0, 2.0, 3.0), new);
     }
@@ -867,7 +853,7 @@ mod tests {
         let v = Normal3f::new(1.0, 2.0, 3.0);
         let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
         // Note this is applying the inverse transpose still! But...
-        let new = translate.apply(&v);
+        let new = translate.apply(v);
         // Translation does not effect vectors or normals!
         assert_eq!(Normal3f::new(1.0, 2.0, 3.0), new);
     }
@@ -876,7 +862,7 @@ mod tests {
     fn translate_normal_inv() {
         let v = Normal3f::new(1.0, 2.0, 3.0);
         let translate = Transform::translate(Vector3f::new(10.0, 20.0, 40.0));
-        let new = translate.apply_inv(&v);
+        let new = translate.apply_inverse(v);
         // Translation does not effect vectors or normals!
         assert_eq!(Normal3f::new(1.0, 2.0, 3.0), new);
     }
@@ -885,9 +871,9 @@ mod tests {
     fn scale_point() {
         let p = Point3f::new(1.0, 2.0, 3.0);
         let scale = Transform::scale(2.0, 3.0, 4.0);
-        let scaled = scale.apply(&p);
+        let scaled = scale.apply(p);
         assert_eq!(Point3f::new(2.0, 6.0, 12.0), scaled);
-        let back_again = scale.apply_inv(&scaled);
+        let back_again = scale.apply_inverse(scaled);
         assert_eq!(p, back_again);
     }
 
@@ -895,9 +881,9 @@ mod tests {
     fn scale_vector() {
         let p = Vector3f::new(1.0, 2.0, 3.0);
         let scale = Transform::scale(2.0, 3.0, 4.0);
-        let scaled = scale.apply(&p);
+        let scaled = scale.apply(p);
         assert_eq!(Vector3f::new(2.0, 6.0, 12.0), scaled);
-        let back_again = scale.apply_inv(&scaled);
+        let back_again = scale.apply_inverse(scaled);
         assert_eq!(p, back_again);
     }
 
@@ -905,19 +891,19 @@ mod tests {
     fn scale_normal() {
         let p = Normal3f::new(1.0, 2.0, 3.0);
         let scale = Transform::scale(2.0, 3.0, 4.0);
-        let scaled = scale.apply(&p);
+        let scaled = scale.apply(p);
         // Note how this differs from vectors - we must transform by the inverse transpose!
         assert_eq!(Normal3f::new(0.5, 0.6666667, 0.75), scaled);
-        let back_again = scale.apply_inv(&scaled);
+        let back_again = scale.apply_inverse(scaled);
         assert_eq!(p, back_again);
 
         // Again, a bit more simply
         let p = Normal3f::new(1.0, 2.0, 3.0);
         let scale = Transform::scale(2.0, 2.0, 2.0);
-        let scaled = scale.apply(&p);
+        let scaled = scale.apply(p);
         // Note how this differs from vectors - we must transform by the inverse transpose!
         assert_eq!(Normal3f::new(0.5, 1.0, 1.5), scaled);
-        let back_again = scale.apply_inv(&scaled);
+        let back_again = scale.apply_inverse(scaled);
         assert_eq!(p, back_again);
     }
 
@@ -925,7 +911,7 @@ mod tests {
     fn apply_bb_transform() {
         let bounds = Bounds3f::new(Point3f::ZERO, Point3f::ONE);
         let translate = Transform::translate(Vector3f::ONE);
-        let translated = translate.apply(&bounds);
+        let translated = translate.apply(bounds);
         assert_eq!(Bounds3f::new(Point3f::ONE, Point3f::ONE * 2.0), translated);
     }
 
@@ -936,9 +922,9 @@ mod tests {
         // This will scale then translate
         let composed = t1 * t2;
         let p = Point3f::ONE;
-        let new = composed.apply(&p);
+        let new = composed.apply(p);
         assert_eq!(Point3f::new(2.0, 3.0, 4.0), new);
-        let reverted = composed.apply_inv(&new);
+        let reverted = composed.apply_inverse(new);
         assert_eq!(p, reverted);
     }
 
@@ -947,26 +933,26 @@ mod tests {
         let from = Vector3f::Z;
         let to = Vector3f::Z;
         let r = Transform::rotate_from_to(&from, &to);
-        let to_new = r.apply(&from);
+        let to_new = r.apply(from);
         assert_eq!(to, to_new);
 
         let from = Vector3f::Z;
         let to = Vector3f::X;
         let r = Transform::rotate_from_to(&from, &to);
-        let to_new = r.apply(&from);
+        let to_new = r.apply(from);
         assert_eq!(to, to_new);
 
         let from = Vector3f::Z;
         let to = Vector3f::Y;
         let r = Transform::rotate_from_to(&from, &to);
-        let to_new = r.apply(&from);
+        let to_new = r.apply(from);
         assert_eq!(to, to_new);
 
         // Note that rotate_from_to() expects normalized vectors.
         let from = Vector3f::new(0.1, 0.2, 0.3).normalize();
         let to = Vector3f::new(0.4, 0.5, 0.6).normalize();
         let r = Transform::rotate_from_to(&from, &to);
-        let to_new = r.apply(&from);
+        let to_new = r.apply(from);
         assert_approx_eq!(Float, to.x, to_new.x);
         assert_approx_eq!(Float, to.y, to_new.y);
         assert_approx_eq!(Float, to.z, to_new.z);

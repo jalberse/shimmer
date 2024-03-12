@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ply_rs::{parser::Parser, ply};
 
 use crate::{
-    file, transform::Transform, vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector3f}
+    transform::{Transform, TransformI}, vecmath::{Normal3f, Point2f, Point3f, Tuple2, Tuple3, Vector3f}
 };
 
 #[derive(Debug, Clone)]
@@ -42,7 +42,7 @@ impl TriangleMesh {
         // Which is better depends on the specific intersection routine.
         let p = p
             .iter()
-            .map(|pt| render_from_object.apply(pt))
+            .map(|pt| render_from_object.apply(*pt))
             .collect_vec();
 
         if !uv.is_empty() {
@@ -53,7 +53,7 @@ impl TriangleMesh {
             debug_assert_eq!(n_vertices, n.len());
             n.iter()
                 .map(|nn| {
-                    let nn = render_from_object.apply(nn);
+                    let nn = render_from_object.apply(*nn);
                     if reverse_orientation {
                         -nn
                     } else {
@@ -68,7 +68,7 @@ impl TriangleMesh {
         let s = if !s.is_empty() {
             debug_assert_eq!(n_vertices, s.len());
             s.iter()
-                .map(|ss| render_from_object.apply(ss))
+                .map(|ss| render_from_object.apply(*ss))
                 .collect_vec()
         } else {
             s
@@ -131,7 +131,7 @@ impl BilinearPatchMesh{
         // Transform mesh vertices to rendering space
         let p = p
             .iter()
-            .map(|pt| render_from_object.apply(pt))
+            .map(|pt| render_from_object.apply(*pt))
             .collect_vec();
         
         // Copy UV and n vertex data, if present
@@ -146,7 +146,7 @@ impl BilinearPatchMesh{
             assert_eq!(n_vertices, n.len());
             for nn in n.iter_mut()
             {
-                *nn = render_from_object.apply(nn);
+                *nn = render_from_object.apply(*nn);
                 if reverse_orientation
                 {
                     *nn = -(*nn);
