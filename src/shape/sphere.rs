@@ -9,7 +9,7 @@ use crate::{
     math::{radians, safe_acos, safe_sqrt, sqr, DifferenceOfProducts, Sqrt},
     ray::Ray,
     sampling::sample_uniform_sphere,
-    transform::Transform,
+    transform::{Transform, TransformI},
     vecmath::{
         normal::Normal3,
         point::{Point3, Point3fi},
@@ -94,8 +94,8 @@ impl Sphere {
 impl Sphere {
     pub fn basic_intersect(&self, ray: &Ray, t_max: Float) -> Option<QuadricIntersection> {
         // Transform ray origin and direction to object space
-        let oi: Point3fi = self.object_from_render.apply(&Point3fi::from(ray.o));
-        let di: Vector3fi = self.object_from_render.apply(&Vector3fi::from(ray.d));
+        let oi: Point3fi = self.object_from_render.apply(Point3fi::from(ray.o));
+        let di: Vector3fi = self.object_from_render.apply(Vector3fi::from(ray.d));
         // Solve quadratic equation to compute sphere t0 and t1
 
         // Compute sphere quadric coefficients
@@ -254,7 +254,7 @@ impl Sphere {
 
         // Return _SurfaceInteraction_ for quadric intersection
         let flip_normal: bool = self.reverse_orientation ^ self.transform_swaps_handedness;
-        let wo_object = self.object_from_render.apply(&wo);
+        let wo_object = self.object_from_render.apply(wo);
 
         let si = SurfaceInteraction::new(
             Point3fi::from_value_and_error(p_hit, p_error),
@@ -267,14 +267,14 @@ impl Sphere {
             time,
             flip_normal,
         );
-        self.render_from_object.apply(&si)
+        self.render_from_object.apply(si)
     }
 }
 
 impl ShapeI for Sphere {
     fn bounds(&self) -> Bounds3f {
         // TODO could be made tighter when self.phi_max < 3pi/2.
-        self.render_from_object.apply(&Bounds3f::new(
+        self.render_from_object.apply(Bounds3f::new(
             Point3f::new(-self.radius, -self.radius, self.z_min),
             Point3f::new(self.radius, self.radius, self.z_max),
         ))
@@ -310,7 +310,7 @@ impl ShapeI for Sphere {
         // Compute surface normal for sphere sample and return shape sample
         let n_obj = Normal3f::new(p_obj.x, p_obj.y, p_obj.z);
         let normal_sign = if self.reverse_orientation { -1.0 } else { 1.0 };
-        let n = normal_sign * self.render_from_object.apply(&n_obj).normalize();
+        let n = normal_sign * self.render_from_object.apply(n_obj).normalize();
 
         let theta = safe_acos(p_obj.z / self.radius);
         let mut phi = Float::atan2(p_obj.y, p_obj.x);
@@ -324,7 +324,7 @@ impl ShapeI for Sphere {
 
         let pi = self
             .render_from_object
-            .apply(&Point3fi::from_value_and_error(p_obj, p_obj_error));
+            .apply(Point3fi::from_value_and_error(p_obj, p_obj_error));
 
         Some(ShapeSample {
             intr: Interaction::new(pi, n, uv, Vector3f::default(), 0.0),
@@ -337,7 +337,7 @@ impl ShapeI for Sphere {
     }
 
     fn sample_with_context(&self, ctx: &ShapeSampleContext, u: Point2f) -> Option<ShapeSample> {
-        let p_center: Point3f = self.render_from_object.apply(&Point3f::ZERO);
+        let p_center: Point3f = self.render_from_object.apply(Point3f::ZERO);
         let p_origin: Point3f = ctx.offset_ray_origin_pt(p_center);
         // Sample uniformly on sphere if $\pt{}$ is inside it
         if p_origin.distance_squared(p_center) <= sqr(self.radius) {
@@ -395,7 +395,7 @@ impl ShapeI for Sphere {
         let p_error: Vector3f = gamma(5) * Vector3f::from(p).abs();
 
         // Compute $(u,v)$ coordinates for sampled point on sphere
-        let p_obj = self.object_from_render.apply(&p);
+        let p_obj = self.object_from_render.apply(p);
         let theta = safe_acos(p_obj.z / self.radius);
         let mut sphere_phi = Float::atan2(p_obj.y, p_obj.x);
         if sphere_phi < 0.0 {
@@ -422,7 +422,7 @@ impl ShapeI for Sphere {
     }
 
     fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vector3f) -> Float {
-        let p_center = self.render_from_object.apply(&Point3f::ZERO);
+        let p_center = self.render_from_object.apply(Point3f::ZERO);
         let p_origin = ctx.offset_ray_origin_pt(p_center);
         if p_origin.distance_squared(p_center) <= self.radius * self.radius {
             // Return solid angle PDF for point inside sphere

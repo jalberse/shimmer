@@ -8,7 +8,7 @@ use crate::{
         sampled_wavelengths::SampledWavelengths,
         spectrum::{self, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, SpectrumI},
         Spectrum,
-    }, transform::Transform, vecmath::{normal::Normal3, spherical::spherical_theta, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f}, Float
+    }, transform::{Transform, TransformI}, vecmath::{normal::Normal3, spherical::spherical_theta, vector::Vector3, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f}, Float
 };
 
 pub trait FloatTextureI {
@@ -948,7 +948,7 @@ pub struct SphericalMapping
 
 impl TextureMapping2DI for SphericalMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
-        let pt = self.texture_from_render.apply(&ctx.p);
+        let pt = self.texture_from_render.apply(ctx.p);
         let x2y2 = sqr(pt.x) + sqr(pt.y);
         let sqrtx2y2 = x2y2.sqrt();
         let dsdp = Vector3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI_F * x2y2);
@@ -956,8 +956,8 @@ impl TextureMapping2DI for SphericalMapping {
             1.0 / (PI_F * (x2y2 + sqr(pt.z))) *
             Vector3f::new(pt.x * pt.z / sqrtx2y2, pt.y * pt.z / sqrtx2y2, -sqrtx2y2);
         
-        let dpdx = self.texture_from_render.apply(&ctx.dpdx);
-        let dpdy = self.texture_from_render.apply(&ctx.dpdy);
+        let dpdx = self.texture_from_render.apply(ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(ctx.dpdy);
 
         let dsdx = dsdp.dot(dpdx);
         let dsdy = dsdp.dot(dpdy);
@@ -988,12 +988,12 @@ pub struct CylindricalMapping
 
 impl TextureMapping2DI for CylindricalMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
-        let pt = self.texture_from_render.apply(&ctx.p);
+        let pt = self.texture_from_render.apply(ctx.p);
         let x2y2 = sqr(pt.x) + sqr(pt.y);
         let dsdp = Vector3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI_F * x2y2);
         let dtdp = Vector3f::Z;
-        let dpdx = self.texture_from_render.apply(&ctx.dpdx);
-        let dpdy = self.texture_from_render.apply(&ctx.dpdy);
+        let dpdx = self.texture_from_render.apply(ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(ctx.dpdy);
         let dsdx = dsdp.dot(dpdx);
         let dsdy = dsdp.dot(dpdy);
         let dtdx = dtdp.dot(dpdx);
@@ -1026,9 +1026,9 @@ pub struct PlanarMapping
 
 impl TextureMapping2DI for PlanarMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
-        let vec: Vector3f = self.texture_from_render.apply(&ctx.p).into();
-        let dpdx = self.texture_from_render.apply(&ctx.dpdx);
-        let dpdy = self.texture_from_render.apply(&ctx.dpdy);
+        let vec: Vector3f = self.texture_from_render.apply(ctx.p).into();
+        let dpdx = self.texture_from_render.apply(ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(ctx.dpdy);
         let dsdx = self.vs.dot(dpdx);
         let dsdy = self.vs.dot(dpdy);
         let dtdx = self.vt.dot(dpdx);

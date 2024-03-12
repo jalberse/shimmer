@@ -14,8 +14,7 @@ use crate::{
     float::PI_F,
     image::Image,
     interaction::{Interaction, SurfaceInteraction},
-    loading::paramdict::ParameterDictionary,
-    loading::parser_target::FileLoc,
+    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
     media::Medium,
     options::Options,
     ray::Ray,
@@ -28,7 +27,7 @@ use crate::{
         DenselySampledSpectrum, Spectrum,
     },
     texture::FloatTexture,
-    transform::Transform,
+    transform::{Transform, TransformI},
     vecmath::{
         normal::Normal3,
         point::{Point3, Point3fi},
@@ -410,7 +409,7 @@ impl LightI for PointLight {
         lambda: &SampledWavelengths,
         _allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
-        let p = self.base.render_from_light.apply(&Point3f::ZERO);
+        let p = self.base.render_from_light.apply(Point3f::ZERO);
         let wi = (p - ctx.p()).normalize();
         let li = self.scale * self.i.sample(&lambda) / p.distance_squared(ctx.p());
         // TODO I do think this is correct compared to PBRT,
