@@ -21,7 +21,7 @@ pub fn create_integrator(
     aggregate: Arc<Primitive>,
     lights: Arc<Vec<Arc<Light>>>,
     color_space: Arc<RgbColorSpace>,
-) -> Box<dyn IntegratorI> {
+) -> Box<dyn Integrator> {
     let integrator = match name {
         "simplepath" => Box::new(ImageTileIntegrator::create_simple_path_integrator(
             parameters, camera, sampler, aggregate, lights,
@@ -46,7 +46,7 @@ struct FilmSample {
     weight: Float,
 }
 
-pub trait IntegratorI {
+pub trait Integrator {
     fn render(&mut self, options: &Options);
 }
 
@@ -133,7 +133,7 @@ pub struct ImageTileIntegrator {
     camera: Camera,
     sampler_prototype: Sampler,
 
-    pixel_sample_evaluator: PixelSampleEvaluator,
+    ray_path_li_evaluator: RayPathLiEvaluator,
 }
 
 impl ImageTileIntegrator {
@@ -151,7 +151,7 @@ impl ImageTileIntegrator {
             lights: lights.clone(),
         };
 
-        let pixel_sample_evaluator = PixelSampleEvaluator::SimplePath(SimplePathIntegrator {
+        let pixel_sample_evaluator = RayPathLiEvaluator::SimplePath(SimplePathIntegrator {
             max_depth,
             sample_lights,
             sample_bsdf,
@@ -177,7 +177,7 @@ impl ImageTileIntegrator {
     ) -> ImageTileIntegrator {
         let max_depth = parameters.get_one_int("maxdepth", 5);
         let pixel_sample_evaluator =
-            PixelSampleEvaluator::RandomWalk(RandomWalkIntegrator { max_depth });
+        RayPathLiEvaluator::RandomWalk(RandomWalkIntegrator { max_depth });
 
         // TODO I dislike having to clone the sampler and camera.
         ImageTileIntegrator::new(
@@ -194,18 +194,18 @@ impl ImageTileIntegrator {
         lights: Arc<Vec<Arc<Light>>>,
         camera: Camera,
         sampler: Sampler,
-        pixel_sample_evaluator: PixelSampleEvaluator,
+        ray_path_li_evaluator: RayPathLiEvaluator,
     ) -> ImageTileIntegrator {
         ImageTileIntegrator {
             base: IntegratorBase::new(aggregate, lights),
             camera,
             sampler_prototype: sampler,
-            pixel_sample_evaluator,
+            ray_path_li_evaluator,
         }
     }
 }
 
-impl IntegratorI for ImageTileIntegrator {
+impl Integrator for ImageTileIntegrator {
     fn render(&mut self, options: &Options) {
         let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
@@ -246,7 +246,7 @@ impl IntegratorI for ImageTileIntegrator {
                                     .borrow_mut()
                                     .start_pixel_sample(p_pixel, sample_index, 0);
                                 let film_sample =
-                                    self.pixel_sample_evaluator.evaluate_pixel_sample(
+                                    self.evaluate_pixel_sample(
                                         &self.base,
                                         &self.camera,
                                         p_pixel,
@@ -297,12 +297,8 @@ impl IntegratorI for ImageTileIntegrator {
     }
 }
 
-// TODO We don't need this to be a trait necessarily.
-//   If we're just matching inside the PixelSampleEvaluator enum's impl,
-//   then we can have each one take their own parameters for evaluate_pixel_sample().
-//   We don't actually need the trait, just the match.
-// We also want to share the evaluate_pixel_sample implementation, thought.
-trait PixelSampleEvaluatorI {
+impl ImageTileIntegrator
+{
     fn evaluate_pixel_sample(
         &self,
         base: &IntegratorBase,
@@ -312,63 +308,8 @@ trait PixelSampleEvaluatorI {
         sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
-    ) -> FilmSample;
-}
-
-pub enum PixelSampleEvaluator {
-    RandomWalk(RandomWalkIntegrator),
-    SimplePath(SimplePathIntegrator),
-}
-
-impl PixelSampleEvaluatorI for PixelSampleEvaluator {
-    fn evaluate_pixel_sample(
-        &self,
-        base: &IntegratorBase,
-        camera: &Camera,
-        p_pixel: Point2i,
-        sample_index: i32,
-        sampler: &mut Sampler,
-        scratch_buffer: &mut Bump,
-        options: &Options,
-    ) -> FilmSample {
-        match self {
-            PixelSampleEvaluator::RandomWalk(integrator) => integrator.evaluate_pixel_sample(
-                base,
-                camera,
-                p_pixel,
-                sample_index,
-                sampler,
-                scratch_buffer,
-                options,
-            ),
-            PixelSampleEvaluator::SimplePath(integrator) => integrator.evaluate_pixel_sample(
-                base,
-                camera,
-                p_pixel,
-                sample_index,
-                sampler,
-                scratch_buffer,
-                options,
-            ),
-        }
-    }
-}
-
-pub struct RandomWalkIntegrator {
-    pub max_depth: i32,
-}
-
-impl PixelSampleEvaluatorI for RandomWalkIntegrator {
-    fn evaluate_pixel_sample(
-        &self,
-        base: &IntegratorBase,
-        camera: &Camera,
-        p_pixel: Point2i,
-        sample_index: i32,
-        sampler: &mut Sampler,
-        scratch_buffer: &mut Bump,
-        options: &Options,
-    ) -> FilmSample {
+    ) -> FilmSample
+    {
         // Sample wavelengths for the ray
         let lu = if options.disable_wavelength_jitter {
             0.5
@@ -404,10 +345,10 @@ impl PixelSampleEvaluatorI for RandomWalkIntegrator {
             };
 
             let l = camera_ray.weight
-                * self.li(
+                * self.ray_path_li_evaluator.li(
                     base,
                     camera,
-                    &camera_ray.ray,
+                    &mut camera_ray.ray,
                     &mut lambda,
                     sampler,
                     &visible_surface,
@@ -438,6 +379,59 @@ impl PixelSampleEvaluatorI for RandomWalkIntegrator {
             weight: camera_sample.filter_weight,
         }
     }
+}
+
+pub enum RayPathLiEvaluator {
+    SimplePath(SimplePathIntegrator),
+    RandomWalk(RandomWalkIntegrator),
+}
+
+impl RayPathLiEvaluator
+{
+    fn li(
+        &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        ray: &mut RayDifferential,
+        lambda: &mut SampledWavelengths,
+        sampler: &mut Sampler,
+        visible_surface: &Option<VisibleSurface>,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> SampledSpectrum
+    {
+        match self {
+            RayPathLiEvaluator::SimplePath(simple_path_integrator) => {
+                simple_path_integrator.li(
+                    base,
+                    camera,
+                    ray,
+                    lambda,
+                    sampler,
+                    visible_surface,
+                    scratch_buffer,
+                    options,
+                )
+            }
+            RayPathLiEvaluator::RandomWalk(random_walk_integrator) => {
+                random_walk_integrator.li(
+                    base,
+                    camera,
+                    ray,
+                    lambda,
+                    sampler,
+                    visible_surface,
+                    scratch_buffer,
+                    options,
+                )
+            }
+        }
+    }
+
+}
+
+pub struct RandomWalkIntegrator {
+    pub max_depth: i32,
 }
 
 impl RandomWalkIntegrator {
@@ -555,89 +549,6 @@ pub struct SimplePathIntegrator {
     /// uniform directional sampling should be used.
     pub sample_bsdf: bool,
     pub light_sampler: UniformLightSampler,
-}
-
-// TODO This should be shared between SimplePathIntegrator and RandomWalkIntegrator.
-impl PixelSampleEvaluatorI for SimplePathIntegrator {
-    fn evaluate_pixel_sample(
-        &self,
-        base: &IntegratorBase,
-        camera: &Camera,
-        p_pixel: Point2i,
-        sample_index: i32,
-        sampler: &mut Sampler,
-        scratch_buffer: &mut Bump,
-        options: &Options,
-    ) -> FilmSample {
-        // Sample wavelengths for the ray
-        let lu = if options.disable_wavelength_jitter {
-            0.5
-        } else {
-            sampler.get_1d()
-        };
-        let mut lambda = camera.get_film_const().sample_wavelengths(lu);
-
-        // Initialize camera_sample for the current sample
-        let filter = camera.get_film_const().get_filter();
-        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
-
-        let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
-
-        let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
-            debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
-            debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
-
-            // TODO Scale camera ray differentials based on image sampling rate.
-            let ray_diff_scale = Float::max(
-                0.125,
-                1.0 / Float::sqrt(sampler.samples_per_pixel() as Float),
-            );
-            if !options.disable_pixel_jitter {
-                camera_ray.ray.scale_differentials(ray_diff_scale);
-            }
-
-            // Evaluate radiance along the camera ray
-            let visible_surface = if camera.get_film_const().uses_visible_surface() {
-                Some(VisibleSurface::default())
-            } else {
-                None
-            };
-
-            let l = camera_ray.weight
-                * self.li(
-                    base,
-                    camera,
-                    &mut camera_ray.ray,
-                    &mut lambda,
-                    sampler,
-                    &visible_surface,
-                    scratch_buffer,
-                    options,
-                );
-
-            if l.has_nan() {
-                // TODO log error, set SampledSpectrum l to 0.
-                // Use env_logger.
-            } else if l.y(&lambda).is_infinite() {
-                // TODO log error, set SampledSpectrum l to 0
-            }
-
-            (l, visible_surface)
-        } else {
-            (
-                SampledSpectrum::from_const(0.0),
-                Some(VisibleSurface::default()),
-            )
-        };
-
-        FilmSample {
-            p_film: p_pixel,
-            l,
-            lambda,
-            visible_surface,
-            weight: camera_sample.filter_weight,
-        }
-    }
 }
 
 impl SimplePathIntegrator {
