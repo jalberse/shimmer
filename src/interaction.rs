@@ -209,7 +209,7 @@ impl SurfaceInteraction {
             _ => false,
         };
 
-        let material_eval_context = MaterialEvalContext::from(&*self);
+        let mut material_eval_context = MaterialEvalContext::from(&*self);
         while is_mixed
         {
             match material.as_ref() {
@@ -245,6 +245,8 @@ impl SurfaceInteraction {
 
             let ns = dpdu.cross(dpdv).normalize();
             self.set_shading_geometry(ns.into(), dpdu, dpdv, self.shading.dndu, self.shading.dndv, false);
+            // Ensure that the material eval context is updated with the new shading geometry.
+            material_eval_context = MaterialEvalContext::from(&*self);
         }
 
         let bsdf = material.get_bsdf(
