@@ -3,26 +3,16 @@ use std::{collections::HashMap, sync::Arc};
 use rand::{rngs::SmallRng, Rng};
 
 use crate::{
-    bsdf::BSDF,
-    bxdf::{BxDF, CoatedConductorBxDF, CoatedDiffuseBxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF, ThinDielectricBxDF},
-    image::Image,
-    interaction::SurfaceInteraction,
-    loading::{
+    bsdf::BSDF, bxdf::{BxDF, CoatedConductorBxDF, CoatedDiffuseBxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF, ThinDielectricBxDF}, frame::Frame, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, loading::{
         paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary},
         parser_target::FileLoc,
-    },
-    math::Sqrt,
-    scattering::TrowbridgeReitzDistribution,
-    spectra::{
+    }, math::Sqrt, scattering::TrowbridgeReitzDistribution, spectra::{
         sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
         spectrum::SpectrumI, ConstantSpectrum, NamedSpectrum, Spectrum,
-    },
-    texture::{
+    }, texture::{
         FloatTexture, FloatTextureI, SpectrumConstantTexture, SpectrumTexture, SpectrumTextureI,
         TextureEvalContext,
-    },
-    vecmath::{Normal3f, Vector3f},
-    Float,
+    }, vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f}, Float
 };
 
 pub trait MaterialI {
@@ -1423,4 +1413,114 @@ impl TextureEvaluatorI for UniversalTextureEvaluator {
     ) -> SampledSpectrum {
         tex.evaluate(ctx, lambda)
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct NormalBumpEvalContextShading
+{
+    pub n: Normal3f,
+    pub dpdu: Vector3f,
+    pub dpdv: Vector3f,
+    pub dndu: Normal3f,
+    pub dndv: Normal3f,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct NormalBumpEvalContext
+{
+    pub p: Point3f,
+    pub uv: Point2f,
+    pub n: Normal3f,
+    pub shading: NormalBumpEvalContextShading,
+    pub dudx: Float,
+    pub dudy: Float,
+    pub dvdx: Float,
+    pub dvdy: Float,
+    pub dpdx: Vector3f,
+    pub dpdy: Vector3f,
+    pub face_index: i32,
+}
+
+impl From<&mut SurfaceInteraction> for NormalBumpEvalContext
+{
+    fn from(value: &mut SurfaceInteraction) -> Self {
+        NormalBumpEvalContext {
+            p: value.p(),
+            uv: value.interaction.uv,
+            n: value.shading.n,
+            shading: NormalBumpEvalContextShading {
+                n: value.shading.n,
+                dpdu: value.shading.dpdu,
+                dpdv: value.shading.dpdv,
+                dndu: value.shading.dndu,
+                dndv: value.shading.dndv,
+            },
+            dudx: value.dudx,
+            dudy: value.dudy,
+            dvdx: value.dvdx,
+            dvdy: value.dvdy,
+            dpdx: value.dpdx,
+            dpdy: value.dpdy,
+            face_index: value.face_index,
+        }
+    }
+}
+
+/// Returns dpdu, dpdv
+pub fn normal_map(normal_map: &Image, ctx: &NormalBumpEvalContext) -> (Vector3f, Vector3f)
+{
+    let wrap: WrapMode2D = WrapMode::Repeat.into();
+    let uv = Point2f::new(ctx.uv[0], 1.0 - ctx.uv[1]);
+    let ns = Vector3f::new(
+        2.0 * normal_map.bilerp_channel_wrapped(uv, 0, wrap) - 1.0,
+        2.0 * normal_map.bilerp_channel_wrapped(uv, 1, wrap) - 1.0,
+        2.0 * normal_map.bilerp_channel_wrapped(uv, 2, wrap) - 1.0,
+    );
+    let ns = ns.normalize();
+
+    // Transform tangent-space normal to rendering space
+    let frame = Frame::from_xz(ctx.shading.dpdu.normalize(), ctx.shading.n.into());
+    let ns = frame.from_local_v(&ns);
+
+    // Find dpdu and dpdv that give the shading normal
+    let ulen = ctx.shading.dpdu.length();
+    let vlen = ctx.shading.dpdv.length();
+    let dpdu = ctx.shading.dpdu.gram_schmidt(ns).normalize() * ulen;
+    let dpdv = ns.cross(dpdu).normalize() * vlen;
+    (dpdu, dpdv)
+}
+
+// Returns dpdu, dpdv
+pub fn bump_map(tex_eval: UniversalTextureEvaluator, displacement: Arc<FloatTexture>, ctx: &NormalBumpEvalContext) -> (Vector3f, Vector3f) 
+{
+    // Compute offset positions and evaluate displacement texture
+    let mut shifted_ctx = ctx.clone();
+
+    // Shift shifted_ctx du in the u direction
+    let mut du = 0.5 * (ctx.dudx.abs() + ctx.dudy.abs());
+    if du == 0.0
+    {
+        du = 0.0005;
+    }
+    shifted_ctx.p = ctx.p + du * ctx.shading.dpdu;
+    shifted_ctx.uv = ctx.uv + Vector2f::new(du, 0.0);
+
+    let u_displace = tex_eval.evaluate_float(&displacement, &(&shifted_ctx).into());
+    
+    // Shift shifted_ctx dv in the v direction
+    let mut dv = 0.5 * (ctx.dvdx.abs() + ctx.dvdy.abs());
+    if dv == 0.0
+    {
+        dv = 0.0005;
+    }
+    shifted_ctx.p = ctx.p + dv * ctx.shading.dpdv;
+    shifted_ctx.uv = ctx.uv + Vector2f::new(0.0, dv);
+    let v_displace = tex_eval.evaluate_float(&displacement, &(&shifted_ctx).into());
+    let displace = tex_eval.evaluate_float(&displacement, &ctx.into());
+
+    // Compute bump-mapped differential geometry
+    let dpdu: Vector3f = ctx.shading.dpdu + (u_displace - displace) / du * ctx.shading.n + displace * ctx.shading.dndu;
+    let dpdv: Vector3f = ctx.shading.dpdv + (v_displace - displace) / dv * ctx.shading.n + displace * ctx.shading.dndv;
+
+    (dpdu, dpdv)
 }

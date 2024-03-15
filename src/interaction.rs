@@ -8,7 +8,7 @@ use crate::{
     bxdf::{self, BxDFFLags, DiffuseBxDF},
     camera::{Camera, CameraI},
     light::{Light, LightI},
-    material::{Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
+    material::{self, bump_map, Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
     math::{sqr, DifferenceOfProducts},
     options::Options,
     ray::{AuxiliaryRays, Ray, RayDifferential},
@@ -229,8 +229,22 @@ impl SurfaceInteraction {
         let displacement = material.get_displacement();
         let normal_map = material.get_normal_map();
         if displacement.is_some() || normal_map.is_some() {
-            // TODO handle shading using normal or bump map - we just won't do anything right now...
-            warn!("Normal and displacement maps not fully implemented yet!");
+            let (dpdu, dpdv) = if let Some(displacement) = displacement {
+                bump_map(
+                    UniversalTextureEvaluator{},
+                    displacement,
+                    &self.into()
+                )
+            } else {
+                let normal_map = normal_map.unwrap();
+                material::normal_map(
+                    normal_map.as_ref(),
+                    &self.into()
+                )
+            };
+
+            let ns = dpdu.cross(dpdv).normalize();
+            self.set_shading_geometry(ns.into(), dpdu, dpdv, self.shading.dndu, self.shading.dndv, false);
         }
 
         let bsdf = material.get_bsdf(
