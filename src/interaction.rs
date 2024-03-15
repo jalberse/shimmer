@@ -20,6 +20,7 @@ use crate::{
     Float,
 };
 
+#[derive(Debug, Clone)]
 pub struct Interaction {
     /// The point the interaction is at
     pub pi: Point3fi,
@@ -83,6 +84,7 @@ impl Interaction {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SurfaceInteraction {
     pub interaction: Interaction,
     pub dpdu: Vector3f,
@@ -474,6 +476,7 @@ impl SurfaceInteraction {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SurfaceInteractionShading {
     pub n: Normal3f,
     pub dpdu: Vector3f,

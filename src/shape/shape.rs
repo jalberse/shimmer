@@ -218,6 +218,7 @@ impl ShapeI for Shape {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ShapeIntersection {
     pub intr: SurfaceInteraction,
     pub t_hit: Float,
@@ -275,8 +276,13 @@ impl ShapeSampleContext {
         self.offset_ray_origin(pt - self.p())
     }
 
-    pub fn spawn_ray(&self, _w: Vector3f) -> Ray {
-        todo!()
+    pub fn spawn_ray(&self, w: Vector3f) -> Ray {
+        Ray::new_with_time(
+            self.offset_ray_origin(w),
+            w,
+            self.time,
+            None,
+        )
     }
 }
 

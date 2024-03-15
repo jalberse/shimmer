@@ -104,4 +104,9 @@ impl BSDF {
     pub fn rho_hh(&self, u1: &[Point2f], uc: &[Float], u2: &[Point2f]) -> SampledSpectrum {
         self.bxdf.rho_hh(u1, uc, u2)
     }
+
+    pub fn regularize(&mut self)
+    {
+        self.bxdf.regularize();
+    }
 }
