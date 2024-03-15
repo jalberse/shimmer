@@ -1293,14 +1293,6 @@ impl MaterialI for CoatedConductorMaterial
     }
 }
 
-// TODO Actually, I think that MixMaterial shouldn't be a MaterialI or a Material subset.
-//    It's handled totally differently and doesn't have a BxDF.
-//    But.... we don't want to like, tote this new type around everywhere we use a Material?
-//       Huh. Instinct was like, well just inside choose bxdf we can just choose one,
-//       but between calls that's hard/inconsistent, and we can't have two concrete types.
-//    So some separate type still seems like the way...
-//    Do we entirely wrap Material in some new enum, with Material { SingleMaterial, MixMaterial }?
-//      That seems like the cleanest approach. Yeah cool I guess.
 #[derive(Debug)]
 pub struct MixMaterial
 {
