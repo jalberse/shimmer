@@ -673,7 +673,7 @@ impl BasicScene {
 
             let mut tex_dict = TextureParameterDictionary::new(material.parameters.clone());
             let m = Arc::new(Material::create(
-                name,
+                &ty,
                 &mut tex_dict,
                 textures,
                 normal_map,
