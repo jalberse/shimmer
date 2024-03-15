@@ -1,3 +1,5 @@
+![ganesha](images/shimmer-ganesha-1.png)
+
 # Shimmer
 
 Shimmer is a physically based rendering system based on the ray tracing algorithm. It is currently under development.
