@@ -1170,36 +1170,45 @@ impl Image {
 
         // Transform the raw bytes into an Image accounting for the format encoded in the header.
         let image = match info.color_type {
-            png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha => match info.bit_depth {
-                png::BitDepth::Eight => Image::new_p8(
-                    img_data,
-                    Point2i::new(info.width as i32, info.height as i32),
-                    &["Y".to_owned()],
-                    encoding,
-                ),
-                png::BitDepth::Sixteen => {
-                    let mut image = Image::new(
-                        PixelFormat::Half,
+            png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha => {
+                // TODO Unfortunately, the png crate does not support stripping alpha - which is really what we want here.
+                // So we'll strip it manually for now.
+                let img_data = if info.color_type == png::ColorType::GrayscaleAlpha {
+                    img_data.chunks_exact(2).map(|chunk| chunk[0]).collect::<Vec<u8>>()
+                } else {
+                    img_data
+                };
+                match info.bit_depth {
+                    png::BitDepth::Eight => Image::new_p8(
+                        img_data,
                         Point2i::new(info.width as i32, info.height as i32),
                         &["Y".to_owned()],
-                        None,
-                    );
-                    for y in 0..info.height {
-                        for x in 0..info.width {
-                            let v = f16::from_le_bytes(
-                                img_data[(2 * (y * info.width + x)) as usize
-                                    ..(2 * (y * info.width + x) + 2) as usize]
-                                    .try_into()
-                                    .unwrap(),
-                            );
-                            let v: Float = v.into();
-                            let v = encoding.0.to_float_linear(v);
-                            image.set_channel(Point2i::new(x as i32, y as i32), 0, v);
+                        encoding,
+                    ),
+                    png::BitDepth::Sixteen => {
+                        let mut image = Image::new(
+                            PixelFormat::Half,
+                            Point2i::new(info.width as i32, info.height as i32),
+                            &["Y".to_owned()],
+                            None,
+                        );
+                        for y in 0..info.height {
+                            for x in 0..info.width {
+                                let v = f16::from_le_bytes(
+                                    img_data[(2 * (y * info.width + x)) as usize
+                                        ..(2 * (y * info.width + x) + 2) as usize]
+                                        .try_into()
+                                        .unwrap(),
+                                );
+                                let v: Float = v.into();
+                                let v = encoding.0.to_float_linear(v);
+                                image.set_channel(Point2i::new(x as i32, y as i32), 0, v);
+                            }
                         }
+                        image
                     }
-                    image
-                }
-                _ => panic!("Unsupported bit depth"),
+                    _ => panic!("Unsupported bit depth"),
+            }
             },
             png::ColorType::Rgb | png::ColorType::Rgba => {
                 let has_alpha = info.color_type == png::ColorType::Rgba;
