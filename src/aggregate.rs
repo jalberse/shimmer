@@ -50,7 +50,7 @@ impl BvhAggregate {
         parameters: &mut ParameterDictionary,
     ) -> BvhAggregate {
         // TODO Change default to SAH, when implemented.
-        let split_method_name = parameters.get_one_string("splitmethod", "middle".to_string());
+        let split_method_name = parameters.get_one_string("splitmethod", "middle");
         let split_method = match split_method_name.as_str() {
             "middle" => SplitMethod::Middle,
             "equal" => SplitMethod::EqualCounts,

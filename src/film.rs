@@ -235,7 +235,7 @@ impl FilmBaseParameters {
         loc: &FileLoc,
         options: &Options,
     ) -> FilmBaseParameters {
-        let filename = parameters.get_one_string("filename", "".to_string());
+        let filename = parameters.get_one_string("filename", "");
         let filename = if let Some(image_file) = options.image_file.as_ref() {
             if !filename.is_empty() {
                 warn!("Output filename supplied on command line {} will override filename in scene description file {}", image_file, filename);
@@ -778,7 +778,7 @@ impl PixelSensor {
     ) -> PixelSensor {
         let iso = parameters.get_one_float("iso", 100.0);
         let white_balance_temp = parameters.get_one_float("whitebalance", 0.0);
-        let sensor_name = parameters.get_one_string("sensor", "cie1931".to_string());
+        let sensor_name = parameters.get_one_string("sensor", "cie1931");
 
         // Pass through 0 for cie1931 if it's unspecified so that it doesn't do any white balancing.
         // For actual sensors, 6500 is the default

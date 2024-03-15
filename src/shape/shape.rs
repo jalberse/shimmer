@@ -95,7 +95,7 @@ impl Shape {
                 Triangle::create_triangles(trianglemesh)
             }
             "plymesh" => {
-                let filename = parameters.get_one_string("filename", "".to_string());
+                let filename = parameters.get_one_string("filename", "");
                 let filename = resolve_filename(options, &filename);
                 let ply_mesh = TriQuadMesh::read_ply(&filename);
 

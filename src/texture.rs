@@ -360,17 +360,17 @@ impl FloatImageTexture
         let map = TextureMapping2D::create(&mut parameters.dict, render_from_texture, loc);
 
         let max_aniso = parameters.get_one_float("maxanisotropy", 8.0);
-        let filter = parameters.get_one_string("filter", "bilinear".to_owned());
+        let filter = parameters.get_one_string("filter", "bilinear");
         
         let ff = FilterFunction::parse(&filter).expect("Unknown filter function");
         let filter_options = MIPMapFilterOptions::new(ff, max_aniso);
 
-        let wrap = parameters.get_one_string("wrap", "repeat".to_owned());
+        let wrap = parameters.get_one_string("wrap", "repeat");
         let wrap = WrapMode::parse(&wrap).expect("Unknown wrap mode");
 
         let scale = parameters.get_one_float("scale", 1.0);
         let invert = parameters.get_one_bool("invert", false);
-        let filename = resolve_filename(options, &parameters.get_one_string("filename", "".to_owned()));
+        let filename = resolve_filename(options, &parameters.get_one_string("filename", ""));
 
         let default_encoding = if Path::new(&filename).extension().expect("Expected extension") == "png"
         {
@@ -378,7 +378,7 @@ impl FloatImageTexture
         } else {
             "linear"
         };
-        let encoding_string = parameters.get_one_string("encoding", default_encoding.to_owned());
+        let encoding_string = parameters.get_one_string("encoding", default_encoding);
 
         let encoding = ColorEncoding::get(&encoding_string, Some(gamma_encoding_cache));
 
@@ -744,17 +744,17 @@ impl SpectrumImageTexture
         let map = TextureMapping2D::create(&mut parameters.dict, render_from_texture, loc);
 
         let max_aniso = parameters.get_one_float("maxanisotropy", 8.0);
-        let filter = parameters.get_one_string("filter", "bilinear".to_owned());
+        let filter = parameters.get_one_string("filter", "bilinear");
 
         let ff = FilterFunction::parse(&filter).expect("Unknown filter function");
         let filter_options = MIPMapFilterOptions::new(ff, max_aniso);
 
-        let wrap = parameters.get_one_string("wrap", "repeat".to_owned());
+        let wrap = parameters.get_one_string("wrap", "repeat");
         let wrap = WrapMode::parse(&wrap).expect("Unknown wrap mode");
 
         let scale = parameters.get_one_float("scale", 1.0);
         let invert = parameters.get_one_bool("invert", false);
-        let filename = resolve_filename(options, &parameters.get_one_string("filename", "".to_owned()));
+        let filename = resolve_filename(options, &parameters.get_one_string("filename", ""));
         
         let default_encoding = if Path::new(&filename).extension().expect("Expected extension") == "png"
         {
@@ -762,7 +762,7 @@ impl SpectrumImageTexture
         } else {
             "linear"
         };
-        let encoding_string = parameters.get_one_string("encoding", default_encoding.to_owned());
+        let encoding_string = parameters.get_one_string("encoding", default_encoding);
         let encoding = ColorEncoding::get(&encoding_string, Some(gamma_encoding_cache));
 
         SpectrumImageTexture::new(
@@ -857,7 +857,7 @@ impl TextureMapping2D
     ) -> TextureMapping2D
     {
         // TODO change the default to take &str...
-        let ty = parameters.get_one_string("mapping", "uv".to_owned());
+        let ty = parameters.get_one_string("mapping", "uv");
         match ty.as_str()
         {
             "uv" => {

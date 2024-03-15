@@ -521,8 +521,8 @@ impl ParameterDictionary {
         self.lookup_single::<Normal3fParam>(name, default_value)
     }
 
-    pub fn get_one_string(&mut self, name: &str, default_value: String) -> String {
-        self.lookup_single::<StringParam>(name, default_value)
+    pub fn get_one_string(&mut self, name: &str, default_value: &str) -> String {
+        self.lookup_single::<StringParam>(name, default_value.to_owned())
     }
 
     pub fn get_one_spectrum(
@@ -859,7 +859,7 @@ impl TextureParameterDictionary {
             .get_one_spectrum(name, default_value, spectrum_type, cached_spectra)
     }
 
-    pub fn get_one_string(&mut self, name: &str, default_value: String) -> String {
+    pub fn get_one_string(&mut self, name: &str, default_value: &str) -> String {
         self.dict.get_one_string(name, default_value)
     }
 

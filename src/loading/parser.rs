@@ -760,7 +760,7 @@ Film \"rgb\"
                     RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
                 );
                 assert_eq!(dict.params.len(), 5);
-                let param = dict.get_one_string("filename", "".to_owned());
+                let param = dict.get_one_string("filename", "");
                 assert_eq!(param, "crown.exr");
                 let param = dict.get_one_int("yresolution", 0);
                 assert_eq!(param, 1400);
@@ -768,7 +768,7 @@ Film \"rgb\"
                 assert_eq!(param, 1000);
                 let param = dict.get_one_float("iso", 0.0);
                 assert_eq!(param, 150.0);
-                let param = dict.get_one_string("sensor", "".to_owned());
+                let param = dict.get_one_string("sensor", "");
                 assert_eq!(param, "canon_eos_5d_mkiv");
             }
             _ => panic!("Unexpected element type"),

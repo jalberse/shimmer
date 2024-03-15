@@ -139,7 +139,7 @@ impl Light {
                 let filename = resolve_filename(
                     options,
                     parameters
-                        .get_one_string("filename", "".to_owned())
+                        .get_one_string("filename", "")
                         .as_str(),
                 );
                 let e_v = parameters.get_one_float("illuminance", -1.0);
@@ -516,7 +516,7 @@ impl DiffuseAreaLight {
 
         let filename = resolve_filename(
             options,
-            &parameters.get_one_string("filename", "".to_owned()),
+            &parameters.get_one_string("filename", ""),
         );
 
         let image: Option<Image> = None; // TODO Use this image; it's used in scaling below.

@@ -203,7 +203,7 @@ impl ImageTileIntegrator {
         let max_depth = parameters.get_one_int("maxdepth", 5);
         let regularize = parameters.get_one_bool("regularize", false);
         // TODO Change default to bvh
-        let light_strategy = parameters.get_one_string("lightsampler", "uniform".to_string());
+        let light_strategy = parameters.get_one_string("lightsampler", "uniform");
         let light_sampler = LightSampler::create(&light_strategy, lights.clone());
 
         let pixel_sample_evaluator = RayPathLiEvaluator::Path(PathIntegrator::new(

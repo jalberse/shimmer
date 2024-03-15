@@ -188,7 +188,7 @@ impl BasicScene {
         let filename = texture
             .base
             .parameters
-            .get_one_string("filename", "".to_owned());
+            .get_one_string("filename", "");
 
         let filename = resolve_filename(options, filename.as_str());
         if filename.is_empty() {
@@ -250,7 +250,7 @@ impl BasicScene {
         let filename = texture
             .base
             .parameters
-            .get_one_string("filename", "".to_owned());
+            .get_one_string("filename", "");
         let filename = resolve_filename(options, filename.as_str());
 
         if filename.is_empty() {
@@ -345,7 +345,7 @@ impl BasicScene {
     }
 
     fn load_normal_map(&mut self, parameters: &mut ParameterDictionary) {
-        let normal_map_filename = parameters.get_one_string("normalmap", "".to_string());
+        let normal_map_filename = parameters.get_one_string("normalmap", "");
         if normal_map_filename.is_empty() {
             return;
         }
@@ -563,11 +563,11 @@ impl BasicScene {
                     material
                         .1
                         .parameters
-                        .get_one_string("type", "".to_owned())
+                        .get_one_string("type", "")
                         .len()
                         > 0
                 );
-                material.1.parameters.get_one_string("type", "".to_owned())
+                material.1.parameters.get_one_string("type", "")
             } else {
                 assert!(
                     shape.material_index >= 0
@@ -652,7 +652,7 @@ impl BasicScene {
                 panic!("{}: Named material {} redefined.", material.loc, name);
             }
 
-            let ty = material.parameters.get_one_string("type", "".to_owned());
+            let ty = material.parameters.get_one_string("type", "");
             if ty.is_empty() {
                 panic!("{}: No type specified for material {}", material.loc, name);
             }
@@ -661,7 +661,7 @@ impl BasicScene {
                 options,
                 &material
                     .parameters
-                    .get_one_string("normalmap", "".to_owned()),
+                    .get_one_string("normalmap", ""),
             );
             let normal_map = if filename.is_empty() {
                 None
@@ -690,7 +690,7 @@ impl BasicScene {
         for mtl in &mut self.materials {
             let filename = resolve_filename(
                 options,
-                &mtl.parameters.get_one_string("normalmap", "".to_owned()),
+                &mtl.parameters.get_one_string("normalmap", ""),
             );
             let normal_map = if filename.is_empty() {
                 None
