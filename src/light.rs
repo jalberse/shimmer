@@ -770,6 +770,17 @@ impl From<&SurfaceInteraction> for LightSampleContext {
     }
 }
 
+impl From<SurfaceInteraction> for LightSampleContext {
+    fn from(value: SurfaceInteraction) -> Self {
+        LightSampleContext {
+            pi: value.interaction.pi,
+            n: value.interaction.n,
+            ns: value.shading.n,
+        }
+    }
+}
+
+
 impl From<&Interaction> for LightSampleContext {
     fn from(value: &Interaction) -> Self {
         LightSampleContext {

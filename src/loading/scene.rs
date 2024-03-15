@@ -1237,7 +1237,7 @@ impl BasicSceneBuilder {
 
         // TODO Change default to volpath when available.
         let integrator = SceneEntity {
-            name: string_interner.get_or_intern("simplepath"),
+            name: string_interner.get_or_intern("path"),
             loc: FileLoc::default(),
             parameters: Default::default(),
         };

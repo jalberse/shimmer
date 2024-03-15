@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    light::{Light, LightSampleContext},
+    light::{self, Light, LightSampleContext},
     Float,
 };
 
@@ -54,6 +54,21 @@ impl LightSamplerI for LightSampler {
     fn pmf_light(&self, light: &Light) -> Float {
         match self {
             LightSampler::Uniform(s) => s.pmf_light(light),
+        }
+    }
+}
+
+impl LightSampler
+{
+    pub fn create(
+        name: &str,
+        lights: Arc<Vec<Arc<Light>>>,
+    ) -> LightSampler {
+        match name {
+            "uniform" => LightSampler::Uniform(UniformLightSampler {
+                lights,
+            }),
+            _ => panic!("Unknown light sampler: {}", name),
         }
     }
 }

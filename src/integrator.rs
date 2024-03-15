@@ -7,10 +7,9 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thread_local::ThreadLocal;
 
 use crate::{
-    bxdf::{BxDFReflTransFlags, TransportMode}, camera::{Camera, CameraI}, colorspace::RgbColorSpace, film::{FilmI, VisibleSurface}, float::PI_F, image::ImageMetadata, interaction::Interaction, light::{Light, LightI, LightSampleContext, LightType}, light_sampler::{LightSamplerI, UniformLightSampler}, loading::paramdict::ParameterDictionary, options::Options, primitive::{Primitive, PrimitiveI}, ray::{Ray, RayDifferential}, sampler::{Sampler, SamplerI}, sampling::{
-        get_camera_sample, sample_uniform_hemisphere, sample_uniform_sphere,
-        uniform_hemisphere_pdf, uniform_sphere_pdf,
-    }, shape::ShapeIntersection, spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths}, tile::Tile, vecmath::{vector::Vector3, HasNan, Length, Point2i, Tuple2, Vector3f}, Float
+    bsdf::BSDF, bxdf::{BxDFReflTransFlags, TransportMode}, camera::{Camera, CameraI}, colorspace::RgbColorSpace, film::{FilmI, VisibleSurface}, float::PI_F, image::ImageMetadata, interaction::{Interaction, SurfaceInteraction}, light::{Light, LightI, LightSampleContext, LightType}, light_sampler::{self, LightSampler, LightSamplerI, UniformLightSampler}, loading::paramdict::ParameterDictionary, math::sqr, options::Options, primitive::{Primitive, PrimitiveI}, ray::{Ray, RayDifferential}, sampler::{Sampler, SamplerI}, sampling::{
+        get_camera_sample, power_heuristic, sample_uniform_hemisphere, sample_uniform_sphere, uniform_hemisphere_pdf, uniform_sphere_pdf
+    }, shape::ShapeIntersection, spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths}, tile::Tile, vecmath::{vector::Vector3, HasNan, Length, Point2f, Point2i, Tuple2, Vector3f}, Float
 };
 
 pub fn create_integrator(
@@ -27,6 +26,9 @@ pub fn create_integrator(
             parameters, camera, sampler, aggregate, lights,
         )),
         "randomwalk" => Box::new(ImageTileIntegrator::create_random_walk_integrator(
+            parameters, camera, sampler, aggregate, lights,
+        )),
+        "path" => Box::new(ImageTileIntegrator::create_path_integrator(
             parameters, camera, sampler, aggregate, lights,
         )),
         _ => {
@@ -189,6 +191,36 @@ impl ImageTileIntegrator {
         )
     }
 
+    pub fn create_path_integrator(
+        parameters: &mut ParameterDictionary,
+        camera: Camera,
+        sampler: Sampler,
+        aggregate: Arc<Primitive>,
+        lights: Arc<Vec<Arc<Light>>>,
+    ) -> ImageTileIntegrator
+    {
+        let max_depth = parameters.get_one_int("maxdepth", 5);
+        let regularize = parameters.get_one_bool("regularize", false);
+        // TODO Change default to bvh
+        let light_strategy = parameters.get_one_string("lightsampler", "uniform".to_string());
+        let light_sampler = LightSampler::create(&light_strategy, lights.clone());
+
+        let pixel_sample_evaluator = RayPathLiEvaluator::Path(PathIntegrator::new(
+            max_depth,
+            light_sampler,
+            regularize,
+        ));
+
+        // TODO I dislike having to clone the sampler and camera.
+        ImageTileIntegrator::new(
+            aggregate,
+            lights,
+            camera.clone(),
+            sampler.clone(),
+            pixel_sample_evaluator,
+        )
+    }
+
     pub fn new(
         aggregate: Arc<Primitive>,
         lights: Arc<Vec<Arc<Light>>>,
@@ -324,7 +356,7 @@ impl ImageTileIntegrator
 
         let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
 
-        let (l, visible_surface) = if let Some(mut camera_ray) = camera_ray {
+        let l = if let Some(mut camera_ray) = camera_ray {
             debug_assert!(camera_ray.ray.ray.d.length() > 0.999);
             debug_assert!(camera_ray.ray.ray.d.length() < 1.001);
 
@@ -338,12 +370,6 @@ impl ImageTileIntegrator
             }
 
             // Evaluate radiance along the camera ray
-            let visible_surface = if camera.get_film_const().uses_visible_surface() {
-                Some(VisibleSurface::default())
-            } else {
-                None
-            };
-
             let l = camera_ray.weight
                 * self.ray_path_li_evaluator.li(
                     base,
@@ -351,7 +377,6 @@ impl ImageTileIntegrator
                     &mut camera_ray.ray,
                     &mut lambda,
                     sampler,
-                    &visible_surface,
                     scratch_buffer,
                     options,
                 );
@@ -363,19 +388,16 @@ impl ImageTileIntegrator
                 // TODO log error, set SampledSpectrum l to 0
             }
 
-            (l, visible_surface)
+            l
         } else {
-            (
-                SampledSpectrum::from_const(0.0),
-                Some(VisibleSurface::default()),
-            )
+            SampledSpectrum::from_const(0.0)            
         };
 
         FilmSample {
             p_film: p_pixel,
             l,
             lambda,
-            visible_surface,
+            visible_surface: None,
             weight: camera_sample.filter_weight,
         }
     }
@@ -384,6 +406,7 @@ impl ImageTileIntegrator
 pub enum RayPathLiEvaluator {
     SimplePath(SimplePathIntegrator),
     RandomWalk(RandomWalkIntegrator),
+    Path(PathIntegrator),
 }
 
 impl RayPathLiEvaluator
@@ -395,7 +418,6 @@ impl RayPathLiEvaluator
         ray: &mut RayDifferential,
         lambda: &mut SampledWavelengths,
         sampler: &mut Sampler,
-        visible_surface: &Option<VisibleSurface>,
         scratch_buffer: &mut Bump,
         options: &Options,
     ) -> SampledSpectrum
@@ -408,7 +430,6 @@ impl RayPathLiEvaluator
                     ray,
                     lambda,
                     sampler,
-                    visible_surface,
                     scratch_buffer,
                     options,
                 )
@@ -420,7 +441,17 @@ impl RayPathLiEvaluator
                     ray,
                     lambda,
                     sampler,
-                    visible_surface,
+                    scratch_buffer,
+                    options,
+                )
+            }
+            RayPathLiEvaluator::Path(path_integrator) => {
+                path_integrator.li(
+                    base,
+                    camera,
+                    *ray,
+                    lambda,
+                    sampler,
                     scratch_buffer,
                     options,
                 )
@@ -442,7 +473,6 @@ impl RandomWalkIntegrator {
         ray: &RayDifferential,
         lambda: &mut SampledWavelengths,
         sampler: &mut Sampler,
-        _visible_surface: &Option<VisibleSurface>,
         scratch_buffer: &mut Bump,
         options: &Options,
     ) -> SampledSpectrum {
@@ -560,7 +590,6 @@ impl SimplePathIntegrator {
         ray: &mut RayDifferential,
         lambda: &mut SampledWavelengths,
         sampler: &mut Sampler,
-        _visible_surface: &Option<VisibleSurface>,
         scratch_buffer: &mut Bump,
         options: &Options,
     ) -> SampledSpectrum {
@@ -693,5 +722,237 @@ impl SimplePathIntegrator {
         debug_assert!(!l.values[2].is_nan());
         debug_assert!(!l.values[3].is_nan());
         l
+    }
+}
+
+pub struct PathIntegrator
+{
+    max_depth: i32,
+    light_sampler: LightSampler,
+    regularize: bool,
+}
+
+impl PathIntegrator
+{
+    pub fn new(max_depth: i32, light_sampler: LightSampler, regularize: bool) -> PathIntegrator
+    {
+        PathIntegrator {
+            max_depth,
+            light_sampler,
+            regularize,
+        }
+    }
+
+    pub fn li(
+        &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        mut ray: RayDifferential,
+        lambda: &mut SampledWavelengths,
+        sampler: &mut Sampler,
+        scratch_buffer: &mut Bump,
+        options: &Options,
+    ) -> SampledSpectrum
+    {
+        let mut l = SampledSpectrum::from_const(0.0);
+        let mut beta = SampledSpectrum::from_const(1.0);
+        let mut depth = 0;
+
+        let mut p_b = 1.0;
+        let mut eta_scale = 1.0;
+
+        let mut specular_bounce = false;
+        let mut any_non_specular_bounces = false;
+        let mut prev_intr_ctx = LightSampleContext::default();
+
+        // Sample path from camera and accumulate radiance
+        loop {
+            // Trace ray and find the closest path vertex and its BSDF
+            let si = base.intersect(&ray.ray, Float::INFINITY);
+
+            if si.is_none()
+            {
+                // If no intersection is found, add emitted light from the environment
+                for light in base.infinite_lights.iter()
+                {
+                    let le = light.le(&ray.ray, lambda);
+                    if depth == 0 || specular_bounce
+                    {
+                        l += beta * le;
+                    } else {
+                        // Compute MIS weight for infinite light
+                        let p_l = self.light_sampler.pmf(&prev_intr_ctx, light) *
+                            light.pdf_li(&prev_intr_ctx, ray.ray.d, true);
+                        let w_b = power_heuristic(1, p_b, 1, p_l);
+                        l += beta * w_b * le;
+                    }
+                }
+                break;
+            }
+            let mut si = si.unwrap();
+
+            // Incorporate emission from surface hit by ray
+            let le = si.intr.le(-ray.ray.d, lambda);
+            if !le.is_zero()
+            {
+                if depth == 0 || specular_bounce
+                {
+                    l += beta * le;
+                } else if let Some(light) = &si.intr.area_light
+                {
+                    // (since le is nonzero, there should always be a light here...)
+                    // Compute MIS weight for area light
+                    let p_l = self.light_sampler.pmf(&prev_intr_ctx, light) *
+                        light.pdf_li(&prev_intr_ctx, ray.ray.d, true);
+                    let w_l = power_heuristic(1, p_b, 1, p_l);
+                    l += beta * w_l * le;
+                }
+            }
+
+            // Get BSDF and skip over medium boundaries
+            let mut bsdf = si.intr.get_bsdf(&ray, lambda, &camera, sampler, options);
+            if bsdf.is_none()
+            {
+                specular_bounce = true;
+                si.intr.skip_intersection(&mut ray, si.t_hit);
+                continue;
+            }
+            let mut bsdf = bsdf.unwrap();
+
+            if self.regularize && any_non_specular_bounces
+            {
+                bsdf.regularize();
+            }
+
+            if depth == self.max_depth
+            {
+                break;
+            }
+            depth += 1;
+
+            // Sample direct illumination from the light sources
+            if bsdf.flags().is_non_specular()
+            {
+                let ld = self.sample_ld(base, &si.intr, &bsdf, lambda, sampler);
+                l += beta * ld;
+            }
+
+            // Sample BSDF to get new path direction
+            let wo = -ray.ray.d;
+            let u = sampler.get_1d();
+            let bs = bsdf.sample_f(
+                wo,
+                u,
+                sampler.get_2d(),
+                TransportMode::Radiance,
+                BxDFReflTransFlags::all(),
+            );
+            if bs.is_none()
+            {
+                break;
+            }
+            let bs = bs.unwrap();
+            // Update path state variables after surface scattering
+            beta *= bs.f * bs.wi.abs_dot_normal(si.intr.shading.n) / bs.pdf;
+            p_b = if bs.pdf_is_proportional
+            {
+                bsdf.pdf(wo, bs.wi, TransportMode::Radiance, BxDFReflTransFlags::all())
+            } else {
+                bs.pdf
+            };
+            debug_assert!(beta.y(lambda).is_finite());
+            specular_bounce = bs.is_specular();
+            any_non_specular_bounces |= !specular_bounce;
+            if bs.is_transmission()
+            {
+                eta_scale *= sqr(bs.eta);
+            }
+            prev_intr_ctx = LightSampleContext::from(&si.intr);
+
+            ray = si.intr.spawn_ray_with_differentials(&ray, bs.wi, bs.flags, bs.eta);
+
+            // Possibly terminate the path with Russian roulette
+            let rr_beta = beta * eta_scale;
+            if rr_beta.max_component_value() < 1.0 && depth > 1
+            {
+                let q = Float::max(0.00, 1.0 - rr_beta.max_component_value());
+                if sampler.get_1d() < q
+                {
+                    break;
+                }
+                beta /= 1.0 - q;
+                debug_assert!(beta.y(lambda).is_finite());
+            }
+        }
+
+        l
+    }
+
+    fn sample_ld(
+        &self,
+        base: &IntegratorBase,
+        intr: &SurfaceInteraction,
+        bsdf: &BSDF,
+        lambda: &SampledWavelengths,
+        sampler: &mut Sampler,
+    ) -> SampledSpectrum
+    {
+        let mut ctx: LightSampleContext = intr.into();
+
+        // Try to nudge the light sampling position to the correct side of the surface
+        let flags = bsdf.flags();
+        if flags.is_reflective() && !flags.is_transmissive()
+        {
+            ctx.pi = intr.interaction.offset_ray_origin(intr.interaction.wo).into();
+        } else if flags.is_transmissive() && !flags.is_reflective()
+        {
+            ctx.pi = intr.interaction.offset_ray_origin(-intr.interaction.wo).into();
+        }
+
+        // Choose a light source for the direct lighting calculation
+        let u = sampler.get_1d();
+        let sampled_light = self.light_sampler.sample(&ctx, u);
+        // Sample before checking for is_none() so that the sampling dimension is
+        // consistent across the render.
+        let u_light = sampler.get_2d();
+        if sampled_light.is_none()
+        {
+            return SampledSpectrum::from_const(0.0);
+        }
+        let sampled_light = sampled_light.unwrap();
+        debug_assert!(sampled_light.p > 0.0);
+
+        // Sample a point on the light source for direct lighting
+        let light = sampled_light.light;
+        let ls = light.sample_li(&ctx, u_light, lambda, true);
+        if ls.is_none()
+        {
+            return SampledSpectrum::from_const(0.0);
+        }
+        let ls = ls.unwrap();
+        if ls.l.is_zero() || ls.pdf == 0.0
+        {
+            return SampledSpectrum::from_const(0.0);
+        }
+
+        // Evaluate BSDF for light sample and check light visibility
+        let wo = intr.interaction.wo;
+        let wi = ls.wi;
+        let f = bsdf.f(wo, wi, TransportMode::Radiance) * wi.abs_dot_normal(intr.shading.n);
+        if f.is_zero() || !base.unoccluded(&intr.interaction, &ls.p_light)
+        {
+            return SampledSpectrum::from_const(0.0);
+        }
+
+        // Return the light's contribution to reflected radiance
+        let p_l = sampled_light.p * ls.pdf;
+        if light.light_type().is_delta()
+        {
+            ls.l * f / p_l
+        } else {
+            let p_b = bsdf.pdf(wo, wi, TransportMode::Radiance, BxDFReflTransFlags::ALL);
+            let w_l = power_heuristic(1, p_l, 1, p_b);
+            w_l * ls.l * f / p_l
+        }
     }
 }
