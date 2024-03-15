@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use log::warn;
+use rand::rngs::SmallRng;
 
 use crate::{
     bsdf::BSDF,
     bxdf::{self, BxDFFLags, DiffuseBxDF},
     camera::{Camera, CameraI},
     light::{Light, LightI},
-    material::{Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
+    material::{self, bump_map, Material, MaterialEvalContext, MaterialI, UniversalTextureEvaluator},
     math::{sqr, DifferenceOfProducts},
     options::Options,
     ray::{AuxiliaryRays, Ray, RayDifferential},
@@ -190,27 +191,64 @@ impl SurfaceInteraction {
         camera: &Camera,
         sampler: &mut Sampler,
         options: &Options,
+        rng: &mut SmallRng,
     ) -> Option<BSDF> {
         // Estimate (u, v) and position differentials at intersection point
         self.compute_differentials(ray, camera, sampler.samples_per_pixel(), options);
 
-        // TODO resolve MixMaterial, once I create MixMaterial.
 
         // This should occur only at a non-scattering interface between two types of participating media.
         if self.material.is_none() {
             return None;
         }
+        let mut material = self.material.as_ref().unwrap().clone();
 
-        let material = self.material.as_ref().unwrap();
+        // Resolve mixed materials
+        let mut is_mixed = match material.as_ref() {
+            Material::Mix(_) => true,
+            _ => false,
+        };
 
-        let displacement = material.as_ref().get_displacement();
-        let normal_map = material.as_ref().get_normal_map();
-        if displacement.is_some() || normal_map.is_some() {
-            // TODO handle shading using normal or bump map - we just won't do anything right now...
-            warn!("Normal and displacement maps not fully implemented yet!");
+        let mut material_eval_context = MaterialEvalContext::from(&*self);
+        while is_mixed
+        {
+            match material.as_ref() {
+                Material::Mix(m) => {
+                    material = m.choose_material(&UniversalTextureEvaluator {}, &material_eval_context, rng);
+                },
+                _ => is_mixed = false,
+            };
         }
 
-        let material_eval_context = MaterialEvalContext::from(&*self);
+        let material = match material.as_ref()
+        {
+            Material::Mix(m) => panic!("Material::Mix should have been resolved by now!"),
+            Material::Single(m) => m,
+        };
+
+        let displacement = material.get_displacement();
+        let normal_map = material.get_normal_map();
+        if displacement.is_some() || normal_map.is_some() {
+            let (dpdu, dpdv) = if let Some(displacement) = displacement {
+                bump_map(
+                    UniversalTextureEvaluator{},
+                    displacement,
+                    &self.into()
+                )
+            } else {
+                let normal_map = normal_map.unwrap();
+                material::normal_map(
+                    normal_map.as_ref(),
+                    &self.into()
+                )
+            };
+
+            let ns = dpdu.cross(dpdv).normalize();
+            self.set_shading_geometry(ns.into(), dpdu, dpdv, self.shading.dndu, self.shading.dndv, false);
+            // Ensure that the material eval context is updated with the new shading geometry.
+            material_eval_context = MaterialEvalContext::from(&*self);
+        }
+
         let bsdf = material.get_bsdf(
             &UniversalTextureEvaluator {},
             &material_eval_context,

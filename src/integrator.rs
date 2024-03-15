@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use bumpalo::Bump;
 use indicatif::ParallelProgressIterator;
+use rand::{rngs::SmallRng, SeedableRng};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use thread_local::ThreadLocal;
 
@@ -270,6 +271,8 @@ impl Integrator for ImageTileIntegrator {
                     let sampler =
                         sampler_tl.get_or(|| RefCell::new(self.sampler_prototype.clone()));
 
+                    let mut rng = SmallRng::from_entropy();
+
                     for x in tile.bounds.min.x..tile.bounds.max.x {
                         for y in tile.bounds.min.y..tile.bounds.max.y {
                             let p_pixel = Point2i::new(x, y);
@@ -286,6 +289,7 @@ impl Integrator for ImageTileIntegrator {
                                         &mut sampler.borrow_mut(),
                                         &mut scratch_buffer.borrow_mut(),
                                         options,
+                                        &mut rng,
                                     );
                                 samples.push(film_sample);
                                 // Note that this does not call drop() on anything allocated in
@@ -340,6 +344,7 @@ impl ImageTileIntegrator
         sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
+        rng: &mut SmallRng,
     ) -> FilmSample
     {
         // Sample wavelengths for the ray
@@ -379,6 +384,7 @@ impl ImageTileIntegrator
                     sampler,
                     scratch_buffer,
                     options,
+                    rng,
                 );
 
             if l.has_nan() {
@@ -420,6 +426,7 @@ impl RayPathLiEvaluator
         sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
+        rng: &mut SmallRng,
     ) -> SampledSpectrum
     {
         match self {
@@ -432,6 +439,7 @@ impl RayPathLiEvaluator
                     sampler,
                     scratch_buffer,
                     options,
+                    rng,
                 )
             }
             RayPathLiEvaluator::RandomWalk(random_walk_integrator) => {
@@ -443,6 +451,7 @@ impl RayPathLiEvaluator
                     sampler,
                     scratch_buffer,
                     options,
+                    rng,
                 )
             }
             RayPathLiEvaluator::Path(path_integrator) => {
@@ -454,6 +463,7 @@ impl RayPathLiEvaluator
                     sampler,
                     scratch_buffer,
                     options,
+                    rng,
                 )
             }
         }
@@ -475,6 +485,7 @@ impl RandomWalkIntegrator {
         sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
+        rng: &mut SmallRng,
     ) -> SampledSpectrum {
         self.li_random_walk(
             base,
@@ -485,6 +496,7 @@ impl RandomWalkIntegrator {
             0,
             scratch_buffer,
             options,
+            rng,
         )
     }
 
@@ -500,6 +512,7 @@ impl RandomWalkIntegrator {
         depth: i32,
         scratch_buffer: &mut Bump,
         options: &Options,
+        rng: &mut SmallRng,
     ) -> SampledSpectrum {
         let si = base.intersect(&ray.ray, Float::INFINITY);
 
@@ -526,7 +539,7 @@ impl RandomWalkIntegrator {
         }
 
         // Compute BSDF at random walk intersection point.
-        let bsdf = isect.get_bsdf(ray, lambda, camera, sampler, &options);
+        let bsdf = isect.get_bsdf(ray, lambda, camera, sampler, &options, rng);
         if bsdf.is_none() {
             return le;
         }
@@ -556,6 +569,7 @@ impl RandomWalkIntegrator {
                 depth + 1,
                 scratch_buffer,
                 options,
+                rng,
             )
             / (1.0 / (4.0 * PI_F))
     }
@@ -592,6 +606,7 @@ impl SimplePathIntegrator {
         sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
+        rng: &mut SmallRng,
     ) -> SampledSpectrum {
         // The current estimated scattered radiance
         let mut l = SampledSpectrum::from_const(0.0);
@@ -630,7 +645,7 @@ impl SimplePathIntegrator {
             depth += 1;
 
             // Get BSDF and skip over medium boundaries
-            let bsdf = isect.get_bsdf(ray, lambda, &camera, sampler, options);
+            let bsdf = isect.get_bsdf(ray, lambda, &camera, sampler, options, rng);
             if bsdf.is_none() {
                 specular_bounce = true;
                 isect.skip_intersection(ray, si.t_hit);
@@ -752,6 +767,7 @@ impl PathIntegrator
         sampler: &mut Sampler,
         scratch_buffer: &mut Bump,
         options: &Options,
+        rng: &mut SmallRng,
     ) -> SampledSpectrum
     {
         let mut l = SampledSpectrum::from_const(0.0);
@@ -810,7 +826,7 @@ impl PathIntegrator
             }
 
             // Get BSDF and skip over medium boundaries
-            let mut bsdf = si.intr.get_bsdf(&ray, lambda, &camera, sampler, options);
+            let mut bsdf = si.intr.get_bsdf(&ray, lambda, &camera, sampler, options, rng);
             if bsdf.is_none()
             {
                 specular_bounce = true;

@@ -565,7 +565,7 @@ mod tests {
 
     use crate::{
         aggregate::{BvhAggregate, SplitMethod},
-        material::{DiffuseMaterial, Material},
+        material::{DiffuseMaterial, Material, SingleMaterial},
         primitive::{Primitive, PrimitiveI, SimplePrimitive},
         ray::Ray,
         shape::{sphere::Sphere, Shape},
@@ -592,7 +592,7 @@ mod tests {
         let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
             value: cs,
         }));
-        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
+        let material = Arc::new(Material::Single(SingleMaterial::Diffuse(DiffuseMaterial::new(kd, None, None))));
         let prim = Arc::new(Primitive::Simple(SimplePrimitive {
             shape: Arc::new(Shape::Sphere(sphere)),
             material,
@@ -622,7 +622,7 @@ mod tests {
         let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
             value: cs,
         }));
-        let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
+        let material = Arc::new(Material::Single(SingleMaterial::Diffuse(DiffuseMaterial::new(kd, None, None))));
         let prim = Arc::new(Primitive::Simple(SimplePrimitive {
             shape: Arc::new(Shape::Sphere(sphere)),
             material,
@@ -666,7 +666,7 @@ mod tests {
             let kd = Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture {
                 value: cs,
             }));
-            let material = Arc::new(Material::Diffuse(DiffuseMaterial::new(kd, None, None)));
+            let material = Arc::new(Material::Single(SingleMaterial::Diffuse(DiffuseMaterial::new(kd, None, None))));
             let prim = Arc::new(Primitive::Simple(SimplePrimitive {
                 shape: Arc::new(Shape::Sphere(sphere)),
                 material,

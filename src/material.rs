@@ -1,26 +1,18 @@
 use std::{collections::HashMap, sync::Arc};
 
+use rand::{rngs::SmallRng, Rng};
+
 use crate::{
-    bsdf::BSDF,
-    bxdf::{BxDF, CoatedConductorBxDF, CoatedDiffuseBxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF, ThinDielectricBxDF},
-    image::Image,
-    interaction::SurfaceInteraction,
-    loading::{
+    bsdf::BSDF, bxdf::{BxDF, CoatedConductorBxDF, CoatedDiffuseBxDF, ConductorBxDF, DielectricBxDF, DiffuseBxDF, ThinDielectricBxDF}, frame::Frame, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, loading::{
         paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary},
         parser_target::FileLoc,
-    },
-    math::Sqrt,
-    scattering::TrowbridgeReitzDistribution,
-    spectra::{
+    }, math::Sqrt, scattering::TrowbridgeReitzDistribution, spectra::{
         sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths,
         spectrum::SpectrumI, ConstantSpectrum, NamedSpectrum, Spectrum,
-    },
-    texture::{
+    }, texture::{
         FloatTexture, FloatTextureI, SpectrumConstantTexture, SpectrumTexture, SpectrumTextureI,
         TextureEvalContext,
-    },
-    vecmath::{Normal3f, Vector3f},
-    Float,
+    }, vecmath::{vector::Vector3, Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector2f, Vector3f}, Float
 };
 
 pub trait MaterialI {
@@ -52,19 +44,15 @@ pub trait MaterialI {
     fn has_subsurface_scattering(&self) -> bool;
 }
 
-/// Materials evaluate textures to get parameter values that are used to initialize their
-/// particular BSFD model.
 #[derive(Debug)]
-pub enum Material {
-    Diffuse(DiffuseMaterial),
-    Conductor(ConductorMaterial),
-    Dielectric(DielectricMaterial),
-    ThinDielectric(ThinDielectricMaterial),
-    CoatedDiffuse(CoatedDiffuseMaterial),
-    CoatedConductor(CoatedConductorMaterial),
+pub enum Material
+{
+    Single(SingleMaterial),
+    Mix(MixMaterial),
 }
 
-impl Material {
+impl Material 
+{
     pub fn create(
         name: &str,
         parameters: &mut TextureParameterDictionary,
@@ -75,42 +63,97 @@ impl Material {
         loc: &FileLoc,
     ) -> Material {
         let material = match name {
-            "diffuse" => Material::Diffuse(DiffuseMaterial::create(
+            "mix" => {
+                let material_names = parameters.get_string_array("materials");
+                if material_names.len() != 2 {
+                    panic!("Expected two materials for mix material.");
+                }
+                let named_material: Vec<Arc<Material>> = material_names
+                    .iter()
+                    .map(|name| {
+                        let material = named_materials.get(name).expect("Material not found.");
+                        material.clone()
+                    })
+                    .collect();
+                let materials: [Arc<Material>; 2] = [
+                    named_material[0].clone(),
+                    named_material[1].clone(),
+                ];
+                Material::Mix(MixMaterial::create(materials, parameters, loc, textures))
+            },
+            _ => Material::Single(SingleMaterial::create(
+                name,
+                parameters,
+                textures,
+                normal_map,
+                named_materials,
+                cached_spectra,
+                loc,
+            )),
+        };
+        material
+    }
+}
+
+/// Materials evaluate textures to get parameter values that are used to initialize their
+/// particular BSFD model.
+#[derive(Debug)]
+pub enum SingleMaterial {
+    Diffuse(DiffuseMaterial),
+    Conductor(ConductorMaterial),
+    Dielectric(DielectricMaterial),
+    ThinDielectric(ThinDielectricMaterial),
+    CoatedDiffuse(CoatedDiffuseMaterial),
+    CoatedConductor(CoatedConductorMaterial),
+}
+
+impl SingleMaterial {
+    pub fn create(
+        name: &str,
+        parameters: &mut TextureParameterDictionary,
+        textures: &NamedTextures,
+        normal_map: Option<Arc<Image>>,
+        named_materials: &HashMap<String, Arc<Material>>,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        loc: &FileLoc,
+    ) -> SingleMaterial {
+        let material = match name {
+            "diffuse" => SingleMaterial::Diffuse(DiffuseMaterial::create(
                 parameters,
                 textures,
                 normal_map,
                 cached_spectra,
                 loc,
             )),
-            "conductor" => Material::Conductor(ConductorMaterial::create(
+            "conductor" => SingleMaterial::Conductor(ConductorMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
             )),
-            "dielectric" => Material::Dielectric(DielectricMaterial::create(
+            "dielectric" => SingleMaterial::Dielectric(DielectricMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
             )),
-            "thindielectric" => Material::ThinDielectric(ThinDielectricMaterial::create(
+            "thindielectric" => SingleMaterial::ThinDielectric(ThinDielectricMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
             )),
-            "coateddiffuse" => Material::CoatedDiffuse(CoatedDiffuseMaterial::create(
+            "coateddiffuse" => SingleMaterial::CoatedDiffuse(CoatedDiffuseMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
             )),
-            "coatedconductor" => Material::CoatedConductor(CoatedConductorMaterial::create(
+            "coatedconductor" => SingleMaterial::CoatedConductor(CoatedConductorMaterial::create(
                 parameters,
                 normal_map,
                 loc,
@@ -123,7 +166,7 @@ impl Material {
     }
 }
 
-impl MaterialI for Material {
+impl MaterialI for SingleMaterial {
     /// Since this Material encompasses all the Material variants, its concrete BxDF
     /// encompasses all the BxDF variants.
     type ConcreteBxDF = BxDF;
@@ -135,12 +178,12 @@ impl MaterialI for Material {
         lambda: &mut SampledWavelengths,
     ) -> Self::ConcreteBxDF {
         match self {
-            Material::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
-            Material::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
-            Material::Dielectric(m) => BxDF::Dielectric(m.get_bxdf(tex_eval, ctx, lambda)),
-            Material::ThinDielectric(m) => BxDF::ThinDielectric(m.get_bxdf(tex_eval, ctx, lambda)),
-            Material::CoatedDiffuse(m) => BxDF::CoatedDiffuse(m.get_bxdf(tex_eval, ctx, lambda)),
-            Material::CoatedConductor(m) => BxDF::CoatedConductor(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::Dielectric(m) => BxDF::Dielectric(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::ThinDielectric(m) => BxDF::ThinDielectric(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::CoatedDiffuse(m) => BxDF::CoatedDiffuse(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::CoatedConductor(m) => BxDF::CoatedConductor(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -158,56 +201,56 @@ impl MaterialI for Material {
         // Look into it.
         // I want to revisit this for using scratch_buffer anyways...
         match self {
-            Material::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
-            Material::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
-            Material::Dielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
-            Material::ThinDielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
-            Material::CoatedDiffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
-            Material::CoatedConductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::Dielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::ThinDielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::CoatedDiffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::CoatedConductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
     fn can_evaluate_textures<T: TextureEvaluatorI>(&self, tex_eval: &T) -> bool {
         match self {
-            Material::Diffuse(m) => m.can_evaluate_textures(tex_eval),
-            Material::Conductor(m) => m.can_evaluate_textures(tex_eval),
-            Material::Dielectric(m) => m.can_evaluate_textures(tex_eval),
-            Material::ThinDielectric(m) => m.can_evaluate_textures(tex_eval),
-            Material::CoatedDiffuse(m) => m.can_evaluate_textures(tex_eval),
-            Material::CoatedConductor(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::Diffuse(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::Conductor(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::Dielectric(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::ThinDielectric(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::CoatedDiffuse(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::CoatedConductor(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
     fn get_normal_map(&self) -> Option<Arc<Image>> {
         match self {
-            Material::Diffuse(m) => m.get_normal_map(),
-            Material::Conductor(m) => m.get_normal_map(),
-            Material::Dielectric(m) => m.get_normal_map(),
-            Material::ThinDielectric(m) => m.get_normal_map(),
-            Material::CoatedDiffuse(m) => m.get_normal_map(),
-            Material::CoatedConductor(m) => m.get_normal_map(),
+            SingleMaterial::Diffuse(m) => m.get_normal_map(),
+            SingleMaterial::Conductor(m) => m.get_normal_map(),
+            SingleMaterial::Dielectric(m) => m.get_normal_map(),
+            SingleMaterial::ThinDielectric(m) => m.get_normal_map(),
+            SingleMaterial::CoatedDiffuse(m) => m.get_normal_map(),
+            SingleMaterial::CoatedConductor(m) => m.get_normal_map(),
         }
     }
 
     fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
         match self {
-            Material::Diffuse(m) => m.get_displacement(),
-            Material::Conductor(m) => m.get_displacement(),
-            Material::Dielectric(m) => m.get_displacement(),
-            Material::ThinDielectric(m) => m.get_displacement(),
-            Material::CoatedDiffuse(m) => m.get_displacement(),
-            Material::CoatedConductor(m) => m.get_displacement(),
+            SingleMaterial::Diffuse(m) => m.get_displacement(),
+            SingleMaterial::Conductor(m) => m.get_displacement(),
+            SingleMaterial::Dielectric(m) => m.get_displacement(),
+            SingleMaterial::ThinDielectric(m) => m.get_displacement(),
+            SingleMaterial::CoatedDiffuse(m) => m.get_displacement(),
+            SingleMaterial::CoatedConductor(m) => m.get_displacement(),
         }
     }
 
     fn has_subsurface_scattering(&self) -> bool {
         match self {
-            Material::Diffuse(m) => m.has_subsurface_scattering(),
-            Material::Conductor(m) => m.has_subsurface_scattering(),
-            Material::Dielectric(m) => m.has_subsurface_scattering(),
-            Material::ThinDielectric(m) => m.has_subsurface_scattering(),
-            Material::CoatedDiffuse(m) => m.has_subsurface_scattering(),
-            Material::CoatedConductor(m) => m.has_subsurface_scattering(),
+            SingleMaterial::Diffuse(m) => m.has_subsurface_scattering(),
+            SingleMaterial::Conductor(m) => m.has_subsurface_scattering(),
+            SingleMaterial::Dielectric(m) => m.has_subsurface_scattering(),
+            SingleMaterial::ThinDielectric(m) => m.has_subsurface_scattering(),
+            SingleMaterial::CoatedDiffuse(m) => m.has_subsurface_scattering(),
+            SingleMaterial::CoatedConductor(m) => m.has_subsurface_scattering(),
         }
     }
 }
@@ -1250,6 +1293,52 @@ impl MaterialI for CoatedConductorMaterial
     }
 }
 
+#[derive(Debug)]
+pub struct MixMaterial
+{
+    amount: Arc<FloatTexture>,
+    // Material must be boxed to avoid infinite size
+    materials: [Arc<Material>; 2],
+}
+
+impl MixMaterial
+{
+    pub fn create(
+        materials: [Arc<Material>; 2],
+        parameters: &mut TextureParameterDictionary,
+        loc: &FileLoc,
+        textures: &NamedTextures,
+    ) -> MixMaterial
+    {
+        let amount = parameters.get_float_texture("amount", 0.5, textures);
+        
+        MixMaterial{ amount, materials }
+    }
+
+    pub fn choose_material(&self, tex_eval: &UniversalTextureEvaluator, ctx: &MaterialEvalContext, rng: &mut SmallRng) -> Arc<Material>
+    {
+        // A stochastic alpha test
+        let amt = tex_eval.evaluate_float(&self.amount, &ctx.tex_ctx);
+        if amt <= 0.0
+        {
+            return self.materials[0].clone()
+        }
+        else if amt >= 1.0
+        {
+            return self.materials[1].clone()
+        }
+        let u = rng.gen::<Float>();
+        if amt < u
+        {
+            self.materials[0].clone()
+        }
+        else
+        {
+            self.materials[1].clone()
+        }
+    }
+}
+
 pub struct MaterialEvalContext {
     tex_ctx: TextureEvalContext,
     wo: Vector3f,
@@ -1316,4 +1405,114 @@ impl TextureEvaluatorI for UniversalTextureEvaluator {
     ) -> SampledSpectrum {
         tex.evaluate(ctx, lambda)
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct NormalBumpEvalContextShading
+{
+    pub n: Normal3f,
+    pub dpdu: Vector3f,
+    pub dpdv: Vector3f,
+    pub dndu: Normal3f,
+    pub dndv: Normal3f,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct NormalBumpEvalContext
+{
+    pub p: Point3f,
+    pub uv: Point2f,
+    pub n: Normal3f,
+    pub shading: NormalBumpEvalContextShading,
+    pub dudx: Float,
+    pub dudy: Float,
+    pub dvdx: Float,
+    pub dvdy: Float,
+    pub dpdx: Vector3f,
+    pub dpdy: Vector3f,
+    pub face_index: i32,
+}
+
+impl From<&mut SurfaceInteraction> for NormalBumpEvalContext
+{
+    fn from(value: &mut SurfaceInteraction) -> Self {
+        NormalBumpEvalContext {
+            p: value.p(),
+            uv: value.interaction.uv,
+            n: value.shading.n,
+            shading: NormalBumpEvalContextShading {
+                n: value.shading.n,
+                dpdu: value.shading.dpdu,
+                dpdv: value.shading.dpdv,
+                dndu: value.shading.dndu,
+                dndv: value.shading.dndv,
+            },
+            dudx: value.dudx,
+            dudy: value.dudy,
+            dvdx: value.dvdx,
+            dvdy: value.dvdy,
+            dpdx: value.dpdx,
+            dpdy: value.dpdy,
+            face_index: value.face_index,
+        }
+    }
+}
+
+/// Returns dpdu, dpdv
+pub fn normal_map(normal_map: &Image, ctx: &NormalBumpEvalContext) -> (Vector3f, Vector3f)
+{
+    let wrap: WrapMode2D = WrapMode::Repeat.into();
+    let uv = Point2f::new(ctx.uv[0], 1.0 - ctx.uv[1]);
+    let ns = Vector3f::new(
+        2.0 * normal_map.bilerp_channel_wrapped(uv, 0, wrap) - 1.0,
+        2.0 * normal_map.bilerp_channel_wrapped(uv, 1, wrap) - 1.0,
+        2.0 * normal_map.bilerp_channel_wrapped(uv, 2, wrap) - 1.0,
+    );
+    let ns = ns.normalize();
+
+    // Transform tangent-space normal to rendering space
+    let frame = Frame::from_xz(ctx.shading.dpdu.normalize(), ctx.shading.n.into());
+    let ns = frame.from_local_v(&ns);
+
+    // Find dpdu and dpdv that give the shading normal
+    let ulen = ctx.shading.dpdu.length();
+    let vlen = ctx.shading.dpdv.length();
+    let dpdu = ctx.shading.dpdu.gram_schmidt(ns).normalize() * ulen;
+    let dpdv = ns.cross(dpdu).normalize() * vlen;
+    (dpdu, dpdv)
+}
+
+// Returns dpdu, dpdv
+pub fn bump_map(tex_eval: UniversalTextureEvaluator, displacement: Arc<FloatTexture>, ctx: &NormalBumpEvalContext) -> (Vector3f, Vector3f) 
+{
+    // Compute offset positions and evaluate displacement texture
+    let mut shifted_ctx = ctx.clone();
+
+    // Shift shifted_ctx du in the u direction
+    let mut du = 0.5 * (ctx.dudx.abs() + ctx.dudy.abs());
+    if du == 0.0
+    {
+        du = 0.0005;
+    }
+    shifted_ctx.p = ctx.p + du * ctx.shading.dpdu;
+    shifted_ctx.uv = ctx.uv + Vector2f::new(du, 0.0);
+
+    let u_displace = tex_eval.evaluate_float(&displacement, &(&shifted_ctx).into());
+    
+    // Shift shifted_ctx dv in the v direction
+    let mut dv = 0.5 * (ctx.dvdx.abs() + ctx.dvdy.abs());
+    if dv == 0.0
+    {
+        dv = 0.0005;
+    }
+    shifted_ctx.p = ctx.p + dv * ctx.shading.dpdv;
+    shifted_ctx.uv = ctx.uv + Vector2f::new(0.0, dv);
+    let v_displace = tex_eval.evaluate_float(&displacement, &(&shifted_ctx).into());
+    let displace = tex_eval.evaluate_float(&displacement, &ctx.into());
+
+    // Compute bump-mapped differential geometry
+    let dpdu: Vector3f = ctx.shading.dpdu + (u_displace - displace) / du * ctx.shading.n + displace * ctx.shading.dndu;
+    let dpdv: Vector3f = ctx.shading.dpdv + (v_displace - displace) / dv * ctx.shading.n + displace * ctx.shading.dndv;
+
+    (dpdu, dpdv)
 }

@@ -39,6 +39,7 @@ impl FromStr for ParamType {
             "vector2" => ParamType::Vector2,
             "point3" => ParamType::Point3,
             "vector3" => ParamType::Vector3,
+            "normal" => ParamType::Normal3,
             "normal3" => ParamType::Normal3,
             "spectrum" => ParamType::Spectrum,
             "rgb" => ParamType::Rgb,

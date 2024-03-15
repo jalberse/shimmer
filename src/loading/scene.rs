@@ -269,6 +269,8 @@ impl BasicScene {
         }
         self.loading_texture_filenames.insert(filename);
 
+        self.async_spectrum_textures.push((name.to_owned(), texture.clone()));
+
         let render_from_texture = texture.render_from_object;
         // None for the textures, as with float textures.
         let mut text_dict = TextureParameterDictionary::new(texture.base.parameters.clone());
@@ -673,7 +675,7 @@ impl BasicScene {
 
             let mut tex_dict = TextureParameterDictionary::new(material.parameters.clone());
             let m = Arc::new(Material::create(
-                name,
+                &ty,
                 &mut tex_dict,
                 textures,
                 normal_map,
@@ -956,6 +958,7 @@ pub struct CameraSceneEntity {
     // TODO medium: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct TransformedSceneEntity {
     base: SceneEntity,
     // TODO this may need to be an AnimatedTransform
@@ -980,6 +983,7 @@ impl TransformedSceneEntity {
 pub type MediumSceneEntity = TransformedSceneEntity;
 pub type TextureSceneEntity = TransformedSceneEntity;
 
+#[derive(Debug, Clone)]
 pub struct LightSceneEntity {
     base: TransformedSceneEntity,
     _medium: String,

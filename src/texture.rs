@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path, sync::{Arc, Mutex}};
 use spectrum::ConstantSpectrum;
 
 use crate::{
-    color::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, RGB}, file::resolve_filename, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, math::{sqr, INV_2PI, INV_PI}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, spectra::{
+    color::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, RGB}, file::resolve_filename, float::PI_F, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, parser_target::FileLoc}, material::NormalBumpEvalContext, math::{sqr, INV_2PI, INV_PI}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
         spectrum::{self, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, SpectrumI},
@@ -1122,6 +1122,22 @@ impl From<&SurfaceInteraction> for TextureEvalContext {
             dpdy: value.dpdy,
             n: value.interaction.n,
             uv: value.interaction.uv,
+            dudx: value.dudx,
+            dudy: value.dudy,
+            dvdx: value.dvdx,
+            dvdy: value.dvdy,
+        }
+    }
+}
+
+impl From<&NormalBumpEvalContext> for TextureEvalContext {
+    fn from(value: &NormalBumpEvalContext) -> Self {
+        Self {
+            p: value.p,
+            dpdx: value.dpdx,
+            dpdy: value.dpdy,
+            n: value.n,
+            uv: value.uv,
             dudx: value.dudx,
             dudy: value.dudy,
             dvdx: value.dvdx,
