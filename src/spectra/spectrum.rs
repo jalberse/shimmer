@@ -127,6 +127,8 @@ impl Spectrum {
             }
             NamedSpectrum::CuEta => Lazy::force(&super::named_spectrum::CU_ETA).clone(),
             NamedSpectrum::CuK => Lazy::force(&super::named_spectrum::CU_K).clone(),
+            NamedSpectrum::AuEta => Lazy::force(&super::named_spectrum::AU_ETA).clone(),
+            NamedSpectrum::AuK => Lazy::force(&super::named_spectrum::AU_K).clone(),
         }
     }
 
