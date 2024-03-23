@@ -2,7 +2,7 @@ use crate::{
     camera::CameraSample, filter::{Filter, FilterI}, float::{next_float_down, Float, PI_F}, frame::Frame, math::{
         lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4,
     }, options::Options, sampler::SamplerI, vecmath::{
-        vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f, Vector3f
+        vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f, Vector2i, Vector3f
     }
 };
 
@@ -617,6 +617,37 @@ pub fn invert_spherical_rectangle_sample(p_ref: Point3f , s: Point3f, ex: Vector
 pub fn sample_exponential(x: Float, a: Float) -> Float
 {
     a * Float::exp(-a * x)
+}
+
+pub struct PiecewiseLinear2D<const DIMENSION: usize>
+{
+    // Resolution of the discretized density function
+    size: Vector2i,
+    // Size of bilinear patch in the unit square
+    patch_size: Vector2f,
+    inv_patch_size: Vector2f,
+
+    // Resolution of each parameter
+    param_size: Vec<u32>,
+
+    // Stride per parameter in units of sizeof(f32)
+    param_stride: Vec<u32>,
+
+    // Discretization of each paramter domain
+    param_values: Vec<Vec<f32>>,
+
+    // Density values
+    data: Vec<f32>,
+
+    marginal_cdf: Vec<f32>,
+    conditional_cdf: Vec<f32>,
+}
+
+impl<const DIMENSION: usize> PiecewiseLinear2D<DIMENSION>
+{
+    const VecSize: usize = if DIMENSION != 0 { DIMENSION } else { 1 };
+
+    // TODO Implement this.
 }
 
 #[cfg(test)]

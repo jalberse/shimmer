@@ -1699,6 +1699,13 @@ where
     }
 }
 
+struct MeasuredBxDFData
+{
+    wavelengths: Vec<f32>,
+    spectra: PiecewiseLinear2D,
+    
+}
+
 pub struct BSDFSample {
     /// Value of the BSDF f()
     pub f: SampledSpectrum,
