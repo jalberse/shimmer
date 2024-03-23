@@ -46,6 +46,7 @@ pub mod vec2d;
 pub mod vecmath;
 mod mipmap;
 mod tile;
+mod tensor;
 
 // For convenience, re-export.
 pub use float::Float;
