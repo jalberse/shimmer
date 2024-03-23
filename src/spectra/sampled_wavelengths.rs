@@ -71,7 +71,7 @@ impl SampledWavelengths {
     }
 
     /// PDf values are returned in the form of a SampledSpectrum to make it easy to
-    /// ocmpute the value of associated Monte Carlo estimators
+    /// compute the value of associated Monte Carlo estimators
     pub fn pdf(&self) -> SampledSpectrum {
         SampledSpectrum::new(self.pdf)
     }
