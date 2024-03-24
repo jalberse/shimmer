@@ -888,16 +888,19 @@ impl PathIntegrator
             ray = si.intr.spawn_ray_with_differentials(&ray, bs.wi, bs.flags, bs.eta);
 
             // Possibly terminate the path with Russian roulette
-            let rr_beta = beta * eta_scale;
-            if rr_beta.max_component_value() < 1.0 && depth > 1
+            if eta_scale.is_finite()
             {
-                let q = Float::max(0.00, 1.0 - rr_beta.max_component_value());
-                if sampler.get_1d() < q
+                let rr_beta = beta * eta_scale;
+                if rr_beta.max_component_value() < 1.0 && depth > 1
                 {
-                    break;
+                    let q = Float::max(0.00, 1.0 - rr_beta.max_component_value());
+                    if sampler.get_1d() < q
+                    {
+                        break;
+                    }
+                    beta /= 1.0 - q;
+                    debug_assert!(beta.y(lambda).is_finite());
                 }
-                beta /= 1.0 - q;
-                debug_assert!(beta.y(lambda).is_finite());
             }
         }
 

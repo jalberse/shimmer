@@ -564,7 +564,7 @@ impl FilmI for RgbFilm {
         // Optionally clamp sensor RGB value
         // This is principally to avoid firefly effects in monte carlo integration.
         debug_assert!(!rgb.has_nan());
-        let m = Float::max(Float::max(rgb.r, rgb.b), rgb.b);
+        let m = Float::max(Float::max(rgb.r, rgb.g), rgb.b);
         let rgb = if m > self.max_component_value {
             rgb * self.max_component_value / m
         } else {
