@@ -58,7 +58,6 @@ impl RgbColorSpace {
         ]);
         let c = rgb.inverse().expect("Uninvertible!") * w;
 
-        // TODO these matrices are also wrong. Was this fixed with spectra fixes?
         let xyz_from_rgb = rgb * SquareMatrix::<3>::diag([c[0], c[1], c[2]]);
         let rgb_from_xyz = xyz_from_rgb.inverse().expect("Uninvertible!");
 
