@@ -1709,6 +1709,7 @@ impl ParserTarget for BasicSceneBuilder {
         } else {
             assert!(self.push_stack.last().unwrap().0 == 'a' as u8);
         }
+        self.push_stack.pop();
     }
 
     fn attribute(&mut self, target: &str, mut attrib: ParsedParameterVector, loc: FileLoc) {
@@ -1905,6 +1906,8 @@ impl ParserTarget for BasicSceneBuilder {
 
         self.pushed_graphics_states
             .push(self.graphics_state.clone());
+
+        self.push_stack.push(('o' as u8, loc.clone()));
 
         if self.active_instance_definition.is_some() {
             panic!("{} ObjectBegin called inside of instance definition.", loc);
