@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::{
     camera::CameraSample, filter::{Filter, FilterI}, float::{next_float_down, Float, PI_F}, frame::Frame, math::{
         lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4,
@@ -5,6 +7,106 @@ use crate::{
         vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f, Vector3f
     }
 };
+
+pub struct PiecewiseConstant1D
+{
+    func: Vec<Float>,
+    cdf: Vec<Float>,
+    min: Float,
+    max: Float,
+    func_int: Float,
+}
+
+impl PiecewiseConstant1D
+{
+    pub fn new(f: &[Float]) -> PiecewiseConstant1D
+    {
+        Self::new_bounded(f, 0.0, 1.0)
+    }
+
+    pub fn new_bounded(f: &[Float], min: Float, max: Float) -> PiecewiseConstant1D
+    {
+        assert!(max > min);
+
+        let func = f.iter().map(|v| v.abs()).collect_vec();
+
+        // Compute integral of step function at x_i
+        let mut cdf = vec![0.0; func.len()];
+        cdf[0] = 0.0;
+        let n = func.len();
+        for i in 1..=n
+        {
+            cdf[i] = cdf[i - 1] + func[i-1] * (max - min) / n as Float;
+        }
+
+        // Transform step function integral into CDF
+        let func_int = cdf[n];
+        if func_int == 0.0
+        {
+            for i in 1..=n {
+                cdf[i] = i as Float / n as Float;
+            }
+        } else {
+            for i in 1..=n {
+                cdf[i] /= func_int;
+            }
+        }
+
+        PiecewiseConstant1D
+        {
+            func,
+            cdf,
+            min,
+            max,
+            func_int,
+        }
+    }
+
+    pub fn integral(&self) -> Float { self.func_int }
+
+    pub fn size(&self) -> usize { self.func.len() }
+
+    /// Returns (value, pdf, offset)
+    pub fn sample(&self, u: Float) -> (Float, Float, usize) {
+        let offset = (0..self.cdf.len()).tuple_windows().find_position(|(a, b)| self.cdf[*a] <= u && u < self.cdf[*b]);
+        let offset = offset.expect("Expected to find interval for u");
+        let offset = offset.1.0;
+
+        // Compute offset along CDF segment
+        let mut du = u - self.cdf[offset];
+        if self.cdf[offset + 1] - self.cdf[offset] > 0.0 
+        {
+            du /= self.cdf[offset + 1] - self.cdf[offset]
+        }
+
+        // Compute PDF for sampled offset
+        let pdf = if self.func_int > 0.0 {
+            self.func[0] / self.func_int
+        } else {
+            0.0
+        };
+
+        let value = lerp((offset as Float + du) / self.size() as Float, self.min, self.max);
+
+        (value, pdf, offset)
+    }
+
+    pub fn invert(&self, x: Float) -> Option<Float>
+    {
+        // Compute offset to CDF values that bracket x
+        if x < self.min || x > self.max {
+            return None;
+        }
+
+        let c = (x - self.min) / (self.max - self.min) * self.func.len() as Float;
+        let offset: usize = (c as usize).clamp(0, self.func.len() - 1);
+        debug_assert!(offset + 1 < self.cdf.len());
+
+        // Linearly interpolate between adjacent CDF values to find the sample value
+        let delta = c - offset as Float;
+        Some(lerp(delta, self.cdf[offset], self.cdf[offset + 1]))
+    }
+}
 
 // See PBRT v4 2.14
 pub fn balance_heuristic(nf: u8, f_pdf: Float, ng: u8, g_pdf: Float) -> Float {
