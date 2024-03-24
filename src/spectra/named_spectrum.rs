@@ -53,7 +53,7 @@ pub static ILLUM_ACES_D60: Lazy<Arc<Spectrum>> = Lazy::new(|| {
 
 pub static GLASS_BK7_ETA: Lazy<Arc<Spectrum>> = Lazy::new(|| {
     Arc::new(Spectrum::PiecewiseLinear(
-        PiecewiseLinearSpectrum::from_interleaved::<58, 24>(&GLASS_BK7_ETA_SAMPLES, false),
+        PiecewiseLinearSpectrum::from_interleaved::<58, 29>(&GLASS_BK7_ETA_SAMPLES, false),
     ))
 });
 

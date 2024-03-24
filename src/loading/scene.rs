@@ -839,7 +839,6 @@ impl BasicScene {
                     Some(instance_primitives[0].clone()),
                 );
             }
-            todo!()
         }
 
         // Don't need these anymore, we've created them as primitives.
