@@ -502,7 +502,16 @@ impl Image {
                 ),
             PixelFormat::Half => {
                 for i in 0..self.n_channels() {
-                    cv[i] = self.p16[pixel_offset + i].to_f32();
+                    // TODO This is giving us a bad value I suppose.
+                    // But we've used PNG textures before...? Why is this just now
+                    // an issue? The offset is correct, it's just giving basically junk
+                    // data? We used to_f32(), should we have used .into()?
+                    // That's what we used in get_channel_wrapped which is how we evaluated MIPMaps, which was working.
+                    // Okay, wasn't .into() change, but that's also better as it fixes if Float is f64.
+                    // The p16 array itself seems different. So it could be PNG reading code, and maybe
+                    // this specific PNG is configured different so we're reading wrong compared to
+                    // our typical textures. 
+                    cv[i] = self.p16[pixel_offset + i].into();
                 }
             }
             PixelFormat::Float => {
@@ -1250,18 +1259,10 @@ impl Image {
                             let mut idx = 0;
                             for y in 0..info.height {
                                 for x in 0..info.width {
-                                    let r = f16::from_le_bytes(
-                                        img_data[idx..idx + 2].try_into().unwrap(),
-                                    );
-                                    let g = f16::from_le_bytes(
-                                        img_data[idx + 2..idx + 4].try_into().unwrap(),
-                                    );
-                                    let b = f16::from_le_bytes(
-                                        img_data[idx + 4..idx + 6].try_into().unwrap(),
-                                    );
-                                    let a = f16::from_le_bytes(
-                                        img_data[idx + 6..idx + 8].try_into().unwrap(),
-                                    );
+                                    let r: Float = (((img_data[idx] as i32) << 8) + (img_data[idx + 1] as i32)) as Float / 65535.0;
+                                    let g: Float = (((img_data[idx + 2] as i32) << 8) + (img_data[idx + 3] as i32)) as Float / 65535.0;
+                                    let b: Float = (((img_data[idx + 4] as i32) << 8) + (img_data[idx + 5] as i32)) as Float / 65535.0;
+                                    let a: Float = (((img_data[idx + 6] as i32) << 8) + (img_data[idx + 7] as i32)) as Float / 65535.0;
                                     let rgba = [r, g, b, a];
                                     for c in 0..4 {
                                         let cv = encoding.0.to_float_linear(rgba[c].into());
@@ -1286,15 +1287,9 @@ impl Image {
                             let mut idx = 0;
                             for y in 0..info.height {
                                 for x in 0..info.width {
-                                    let r = f16::from_le_bytes(
-                                        img_data[idx..idx + 2].try_into().unwrap(),
-                                    );
-                                    let g = f16::from_le_bytes(
-                                        img_data[idx + 2..idx + 4].try_into().unwrap(),
-                                    );
-                                    let b = f16::from_le_bytes(
-                                        img_data[idx + 4..idx + 6].try_into().unwrap(),
-                                    );
+                                    let r: Float = (((img_data[idx] as i32) << 8) + (img_data[idx + 1] as i32)) as Float / 65535.0;
+                                    let g: Float = (((img_data[idx + 2] as i32) << 8) + (img_data[idx + 3] as i32)) as Float / 65535.0;
+                                    let b: Float = (((img_data[idx + 4] as i32) << 8) + (img_data[idx + 5] as i32)) as Float / 65535.0;
                                     let rgb = [r, g, b];
                                     for c in 0..3 {
                                         let cv = encoding.0.to_float_linear(rgb[c].into());
