@@ -1410,7 +1410,6 @@ impl Image {
         {
             for x in 0..self.resolution[0]
             {
-                // TODO It seems like we're calculating dist wrong.
                 let value = self.get_channels(Point2i::new(x, y)).average();
                 // Assume jacobian term is constant over region
                 let p = domain.lerp(Point2f::new((x as Float + 0.5) / self.resolution[0] as Float,
