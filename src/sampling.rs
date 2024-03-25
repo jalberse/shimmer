@@ -80,7 +80,7 @@ impl PiecewiseConstant1D
 
         // Compute PDF for sampled offset
         let pdf = if self.func_int > 0.0 {
-            self.func[0] / self.func_int
+            self.func[offset] / self.func_int
         } else {
             0.0
         };
