@@ -502,15 +502,6 @@ impl Image {
                 ),
             PixelFormat::Half => {
                 for i in 0..self.n_channels() {
-                    // TODO This is giving us a bad value I suppose.
-                    // But we've used PNG textures before...? Why is this just now
-                    // an issue? The offset is correct, it's just giving basically junk
-                    // data? We used to_f32(), should we have used .into()?
-                    // That's what we used in get_channel_wrapped which is how we evaluated MIPMaps, which was working.
-                    // Okay, wasn't .into() change, but that's also better as it fixes if Float is f64.
-                    // The p16 array itself seems different. So it could be PNG reading code, and maybe
-                    // this specific PNG is configured different so we're reading wrong compared to
-                    // our typical textures. 
                     cv[i] = self.p16[pixel_offset + i].into();
                 }
             }
