@@ -103,6 +103,15 @@ impl RgbColorSpace {
         }
         to.rgb_from_xyz * self.xyz_from_rgb
     }
+
+    pub fn luminance_vector(&self) -> RGB
+    {
+        RGB::new(
+            self.xyz_from_rgb[1][0],
+            self.xyz_from_rgb[1][1],
+            self.xyz_from_rgb[1][2],
+        )
+    }
 }
 
 pub enum NamedColorSpace {

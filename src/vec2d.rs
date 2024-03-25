@@ -6,7 +6,7 @@ pub struct Vec2d<T>
 where
     T: Default + Copy + Clone,
 {
-    data: Vec<T>,
+    pub data: Vec<T>,
     extent: Bounds2i,
 }
 
@@ -46,6 +46,11 @@ where
 
     pub fn width(&self) -> i32 {
         self.extent.max.x - self.extent.min.x
+    }
+
+    pub fn height(&self) -> i32
+    {
+        self.extent.max.y - self.extent.min.y
     }
 
     fn xy(&self, p: Point2i) -> (i32, i32) {

@@ -1,5 +1,6 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{mem, ops::{Add, Div, Mul, Sub}};
 
+use fast_polynomial::{poly_array, polynomials};
 use num::Complex;
 
 use crate::{
@@ -7,7 +8,7 @@ use crate::{
     float::{Float, PI_F},
     interval::Interval,
     square_matrix::{Invertible, SquareMatrix},
-    vecmath::Vector3f,
+    vecmath::{Length, Point2f, Tuple2, Tuple3, Vector3f},
 };
 
 pub const INV_PI: Float = 0.31830988618379067154;
@@ -449,6 +450,94 @@ where
     {
         result
     }
+}
+
+/// Square-sphere mapping function definition
+/// Via source code from Clarberg: Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD
+pub fn equal_area_square_to_sphere(p: Point2f) -> Vector3f
+{
+    assert!(p.x >= 0.0 && p.x <= 1.0 && p.y >= 0.0 && p.y <= 1.0);
+
+    // Transform p to [-1, 1]^2 amd compute abs
+    let u = 2.0 * p.x - 1.0;
+    let v = 2.0 * p.y - 1.0;
+    let up = u.abs();
+    let vp = v.abs();
+
+    // Compute radius r as signed distance from diagonal
+    let signed_distance = 1.0 - (up + vp);
+    let d = signed_distance.abs();
+    let r = 1.0 - d;
+
+    // Compute angle phi for square to sphere mapping
+    let phi = if r == 0.0 { 1.0 } else { vp - up / r + 1.0} * PI_F / 4.0;
+
+    // Find z coordinate for spherical direction
+    let z = Float::copysign(1.0 - sqr(r), signed_distance);
+
+    // Compute cos(phi) and sin(phi) for original quadrant and return the vector
+    let cos_phi = Float::copysign(Float::cos(phi), u);
+    let sin_phi = Float::copysign(Float::sin(phi), v);
+    Vector3f::new(
+        cos_phi * r * safe_sqrt(2.0 - sqr(r)),
+        sin_phi * r * safe_sqrt(2.0 - sqr(r)),
+        z
+    )
+}
+
+// Via source code from Clarberg: Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD
+pub fn equal_area_sphere_to_square(d: Vector3f) -> Point2f
+{
+    debug_assert!(d.length_squared() > 0.999 && d.length_squared() < 1.001);
+
+    let x = d.x.abs();
+    let y = d.y.abs();
+    let z = d.z.abs();
+
+    let r = safe_sqrt(1.0 - z);
+
+    let a = Float::max(x, y);
+    let b = Float::min(x, y);
+    let b = if a == 0.0 { 0.0 } else { b / a };
+
+    // // Polynomial approximation of atan(x)*2/pi, x=b
+    // Coefficients for 6th degree minimax approximation of atan(x)*2/pi,
+    // x=[0,1].
+    let t1 = 0.406758566246788489601959989e-5;
+    let t2 = 0.636226545274016134946890922156;
+    let t3 = 0.61572017898280213493197203466e-2;
+    let t4 = -0.247333733281268944196501420480;
+    let t5 = 0.881770664775316294736387951347e-1;
+    let t6 = 0.419038818029165735901852432784e-1;
+    let t7 = -0.251390972343483509333252996350e-1;
+
+    // TODO Is the order of this okay?
+    let mut phi = poly_array(b, &[t1, t2, t3, t4, t5, t6, t7]);
+
+    if x < y{
+        phi = 1.0 - phi;
+    }
+
+    let mut v = phi * r;
+    let mut u = r - v;
+
+    if d.z < 0.0
+    {
+        // Southern hemisphere, mirror uv
+        mem::swap(&mut u, &mut v);
+        u = 1.0 - u;
+        v = 1.0 - v;
+    }
+
+    // Move uv to the correct quadrant based on the signs
+    u = Float::copysign(u, d.x);
+    v = Float::copysign(v, d.y);
+
+    // Transform from [-1, 1] to [0, 1]
+    Point2f::new(
+        0.5 * (u + 1.0),
+        0.5 * (v + 1.0),
+    )
 }
 
 #[cfg(test)]

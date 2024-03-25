@@ -2,12 +2,13 @@ use itertools::Itertools;
 
 use crate::{
     bounding_box::Bounds2f, camera::CameraSample, filter::{Filter, FilterI}, float::{next_float_down, Float, PI_F}, frame::Frame, math::{
-        lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4,
-    }, options::Options, sampler::SamplerI, vecmath::{
+        find_interval, lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4
+    }, options::Options, sampler::SamplerI, vec2d::Vec2d, vecmath::{
         vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f, Vector3f
     }
 };
 
+#[derive(Debug, Clone)]
 pub struct PiecewiseConstant1D
 {
     func: Vec<Float>,
@@ -31,7 +32,7 @@ impl PiecewiseConstant1D
         let func = f.iter().map(|v| v.abs()).collect_vec();
 
         // Compute integral of step function at x_i
-        let mut cdf = vec![0.0; func.len()];
+        let mut cdf = vec![0.0; func.len() + 1];
         cdf[0] = 0.0;
         let n = func.len();
         for i in 1..=n
@@ -68,9 +69,7 @@ impl PiecewiseConstant1D
 
     /// Returns (value, pdf, offset)
     pub fn sample(&self, u: Float) -> (Float, Float, usize) {
-        let offset = (0..self.cdf.len()).tuple_windows().find_position(|(a, b)| self.cdf[*a] <= u && u < self.cdf[*b]);
-        let offset = offset.expect("Expected to find interval for u");
-        let offset = offset.1.0;
+        let offset = find_interval(self.cdf.len(), |i| self.cdf[i] <= u);
 
         // Compute offset along CDF segment
         let mut du = u - self.cdf[offset];
@@ -108,6 +107,7 @@ impl PiecewiseConstant1D
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PiecewiseConstant2D
 {
     domain: Bounds2f,
@@ -117,6 +117,16 @@ pub struct PiecewiseConstant2D
 
 impl PiecewiseConstant2D
 {
+    pub fn new_from_2d(data: &Vec2d<Float>, domain: Bounds2f) -> PiecewiseConstant2D
+    {
+        PiecewiseConstant2D::new(
+            &data.data,
+            data.width() as usize,
+            data.height() as usize,
+            domain,
+        )
+    }
+
     pub fn new(func: &[Float], nu: usize, nv: usize, domain: Bounds2f) -> PiecewiseConstant2D
     {
         assert_eq!(func.len(), nu * nv);
@@ -124,7 +134,7 @@ impl PiecewiseConstant2D
         for v in 0..nv
         {
             // Compute conditional sampling distribution for v
-            conditional_v.push(PiecewiseConstant1D::new_bounded(&func[v * nu..nu], domain.min[0], domain.max[0]));
+            conditional_v.push(PiecewiseConstant1D::new_bounded(&func[v * nu..(v * nu) + nu], domain.min[0], domain.max[0]));
         }
 
         // Compute marginal sampling distribution

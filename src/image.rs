@@ -1,11 +1,12 @@
 use arrayvec::ArrayVec;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use core::fmt;
 use half::f16;
 use std::{collections::HashMap, fs::File, io::{BufWriter, Write}, ops::{Index, IndexMut}, path::Path, sync::Arc
 };
 
 use crate::{
-    bounding_box::Bounds2i, color::{ColorEncoding, ColorEncodingI, ColorEncodingPtr}, colorspace::RgbColorSpace, float::Float, math::{modulo, windowed_sinc}, square_matrix::SquareMatrix, tile::Tile, vecmath::{Point2f, Point2i, Tuple2}
+    bounding_box::{Bounds2f, Bounds2i}, color::{ColorEncoding, ColorEncodingI, ColorEncodingPtr}, colorspace::RgbColorSpace, float::Float, math::{modulo, windowed_sinc}, square_matrix::SquareMatrix, tile::Tile, vec2d::Vec2d, vecmath::{Point2f, Point2i, Tuple2}
 };
 
 #[cfg(target_endian = "little")]
@@ -484,7 +485,7 @@ impl Image {
     }
 
     pub fn get_channels_wrapped(&self, p: Point2i, wrap_mode: WrapMode2D) -> ImageChannelValues {
-        let mut cv = ImageChannelValues::default();
+        let mut cv = ImageChannelValues::new(self.n_channels(), 0.0);
         let mut p = p;
         if !remap_pixel_coords(&mut p, self.resolution, wrap_mode) {
             return cv;
@@ -576,6 +577,7 @@ impl Image {
                 return None;
             }
         }
+        offset.truncate(requested_channels.len());
         Some(ImageChannelDesc { offset })
     }
 
@@ -1393,6 +1395,35 @@ impl Image {
         buf.flush()?;
 
         Ok(())
+    }
+
+    pub fn get_default_sampling_distribution(&self) -> Vec2d<Float>
+    {
+        self.get_sampling_distribution(|_p| 1.0, &Bounds2f::from_point(Point2f::ONE))
+    }
+
+    pub fn get_sampling_distribution<F>(&self, dx_da: F, domain: &Bounds2f) -> Vec2d<Float>
+    where
+        F: Fn(Point2f) -> Float
+    {
+        let mut dist: Vec2d<Float> = Vec2d::from_bounds(Bounds2i::new(
+            Point2i::ZERO,
+            self.resolution,
+        ));
+        // TODO We'd like to parallelize this.
+        for y in 0..self.resolution[1]
+        {
+            for x in 0..self.resolution[0]
+            {
+                // TODO It seems like we're calculating dist wrong.
+                let value = self.get_channels(Point2i::new(x, y)).average();
+                // Assume jacobian term is constant over region
+                let p = domain.lerp(Point2f::new((x as Float + 0.5) / self.resolution[0] as Float,
+                    (y as Float + 0.5) / self.resolution[1] as Float));
+                dist.set(Point2i::new(x, y), value * dx_da(p))
+            }
+        }
+        dist
     }
 }
 
