@@ -2,38 +2,20 @@
 // and implement them later as needed - but just a PointLight should be sufficient for now
 // to render early test scenes.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 use log::warn;
+use num::Zero;
 
 use crate::{
-    bounding_box::Bounds3f,
-    camera::CameraTransform,
-    colorspace::RgbColorSpace,
-    file::resolve_filename,
-    float::PI_F,
-    image::Image,
-    interaction::{Interaction, SurfaceInteraction},
-    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
-    media::Medium,
-    options::Options,
-    ray::Ray,
-    sampling::{sample_uniform_sphere, uniform_hemisphere_pdf, uniform_sphere_pdf},
-    shape::{Shape, ShapeI, ShapeSampleContext},
-    spectra::{
+    bounding_box::{Bounds2f, Bounds3f}, camera::CameraTransform, color::{self, RGB}, colorspace::RgbColorSpace, file::resolve_filename, float::PI_F, image::{Image, WrapMode}, interaction::{Interaction, SurfaceInteraction}, loading::{paramdict::ParameterDictionary, parser_target::FileLoc}, math::{equal_area_sphere_to_square, equal_area_square_to_sphere, sqr}, media::Medium, options::Options, ray::Ray, sampling::{sample_uniform_sphere, uniform_hemisphere_pdf, uniform_sphere_pdf, PiecewiseConstant2D}, shape::{Shape, ShapeI, ShapeSampleContext}, spectra::{
         sampled_spectrum::SampledSpectrum,
         sampled_wavelengths::SampledWavelengths,
-        spectrum::{spectrum_to_photometric, SpectrumI},
+        spectrum::{spectrum_to_photometric, RgbIlluminantSpectrum, SpectrumI},
         DenselySampledSpectrum, Spectrum,
-    },
-    texture::FloatTexture,
-    transform::{Transform, TransformI},
-    vecmath::{
-        normal::Normal3,
-        point::{Point3, Point3fi},
-        Length, Normal3f, Normalize, Point2f, Point3f, Vector3f,
-    },
-    Float,
+    }, texture::FloatTexture, transform::{InverseTransformI, Transform, TransformI}, vecmath::{
+        normal::Normal3, point::{Point3, Point3fi}, spherical::cos_theta, Length, Normal3f, Normalize, Point2f, Point2i, Point3f, Tuple2, Vector3f
+    }, Float
 };
 
 pub trait LightI {
@@ -104,6 +86,7 @@ pub enum Light {
     Point(PointLight),
     DiffuseAreaLight(DiffuseAreaLight),
     UniformInfinite(UniformInfiniteLight),
+    ImageInfinite(ImageInfinitelight),
 }
 
 impl Light {
@@ -180,7 +163,77 @@ impl Light {
                     ))
                 } else {
                     // Either an image was provided or it's "L" with a portal
-                    todo!("Image infinite lights not yet implemented")
+
+                    let image_and_metadata = if filename.is_empty()
+                    {
+                        todo!("Implement empty filename case")
+                    } else {
+                        let image_and_metadata = Image::read(Path::new(&filename), None);
+
+                        // TODO Check for infinite and NaN pixels and error out
+
+                        image_and_metadata
+                    };
+
+                    let color_space = image_and_metadata.metadata.color_space.expect("Expected color space");
+
+                    let channel_desc = image_and_metadata.image.get_channel_desc(&["R", "G", "B"]);
+                    if channel_desc.is_none()
+                    {
+                        panic!("Infinite image light sources must have RGB channels");
+                    }
+                    let channel_desc = channel_desc.unwrap();
+
+                    // Scale the light spectrum to be equivalent to 1 nit
+                    scale /= spectrum_to_photometric(&color_space.illuminant);
+
+                    if e_v > 0.0 
+                    {
+                        // Upper hemisphere illuminance calc for converting map to physical units
+                        let mut illuminance = 0.0;
+                        let image = &image_and_metadata.image;
+                        let lum = color_space.luminance_vector();
+                        for y in 0..image.resolution().y
+                        {
+                            let v = (y as Float + 0.5) / image.resolution().y as Float;
+                            for x in 0..image.resolution().x
+                            {
+                                let u = (x as Float + 0.5) / image.resolution().x as Float;
+                                let w = equal_area_square_to_sphere(Point2f::new(u,v));
+                                if w.z <= 0.0
+                                {
+                                    continue;
+                                }
+
+                                let values = image.get_channels(Point2i::new(x, y));
+                                for c in 0..3
+                                {
+                                    illuminance += values[c] * lum[c] * cos_theta(w);
+                                }
+                            }
+                        }
+                        illuminance *= 2.0 * PI_F / (image.resolution().x * image.resolution().y) as Float;
+
+                        // Scaling factor is the ratio of the target illuminance and the illuminance of the
+                        // map multiplied by the illuminant spectrum
+                        let k_e = illuminance;
+                        scale *= e_v / k_e;
+                    }
+
+                    let image = image_and_metadata.image.select_channels(&channel_desc);
+
+                    if !portal.is_empty()
+                    {
+                        todo!("Implement portals")
+                    } else {
+                        Light::ImageInfinite(ImageInfinitelight::new(
+                            render_from_light,
+                            Arc::new(image),
+                            color_space,
+                            scale,
+                            &filename
+                        ))
+                    }
                 }
             }
             _ => {
@@ -230,6 +283,8 @@ impl LightI for Light {
             Light::Point(l) => l.phi(lambda),
             Light::DiffuseAreaLight(l) => l.phi(lambda),
             Light::UniformInfinite(l) => l.phi(lambda),
+            Light::ImageInfinite(l) => l.phi(lambda),
+            
         }
     }
 
@@ -238,6 +293,7 @@ impl LightI for Light {
             Light::Point(l) => l.light_type(),
             Light::DiffuseAreaLight(l) => l.light_type(),
             Light::UniformInfinite(l) => l.light_type(),
+            Light::ImageInfinite(l) => l.light_type(),
         }
     }
 
@@ -252,6 +308,7 @@ impl LightI for Light {
             Light::Point(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
             Light::DiffuseAreaLight(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
             Light::UniformInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+            Light::ImageInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf)
         }
     }
 
@@ -260,6 +317,7 @@ impl LightI for Light {
             Light::Point(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
             Light::DiffuseAreaLight(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
             Light::UniformInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
+            Light::ImageInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf)
         }
     }
 
@@ -275,6 +333,8 @@ impl LightI for Light {
             Light::Point(l) => l.l(p, n, uv, w, lambda),
             Light::DiffuseAreaLight(l) => l.l(p, n, uv, w, lambda),
             Light::UniformInfinite(l) => l.l(p, n, uv, w, lambda),
+            Light::ImageInfinite(l) => l.l(p, n, uv, w, lambda),
+            
         }
     }
 
@@ -283,6 +343,7 @@ impl LightI for Light {
             Light::Point(l) => l.le(ray, lambda),
             Light::DiffuseAreaLight(l) => l.le(ray, lambda),
             Light::UniformInfinite(l) => l.le(ray, lambda),
+            Light::ImageInfinite(l) => l.le(ray, lambda),
         }
     }
 
@@ -291,6 +352,8 @@ impl LightI for Light {
             Light::Point(l) => l.preprocess(scene_bounds),
             Light::DiffuseAreaLight(l) => l.preprocess(scene_bounds),
             Light::UniformInfinite(l) => l.preprocess(scene_bounds),
+            Light::ImageInfinite(l) => l.preprocess(scene_bounds),
+            
         }
     }
 }
@@ -736,6 +799,184 @@ impl LightI for UniformInfiniteLight {
         let bounding_sphere = scene_bounds.bounding_sphere();
         self.scene_center = bounding_sphere.center;
         self.scene_radius = bounding_sphere.radius;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ImageInfinitelight
+{
+    base: LightBase,
+    image: Arc<Image>,
+    image_color_space: Arc<RgbColorSpace>,
+    scale: Float,
+    scene_center: Point3f,
+    scene_radius: Float,
+    distribution: PiecewiseConstant2D,
+    compensated_distribution: PiecewiseConstant2D,
+}
+
+impl LightI for ImageInfinitelight
+{
+    fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let mut sum_l = SampledSpectrum::from_const(0.0);
+
+        let width = self.image.resolution().x;
+        let height = self.image.resolution().y;
+        for v in 0..height
+        {
+            for u in 0..width
+            {
+                let mut rgb = RGB::default();
+                for c in  0..3 
+                {
+                    rgb[c] = self.image.get_channel_wrapped(Point2i::new(u,v), c, WrapMode::OctahedralSphere.into());
+                }
+                sum_l += RgbIlluminantSpectrum::new(&self.image_color_space, &rgb.clamp_zero()).sample(lambda);
+            }
+        }
+
+        // Integrating over the sphere, 4pi
+        // Then one more for pi r ^2 for the area of the disk receiving illumination
+        4.0 * PI_F * PI_F * sqr(self.scene_radius) * self.scale * sum_l / (width * height) as Float
+    }
+
+    fn light_type(&self) -> LightType {
+        self.base.light_type
+    }
+
+    fn sample_li(
+        &self,
+        ctx: &LightSampleContext,
+        u: Point2f,
+        lambda: &SampledWavelengths,
+        allow_incomplete_pdf: bool,
+    ) -> Option<LightLiSample> {
+        let (uv, map_pdf, _offset) = if allow_incomplete_pdf
+        {
+            self.compensated_distribution.sample(u)
+        } else {
+            self.distribution.sample(u)
+        };
+        if map_pdf == 0.0 
+        {
+            return None;
+        }
+
+        // Convert infinite light sample point to direction
+        let w_light = equal_area_square_to_sphere(uv);
+        let wi = self.base.render_from_light.apply(w_light);
+
+        // Compute PDF for sampled infinite light direciton
+        let pdf = map_pdf / (4.0 * PI_F);
+
+        // TODO We'll want to include the medium interface here, when we add media.
+        // I also want to rework Interaction ctors.
+        let intr = Interaction::new((ctx.p() + wi * (2.0 * self.scene_radius)).into(),
+            Default::default(), Default::default(), Default::default(), Default::default());
+
+        Some(LightLiSample::new(
+            self.image_le(uv, lambda), wi, pdf, intr))
+    }
+
+    fn pdf_li(&self, ctx: &LightSampleContext, wi: Vector3f, allow_incomplete_pdf: bool) -> Float {
+        let w_light = self.base.render_from_light.apply_inverse(wi);
+        let uv = equal_area_sphere_to_square(w_light);
+        let pdf = if allow_incomplete_pdf
+        {
+            self.compensated_distribution.pdf(uv)
+        } else {
+            self.distribution.pdf(uv)
+        };
+        pdf / (4.0 * PI_F)
+    }
+
+    fn l(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        uv: Point2f,
+        w: Vector3f,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
+        SampledSpectrum::from_const(0.0)
+    }
+
+    fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let w_light = self.base.render_from_light.apply_inverse(ray.d);
+        let uv = equal_area_sphere_to_square(w_light);
+        self.image_le(uv, lambda)
+    }
+
+    fn preprocess(&mut self, scene_bounds: &Bounds3f) {
+        let sphere = scene_bounds.bounding_sphere();
+        self.scene_center = sphere.center;
+        self.scene_radius = sphere.radius;
+    }
+}
+
+impl ImageInfinitelight
+{
+    pub fn new(
+        render_from_light: Transform,
+        image: Arc<Image>,
+        image_color_space: Arc<RgbColorSpace>,
+        scale: Float,
+        filename: &str,
+    ) -> ImageInfinitelight
+    {
+        let base = LightBase{
+            light_type: LightType::Infinite,
+            render_from_light,
+        };
+
+        let channel_desc = image.get_channel_desc(&["R", "G", "B"]);
+        if channel_desc.is_none(){
+            panic!("{} Image used for ImageInfiniteLight doesn't have RGB channels", filename);
+        }
+        let channel_desc = channel_desc.unwrap();
+        assert!(channel_desc.size() == 3);
+        assert!(channel_desc.is_identity());
+        if image.resolution().x != image.resolution().y
+        {
+            panic!("{} Image resolution is non-square; it is unlikely that it is an environment map", filename);
+        }
+
+        let mut d = image.get_default_sampling_distribution();
+        let domain = Bounds2f::new(Point2f::ZERO, Point2f::ONE);
+        let distribution = PiecewiseConstant2D::new_from_2d(&d, domain);
+
+        // Initialize compensated PDF for image infinite area light
+        let average: Float = d.data.iter().sum::<Float>() / d.data.len() as Float;
+        d.data.iter_mut().for_each(|v| *v = Float::max(*v - average, 0.0));
+        if d.data.iter().all(|v| v.is_zero())
+        {
+            d.data.iter_mut().for_each(|v| *v = 1.0 );
+        }
+        let compensated_distribution = PiecewiseConstant2D::new_from_2d(&d, domain);
+
+        // Scene radius and center are found in preprocess()
+        ImageInfinitelight
+        {
+            base,
+            image,
+            image_color_space,
+            scale,
+            scene_center: Default::default(),
+            scene_radius: 0.0,
+            distribution,
+            compensated_distribution,
+        }
+    }
+
+    fn image_le(&self, uv: Point2f, lambda: &SampledWavelengths) -> SampledSpectrum
+    {
+        let mut rgb = RGB::default();
+        for c in 0..3
+        {
+            rgb[c] = self.image.lookup_nearest_channel_wrapped(uv, c, WrapMode::OctahedralSphere.into());
+        }
+        let spec = RgbIlluminantSpectrum::new(&self.image_color_space, &rgb.clamp_zero());
+        self.scale * spec.sample(lambda)
     }
 }
 

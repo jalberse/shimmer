@@ -1,11 +1,12 @@
 use arrayvec::ArrayVec;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use core::fmt;
 use half::f16;
 use std::{collections::HashMap, fs::File, io::{BufWriter, Write}, ops::{Index, IndexMut}, path::Path, sync::Arc
 };
 
 use crate::{
-    bounding_box::Bounds2i, color::{ColorEncoding, ColorEncodingI, ColorEncodingPtr}, colorspace::RgbColorSpace, float::Float, math::{modulo, windowed_sinc}, square_matrix::SquareMatrix, tile::Tile, vecmath::{Point2f, Point2i, Tuple2}
+    bounding_box::{Bounds2f, Bounds2i}, color::{ColorEncoding, ColorEncodingI, ColorEncodingPtr}, colorspace::RgbColorSpace, float::Float, math::{modulo, windowed_sinc}, square_matrix::SquareMatrix, tile::Tile, vec2d::Vec2d, vecmath::{Point2f, Point2i, Tuple2}
 };
 
 #[cfg(target_endian = "little")]
@@ -484,7 +485,7 @@ impl Image {
     }
 
     pub fn get_channels_wrapped(&self, p: Point2i, wrap_mode: WrapMode2D) -> ImageChannelValues {
-        let mut cv = ImageChannelValues::default();
+        let mut cv = ImageChannelValues::new(self.n_channels(), 0.0);
         let mut p = p;
         if !remap_pixel_coords(&mut p, self.resolution, wrap_mode) {
             return cv;
@@ -501,7 +502,7 @@ impl Image {
                 ),
             PixelFormat::Half => {
                 for i in 0..self.n_channels() {
-                    cv[i] = self.p16[pixel_offset + i].to_f32();
+                    cv[i] = self.p16[pixel_offset + i].into();
                 }
             }
             PixelFormat::Float => {
@@ -576,6 +577,7 @@ impl Image {
                 return None;
             }
         }
+        offset.truncate(requested_channels.len());
         Some(ImageChannelDesc { offset })
     }
 
@@ -1248,18 +1250,10 @@ impl Image {
                             let mut idx = 0;
                             for y in 0..info.height {
                                 for x in 0..info.width {
-                                    let r = f16::from_le_bytes(
-                                        img_data[idx..idx + 2].try_into().unwrap(),
-                                    );
-                                    let g = f16::from_le_bytes(
-                                        img_data[idx + 2..idx + 4].try_into().unwrap(),
-                                    );
-                                    let b = f16::from_le_bytes(
-                                        img_data[idx + 4..idx + 6].try_into().unwrap(),
-                                    );
-                                    let a = f16::from_le_bytes(
-                                        img_data[idx + 6..idx + 8].try_into().unwrap(),
-                                    );
+                                    let r: Float = (((img_data[idx] as i32) << 8) + (img_data[idx + 1] as i32)) as Float / 65535.0;
+                                    let g: Float = (((img_data[idx + 2] as i32) << 8) + (img_data[idx + 3] as i32)) as Float / 65535.0;
+                                    let b: Float = (((img_data[idx + 4] as i32) << 8) + (img_data[idx + 5] as i32)) as Float / 65535.0;
+                                    let a: Float = (((img_data[idx + 6] as i32) << 8) + (img_data[idx + 7] as i32)) as Float / 65535.0;
                                     let rgba = [r, g, b, a];
                                     for c in 0..4 {
                                         let cv = encoding.0.to_float_linear(rgba[c].into());
@@ -1284,15 +1278,9 @@ impl Image {
                             let mut idx = 0;
                             for y in 0..info.height {
                                 for x in 0..info.width {
-                                    let r = f16::from_le_bytes(
-                                        img_data[idx..idx + 2].try_into().unwrap(),
-                                    );
-                                    let g = f16::from_le_bytes(
-                                        img_data[idx + 2..idx + 4].try_into().unwrap(),
-                                    );
-                                    let b = f16::from_le_bytes(
-                                        img_data[idx + 4..idx + 6].try_into().unwrap(),
-                                    );
+                                    let r: Float = (((img_data[idx] as i32) << 8) + (img_data[idx + 1] as i32)) as Float / 65535.0;
+                                    let g: Float = (((img_data[idx + 2] as i32) << 8) + (img_data[idx + 3] as i32)) as Float / 65535.0;
+                                    let b: Float = (((img_data[idx + 4] as i32) << 8) + (img_data[idx + 5] as i32)) as Float / 65535.0;
                                     let rgb = [r, g, b];
                                     for c in 0..3 {
                                         let cv = encoding.0.to_float_linear(rgb[c].into());
@@ -1393,6 +1381,34 @@ impl Image {
         buf.flush()?;
 
         Ok(())
+    }
+
+    pub fn get_default_sampling_distribution(&self) -> Vec2d<Float>
+    {
+        self.get_sampling_distribution(|_p| 1.0, &Bounds2f::from_point(Point2f::ONE))
+    }
+
+    pub fn get_sampling_distribution<F>(&self, dx_da: F, domain: &Bounds2f) -> Vec2d<Float>
+    where
+        F: Fn(Point2f) -> Float
+    {
+        let mut dist: Vec2d<Float> = Vec2d::from_bounds(Bounds2i::new(
+            Point2i::ZERO,
+            self.resolution,
+        ));
+        // TODO We'd like to parallelize this.
+        for y in 0..self.resolution[1]
+        {
+            for x in 0..self.resolution[0]
+            {
+                let value = self.get_channels(Point2i::new(x, y)).average();
+                // Assume jacobian term is constant over region
+                let p = domain.lerp(Point2f::new((x as Float + 0.5) / self.resolution[0] as Float,
+                    (y as Float + 0.5) / self.resolution[1] as Float));
+                dist.set(Point2i::new(x, y), value * dx_da(p))
+            }
+        }
+        dist
     }
 }
 

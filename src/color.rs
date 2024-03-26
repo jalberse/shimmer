@@ -203,9 +203,9 @@ impl RGB {
 
     pub fn clamp_zero(self) -> RGB {
         RGB::new(
-            self.r.clamp(0.0, self.r),
-            self.g.clamp(0.0, self.g),
-            self.b.clamp(0.0, self.b),
+            Float::max(0.0, self.r),
+            Float::max(0.0, self.g),
+            Float::max(0.0, self.b),
         )
     }
 }

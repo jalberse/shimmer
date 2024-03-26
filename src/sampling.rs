@@ -1,10 +1,182 @@
+use itertools::Itertools;
+
 use crate::{
-    camera::CameraSample, filter::{Filter, FilterI}, float::{next_float_down, Float, PI_F}, frame::Frame, math::{
-        lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4,
-    }, options::Options, sampler::SamplerI, vecmath::{
+    bounding_box::Bounds2f, camera::CameraSample, filter::{Filter, FilterI}, float::{next_float_down, Float, PI_F}, frame::Frame, math::{
+        find_interval, lerp, safe_sqrt, sqr, DifferenceOfProducts, INV_2PI, INV_4PI, INV_PI, PI_OVER_2, PI_OVER_4
+    }, options::Options, sampler::SamplerI, vec2d::Vec2d, vecmath::{
         vector::Vector3, Length, Normalize, Point2f, Point2i, Point3f, Tuple2, Tuple3, Vector2f, Vector3f
     }
 };
+
+#[derive(Debug, Clone)]
+pub struct PiecewiseConstant1D
+{
+    func: Vec<Float>,
+    cdf: Vec<Float>,
+    min: Float,
+    max: Float,
+    func_int: Float,
+}
+
+impl PiecewiseConstant1D
+{
+    pub fn new(f: &[Float]) -> PiecewiseConstant1D
+    {
+        Self::new_bounded(f, 0.0, 1.0)
+    }
+
+    pub fn new_bounded(f: &[Float], min: Float, max: Float) -> PiecewiseConstant1D
+    {
+        assert!(max > min);
+
+        let func = f.iter().map(|v| v.abs()).collect_vec();
+
+        // Compute integral of step function at x_i
+        let mut cdf = vec![0.0; func.len() + 1];
+        cdf[0] = 0.0;
+        let n = func.len();
+        for i in 1..=n
+        {
+            cdf[i] = cdf[i - 1] + func[i-1] * (max - min) / n as Float;
+        }
+
+        // Transform step function integral into CDF
+        let func_int = cdf[n];
+        if func_int == 0.0
+        {
+            for i in 1..=n {
+                cdf[i] = i as Float / n as Float;
+            }
+        } else {
+            for i in 1..=n {
+                cdf[i] /= func_int;
+            }
+        }
+
+        PiecewiseConstant1D
+        {
+            func,
+            cdf,
+            min,
+            max,
+            func_int,
+        }
+    }
+
+    pub fn integral(&self) -> Float { self.func_int }
+
+    pub fn size(&self) -> usize { self.func.len() }
+
+    /// Returns (value, pdf, offset)
+    pub fn sample(&self, u: Float) -> (Float, Float, usize) {
+        let offset = find_interval(self.cdf.len(), |i| self.cdf[i] <= u);
+
+        // Compute offset along CDF segment
+        let mut du = u - self.cdf[offset];
+        if self.cdf[offset + 1] - self.cdf[offset] > 0.0 
+        {
+            du /= self.cdf[offset + 1] - self.cdf[offset]
+        }
+
+        // Compute PDF for sampled offset
+        let pdf = if self.func_int > 0.0 {
+            self.func[offset] / self.func_int
+        } else {
+            0.0
+        };
+
+        let value = lerp((offset as Float + du) / self.size() as Float, self.min, self.max);
+
+        (value, pdf, offset)
+    }
+
+    pub fn invert(&self, x: Float) -> Option<Float>
+    {
+        // Compute offset to CDF values that bracket x
+        if x < self.min || x > self.max {
+            return None;
+        }
+
+        let c = (x - self.min) / (self.max - self.min) * self.func.len() as Float;
+        let offset: usize = (c as usize).clamp(0, self.func.len() - 1);
+        debug_assert!(offset + 1 < self.cdf.len());
+
+        // Linearly interpolate between adjacent CDF values to find the sample value
+        let delta = c - offset as Float;
+        Some(lerp(delta, self.cdf[offset], self.cdf[offset + 1]))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PiecewiseConstant2D
+{
+    domain: Bounds2f,
+    conditional_v: Vec<PiecewiseConstant1D>,
+    marginal: PiecewiseConstant1D,
+}
+
+impl PiecewiseConstant2D
+{
+    pub fn new_from_2d(data: &Vec2d<Float>, domain: Bounds2f) -> PiecewiseConstant2D
+    {
+        PiecewiseConstant2D::new(
+            &data.data,
+            data.width() as usize,
+            data.height() as usize,
+            domain,
+        )
+    }
+
+    pub fn new(func: &[Float], nu: usize, nv: usize, domain: Bounds2f) -> PiecewiseConstant2D
+    {
+        assert_eq!(func.len(), nu * nv);
+        let mut conditional_v = Vec::with_capacity(nv);
+        for v in 0..nv
+        {
+            // Compute conditional sampling distribution for v
+            conditional_v.push(PiecewiseConstant1D::new_bounded(&func[v * nu..(v * nu) + nu], domain.min[0], domain.max[0]));
+        }
+
+        // Compute marginal sampling distribution
+        let mut marginal_func = Vec::with_capacity(nv);
+        for v in 0..nv
+        {
+            marginal_func.push(conditional_v[v].integral());
+        }
+        let marginal = PiecewiseConstant1D::new_bounded(&marginal_func, domain.min[1], domain.max[1]);
+        PiecewiseConstant2D
+        {
+            domain,
+            conditional_v,
+            marginal,
+        }
+    }
+
+    pub fn integral(&self) -> Float { self.marginal.integral() }
+
+    pub fn domain(&self) -> &Bounds2f { &self.domain }
+
+    pub fn resolution(&self) -> Point2i { Point2i::new(self.conditional_v[0].size() as i32, self.marginal.size() as i32 )}
+
+    /// Returns (sampled value, PDF, offset)
+    pub fn sample(&self, u: Point2f) -> (Point2f, Float, Point2i)
+    {
+        let (d1, pdf1, uv1) = self.marginal.sample(u[1]);
+        let (d0, pdf0, uv0) = self.conditional_v[uv1].sample(u[0]);
+        let value = Point2f::new(d0, d1);
+        let pdf = pdf0 * pdf1;
+        let offset = Point2i::new(uv0 as i32, uv1 as i32);
+        (value, pdf, offset)
+    }
+
+    pub fn pdf(&self, pr: Point2f) -> Float {
+        let p = self.domain.offset(pr);
+
+        let iu = ((p[0] * self.conditional_v[0].size() as Float) as usize).clamp(0, self.conditional_v[0].size() - 1);
+        let iv = ((p[1] * self.marginal.size() as Float) as usize).clamp(0, self.marginal.size() - 1);
+        self.conditional_v[iv].func[iu] / self.marginal.integral()
+    }
+}
 
 // See PBRT v4 2.14
 pub fn balance_heuristic(nf: u8, f_pdf: Float, ng: u8, g_pdf: Float) -> Float {
