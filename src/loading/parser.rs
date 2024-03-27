@@ -170,10 +170,10 @@ pub fn parse_str<T: ParserTarget>(
                 target.area_light_source(ty, params.into(), loc)
             }
             Element::Material { ty, params } => {
-                target.material(ty, params.into(), string_interner, loc)
+                target.material(ty, params.into(), string_interner, loc, options)
             }
             Element::MakeNamedMaterial { name, params } => {
-                target.make_named_material(name, params.into(), string_interner, loc)
+                target.make_named_material(name, params.into(), string_interner, loc, options)
             }
             Element::NamedMaterial { name } => target.named_material(name, loc),
             Element::Texture {

@@ -155,6 +155,7 @@ pub trait ParserTarget {
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: FileLoc,
+        options: &Options,
     );
     fn make_named_material(
         &mut self,
@@ -162,6 +163,7 @@ pub trait ParserTarget {
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: FileLoc,
+        options: &Options,
     );
     fn named_material(&mut self, name: &str, loc: FileLoc);
     fn light_source(

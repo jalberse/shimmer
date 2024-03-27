@@ -144,14 +144,14 @@ impl BasicScene {
         ));
     }
 
-    fn add_named_material(&mut self, name: &str, mut material: SceneEntity) {
-        self.load_normal_map(&mut material.parameters);
+    fn add_named_material(&mut self, name: &str, mut material: SceneEntity, options: &Options) {
+        self.load_normal_map(&mut material.parameters, options);
         self.named_materials.push((name.to_owned(), material));
     }
 
     // Returns the new material index
-    fn add_material(&mut self, mut material: SceneEntity) -> i32 {
-        self.load_normal_map(&mut material.parameters);
+    fn add_material(&mut self, mut material: SceneEntity, options: &Options) -> i32 {
+        self.load_normal_map(&mut material.parameters, options);
         self.materials.push(material);
         (self.materials.len() - 1) as i32
     }
@@ -344,8 +344,8 @@ impl BasicScene {
         // TODO Check for unused textures, lights, etc and warn about them.
     }
 
-    fn load_normal_map(&mut self, parameters: &mut ParameterDictionary) {
-        let normal_map_filename = parameters.get_one_string("normalmap", "");
+    fn load_normal_map(&mut self, parameters: &mut ParameterDictionary, options: &Options) {
+        let normal_map_filename = resolve_filename(options, &parameters.get_one_string("normalmap", ""));
         if normal_map_filename.is_empty() {
             return;
         }
@@ -1218,7 +1218,7 @@ impl BasicSceneBuilder {
     const END_TRANSFORM_BITS: u32 = 1 << 1;
     const ALL_TRANSFORM_BITS: u32 = (1 << MAX_TRANSFORMS) - 1;
 
-    pub fn new(scene: Box<BasicScene>, string_interner: &mut StringInterner) -> BasicSceneBuilder {
+    pub fn new(scene: Box<BasicScene>, string_interner: &mut StringInterner, options: &Options) -> BasicSceneBuilder {
         // TODO Rather than Optional SceneEntities, we need to instantiate them here.
         //   PBRT provides some defaults for their names, I guess...
 
@@ -1297,7 +1297,7 @@ impl BasicSceneBuilder {
             RgbColorSpace::get_named(crate::colorspace::NamedColorSpace::SRGB).clone(),
         );
         let diffuse = SceneEntity::new("diffuse", FileLoc::default(), dict, string_interner);
-        builder.current_material_index = builder.scene.add_material(diffuse);
+        builder.current_material_index = builder.scene.add_material(diffuse, options);
 
         builder
     }
@@ -1810,6 +1810,7 @@ impl ParserTarget for BasicSceneBuilder {
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: FileLoc,
+        options: &Options,
     ) {
         // TODO Verify world
         let dict = ParameterDictionary::new_with_unowned(
@@ -1820,7 +1821,7 @@ impl ParserTarget for BasicSceneBuilder {
 
         self.graphics_state.current_material_index =
             self.scene
-                .add_material(SceneEntity::new(name, loc, dict, string_interner));
+                .add_material(SceneEntity::new(name, loc, dict, string_interner), options);
         self.graphics_state.current_named_material.clear();
     }
 
@@ -1830,6 +1831,7 @@ impl ParserTarget for BasicSceneBuilder {
         params: ParsedParameterVector,
         string_interner: &mut StringInterner,
         loc: FileLoc,
+        options: &Options,
     ) {
         // TODO Normalize name to UTF8
         let dict = ParameterDictionary::new_with_unowned(
@@ -1840,7 +1842,7 @@ impl ParserTarget for BasicSceneBuilder {
 
         if self.named_material_names.insert(name.to_owned()) {
             self.scene
-                .add_named_material(name, SceneEntity::new(name, loc, dict, string_interner));
+                .add_named_material(name, SceneEntity::new(name, loc, dict, string_interner), options);
         } else {
             // TODO defer error instead
             panic!("{} Named material {} redefined.", loc, name);
