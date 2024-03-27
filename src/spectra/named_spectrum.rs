@@ -15,6 +15,7 @@ pub enum NamedSpectrum {
     IllumAcesD60,
     GlassBk7,
     GlassBaf10,
+    GlassF11,
     CuEta,
     CuK,
     AuEta,
@@ -27,6 +28,7 @@ impl NamedSpectrum {
             "StdIllum-D65" => Some(NamedSpectrum::StdIllumD65),
             "illum-acesD60" => Some(NamedSpectrum::IllumAcesD60),
             "glass-BK7" => Some(NamedSpectrum::GlassBk7),
+            "glass-F11" => Some(NamedSpectrum::GlassF11),
             "glass-baf10" => Some(NamedSpectrum::GlassBaf10),
             "metal-Cu-eta" => Some(NamedSpectrum::CuEta),
             "metal-Cu-k" => Some(NamedSpectrum::CuK),
@@ -60,6 +62,12 @@ pub static GLASS_BK7_ETA: Lazy<Arc<Spectrum>> = Lazy::new(|| {
 pub static GLASS_BAF10_ETA: Lazy<Arc<Spectrum>> = Lazy::new(|| {
     Arc::new(Spectrum::PiecewiseLinear(
         PiecewiseLinearSpectrum::from_interleaved::<54, 27>(&GLASS_BAF10_ETA_SAMPLES, false),
+    ))
+});
+
+pub static GLASS_F11_ETA: Lazy<Arc<Spectrum>> = Lazy::new(|| {
+    Arc::new(Spectrum::PiecewiseLinear(
+        PiecewiseLinearSpectrum::from_interleaved::<52, 26>(&GLASS_F11_ETA_SAMPLES, false),
     ))
 });
 
@@ -176,6 +184,19 @@ const GLASS_BK7_ETA_SAMPLES: [Float; 58] = [
     1.5090939781792,
     916.0,
     1.5087426727363,
+];
+
+
+const GLASS_F11_ETA_SAMPLES: [Float; 52] = [
+    370.0, 1.8700216173234, 391.0, 1.8516255860581, 412.0, 1.8374707714715,
+    433.0, 1.8262323798466, 455.0, 1.8170946940119, 476.0, 1.8095242343848,
+    497.0, 1.803155581666,  519.0, 1.7977291183308, 540.0, 1.7930548640505,
+    561.0, 1.7889903663666, 583.0, 1.7854266026774, 604.0, 1.7822786683156,
+    625.0, 1.7794794394722, 646.0, 1.7769751487395, 668.0, 1.7747222267051,
+    689.0, 1.7726850031375, 710.0, 1.770834004936,  732.0, 1.7691446766161,
+    753.0, 1.7675964052635, 774.0, 1.7661717683505, 796.0, 1.764855947008,
+    817.0, 1.7636362637211, 838.0, 1.7625018146862, 859.0, 1.7614431749629,
+    881.0, 1.7604521601554, 902.0, 1.7595216323879
 ];
 
 // Via https://gist.github.com/aforsythe/4df4e5377853df76a5a83a3c001c7eeb
