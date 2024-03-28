@@ -240,7 +240,7 @@ impl ImageTileIntegrator {
 
 impl Integrator for ImageTileIntegrator {
     fn render(&mut self, options: &Options) {
-        let pixel_bounds = self.camera.get_film().pixel_bounds();
+        let pixel_bounds = self.camera.get_film().lock().unwrap().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
 
         let mut wave_start = 0;
@@ -251,17 +251,13 @@ impl Integrator for ImageTileIntegrator {
 
         let scratch_buffer_tl = ThreadLocal::new();
         let sampler_tl = ThreadLocal::new();
+        let film = self.camera.get_film().clone();
         // Render in waves until the samples per pixel limit is reached.
         while wave_start < spp {
-            let film_samples: Box<Vec<Box<Vec<FilmSample>>>> = Box::new(tiles
+            tiles
                 .par_iter()
                 .progress()
-                .map(|tile| -> Box<Vec<FilmSample>> {
-                    let mut samples = Box::new(Vec::with_capacity(
-                        (tile.bounds.width() * tile.bounds.height() * (wave_end - wave_start))
-                            as usize,
-                    ));
-
+                .for_each(|tile| {
                     // Initialize or get thread-local objects.
                     //
                     // Be wary of allocating anything on the scratchbuffer that uses the
@@ -291,7 +287,19 @@ impl Integrator for ImageTileIntegrator {
                                         options,
                                         &mut rng,
                                     );
-                                samples.push(film_sample);
+
+                                // TODO Okay, memory consumption is actually quite bad to collect film samples and process sequentially.
+                                // So we want to write to the film directly here.
+                                // Dead simple soluition is make Film an Arc<Mutex<Film>> and lock it here - what will be the performance impact of that?
+                                // But... that makes the result way too slow. We want unchecked access to the film.
+                                film.lock().unwrap().add_sample(
+                                        &film_sample.p_film,
+                                        &film_sample.l,
+                                        &film_sample.lambda,
+                                        &film_sample.visible_surface,
+                                        film_sample.weight,
+                                    );
+
                                 // Note that this does not call drop() on anything allocated in
                                 // the scratch buffer. If we allocate anything on the heap, we gotta clean
                                 // that ourselves. This is where memory leaks can happen!
@@ -299,21 +307,7 @@ impl Integrator for ImageTileIntegrator {
                             }
                         }
                     }
-                    samples
-                })
-                .collect());
-            film_samples.into_iter().for_each(|vec| {
-                vec.into_iter().for_each(|s|
-                {
-                    self.camera.get_film().add_sample(
-                        &s.p_film,
-                        &s.l,
-                        &s.lambda,
-                        &s.visible_surface,
-                        s.weight,
-                    )
-                })
-            });
+                });
 
             wave_start = wave_end;
             wave_end = i32::min(spp, wave_end + next_wave_size);
@@ -325,7 +319,7 @@ impl Integrator for ImageTileIntegrator {
                 let mut metadata = ImageMetadata::default();
                 // TODO populate metadata here!
                 self.camera
-                    .get_film()
+                    .get_film().lock().unwrap()
                     .write_image(&mut metadata, 1.0 / wave_start as Float)
                     .unwrap();
             }
@@ -353,11 +347,10 @@ impl ImageTileIntegrator
         } else {
             sampler.get_1d()
         };
-        let mut lambda = camera.get_film_const().sample_wavelengths(lu);
+        let mut lambda = camera.get_film_const().lock().unwrap().sample_wavelengths(lu);
 
         // Initialize camera_sample for the current sample
-        let filter = camera.get_film_const().get_filter();
-        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
+        let camera_sample = get_camera_sample(sampler, p_pixel, camera.get_film_const().lock().unwrap().get_filter(), options);
 
         let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
 
