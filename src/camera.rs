@@ -3,26 +3,14 @@
 // TODO circular camera (maybe, low priority)
 // TODO place Camera types into a Camera enum that impl CameraI (typical pattern).
 
+use std::sync::{Arc, Mutex};
+
 use log::warn;
 
 use crate::{
-    bounding_box::Bounds2f,
-    film::{Film, FilmI},
-    filter::FilterI,
-    frame::Frame,
-    image::ImageMetadata,
-    loading::{paramdict::ParameterDictionary, parser_target::FileLoc},
-    math::{lerp, radians},
-    media::Medium,
-    options::{Options, RenderingCoordinateSystem},
-    ray::{AuxiliaryRays, Ray, RayDifferential, RayI},
-    sampling::sample_uniform_disk_concentric,
-    spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths},
-    transform::{InverseTransformI, InverseTransformRayI, Transform, TransformI, TransformRayI},
-    vecmath::{
+    bounding_box::Bounds2f, film::{Film, FilmI}, filter::FilterI, frame::Frame, image::ImageMetadata, loading::{paramdict::ParameterDictionary, parser_target::FileLoc}, math::{lerp, radians}, media::Medium, options::{Options, RenderingCoordinateSystem}, ray::{AuxiliaryRays, Ray, RayDifferential, RayI}, sampling::sample_uniform_disk_concentric, spectra::{sampled_spectrum::SampledSpectrum, sampled_wavelengths::SampledWavelengths}, transform::{InverseTransformI, InverseTransformRayI, Transform, TransformI, TransformRayI}, vecmath::{
         normal::Normal3, Length, Normal3f, Normalize, Point2f, Point3f, Tuple2, Tuple3, Vector3f
-    },
-    Float,
+    }, Float
 };
 
 /// Interface that all different kinds of cameras must implement.
@@ -40,9 +28,9 @@ pub trait CameraI {
         lambda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential>;
 
-    fn get_film(&mut self) -> &mut Film;
+    fn get_film(&mut self) -> &mut Arc<Film>;
 
-    fn get_film_const(&self) -> &Film;
+    fn get_film_const(&self) -> &Arc<Film>;
 
     /// Maps a uniform random sample u [0, 1) to a time when the camera shutter is open.
     fn sample_time(&self, u: Float) -> Float;
@@ -74,7 +62,7 @@ impl Camera {
         parameters: &mut ParameterDictionary,
         medium: Option<Medium>,
         camera_transform: CameraTransform,
-        film: Film,
+        film: Arc<Film>,
         options: &Options,
         loc: &FileLoc,
     ) -> Camera {
@@ -123,14 +111,14 @@ impl CameraI for Camera {
         }
     }
 
-    fn get_film(&mut self) -> &mut Film {
+    fn get_film(&mut self) -> &mut Arc<Film> {
         match self {
             Camera::Orthographic(c) => c.get_film(),
             Camera::Perspective(c) => c.get_film(),
         }
     }
 
-    fn get_film_const(&self) -> &Film {
+    fn get_film_const(&self) -> &Arc<Film> {
         match self {
             Camera::Orthographic(c) => c.get_film_const(),
             Camera::Perspective(c) => c.get_film_const(),
@@ -181,7 +169,7 @@ struct CameraBase {
     shutter_open: Float,
     /// The time of the shutter closing
     shutter_close: Float,
-    film: Film,
+    film: Arc<Film>,
     /// The scattering medium that the camera lies in, if any.
     medium: Option<Medium>,
     min_pos_differential_x: Vector3f,
@@ -191,7 +179,7 @@ struct CameraBase {
 }
 
 impl CameraBase {
-    pub fn get_film(&self) -> &Film {
+    pub fn get_film(&self) -> &Arc<Film> {
         &self.film
     }
 
@@ -632,9 +620,11 @@ impl ProjectiveCameraBase {
             -screen_window.max.y,
             0.0,
         ));
+        let x = camera_base.film.full_resolution().x as Float;
+        let y = camera_base.film.full_resolution().y as Float;
         let raster_from_ndc = Transform::scale(
-            camera_base.film.full_resolution().x as Float,
-            -camera_base.film.full_resolution().y as Float,
+            x,
+            -y,
             1.0,
         );
         let raster_from_screen = raster_from_ndc * ndc_from_screen;
@@ -675,7 +665,7 @@ impl OrthographicCamera {
     pub fn create(
         parameters: &mut ParameterDictionary,
         camera_transform: CameraTransform,
-        film: Film,
+        film: Arc<Film>,
         medium: Option<Medium>,
         options: &Options,
         loc: &FileLoc,
@@ -685,10 +675,11 @@ impl OrthographicCamera {
 
         let lens_radius = parameters.get_one_float("lensradius", 0.0);
         let focal_distance = parameters.get_one_float("focaldistance", 1e6);
+        let x = camera_base_paramters.film.full_resolution().x as Float;
+        let y = camera_base_paramters.film.full_resolution().y as Float;
         let frame = parameters.get_one_float(
             "frameaspectratio",
-            camera_base_paramters.film.full_resolution().x as Float
-                / camera_base_paramters.film.full_resolution().y as Float,
+            x / y,
         );
 
         let mut screen = if frame > 1.0 {
@@ -800,11 +791,11 @@ impl CameraI for OrthographicCamera {
         Some(CameraRayDifferential::new(rd))
     }
 
-    fn get_film(&mut self) -> &mut Film {
+    fn get_film(&mut self) -> &mut Arc<Film>{
         &mut self.projective_base.camera_base.film
     }
 
-    fn get_film_const(&self) -> &Film {
+    fn get_film_const(&self) -> &Arc<Film>{
         &self.projective_base.camera_base.film
     }
 
@@ -848,7 +839,7 @@ impl PerspectiveCamera {
     pub fn create(
         parameters: &mut ParameterDictionary,
         camera_transform: CameraTransform,
-        film: Film,
+        film: Arc<Film>,
         medium: Option<Medium>,
         options: &Options,
         loc: &FileLoc,
@@ -858,10 +849,11 @@ impl PerspectiveCamera {
 
         let lens_radius = parameters.get_one_float("lensradius", 0.0);
         let focal_distance = parameters.get_one_float("focaldistance", 1e6);
+        let x = camera_base_paramters.film.full_resolution().x as Float;
+        let y = camera_base_paramters.film.full_resolution().y as Float;
         let frame = parameters.get_one_float(
             "frameaspectratio",
-            camera_base_paramters.film.full_resolution().x as Float
-                / camera_base_paramters.film.full_resolution().y as Float,
+            x / y,
         );
         let mut screen = if frame > 1.0 {
             Bounds2f::new(Point2f::new(-frame, -1.0), Point2f::new(frame, 1.0))
@@ -1086,11 +1078,11 @@ impl CameraI for PerspectiveCamera {
         ))
     }
 
-    fn get_film(&mut self) -> &mut Film {
+    fn get_film(&mut self) -> &mut Arc<Film> {
         &mut self.projective_base.camera_base.film
     }
 
-    fn get_film_const(&self) -> &Film {
+    fn get_film_const(&self) -> &Arc<Film> {
         self.projective_base.camera_base.get_film()
     }
 
@@ -1125,14 +1117,14 @@ pub struct CameraBaseParameters {
     pub camera_transform: CameraTransform,
     pub shutter_open: Float,
     pub shutter_close: Float,
-    pub film: Film,
+    pub film: Arc<Film>,
     pub medium: Option<Medium>,
 }
 
 impl CameraBaseParameters {
     pub fn new(
         camera_transform: CameraTransform,
-        film: Film,
+        film: Arc<Film>,
         medium: Option<Medium>,
         parameters: &mut ParameterDictionary,
         loc: &FileLoc,

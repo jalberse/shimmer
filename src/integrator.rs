@@ -251,17 +251,13 @@ impl Integrator for ImageTileIntegrator {
 
         let scratch_buffer_tl = ThreadLocal::new();
         let sampler_tl = ThreadLocal::new();
+        let mut film = self.camera.get_film().clone();
         // Render in waves until the samples per pixel limit is reached.
         while wave_start < spp {
-            let film_samples: Box<Vec<Box<Vec<FilmSample>>>> = Box::new(tiles
+            tiles
                 .par_iter()
                 .progress()
-                .map(|tile| -> Box<Vec<FilmSample>> {
-                    let mut samples = Box::new(Vec::with_capacity(
-                        (tile.bounds.width() * tile.bounds.height() * (wave_end - wave_start))
-                            as usize,
-                    ));
-
+                .for_each(|tile| {
                     // Initialize or get thread-local objects.
                     //
                     // Be wary of allocating anything on the scratchbuffer that uses the
@@ -291,7 +287,28 @@ impl Integrator for ImageTileIntegrator {
                                         options,
                                         &mut rng,
                                     );
-                                samples.push(film_sample);
+
+                                // Add the sample to the film.
+                                // unsafe: While multiple threads reference this film, the sample
+                                // other threads should not be modifying the portion of the film's
+                                // data that this thread is modifying, because each thread handles its
+                                // own tile.
+                                // The typical alternative would be to wrap the Film in a mutex and lock it,
+                                // but this slows down the program as we wait on locks (x3 in one test).
+                                // Another alternative would be to accumulate film samples and process them
+                                // sequentially after joining threads. That was the original approach used,
+                                // but that required more memory, which again slowed down rendering too much
+                                // for large resolutions.
+                                unsafe {
+                                    Arc::get_mut_unchecked(&mut film.clone()).add_sample(
+                                        &film_sample.p_film,
+                                        &film_sample.l,
+                                        &film_sample.lambda,
+                                        &film_sample.visible_surface,
+                                        film_sample.weight,
+                                    );
+                                }
+                                    
                                 // Note that this does not call drop() on anything allocated in
                                 // the scratch buffer. If we allocate anything on the heap, we gotta clean
                                 // that ourselves. This is where memory leaks can happen!
@@ -299,21 +316,7 @@ impl Integrator for ImageTileIntegrator {
                             }
                         }
                     }
-                    samples
-                })
-                .collect());
-            film_samples.into_iter().for_each(|vec| {
-                vec.into_iter().for_each(|s|
-                {
-                    self.camera.get_film().add_sample(
-                        &s.p_film,
-                        &s.l,
-                        &s.lambda,
-                        &s.visible_surface,
-                        s.weight,
-                    )
-                })
-            });
+                });
 
             wave_start = wave_end;
             wave_end = i32::min(spp, wave_end + next_wave_size);
@@ -356,8 +359,7 @@ impl ImageTileIntegrator
         let mut lambda = camera.get_film_const().sample_wavelengths(lu);
 
         // Initialize camera_sample for the current sample
-        let filter = camera.get_film_const().get_filter();
-        let camera_sample = get_camera_sample(sampler, p_pixel, filter, options);
+        let camera_sample = get_camera_sample(sampler, p_pixel, camera.get_film_const().get_filter(), options);
 
         let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
 
