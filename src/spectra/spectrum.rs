@@ -132,6 +132,8 @@ impl Spectrum {
             NamedSpectrum::AuK => Lazy::force(&super::named_spectrum::AU_K).clone(),
             NamedSpectrum::AgEta => Lazy::force(&super::named_spectrum::AG_ETA).clone(),
             NamedSpectrum::AgK => Lazy::force(&super::named_spectrum::AG_K).clone(),
+            NamedSpectrum::AlEta => Lazy::force(&super::named_spectrum::AL_ETA).clone(),
+            NamedSpectrum::AlK => Lazy::force(&super::named_spectrum::AL_K).clone(),
         }
     }
 
