@@ -138,7 +138,7 @@ impl BasicScene {
             &mut camera.base.parameters,
             None,
             camera.camera_transform,
-            Arc::new(Mutex::new(self.film.as_ref().unwrap().clone())),
+            Arc::new(self.film.as_ref().unwrap().clone()),
             options,
             &mut camera.base.loc,
         ));
