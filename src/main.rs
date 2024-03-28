@@ -169,7 +169,7 @@ fn main() {
 
     // let file = fs::read_to_string(cli.scene_file).unwrap();
     let scene = Box::new(BasicScene::default());
-    let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner);
+    let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner, &options);
     parser::parse_files(
         &[&cli.scene_file],
         &mut scene_builder,

@@ -122,6 +122,7 @@ impl Spectrum {
                 Lazy::force(&super::named_spectrum::ILLUM_ACES_D60).clone()
             }
             NamedSpectrum::GlassBk7 => Lazy::force(&super::named_spectrum::GLASS_BK7_ETA).clone(),
+            NamedSpectrum::GlassF11 => Lazy::force(&super::named_spectrum::GLASS_F11_ETA).clone(),
             NamedSpectrum::GlassBaf10 => {
                 Lazy::force(&super::named_spectrum::GLASS_BAF10_ETA).clone()
             }
@@ -129,6 +130,8 @@ impl Spectrum {
             NamedSpectrum::CuK => Lazy::force(&super::named_spectrum::CU_K).clone(),
             NamedSpectrum::AuEta => Lazy::force(&super::named_spectrum::AU_ETA).clone(),
             NamedSpectrum::AuK => Lazy::force(&super::named_spectrum::AU_K).clone(),
+            NamedSpectrum::AgEta => Lazy::force(&super::named_spectrum::AG_ETA).clone(),
+            NamedSpectrum::AgK => Lazy::force(&super::named_spectrum::AG_K).clone(),
         }
     }
 

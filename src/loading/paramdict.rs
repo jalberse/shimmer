@@ -1,6 +1,8 @@
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
+use itertools::Itertools;
 use log::warn;
+use shell_words::quote;
 
 use crate::{
     color::RGB,
@@ -301,14 +303,51 @@ impl<'a> From<Param<'a>> for ParsedParameter {
             ValueType::Unknown
         };
 
-        for v in value.value.split_ascii_whitespace() {
-            if is_quoted_string(v) {
+        // Split the values by whitespace, but keep quoted strings together.
+        // e.g. "15 14 12" => vector of ["15", "14", "12"]
+        // e.g. ""myString" "string with spaces" "another"" => vector of ["myString", "string with spaces", "another"]
+        let mut split_values = Vec::new();
+        let mut quoted_sequence = Vec::new();
+        for v in value.value.split_ascii_whitespace()
+        {
+            if v.starts_with("\"") && v.ends_with("\"")
+            {
+                // A quoted string all by itself, add it
+                split_values.push(v.to_owned());
+            }
+            else if v.starts_with("\"")
+            {
+                // The start of a quoted sequence
+                quoted_sequence.push(v);
+            }
+            else if v.ends_with("\"")
+            {
+                // The end of a quoted sequence
+                quoted_sequence.push(v);
+                let merged_quoted_string = quoted_sequence.join(" ");
+                split_values.push(merged_quoted_string);
+                quoted_sequence.clear();
+            }
+            else if !quoted_sequence.is_empty()
+            {
+                // This is in the middle of a quoted sequence
+                // (i.e. we encounterd a quote open and haven't closed it yet)
+                quoted_sequence.push(v);
+            }
+            else {
+                // This is just a non-quoted string that's not part of a quoted sequence.
+                split_values.push(v.to_owned());
+            }
+        }
+
+        for v in split_values.into_iter() {
+            if is_quoted_string(v.as_str()) {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::String,
                     ValueType::String => {}
                     _ => panic!("Parameter {} has mixed types", name),
                 }
-                param.add_string(dequote_string(v).to_owned());
+                param.add_string(dequote_string(v.as_str()).to_owned());
             } else if v.starts_with('t') && v == "true" {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::Boolean,
