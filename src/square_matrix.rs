@@ -16,8 +16,6 @@ pub trait Determinant {
     fn determinant(&self) -> Float;
 }
 
-// PAPERDOC - PBRTv4 must implement ==, <, !=.
-//   In Rust, you can often derive a trait like so instead. Easier.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct SquareMatrix<const N: usize> {
     pub m: [[Float; N]; N],
@@ -44,9 +42,6 @@ impl<const N: usize> SquareMatrix<N> {
 
     /// Sets the diagonal of the matrix to the provided values with other values 0.
     pub fn diag(vals: [Float; N]) -> Self {
-        // PAPERDOC - Rust const generics allow this nice method of passing values in,
-        // where PBRTv4 uses variable length parameter lists.
-        // I think this is also possible in C++, though.
         let mut m: [[Float; N]; N] = [[0.0; N]; N];
         for i in 0..N {
             m[i][i] = vals[i];
@@ -271,9 +266,6 @@ impl_op_ex!(
     }
 );
 
-// PAPERDOC - In PBRTv4/C++, this would typically be done via function
-// overloading for the different values of N. That doesn't allow us to e.g.
-// constrain a generic on Determinant.
 impl Determinant for SquareMatrix<1> {
     fn determinant(&self) -> Float {
         self[0][0]

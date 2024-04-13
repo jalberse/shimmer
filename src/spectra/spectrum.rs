@@ -48,11 +48,6 @@ pub enum Spectrum {
 }
 
 impl SpectrumI for Spectrum {
-    // PAPERDOC - this will be a great example against PBRTv4's call with TaggedPointer
-    // to achieve static dispatch. If this is too verbose for someone's taste, then
-    // there are crates like enum_dispatch which could generate this automatically from
-    // the SpectrumI trait.
-
     /// Gets the value of the spectral distribution at wavelength lambda
     fn get(&self, lambda: Float) -> Float {
         match self {
@@ -191,8 +186,6 @@ impl DenselySampledSpectrum {
         lambda_min: i32,
         lambda_max: i32,
     ) -> DenselySampledSpectrum {
-        // PAPERDOC This is a fun area where idiomatic rust code (map -> collect) is arguably cleaner
-        // than similar C++ code (allowing e.g. const correctness). Of course, C++ can accomplish similar.
         let values: Vec<Float> = (lambda_min..=lambda_max)
             .map(|lambda: i32| spectrum.get(lambda as Float))
             .collect();
@@ -277,12 +270,6 @@ impl SpectrumI for DenselySampledSpectrum {
     }
 
     fn max_value(&self) -> Float {
-        // PAPERDOC This is a vector of Floats and we must find the maximum.
-        // But what about NaN? In C++, this is a very easy case to miss.
-        // In Rust, the compiler makes you handle NaN or else it won't compile.
-        // e.g. using values.iter().max() will complain that f32 does not satisfy
-        // the Ord constraint (due to NaN). We can instead fold() and clearly handle the
-        // NaN case, with a panic!() in this case.
         let max = self.values.iter().fold(Float::NAN, |a, &b| a.max(b));
         if max.is_nan() {
             panic!("Empty or NaN-filled Densely Sampled Spectrum!")

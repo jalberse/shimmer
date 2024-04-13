@@ -13,8 +13,6 @@ pub fn reflect(wo: Vector3f, n: Normal3f) -> Vector3f {
     -wo + 2.0 * wo.dot_normal(n) * Vector3f::from(n)
 }
 
-// PAPERDOC - Easy example of where Option is useful, compared to returning a boolean.
-// Option ensures both cases are handled, where callers might ignore the boolean.
 /// Returns (wt, etap) where wt is the refracted direction and etap is the adjusted relative IOR.
 /// wi: Incident direction
 /// n: Surface normal in same hemisphere as wi

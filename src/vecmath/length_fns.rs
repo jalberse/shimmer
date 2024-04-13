@@ -17,8 +17,6 @@ where
     V: Tuple3<T>,
     T: TupleElement,
 {
-    // PAPERDOC - PBRTv4 has a discussion on page 88 about an odd usage of std::sqrt().
-    // We see here that Rust's trait system obviates the issue.
     length_squared3(v).sqrt()
 }
 

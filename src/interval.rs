@@ -24,9 +24,6 @@ use crate::{
 //  I don't think that we rely on ordering of any interval points or vectors (that's mostly important
 //  in bounding boxes, I think), so for now I am okay with this bug existing until I go back
 //  and rework the vector math types to make a little more sense at some point.
-// PAPERDOC - This could be seen as a negative of Rust, in that you're "fighting the compiler"
-//  on a lot of stuff. Conversely, it actually is ensuring all of this is though through
-//  (or at least explicit).
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct Interval {
     low: Float,

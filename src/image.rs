@@ -214,13 +214,6 @@ pub struct ImageAndMetadata {
     pub metadata: ImageMetadata,
 }
 
-// PAPERDOC - PBRT rolls its own `InlinedVector` class for a vector that can grow up to N in size.
-// In Rust, it's trivial for me to find the arrayvec crate and add it to my project.
-// Obviously libraries exist for C++, but they tend to be more tedious to add to the project -
-// I think that people often roll their own if there's not something in boost, unless it's truly a large
-// library/dependency. This can lead to more bugs and less time doing useful development.
-// I have no data to back this up. This is vibes only for now.
-
 pub struct ImageChannelDesc {
     offset: ArrayVec<i32, 4>,
 }
@@ -900,7 +893,7 @@ impl Image {
             },
             PixelFormat::Half => 
             {
-                // PAPERDOC: Useful for obviating interprocedural conflicts - pass a reference to self to the closure.
+                // We pass a reference to th closure to avoid interprocedural conflicts.
                 self.for_extent(
                     extent,
                     WrapMode::Clamp.into(),

@@ -36,12 +36,6 @@ use crate::{
 };
 
 pub trait FilmI {
-    // PAPERDOC - can likely discuss this.
-    // TODO - PBRT correctly assumes that multiple threads won't call add_sample() concurrently
-    // with the same p_film location, so I think it plays loose with mutual exclusion in implementation.
-    // We won't have that because we need to prove to the compiler that access will be OK.
-    // I don't have the full architecture in my head yet so I'm not sure how we'll do this differently;
-    // possibly with data structures independent per thread that are then collected later?
     fn add_sample(
         &mut self,
         p_film: &Point2i,

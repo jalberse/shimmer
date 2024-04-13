@@ -294,7 +294,6 @@ pub fn safe_sqrt(x: Float) -> Float {
 /// Accurate summation, dot product and polynomial evaluation in complex
 /// floating point arithmetic, Graillat and Menissier-Morain.
 pub fn inner_product(xs: &[Float], ys: &[Float]) -> CompensatedFloat {
-    // PAPERDOC this is arguable a more elegant solution with slices than variadic parameters.
     debug_assert!(xs.len() == ys.len());
     if xs.len() == 1 {
         // Base case

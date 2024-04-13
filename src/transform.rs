@@ -77,14 +77,6 @@ impl Transform {
             }
         };
 
-        // PAPERDOC - It might be idiomatic in Rust to store the inverse in Option here,
-        // rather than populate with NaN as PBRTv4 does. This would ensure the programmer
-        // must check for non-invertible, rather than let it poison anything.
-        // However, then each transform would take an additional byte of memory to store
-        // the discriminator. Maybe this is a case of premature optimization, but I'll elect
-        // to also store NaN in the inverse if the matrix was non-invertible instead.
-        // This should hopefully be quite self-contained and any NaN poisoning would be
-        // extremely obvious, so we'll accept it.
         Transform { m, m_inv }
     }
 
@@ -234,10 +226,6 @@ impl Transform {
     /// both from and to should be normalized.
     pub fn rotate_from_to(from: &Vector3f, to: &Vector3f) -> Transform {
         // Compute intermediate vector for vector reflection
-        // PAPERDOC - Example of where Rust being expression-based
-        // allows for easy const correctness where PBRTv4 does not allow const.
-        // In C++, a common pattern to maintain const correctness here is to define and call a lambda inline,
-        // which is overcomplicated syntax.
         let ref1: Vector3f = if from.x.abs() < 0.72 && to.x.abs() < 0.72 {
             Vector3f::X
         } else if from.y.abs() < 0.72 && to.y.abs() < 0.72 {
@@ -249,10 +237,6 @@ impl Transform {
         let u = ref1 - from;
         let v = ref1 - to;
 
-        // PAPERDOC - I encountered a bug here because it was unclear in PBRTv4's source
-        // that `r` is initialized to the identity matrix, as C++'s implicit default-initialization
-        // doesn't make the behavior immediately apparent. Rust is designed to be more  explicit,
-        // which can avoid such bugs.
         let mut r = SquareMatrix::<4>::identity();
         for i in 0..3 {
             for j in 0..3 {

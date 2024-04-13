@@ -34,7 +34,7 @@ pub trait ParameterType: sealed::Sealed {
 
 // Parameter types; a ParameterDictionary can hold these types of parameters.
 // This should all implement ParameterType.
-// PAPERDOC This is an interesting construct; if Rust could support enum values as const generics,
+// This is an interesting construct; if Rust could support enum values as const generics,
 // we could implement some ParameterType<const T: ParameterTypeEnum>, and define the associated types
 // and constants in the impl block for each variant. That's similar to what PBRT does, loosely,
 // within C++'s system, though that requires some templating which is less clean.

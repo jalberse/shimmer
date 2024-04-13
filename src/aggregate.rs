@@ -429,11 +429,6 @@ impl BvhAggregate {
     ) -> usize {
         let node = node.expect("flatten_bvh should be called with a valid root");
 
-        // PAPERDOC This is an interesting comparison to the PBRT implementation.
-        // The borrow checker would complain if we held both the linear_node as a mutable reference to
-        // the element in the array, and passed the array recrusively. We instead need to initialize
-        // the linear node locally, and set it after we're returned ownership of the vector.
-
         let linear_node_bounds = node.bounds;
 
         let node_offset = *offset;

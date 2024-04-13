@@ -193,13 +193,6 @@ impl MaterialI for SingleMaterial {
         ctx: &MaterialEvalContext,
         lambda: &mut SampledWavelengths,
     ) -> BSDF {
-        // PAPERDOC - PBRT's implementation of GetBsdf() involves some semi-arcane C++.
-        // We avoid arcane-looking code, but aren't at parity - if we just implement bsdf for each
-        // variant, then we violate DRY. Ideally we'd like to move the implementation we have for Diffuse
-        // (which should be the same except for the types involved) into the MaterialI trait as a default implementation.
-        // But I'm not sure if we can use an associated *variant*, not just an associated type?
-        // Look into it.
-        // I want to revisit this for using scratch_buffer anyways...
         match self {
             SingleMaterial::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
             SingleMaterial::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
@@ -618,8 +611,6 @@ impl MaterialI for DielectricMaterial {
         // same path. If the IOR varies, then they will go in different directions - this is dispersion.
         // So, if we do not have a constant IOR, terminate secondary wavelengths in lambda.
         // In the aggregate over many sampled rays, we will be able to see the effects of dispersion.
-        // This is a nice feature of spectral rendering that is more difficult to achieve than
-        // through RGB rendering. PAPERDOC.
         let is_eta_constant = match self.eta.as_ref() {
             Spectrum::Constant(_) => true,
             _ => false,

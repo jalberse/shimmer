@@ -171,10 +171,6 @@ impl HasNan for RayDifferential {
     }
 }
 
-// PAPERDOC PBRTv4 uses a flag which we must remember to check (hasDifferentials).
-// The inclusion of the Option type is just as efficient (we store a flag anyways)
-// but is easier for the programmer.
-
 /// We wrap the differential information in a single struct so that
 /// we can guarantee all or none are present in RayDifferential via a single Option member.
 #[derive(Debug, Copy, Clone)]

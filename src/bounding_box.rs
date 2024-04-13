@@ -132,12 +132,10 @@ where
     }
 
     pub fn distance(&self, p: &P) -> P::ElementType {
-        // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
         P::ElementType::sqrt(self.distance_squared(p))
     }
 
     pub fn expand(self, delta: P::ElementType) -> Self {
-        // PAPERDOC this is an example of a better model than pass-by-mut-reference that PBRTv4 uses (page 97)
         let vec = V::new(delta, delta);
 
         let min = self.min - vec;
@@ -313,9 +311,6 @@ where
         let min = Tuple3::max(self.min, other.min);
         let max = Tuple3::min(self.max, other.max);
 
-        // PAPERDOC - PBRTv4 has an IsEmpty() function that must be called after this
-        // function in case the bounds don't intersect; but that intent is not clear
-        // from the function signature. An Option result type is more clear.
         if min.x() >= max.x() || min.y() >= max.y() || min.z() >= max.z() {
             return None;
         }
@@ -374,12 +369,10 @@ where
     }
 
     pub fn distance(&self, p: &P) -> P::ElementType {
-        // PAPERDOC - We don't require an intermediate type here as PBRTv4 does.
         P::ElementType::sqrt(self.distance_squared(p))
     }
 
     pub fn expand(self, delta: P::ElementType) -> Self {
-        // PAPERDOC this is an example of a better model than pass-by-mut-reference that PBRTv4 uses (page 97)
         let vec = V::new(delta, delta, delta);
 
         let min = self.min - vec;
