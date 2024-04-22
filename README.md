@@ -1,7 +1,7 @@
 
 # Shimmer
 
-Shimmer is a physically based rendering system based on the ray tracing algorithm. It is currently under development.
+Shimmer is a physically based, spectral rendering system based on the ray tracing algorithm. It is currently under development.
 
 ## Example Scenes
 
