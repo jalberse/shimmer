@@ -70,21 +70,6 @@ impl IntegratorBase {
     pub fn new(aggregate: Arc<Primitive>, mut lights: Arc<Vec<Arc<Light>>>) -> IntegratorBase {
         let scene_bounds = aggregate.bounds();
 
-        // TODO Is there a better alternative here that does not require get_mut_unchecked?
-        // That is nightly-only and unsafe, and I'd like to avoid that if possible.
-        // But this is a quick way forward, so we'll do it for now.
-        // The alternatives could include:
-        // 1. Use Vec<Arc<Mutex<Light>>>, but we don't ever need the Mutex after this (read-only after this write),
-        //    and I don't want to pay that cost. We could try to convert afterwards, but that's awkward, touching a lot of structs.
-        // 2. Defer wrapping the Lights in Arc until after this pre-processing step. But that would mean only
-        //    keeping one copy - maybe we keep one copy of the area_light Arc in the aggregate (we could use get_mut() for that,
-        //    which is stable), and then keep one copy of all other lights (point, infinite) in the lights vector.
-        //    Plus the lights in the light sampler.
-        //    Then we can pre-process those while there's only one reference, and then copy the lights from the aggregate
-        //    into the lights list (thereby making the second reference for those).
-        // We almost certainly want to take advantage of interior mutability for this
-        //  instead; https://ricardomartins.cc/2016/06/08/interior-mutability
-
         // Unsafe get_mut_unchecked() - If any other Arc or Weak pointers to the same allocation exist,
         // then they must not be dereferenced or have active borrows for the duration.
         // That should be okay here, because the only other references to this same light
